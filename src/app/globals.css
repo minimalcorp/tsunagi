@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+
+:root {
+  /* Light Mode - Claude.ai inspired */
+  --background: #f4f3ee;
+  --foreground: #2b2b2b;
+  --card-background: #ffffff;
+  --hover-background: #eaeaea;
+  --border: #d0d0d0;
+  --muted: #8c8c8c;
+  --subtle: #6c6c6c;
+
+  /* Accents */
+  --primary: #c15f3c;
+  --primary-hover: #a34c2f;
+  --secondary: #3574d9;
+  --selection: #3574d9;
+  --success: #62a357;
+  --warning: #c7ad3a;
+  --error: #d95450;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark Mode - Darcula inspired */
+    --background: #2b2b2b;
+    --foreground: #a9b7c6;
+    --card-background: #3c3f41;
+    --hover-background: #313335;
+    --border: #323232;
+    --muted: #808080;
+    --subtle: #9aa7b0;
+
+    /* Accents */
+    --primary: #c15f3c;
+    --primary-hover: #a34c2f;
+    --secondary: #5394ec;
+    --selection: #214283;
+    --success: #62a357;
+    --warning: #c7ad3a;
+    --error: #b94640;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card-background);
+  --color-hover: var(--hover-background);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-selection: var(--selection);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}

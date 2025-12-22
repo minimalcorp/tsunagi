@@ -1,0 +1,4 @@
+{
+  "enabledMcpjsonServers": ["serena", "github"],
+  "enableAllProjectMcpServers": true
+}

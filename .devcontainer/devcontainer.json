@@ -1,0 +1,86 @@
+{
+  "name": "tsunagi",
+  "dockerComposeFile": "./compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "runServices": ["app"],
+
+  // VS Code設定の上書き
+  "customizations": {
+    "vscode": {
+      // 拡張機能
+      "extensions": [
+        // 必須
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "styled-components.vscode-styled-components",
+
+        // Claude Code & GitHub
+        "anthropic.claude-code",
+        "github.vscode-github-actions",
+
+        // 推奨
+        "yoavbls.pretty-ts-errors",
+        "eamodio.gitlens",
+        "mikestead.dotenv",
+        "ezforo.copy-relative-path-and-line-numbers"
+      ],
+
+      // ワークスペース設定
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "editor.tabSize": 2,
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "typescript.enablePromptUseWorkspaceTsdk": true,
+
+        // ESLint
+        "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+
+        // ターミナル
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "/bin/bash"
+          }
+        }
+      }
+    }
+  },
+
+  // コンテナ内環境変数
+  "containerEnv": {
+    "NODE_ENV": "development"
+  },
+
+  // ホスト環境変数の引き継ぎ
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/workspace/node_modules/.bin:/home/node/.local/bin",
+    "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}",
+    "GITHUB_PAT": "${localEnv:GITHUB_PAT}"
+  },
+
+  // マウント設定
+  "mounts": [
+    // SSH認証（一時的な場所にマウント）
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/tmp/host-ssh,type=bind,readonly",
+    // Git設定
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/node/.gitconfig,type=bind,readonly"
+  ],
+
+  // 機能の追加
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
+    }
+  },
+
+  // コンテナ作成後の初期化コマンド
+  "postCreateCommand": "npm run prepare",
+
+  // コンテナユーザー
+  "remoteUser": "node"
+}
