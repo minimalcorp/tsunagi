@@ -29,6 +29,10 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}"
       }
+    },
+    "penpot": {
+      "type": "http",
+      "url": "http://localhost:4401/mcp"
     }
   }
 }
