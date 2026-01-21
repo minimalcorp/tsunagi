@@ -654,7 +654,7 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
 
 #### Worktree Path
 
-タスクのworktreeパスを表示：`~/tsunagi/{owner}/{repo}/{branch}`
+タスクのworktreeパスを表示：`~/.tsunagi/workspaces/{owner}/{repo}/{branch}`
 
 #### ボタン
 
@@ -769,7 +769,7 @@ function TaskActions({ task, onDelete }: Props) {
 
 // Helper function
 function getWorktreePath(task: Task): string {
-  const baseDir = process.env.NEXT_PUBLIC_TSUNAGI_WORKTREE_BASE || '~/tsunagi';
+  const baseDir = process.env.NEXT_PUBLIC_TSUNAGI_WORKTREE_BASE || '~/.tsunagi/workspaces';
   return `${baseDir}/${task.owner}/${task.repo}/${task.branch}`;
 }
 ```
