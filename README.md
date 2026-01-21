@@ -1,57 +1,224 @@
 # Tsunagi (繋ぎ)
 
-AI時代の統合開発マネージャー - Claude と人間のシームレスな協働開発を実現
+複数GitHub組織のプロジェクトをローカルで統合管理し、Claude Agent SDKを介してAI駆動開発を可視化・制御するWeb UIツール
+
+---
 
 ## 概要
 
-Tsunagiは、ソフトウェア開発の全フロー（要件定義 → 開発 → QA → リリース）を一元管理し、Claude（AI）と人間のタスク分担を可視化・自動化するローカル開発ツールです。
+**Tsunagi**は、複数のGitHub organizationのプロジェクトを1つのUIで統合管理し、Claude AIによる開発タスクを効率化するローカルツールです。
 
-## 特徴
+### 主要機能
 
-- **🔄 完全なフロー管理**: 要件定義からPR作成まで、開発プロセス全体をトラッキング
-- **🤖 AI/人間の協働可視化**: 誰が何を担当しているか、進捗状況を一目で把握
-- **📦 Dev Container統合**: ClaudeがDev Container内で直接作業、環境分離を実現
-- **⚡ 並行タスク処理**: 複数タスクの同時進行で開発効率を最大化
-- **🏠 ローカル完結**: Webサービス不要、ローカルマシンで完全に動作
+- **Kanban Board** - タスクを視覚的に管理、優先度順ソート
+- **Git Worktree統合** - `owner/repo/branch` ディレクトリモデルで効率的なブランチ管理
+- **Claude統合** - タスクごとのAI実行・ログ可視化、工数・優先度の自動見積もり
+- **環境変数管理** - グローバル/Owner/Repo単位で設定、自動読み込み
+- **リソース削除** - Owner/Repo/Branch単位で完全削除
+- **リアルタイム更新** - WebSocketによる常時同期（Phase 5）
 
-## 開発フロー
+---
 
+## クイックスタート
+
+### 前提条件
+
+- Node.js 20+
+- Git
+- Claude API Key
+
+### セットアップ
+
+```bash
+# 依存関係のインストール
+npm install
+
+# 環境変数の設定
+echo "ANTHROPIC_API_KEY=your-api-key" > .env.local
+
+# 開発サーバーの起動
+npm run dev
 ```
-1. 要件定義 → Claude がプラン作成
-2. 開発     → Claude が Dev Container 内で実装
-3. QA       → 人間が動作確認、必要に応じて差し戻し
-4. リリース → 自動で git push & PR 作成
-```
 
-各フェーズで Claude ⇄ 人間 のバトンタッチが明確に管理されます。
+ブラウザで `http://localhost:3000` を開きます。
+
+---
+
+## ドキュメント
+
+詳細な仕様は `docs/` ディレクトリを参照してください：
+
+### 主要ドキュメント
+
+- **[docs/overview.md](./docs/overview.md)** - プロジェクト概要
+- **[docs/design-principles.md](./docs/design-principles.md)** - UI/UX設計原則（必読）
+- **[docs/architecture.md](./docs/architecture.md)** - 技術スタック・アーキテクチャ
+- **[docs/implementation-plan.md](./docs/implementation-plan.md)** - 実装計画
+
+### データ・API
+
+- **[docs/data-models.md](./docs/data-models.md)** - データモデル定義
+- **[docs/local-data.md](./docs/local-data.md)** - ローカルデータ管理
+- **[docs/api-specification.md](./docs/api-specification.md)** - REST API仕様
+
+### 機能詳細
+
+- **[docs/git-worktree.md](./docs/git-worktree.md)** - Git Worktree管理
+- **[docs/environment-variables.md](./docs/environment-variables.md)** - 環境変数管理
+- **[docs/pages/kanban.md](./docs/pages/kanban.md)** - Kanban UI仕様
+- **[docs/pages/task-detail.md](./docs/pages/task-detail.md)** - タスク詳細UI仕様
+
+---
 
 ## 使い方
 
-```bash
-# タスク作成
-tsunagi task create "ログイン機能の実装"
+### 1. リポジトリの登録
 
-# 開発開始（Claude に引き渡し）
-tsunagi dev start
+設定からGitHubリポジトリを登録します。
 
-# QA（動作確認後）
-tsunagi qa approve  # または tsunagi qa reject
-
-# リリース
-tsunagi release
+```json
+{
+  "owner": "minimalcorp",
+  "repo": "tsunagi",
+  "cloneUrl": "https://github.com/minimalcorp/tsunagi.git"
+}
 ```
 
-## ユースケース
+### 2. タスクの作成
 
-- **ソロ開発者**: AI を活用した高速開発
-- **小規模チーム**: タスク管理と AI 協働の統合
-- **プロトタイピング**: 要件から実装までの迅速な反復
+Kanban boardで「+ Add Task」をクリックし、タスク情報を入力します。
 
-## Requirements
+- タイトル
+- 説明
+- owner/repo/branch
 
-- Docker（Dev Container用）
-- Claude API access
-- Git
+タスク作成時に、Git worktreeが自動で `~/.tsunagi/workspaces/owner/repo/branch/` に作成されます。
+
+### 3. Claudeの実行
+
+タスクカードをクリックして詳細を表示し、Claudeへの指示を入力して実行します。
+
+実行ログがリアルタイムで表示されます。
+
+### 4. 進捗管理
+
+タスクをドラッグ&ドロップでステータス変更（Todo/In Progress/Done）できます。
+
+フィルターで特定のowner/repoのタスクに絞り込めます。
+
+---
+
+## ディレクトリ構造
+
+### プロジェクト
+
+```
+tsunagi/
+├── docs/              # ドキュメント
+├── src/
+│   ├── app/            # Next.js App Router
+│   │   ├── api/        # API Routes
+│   │   └── page.tsx    # メインページ
+│   ├── components/     # Reactコンポーネント
+│   └── lib/            # ビジネスロジック
+└── package.json
+```
+
+### ローカルデータ
+
+```
+~/.tsunagi/                      # 設定・データ
+├── state/                       # 永続化データ
+│   ├── tasks.json               # タスクデータ
+│   ├── repos.json               # リポジトリ設定
+│   └── sessions.json            # Claude Sessions
+└── workspaces/                  # Git Worktrees
+    └── {owner}/                 # GitHub organization/user
+        └── {repo}/              # リポジトリ名
+            ├── .git/            # bare repository
+            ├── main/            # mainブランチのworktree
+            └── {branch}/        # 各ブランチのworktree
+```
+
+---
+
+## 開発
+
+### スクリプト
+
+```bash
+# 開発サーバー
+npm run dev
+
+# ビルド
+npm run build
+
+# 本番サーバー
+npm run start
+
+# Lint
+npm run lint
+
+# フォーマット
+npm run format
+```
+
+### コミット
+
+```bash
+# フォーマット + Lint実行（自動）
+git commit -m "message"
+```
+
+---
+
+## 技術スタック
+
+- **Next.js 16** - フレームワーク
+- **React 19** - UI
+- **TypeScript** - 型安全性
+- **Tailwind CSS v4** - スタイリング
+- **Ark UI** - ヘッドレスUIコンポーネント
+- **Monaco Editor** - コードエディタ
+- **@hello-pangea/dnd** - ドラッグ&ドロップ
+- **simple-git** - Git操作
+- **@anthropic-ai/sdk** - Claude統合
+
+---
+
+## ロードマップ
+
+### MVP（v1.0）
+
+- [x] データモデル・基盤
+- [x] Kanban UI
+- [x] Git Worktree管理
+- [x] Claude Agent基本統合
+- [x] 環境変数管理（グローバル/Owner/Repo）
+- [x] リソース削除（Owner/Repo/Branch強制削除）
+- [x] Claude自動見積もり（工数・優先度判定）
+- [x] 優先度順ソート
+
+### 将来実装（v2.0+）
+
+- [ ] WebSocketリアルタイム更新
+- [ ] 外部ツール統合（Terminal/VSCode）
+- [ ] 実行計画の自動生成
+- [ ] 複数Claudeの並列実行
+- [ ] タスク依存関係の管理
+- [ ] GitHub PR自動作成
+
+---
+
+## コントリビューション
+
+現在準備中です。
+
+---
+
+## ライセンス
+
+TBD
 
 ---
 
