@@ -182,7 +182,7 @@ git commit -m "message"
 - **Monaco Editor** - コードエディタ
 - **@hello-pangea/dnd** - ドラッグ&ドロップ
 - **simple-git** - Git操作
-- **@anthropic-ai/sdk** - Claude統合
+- **@anthropic-ai/agent-sdk** - Claude Agent SDK統合
 
 ---
 
@@ -193,7 +193,7 @@ git commit -m "message"
 - [x] データモデル・基盤
 - [x] Kanban UI
 - [x] Git Worktree管理
-- [x] Claude Agent基本統合
+- [x] Claude Agent SDK統合
 - [x] 環境変数管理（グローバル/Owner/Repo）
 - [x] リソース削除（Owner/Repo/Branch強制削除）
 - [x] Claude自動見積もり（工数・優先度判定）
@@ -201,7 +201,7 @@ git commit -m "message"
 
 ### 将来実装（v2.0+）
 
-- [ ] WebSocketリアルタイム更新
+- [ ] WebSocketリアルタイム更新（REST API + WebSocketデュアル実装、フォールバック対応）
 - [ ] 外部ツール統合（Terminal/VSCode）
 - [ ] 実行計画の自動生成
 - [ ] 複数Claudeの並列実行
