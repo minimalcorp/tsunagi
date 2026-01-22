@@ -1,115 +1,63 @@
-// ノード設定（settings.json）
-export interface NodeSettings {
-  model: string;
-  arcs: string[];
-  position?: { x: number; y: number };
+// Task型
+export interface Task {
+  id: string; // UUID
+  title: string;
+  description: string;
+  status: 'backlog' | 'planning' | 'tasking' | 'coding' | 'reviewing' | 'done';
+  owner: string;
+  repo: string;
+  branch: string;
+  worktreeStatus: 'pending' | 'created' | 'error';
+  claudeState: 'idle' | 'running';
+  plan?: string;
+  effort?: number;
+  order?: number;
+  deleted: boolean;
+  deletedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// セッション状態（session.json）
-export interface NodeSession {
-  session_id?: string;
-  status: 'idle' | 'active';
-  last_active?: string;
-  total_cost_usd: number;
-}
-
-// ノード全体の情報
-export interface Node {
+// ClaudeSession型
+export interface ClaudeSession {
   id: string;
-  model: string;
-  arcs: string[];
-  status: 'idle' | 'active';
-  session_id?: string;
-  total_cost_usd: number;
-  position?: { x: number; y: number };
+  taskId: string;
+  status: 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+  logs: LogEntry[];
+  startedAt: string;
+  completedAt?: string;
+  updatedAt: string;
 }
 
-// Claude CLI の出力
-export interface ClaudeResponse {
-  type: string;
-  subtype: string;
-  session_id: string;
-  result: string;
-  total_cost_usd: number;
-  is_error: boolean;
-}
-
-// ログエントリ
+// LogEntry型
 export interface LogEntry {
-  time: string;
-  nodeId: string;
-  direction: 'send' | 'receive';
-  content: string;
-  eventType?: StreamEventType;
-}
-
-// SSEストリームイベントタイプ
-export type StreamEventType =
-  | 'status'
-  | 'message'
-  | 'tool_use'
-  | 'tool_result'
-  | 'complete'
-  | 'error';
-
-// SSEストリームイベント
-export interface StreamEvent {
-  type: StreamEventType;
-  nodeId: string;
-  data: {
-    content?: string;
-    toolName?: string;
-    targetNodeId?: string;
-    cost?: number;
-    sessionId?: string;
-  };
   timestamp: string;
-}
-
-// Claude CLI stream-json イベント
-export interface ClaudeStreamEvent {
-  type: string;
-  subtype?: string;
-  session_id?: string;
-  message?: {
-    role: string;
-    content: string | { type: string; text: string }; // contentはオブジェクトの場合もある
-  };
-  tool_use?: {
-    name: string;
-    input: Record<string, unknown>;
-  };
-  tool_result?: {
-    content: string | { type: string; text: string }; // contentはオブジェクトの場合もある
-  };
-  result?: string;
-  total_cost_usd?: number;
-  is_error?: boolean;
-}
-
-// メッセージ送信リクエスト
-export interface MessageRequest {
+  type: 'tool_use' | 'file_operation' | 'thinking' | 'message' | 'error';
   content: string;
-  target?: string;
+  metadata?: Record<string, unknown>;
 }
 
-// メッセージ送信レスポンス
-export interface MessageResponse {
-  response: string;
-  session_id?: string;
-  cost: number;
+// Repository型
+export interface Repository {
+  id: string;
+  owner: string;
+  repo: string;
+  cloneUrl: string;
+  authToken?: string;
+  createdAt: string;
 }
 
-// システムプロンプト構築用オプション
-export interface PromptOptions {
-  currentNodeId: string;
-  baseRole: string;
-  connectedNodes: Array<{ nodeId: string; role: string }>;
-  apiEndpoint: string;
+// EnvironmentVariable型
+export interface EnvironmentVariable {
+  key: string;
+  value: string;
+  scope: 'global' | 'owner' | 'repo';
+  owner?: string;
+  repo?: string;
 }
 
-// 接続ノード情報
-export interface ConnectedNodeInfo {
-  nodeId: string;
-  role: string;
+// API Request/Response型
+export interface ApiResponse<T> {
+  data: T;
+  error?: string;
 }

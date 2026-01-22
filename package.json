@@ -13,12 +13,20 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.15",
+    "@anthropic-ai/sdk": "^0.71.2",
     "@headlessui/react": "^2.2.9",
+    "@hello-pangea/dnd": "^18.0.1",
     "@heroicons/react": "^2.2.0",
+    "@monaco-editor/react": "^4.7.0",
     "@xyflow/react": "^12.10.0",
     "next": "16.0.10",
     "react": "19.2.1",
-    "react-dom": "19.2.1"
+    "react-dom": "19.2.1",
+    "react-markdown": "^10.1.0",
+    "simple-git": "^3.30.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
