@@ -662,6 +662,7 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
 #### Worktree Path
 
 タスクのworktreeパスを表示：`~/.tsunagi/workspaces/{owner}/{repo}/{branch}`
+(bare repository: `~/.tsunagi/workspaces/{owner}/{repo}/.bare`)
 
 #### ボタン
 

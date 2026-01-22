@@ -57,7 +57,7 @@ GET /api/owners
             "owner": "minimalcorp",
             "repo": "tsunagi",
             "cloneUrl": "https://github.com/minimalcorp/tsunagi.git",
-            "bareRepoPath": "/Users/username/tsunagi/minimalcorp/tsunagi",
+            "bareRepoPath": "/Users/username/.tsunagi/workspaces/minimalcorp/tsunagi/.bare",
             "createdAt": "2024-01-15T09:00:00.000Z"
           }
         ]
@@ -132,7 +132,7 @@ GET /api/owners/minimalcorp/repositories/tsunagi
       "owner": "minimalcorp",
       "repo": "tsunagi",
       "cloneUrl": "https://github.com/minimalcorp/tsunagi.git",
-      "bareRepoPath": "/Users/username/tsunagi/minimalcorp/tsunagi",
+      "bareRepoPath": "/Users/username/.tsunagi/workspaces/minimalcorp/tsunagi/.bare",
       "createdAt": "2024-01-15T09:00:00.000Z"
     }
   }
@@ -287,7 +287,7 @@ Gitリポジトリをクローンして登録します。
 1. **Git URLパース**: URLからowner/repoを抽出
    - HTTPS: `https://github.com/{owner}/{repo}.git`
    - SSH: `git@github.com:{owner}/{repo}.git`
-2. **Bare repositoryパス決定**: `~/.tsunagi/workspaces/{owner}/{repo}`
+2. **Bare repositoryパス決定**: `~/.tsunagi/workspaces/{owner}/{repo}/.bare`
 3. **Bare clone実行**: `git clone --bare {gitUrl} {bareRepoPath}`
 4. **Repository登録**: `repos.json` にowner/repo/cloneUrl等を保存
 5. `repository:created` イベントを全クライアントに送信

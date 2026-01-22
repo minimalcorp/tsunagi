@@ -18,7 +18,7 @@ export function normalizeBranchName(branch: string): string {
 
 // bare repositoryのパスを取得
 function getBareRepoPath(owner: string, repo: string): string {
-  return path.join(WORKSPACES_ROOT, owner, repo);
+  return path.join(WORKSPACES_ROOT, owner, repo, '.bare');
 }
 
 // worktreeのパスを取得

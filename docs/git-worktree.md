@@ -37,7 +37,7 @@ cd feature-auth/   # feature/authブランチ
 ~/.tsunagi/workspaces/
 └── {owner}/
     └── {repo}/
-        ├── .git/           # bare repository
+        ├── .bare/          # bare repository
         ├── main/           # mainブランチのworktree
         └── feat-auth/      # feature/authブランチのworktree
 ```
@@ -46,7 +46,7 @@ cd feature-auth/   # feature/authブランチ
 
 ```
 ~/.tsunagi/workspaces/minimalcorp/tsunagi/
-├── .git/                   # bare repository
+├── .bare/                  # bare repository
 ├── main/                   # mainブランチ
 │   ├── .git               # worktreeへのリンク
 │   ├── src/
@@ -73,8 +73,8 @@ mkdir -p ~/tsunagi
 mkdir -p ~/.tsunagi/workspaces/{owner}
 
 # bare repositoryとしてクローン
-cd ~/.tsunagi/workspaces/{owner}
-git clone --bare {clone-url} {repo}
+cd ~/.tsunagi/workspaces/{owner}/{repo}
+git clone --bare {clone-url} .bare
 ```
 
 ### TypeScript実装例
@@ -90,8 +90,8 @@ async function initBareRepository(
   cloneUrl: string,
   authToken?: string
 ): Promise<string> {
-  const worktreeRoot = path.join(os.homedir(), 'tsunagi');
-  const bareRepoPath = path.join(worktreeRoot, owner, repo);
+  const worktreeRoot = path.join(os.homedir(), '.tsunagi', 'workspaces');
+  const bareRepoPath = path.join(worktreeRoot, owner, repo, '.bare');
 
   // ディレクトリ作成
   await fs.mkdir(path.dirname(bareRepoPath), { recursive: true });
@@ -149,9 +149,9 @@ function normalizeBranchName(branch: string): string {
 
 ```typescript
 async function createWorktree(owner: string, repo: string, branch: string): Promise<string> {
-  const bareRepoPath = path.join(os.homedir(), 'tsunagi', owner, repo);
+  const bareRepoPath = path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, '.bare');
   const worktreeName = normalizeBranchName(branch);
-  const worktreePath = path.join(bareRepoPath, worktreeName);
+  const worktreePath = path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, worktreeName);
 
   const git = simpleGit(bareRepoPath);
 
@@ -195,7 +195,7 @@ async function removeWorktree(
   branch: string,
   force: boolean = true
 ): Promise<void> {
-  const bareRepoPath = path.join(os.homedir(), 'tsunagi', owner, repo);
+  const bareRepoPath = path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, '.bare');
   const worktreeName = normalizeBranchName(branch);
 
   const git = simpleGit(bareRepoPath);
@@ -241,7 +241,7 @@ interface WorktreeInfo {
 }
 
 async function listWorktrees(owner: string, repo: string): Promise<WorktreeInfo[]> {
-  const bareRepoPath = path.join(os.homedir(), 'tsunagi', owner, repo);
+  const bareRepoPath = path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, '.bare');
   const git = simpleGit(bareRepoPath);
 
   const output = await git.raw(['worktree', 'list', '--porcelain']);
@@ -365,7 +365,7 @@ async function executeClaude(taskId: string, prompt: string): Promise<void> {
   }
 
   // worktreeパスを取得
-  const worktreeRoot = path.join(os.homedir(), 'tsunagi');
+  const worktreeRoot = path.join(os.homedir(), '.tsunagi', 'workspaces');
   const worktreeName = normalizeBranchName(task.branch);
   const workingDirectory = path.join(worktreeRoot, task.owner, task.repo, worktreeName);
 
@@ -399,7 +399,7 @@ async function safeCreateWorktree(owner: string, repo: string, branch: string): 
     if (error.message.includes('already exists')) {
       // すでに存在する場合はパスを返す
       const worktreeName = normalizeBranchName(branch);
-      return path.join(os.homedir(), 'tsunagi', owner, repo, worktreeName);
+      return path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, worktreeName);
     }
     throw error;
   }
@@ -410,10 +410,10 @@ async function safeCreateWorktree(owner: string, repo: string, branch: string): 
 
 ```typescript
 async function ensureBareRepository(owner: string, repo: string): Promise<string> {
-  const bareRepoPath = path.join(os.homedir(), 'tsunagi', owner, repo);
+  const bareRepoPath = path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, '.bare');
 
   try {
-    // .gitディレクトリが存在するか確認
+    // bare repositoryが存在するか確認
     await fs.access(path.join(bareRepoPath, 'HEAD'));
     return bareRepoPath;
   } catch {
