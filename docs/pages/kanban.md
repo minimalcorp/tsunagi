@@ -809,9 +809,11 @@ function KanbanColumn({ title, status, tasks }: Props) {
 - **Order**: 実行順序バッジ（小さい値ほど高優先度）
 - **Owner/Repo/Branch**: `owner/repo @ branch` 形式で表示
 - **Claude実行状態**: アイコンで表示
-  - 🟢 idle（緑）
-  - 🔵 running（青、アニメーション）
-  - 🟡 waiting（黄色）
+  - 🔵 running（青、アニメーション）: Claude実行中
+  - 🟢 idle + completed（緑）: 成功完了
+  - 🔴 idle + failed（赤）: 失敗
+  - ⚫ idle + paused/cancelled（グレー）: 中断
+  - ⚪ idle + セッションなし（白/グレー）: 未実行
 - **Effort**: 工数見積もり（例: 2.5h）
 
 ### スタイル
@@ -824,13 +826,17 @@ function KanbanColumn({ title, status, tasks }: Props) {
 ### 実装例
 
 ```tsx
-function TaskCard({ task, isDragging }: Props) {
-  const stateIcon = {
-    idle: '🟢',
-    running: '🔵',
-    waiting: '🟡',
-  }[task.claudeState];
+function TaskCard({ task, latestSession, isDragging }: Props) {
+  // Claude実行状態のアイコン判定
+  const getStateIcon = () => {
+    if (task.claudeState === 'running') return '🔵'; // 実行中
+    if (!latestSession) return '⚪'; // 未実行
+    if (latestSession.status === 'completed') return '🟢'; // 成功
+    if (latestSession.status === 'failed') return '🔴'; // 失敗
+    return '⚫'; // 中断/キャンセル
+  };
 
+  const stateIcon = getStateIcon();
   const isClaudeRunning = task.claudeState === 'running';
 
   return (

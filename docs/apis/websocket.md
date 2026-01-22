@@ -2,6 +2,11 @@
 
 WebSocketを使用したリアルタイム通信の詳細仕様です。
 
+**MVP注**: この仕様はPhase 5〜6を含む完全版です。MVPでは以下の制限があります:
+
+- **Phase 5（WebSocket）は将来実装**: MVPではREST APIのみを使用
+- **bypass permissions 前提**: `session:waiting_for_permission` イベントは発生しません（Phase 6以降）
+
 ---
 
 ## 概要

@@ -4,18 +4,60 @@
 
 ---
 
+## 🎯 ビジョン
+
+### 人間が人間にしかできないことにフォーカスする
+
+Tsunagiは、**人間が人間にしかできないことに集中できる環境**を提供します。
+
+- **AIに任せられることはAIに任せる**: コーディング、ドキュメント作成、テストなど、ルーチンワークはClaudeに委譲
+- **人間は創造的な活動に専念**: アーキテクチャ設計、要件定義、意思決定、レビューなど、判断が必要な部分に時間を使う
+- **AI実行の可視化と制御**: Claudeが何をしているかを把握し、必要な時に介入できる透明性を確保
+
+---
+
 ## 概要
 
 **Tsunagi**は、複数のGitHub organizationのプロジェクトを1つのUIで統合管理し、Claude AIによる開発タスクを効率化するローカルツールです。
 
+開発者が複数のリポジトリやブランチを横断してタスクを管理し、Claude AIによる自動化を効率的に活用できる環境を提供します。
+
+### コアコンセプト
+
+#### 1. 統合管理
+
+- **複数組織対応**: 複数のGitHub organizationのプロジェクトを1つのUIで管理
+- **ローカル完結**: 全てのデータと作業がローカル環境で完結
+- **Kanban可視化**: タスクの状態をKanban boardで直感的に把握
+
+#### 2. Git Worktree活用
+
+- **owner/repo/branch** ディレクトリモデル
+- Git worktreeによる効率的なブランチ管理
+- タスクごとに独立した作業環境を自動構築
+
+#### 3. Claude Agent統合
+
+- タスクに対するClaudeの実行状態をリアルタイム表示
+- 実行ログの可視化
+- Agent SDKによる高度な制御
+
+#### 4. リアルタイム性
+
+- WebSocketによる状態の常時更新（Phase 5）
+- 複数タスクの並行実行を可視化
+
 ### 主要機能
 
-- **Kanban Board** - タスクを視覚的に管理、優先度順ソート
-- **Git Worktree統合** - `owner/repo/branch` ディレクトリモデルで効率的なブランチ管理
-- **Claude統合** - タスクごとのAI実行・ログ可視化、工数・優先度の自動見積もり
-- **環境変数管理** - グローバル/Owner/Repo単位で設定、自動読み込み
-- **リソース削除** - Owner/Repo/Branch単位で完全削除
-- **リアルタイム更新** - WebSocketによる常時同期（Phase 5）
+- **Kanban Board** - タスクの視覚的管理、ドラッグ&ドロップ、フィルタリング（詳細: [docs/pages/kanban.md](./docs/pages/kanban.md)）
+- **タスク管理** - CRUD操作、Claude自動見積もり、優先度ソート（詳細: [docs/pages/task-detail.md](./docs/pages/task-detail.md)）
+- **Git Worktree管理** - 自動初期化、worktree作成・削除（詳細: [docs/git-worktree.md](./docs/git-worktree.md)）
+- **Claude Agent SDK統合** - プロンプト実行、ストリーミングログ、実行状態追跡
+- **環境変数管理** - グローバル/Owner/Repo単位設定、自動読み込み（詳細: [docs/environment-variables.md](./docs/environment-variables.md)）
+- **リソース削除** - Owner/Repo/Branch単位の完全削除
+- **外部ツール統合** - Terminal/VSCode起動（Phase 6）
+
+各機能の詳細仕様は下記のドキュメントを参照してください。
 
 ---
 
@@ -23,15 +65,31 @@
 
 ### 前提条件
 
-- Node.js 20+
+- Docker & Docker Compose（推奨）
+- または Node.js 20+
 - Git
 - Claude API Key
 
-### セットアップ
+### Docker での起動（推奨）
+
+```bash
+# コンテナの起動
+make up
+
+# ログの確認
+make logs
+
+# コンテナ内でシェルを開く
+make shell
+```
+
+ブラウザで `http://localhost:3000` を開きます。
+
+### ローカル環境での起動
 
 ```bash
 # 依存関係のインストール
-npm install
+npm ci
 
 # 環境変数の設定
 echo "ANTHROPIC_API_KEY=your-api-key" > .env.local
@@ -44,67 +102,47 @@ npm run dev
 
 ---
 
-## ドキュメント
+## 📂 ドキュメント
 
 詳細な仕様は `docs/` ディレクトリを参照してください：
 
-### 主要ドキュメント
-
-- **[docs/overview.md](./docs/overview.md)** - プロジェクト概要
-- **[docs/design-principles.md](./docs/design-principles.md)** - UI/UX設計原則（必読）
-- **[docs/architecture.md](./docs/architecture.md)** - 技術スタック・アーキテクチャ
-- **[docs/implementation-plan.md](./docs/implementation-plan.md)** - 実装計画
-
-### データ・API
-
+- **[docs/design-principles.md](./docs/design-principles.md)** - UI/UX設計原則（全UI実装で必須参照）
+- **[docs/architecture.md](./docs/architecture.md)** - 技術スタック・アーキテクチャ詳細
 - **[docs/data-models.md](./docs/data-models.md)** - データモデル定義
-- **[docs/local-data.md](./docs/local-data.md)** - ローカルデータ管理
-- **[docs/api-specification.md](./docs/api-specification.md)** - REST API仕様
-
-### 機能詳細
-
-- **[docs/git-worktree.md](./docs/git-worktree.md)** - Git Worktree管理
-- **[docs/environment-variables.md](./docs/environment-variables.md)** - 環境変数管理
-- **[docs/pages/kanban.md](./docs/pages/kanban.md)** - Kanban UI仕様
-- **[docs/pages/task-detail.md](./docs/pages/task-detail.md)** - タスク詳細UI仕様
+- **[docs/local-data.md](./docs/local-data.md)** - ローカルデータ管理方法
+- **[docs/git-worktree.md](./docs/git-worktree.md)** - Git Worktree管理詳細
+- **docs/apis/** - API仕様
+  - **[docs/apis/overview.md](./docs/apis/overview.md)** - API全体像（必読）
+  - **[docs/apis/common.md](./docs/apis/common.md)** - 共通仕様
+  - **[docs/apis/tasks.md](./docs/apis/tasks.md)** - Tasks API
+  - **[docs/apis/sessions.md](./docs/apis/sessions.md)** - Claude Sessions API
+  - **[docs/apis/repositories.md](./docs/apis/repositories.md)** - Repositories API
+  - **[docs/apis/environments.md](./docs/apis/environments.md)** - Environment Variables API
+  - **[docs/apis/websocket.md](./docs/apis/websocket.md)** - WebSocket API
+  - **[docs/apis/estimation.md](./docs/apis/estimation.md)** - Estimation API
+- **docs/pages/** - UI仕様
+  - **[docs/pages/kanban.md](./docs/pages/kanban.md)** - Kanban UI仕様
+  - **[docs/pages/task-detail.md](./docs/pages/task-detail.md)** - タスク詳細UI仕様
+  - **[docs/pages/environment-settings.md](./docs/pages/environment-settings.md)** - 環境変数設定UI仕様
 
 ---
 
-## 使い方
+## 📝 使い方
 
-### 1. リポジトリの登録
+1. **リポジトリの登録**
+   - 設定からGitHubリポジトリを登録
 
-設定からGitHubリポジトリを登録します。
+2. **タスクの作成**
+   - Kanban boardで「+ Add Task」をクリック
+   - タスク情報を入力（title、owner/repo/branch）
 
-```json
-{
-  "owner": "minimalcorp",
-  "repo": "tsunagi",
-  "cloneUrl": "https://github.com/minimalcorp/tsunagi.git"
-}
-```
+3. **Claudeの実行**
+   - タスクカードをクリックして詳細を表示
+   - Claudeへの指示を入力して実行
 
-### 2. タスクの作成
-
-Kanban boardで「+ Add Task」をクリックし、タスク情報を入力します。
-
-- タイトル
-- 説明
-- owner/repo/branch
-
-タスク作成時に、Git worktreeが自動で `~/.tsunagi/workspaces/owner/repo/branch/` に作成されます。
-
-### 3. Claudeの実行
-
-タスクカードをクリックして詳細を表示し、Claudeへの指示を入力して実行します。
-
-実行ログがリアルタイムで表示されます。
-
-### 4. 進捗管理
-
-タスクをドラッグ&ドロップでステータス変更（Todo/In Progress/Done）できます。
-
-フィルターで特定のowner/repoのタスクに絞り込めます。
+4. **進捗管理**
+   - タスクをドラッグ&ドロップでステータス変更
+   - フィルターで特定のリポジトリのタスクに絞り込み
 
 ---
 
@@ -144,23 +182,51 @@ tsunagi/
 
 ## 開発
 
-### スクリプト
+### Docker コマンド（推奨）
+
+```bash
+# コンテナ起動
+make up
+
+# コンテナ停止
+make down
+
+# ログ表示
+make logs
+
+# コンテナ一覧
+make ps
+
+# シェル起動
+make shell
+
+# イメージ再ビルド
+make rebuild
+
+# ボリューム含めて削除
+make clean
+```
+
+### npm スクリプト
 
 ```bash
 # 開発サーバー
-npm run dev
+make dev  # または npm run dev
 
 # ビルド
-npm run build
+make build  # または npm run build
 
 # 本番サーバー
 npm run start
 
 # Lint
-npm run lint
+make lint  # または npm run lint
 
 # フォーマット
-npm run format
+make format  # または npm run format
+
+# 型チェック
+make type-check  # または npm run type-check
 ```
 
 ### コミット
@@ -186,37 +252,68 @@ git commit -m "message"
 
 ---
 
-## ロードマップ
+## 🚀 ロードマップ
 
-### MVP（v1.0）
+### MVP（v1.0）に含まれる機能
 
-- [x] データモデル・基盤
-- [x] Kanban UI
-- [x] Git Worktree管理
-- [x] Claude Agent SDK統合
-- [x] 環境変数管理（グローバル/Owner/Repo）
-- [x] リソース削除（Owner/Repo/Branch強制削除）
-- [x] Claude自動見積もり（工数・優先度判定）
-- [x] 優先度順ソート
+✅ **Phase 1**: データモデル・基盤
 
-### 将来実装（v2.0+）
+- タスク・リポジトリのデータモデル
+- JSON永続化
+- REST API
 
-- [ ] WebSocketリアルタイム更新（REST API + WebSocketデュアル実装、フォールバック対応）
-- [ ] 外部ツール統合（Terminal/VSCode）
-- [ ] 実行計画の自動生成
-- [ ] 複数Claudeの並列実行
-- [ ] タスク依存関係の管理
-- [ ] GitHub PR自動作成
+✅ **Phase 2**: Kanban UI
+
+- Kanban board表示
+- ドラッグ&ドロップ
+- タスクフィルター・検索
+- タスク作成・編集UI
+
+✅ **Phase 3**: Git Worktree管理
+
+- bare repository初期化
+- worktree作成・削除
+- ディレクトリ構造管理
+
+✅ **Phase 4**: Claude Agent SDK統合
+
+- Claude Agent SDK統合（`@anthropic-ai/agent-sdk`）
+- ストリーミングログ表示
+- 実行状態追跡
+
+🆕 **Phase 4.5**: 環境変数・リソース削除・優先度判定
+
+- 環境変数管理（グローバル/Owner/Repo単位）
+- リソース削除（Owner/Repo/Branch）
+- Claude自動見積もり（工数・優先度）
+- 優先度順ソート
+
+### 将来実装（v2.0以降）
+
+⏸️ **Phase 5**: WebSocketリアルタイム更新
+
+- Socket.IO統合（イベント駆動アーキテクチャ）
+- **デュアルインターフェース実装**: REST APIとWebSocketの両方を実装
+- **フォールバック戦略**: WebSocket接続失敗時はREST APIポーリングに自動切替
+- サーバー側controller層による統一的な状態管理
+
+⏸️ **Phase 6**: 外部ツール統合（Terminal/VSCode）
+
+🔮 実行計画の自動生成
+🔮 複数Claudeの並列実行
+🔮 タスク依存関係の管理
+🔮 GitHub PR自動作成
+🔮 通知機能
 
 ---
 
-## コントリビューション
+## 🤝 コントリビューション
 
-現在準備中です。
+詳細は実装フェーズで整備予定です。
 
 ---
 
-## ライセンス
+## 📄 ライセンス
 
 TBD
 

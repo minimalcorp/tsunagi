@@ -56,13 +56,15 @@ Task Detailは、選択されたタスクの詳細情報を表示・編集する
 interface ClaudeSession {
   id: string;
   taskId: string;
-  name: string; // "Session 1", "Session 2", etc.
-  prompt: string; // Monaco Editorの現在のコンテンツ
-  claudeState: 'idle' | 'waiting' | 'running' | 'stopped' | 'error';
+  name: string; // "Session 1", "Session 2", etc.（UI表示用）
+  prompt: string; // Monaco Editorの現在の入力内容（一時的なUIステート）
+  status: 'running' | 'paused' | 'completed' | 'failed' | 'cancelled'; // セッション状態
   createdAt: Date;
   updatedAt: Date;
 }
 ```
+
+**注**: このインターフェースはUI向けのデータ構造です。永続化されるデータモデルは `docs/data-models.md` を参照してください。
 
 ### ChatMessage
 
@@ -254,6 +256,7 @@ function TaskInfo({ task, onUpdate }: Props) {
           </div>
           <div>
             <span className="font-medium">Claude State:</span> {task.claudeState}
+            {/* idle時は最新セッションのstatusも表示推奨 (completed/failed/paused/cancelled) */}
           </div>
           <div className="text-xs text-gray-500">
             Created: {new Date(task.createdAt).toLocaleString()}
@@ -422,11 +425,15 @@ Claudeへの指示をMonaco Editorで入力・実行します。
 - **Execute Button**: Claude実行ボタン
 - **Stop Button**: 実行停止ボタン（実行中のみ表示）
 
-#### 状態
+#### 状態（ClaudeSession.status）
 
-- **idle**: プロンプト入力可能、Execute ボタン有効
-- **running**: プロンプト入力可能、Execute/Stop ボタン両方表示
-- **waiting**: プロンプト入力可能、Executeボタンは無効化、待機中表示
+- **running**: Claude実行中、プロンプト入力可能、Execute/Pause ボタン両方表示
+- **paused**: 中断中、プロンプト入力可能、Resume ボタン表示
+- **completed**: 成功完了、プロンプト入力可能、Execute ボタン有効（新規実行可能）
+- **failed**: 失敗、プロンプト入力可能、Execute ボタン有効（再実行可能）
+- **cancelled**: キャンセル、プロンプト入力可能、Execute ボタン有効
+
+**MVP注**: bypass permissions のため、許可待ち（waiting_for_permission）は発生しません。
 
 #### 実装例
 
@@ -449,8 +456,8 @@ function ClaudePromptEditor({ session, onExecute, onStop, onPromptChange }: Prop
     onPromptChange(session.id, newPrompt);
   };
 
-  const isRunning = session.claudeState === 'running';
-  const isWaiting = session.claudeState === 'waiting';
+  const isRunning = session.status === 'running';
+  const isPaused = session.status === 'paused';
 
   return (
     <div className="flex flex-col h-full">
@@ -459,10 +466,10 @@ function ClaudePromptEditor({ session, onExecute, onStop, onPromptChange }: Prop
         <div className="flex gap-2">
           <button
             onClick={handleExecute}
-            disabled={!prompt.trim() || isWaiting}
+            disabled={!prompt.trim() || isRunning}
             className="px-3 py-1 bg-blue-500 text-white rounded text-sm disabled:opacity-50"
           >
-            {isWaiting ? 'Waiting...' : '▶ Execute'}
+            {isPaused ? '▶ Resume' : '▶ Execute'}
           </button>
 
           {isRunning && (

@@ -27,10 +27,13 @@ interface Task {
   repo: string; // GitHub repository名
   branch: string; // ブランチ名（1タスク = 1ブランチ）
 
+  // Worktree作成状態
+  worktreeStatus: 'creating' | 'created' | 'failed'; // Worktree作成状態
+  worktreeError?: string; // Worktree作成失敗時のエラーメッセージ
+
   // Claude実行状態
-  claudeState: 'idle' | 'running' | 'waiting'; // Claude実行状態
-  prompt?: string; // Claudeへの指示（オプション）
-  plan?: string; // 実行計画（オプション）
+  claudeState: 'idle' | 'running'; // Claude実行状態（MVPではidle/runningのみ）
+  plan?: string; // 実行計画（markdown + チェックリスト形式、オプション）
 
   // 工数・順序（Claude自動見積もり）
   effort?: number; // 工数（時間単位、0.5刻み）
@@ -40,8 +43,7 @@ interface Task {
   logs: LogEntry[]; // 実行ログの配列
 
   // 論理削除
-  deleted: boolean; // 削除フラグ（デフォルト: false）
-  deletedAt?: string; // 削除日時（ISO 8601形式、削除時のみ）
+  deletedAt?: string; // 削除日時（ISO 8601形式、存在すれば削除済み）
 
   // タイムスタンプ
   createdAt: string; // 作成日時（ISO 8601形式）
@@ -67,9 +69,10 @@ interface Task {
 #### description
 
 - **型**: `string`
-- **制約**: 0〜5000文字
+- **制約**: 0〜20000文字
 - **形式**: Markdown対応（将来）
 - **意味**: タスクで行うべきこと。要件定義相当。
+- **方針**: 詳細な仕様は別途ファイルベース（docs/）で管理することを推奨
 - **例**:
   ```
   ユーザー認証機能を実装する。
@@ -96,44 +99,85 @@ interface Task {
 #### owner / repo / branch
 
 - **型**: `string`
-- **制約**:
-  - `owner`: 1〜39文字、英数字とハイフン
-  - `repo`: 1〜100文字
-  - `branch`: 1〜255文字
+- **制約**（Git/GitHub仕様準拠）:
+  - **owner** (GitHub username/organization):
+    - 1〜39文字
+    - 使用可能文字: 英数字（a-z, A-Z, 0-9）、ハイフン（`-`）
+    - 正規表現: `/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i`
+    - ハイフンは先頭/末尾/連続不可
+  - **repo** (GitHub repository name):
+    - 1〜100文字
+    - 使用可能文字: 英数字（a-z, A-Z, 0-9）、ハイフン（`-`）、アンダースコア（`_`）、ピリオド（`.`）
+    - `.git`サフィックスは自動削除される
+  - **branch** (Git branch name):
+    - 1〜255文字（実用上の推奨値）
+    - 使用可能文字（推奨）: 英数字、ピリオド（`.`）、ハイフン（`-`）、アンダースコア（`_`）、スラッシュ（`/`）
+    - スラッシュ/ドットには多数の制約あり（詳細は git-check-ref-format 参照）
+    - スペース、`~`、`^`、`:`、`?`、`*`、`[`、`\`などは禁止
 - **例**:
   - `owner: "minimalcorp"`
   - `repo: "tsunagi"`
   - `branch: "feat/auth"`
 
-#### claudeState
+#### worktreeStatus
 
-- **型**: `'idle' | 'running' | 'waiting'`
-- **初期値**: `'idle'`
+- **型**: `'creating' | 'created' | 'failed'`
+- **初期値**: `'creating'`（タスク作成時にworktree作成開始）
 - **意味**:
-  - `idle`: 実行していない
-  - `running`: 現在Claudeが実行中
-  - `waiting`: 実行待機中（将来、並列実行時に使用）
+  - `creating`: Worktree作成中（bare repositoryクローン + worktree作成）
+  - `created`: Worktree作成完了、Claude実行可能
+  - `failed`: Worktree作成失敗
+- **ワークフロー**:
+  1. タスク作成 → `worktreeStatus: 'creating'` でバックグラウンド処理開始
+  2. bare repository がなければクローン
+  3. worktree を作成
+  4. 成功 → `'created'`、失敗 → `'failed'` + エラーメッセージ
+- **UI表示**:
+  - `creating`: スピナー表示、Claude実行ボタン無効化、"Creating workspace..." 表示
+  - `created`: Claude実行可能
+  - `failed`: エラーメッセージ表示 + リトライボタン
 
-#### prompt
+#### worktreeError
 
 - **型**: `string | undefined`
-- **制約**: 0〜10000文字
-- **例**: `"このブランチでログイン機能を実装してください。JWT認証を使用してください。"`
+- **意味**: `worktreeStatus === 'failed'` 時のエラーメッセージ
+- **例**: `"Failed to clone repository: authentication required"`, `"Branch 'feat/auth' does not exist"`
+- **UI表示**: エラー内容をユーザーに表示し、リトライまたは設定修正を促す
+
+#### claudeState
+
+- **型**: `'idle' | 'running'`（MVP）
+- **初期値**: `'idle'`
+- **意味**:
+  - `idle`: Claudeが動いていない（初期状態、または完了/失敗/中断後）
+  - `running`: Claude実行中
+- **UI表示**: `idle`時は最新の`ClaudeSession.status`を参照して状態を表示
+  - `completed` → 成功アイコン（緑）
+  - `failed` → 失敗アイコン（赤）
+  - `paused/cancelled` → 中断アイコン（グレー）
+  - セッションなし → 未実行（グレー）
+- **Phase 6以降**: `'waiting'`（ユーザー承認待ち）を追加予定
 
 #### plan
 
 - **型**: `string | undefined`
 - **制約**: 0〜10000文字
-- **形式**: Markdown対応（将来）
-- **意味**: 実行計画。このステップで実装を進める。
-- **用途**: Claudeが生成した実行計画を保存、または手動で記述
+- **形式**: Markdown + チェックリスト
+- **役割**: Claudeが作成する実行計画をタスキングプロセスで保存し、コーディング時に参照
+- **ワークフロー**:
+  1. **Planning/Tasking Phase**: Claudeが実行計画を作成し、Task.planに保存
+  2. **Coding Phase**: Task.planをClaudeSession.promptに渡して実装を開始
+  3. 各ステップの完了に応じてチェックリストを更新
 - **例**:
-  ```
-  1. パスワードハッシュ化機能の実装
-  2. JWT生成・検証機能の実装
-  3. ログインエンドポイントの作成
-  4. 認証ミドルウェアの実装
-  5. テストコードの追加
+
+  ```markdown
+  ## 実行計画
+
+  - [ ] パスワードハッシュ化機能の実装
+  - [ ] JWT生成・検証機能の実装
+  - [ ] ログインエンドポイントの作成
+  - [ ] 認証ミドルウェアの実装
+  - [ ] テストコードの追加
   ```
 
 #### effort
@@ -171,22 +215,16 @@ interface Task {
 - **型**: `LogEntry[]`
 - **詳細**: 後述の LogEntry 参照
 
-#### deleted
-
-- **型**: `boolean`
-- **デフォルト**: `false`
-- **用途**: 論理削除フラグ
-- **動作**:
-  - `true`: タスクは削除済み（通常のUI表示から除外）
-  - `false`: タスクは有効（通常表示）
-- **注意**: 論理削除されたタスクでも、worktreeとブランチは物理削除されます
-
 #### deletedAt
 
 - **型**: `string | undefined`
 - **形式**: ISO 8601（例: `"2024-01-20T15:30:00.000Z"`）
-- **設定**: タスク削除時（`deleted: true` 設定時）のみ
-- **用途**: 削除日時の記録、削除済みタスクのソート・フィルタに使用
+- **用途**: 論理削除の日時。存在すれば削除済み、存在しなければ有効
+- **動作**:
+  - `undefined`: タスクは有効（通常表示）
+  - 値あり: タスクは削除済み（通常のUI表示から除外）
+- **判定**: `task.deletedAt !== undefined` で削除済みか判定
+- **注意**: 論理削除されたタスクでも、worktreeとブランチは物理削除されます
 
 #### createdAt / updatedAt
 
@@ -245,23 +283,11 @@ interface ClaudeSession {
   id: string; // UUID（例: "660e8400-e29b-41d4-a716-446655440001"）
   taskId: string; // 紐付くタスクID
 
-  // セッション情報
-  prompt: string; // Claudeへの指示
+  // セッション状態
   status: ClaudeSessionStatus; // セッション状態
 
-  // 許可プロンプト（waiting_for_permission時のみ）
-  permissionPrompt?: {
-    type: 'tool_use' | 'file_write' | 'bash_command'; // 操作タイプ
-    description: string; // 操作の説明（例: "Edit src/auth/login.ts"）
-    details: any; // 操作の詳細情報
-  };
-
-  // 実行結果
-  result?: string; // 実行結果（完了時）
-  error?: string; // エラーメッセージ（失敗時）
-
-  // ログ
-  logs: LogEntry[]; // 実行ログの配列
+  // ログ（promptや実行結果を含む全てのやり取り）
+  logs: LogEntry[]; // 実行ログの配列（初回promptを含む）
 
   // タイムスタンプ
   startedAt: string; // 開始日時（ISO 8601形式）
@@ -270,10 +296,9 @@ interface ClaudeSession {
 }
 
 type ClaudeSessionStatus =
-  | 'running' // 実行中（メッセージ送信可能）
-  | 'waiting_for_permission' // 許可待ち（ツール実行、ファイル操作など）
-  | 'paused' // ユーザーが中断（ESC相当）
-  | 'completed' // 完了
+  | 'running' // 実行中
+  | 'paused' // ユーザーが中断（ESC）
+  | 'completed' // 成功完了
   | 'failed' // 失敗
   | 'cancelled'; // キャンセル
 ```
@@ -293,74 +318,60 @@ type ClaudeSessionStatus =
 - **説明**: このセッションが属するタスクのID
 - **制約**: 参照先のTaskが存在する必要がある
 
-#### prompt
-
-- **型**: `string`
-- **必須**: ✓
-- **説明**: Claudeへの指示内容
-- **例**: `"ログイン機能のテストコードを追加してください"`
-
 #### status
 
 - **型**: `ClaudeSessionStatus`
 - **初期値**: `'running'`
-- **状態遷移**:
+- **状態遷移（MVP）**:
   ```
-  running → waiting_for_permission → running → completed
-  running → paused → running → completed
-  running → failed
-  running → cancelled
-  waiting_for_permission → running (許可)
-  waiting_for_permission → failed (拒否/エラー)
-  paused → running (再開)
-  paused → cancelled
+  running → completed  (成功完了)
+  running → failed     (エラー発生)
+  running → paused     (ユーザーが中断)
+  running → cancelled  (ユーザーがキャンセル)
+  paused → running     (再開)
+  paused → cancelled   (キャンセル)
   ```
+- **Phase 6以降**: `waiting_for_permission`（許可待ち）を追加予定
 
 #### status詳細
 
 **running（実行中）**
 
-- Claudeが実行中
+- Claudeが実行中（bypass permissions でツール自動実行）
 - **ユーザー操作可能**:
   - 追加メッセージ送信（途中で指示を追加）
-  - 中断（ESC相当）
-  - キャンセル
-- UI: スピナー表示、実行中インジケーター、メッセージ入力フォーム表示
-
-**waiting_for_permission（許可待ち）**
-
-- ツール実行、ファイル書き込み、Bashコマンド実行などの許可を求めている
-- `permissionPrompt` フィールドに操作の詳細が含まれる
-- **ユーザーアクション必要**: 許可/拒否の選択
-- UI: **ハイライト表示**、通知バッジ、許可プロンプト表示
+  - 中断（ESC相当） → `paused`
+  - キャンセル → `cancelled`
+- **UI**: スピナー表示、実行中インジケーター、メッセージ入力フォーム表示
 
 **paused（中断中）**
 
 - ユーザーが中断した状態（ESC相当）
 - **ユーザー操作可能**:
-  - 再開（追加メッセージと共に再開可能）
-  - キャンセル
-- UI: 中断アイコン、再開ボタン表示
+  - 再開（追加メッセージと共に再開可能） → `running`
+  - キャンセル → `cancelled`
+- **UI**: 中断アイコン、再開ボタン表示
 
-**completed（完了）**
+**completed（成功完了）**
 
 - セッション正常完了
-- UI: 完了マーク、グレーアウト
+- **UI**: 完了マーク（緑）、グレーアウト
 
 **failed（失敗）**
 
 - エラーで失敗
-- UI: エラーアイコン、赤色表示
+- **UI**: エラーアイコン（赤）、エラーメッセージ表示
 
 **cancelled（キャンセル）**
 
 - ユーザーがキャンセルした
-- UI: キャンセルアイコン、グレーアウト
+- **UI**: キャンセルアイコン（グレー）、グレーアウト
 
 #### logs
 
 - **型**: `LogEntry[]`
-- **説明**: セッションの実行ログ
+- **説明**: セッションの実行ログ（初回prompt、Claudeの応答、実行結果など全て含む）
+- **初回エントリ**: セッション開始時のpromptが`logs[0]`として記録される
 - **リアルタイム更新**: WebSocketで随時追加
 
 #### startedAt / completedAt / updatedAt
@@ -372,13 +383,20 @@ type ClaudeSessionStatus =
 ### セッションのライフサイクル
 
 ```typescript
-// 1. セッション作成
+// 1. セッション作成（promptを初回ログとして記録）
+const initialPrompt = 'ログイン機能を実装してください';
 const session: ClaudeSession = {
   id: uuid(),
   taskId: '550e8400-...',
-  prompt: 'ログイン機能を実装してください',
   status: 'running',
-  logs: [],
+  logs: [
+    {
+      timestamp: new Date().toISOString(),
+      direction: 'send',
+      content: initialPrompt,
+      type: 'user_message',
+    },
+  ],
   startedAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -391,32 +409,31 @@ session.logs.push({
   type: 'user_message',
 });
 
-// 3. 実行中 → 許可待ち
-session.status = 'waiting_for_permission';
-session.permissionPrompt = {
-  type: 'file_write',
-  description: 'Edit src/auth/login.ts',
-  details: {
-    filePath: 'src/auth/login.ts',
-    operation: 'write',
-    preview: '... 変更内容のプレビュー ...',
-  },
-};
-
-// 4. ユーザーが許可 → 再開
-session.status = 'running';
-session.permissionPrompt = undefined;
-
-// 5. ユーザーが中断（ESC）
+// 3. ユーザーが中断（ESC）
 session.status = 'paused';
 
-// 6. ユーザーが再開
+// 4. ユーザーが再開
 session.status = 'running';
 
-// 7. 完了
+// 5. 完了（成功）
 session.status = 'completed';
 session.completedAt = new Date().toISOString();
-session.result = 'ログイン機能を実装しました';
+session.logs.push({
+  timestamp: new Date().toISOString(),
+  direction: 'receive',
+  content: 'ログイン機能を実装しました',
+  type: 'success',
+});
+
+// または失敗
+session.status = 'failed';
+session.completedAt = new Date().toISOString();
+session.logs.push({
+  timestamp: new Date().toISOString(),
+  direction: 'receive',
+  content: 'エラー: ...',
+  type: 'error',
+});
 ```
 
 ### UI表示要件
@@ -428,15 +445,14 @@ session.result = 'ログイン機能を実装しました';
   - タスク名
   - セッション状態（アイコン + ステータステキスト）
   - 経過時間
-  - **waiting_for_permission はハイライト表示**（ユーザーアクション必要）
 
 **クリック時の動作**:
 
 - タスク詳細パネルを開く
 - セッションのログをリアルタイム表示
 - `running`: メッセージ入力フォーム + 中断ボタン表示
-- `waiting_for_permission`: 許可/拒否ボタン表示
 - `paused`: 再開ボタン表示
+- `completed/failed/cancelled`: ログ表示のみ（操作不可）
 
 ### データ永続化
 
@@ -449,10 +465,21 @@ session.result = 'ログイン機能を実装しました';
     {
       "id": "660e8400-e29b-41d4-a716-446655440001",
       "taskId": "550e8400-e29b-41d4-a716-446655440000",
-      "prompt": "ログイン機能を実装してください",
       "status": "completed",
-      "result": "実装完了しました",
-      "logs": [...],
+      "logs": [
+        {
+          "timestamp": "2024-01-20T10:00:00.000Z",
+          "direction": "send",
+          "content": "ログイン機能を実装してください",
+          "type": "user_message"
+        },
+        {
+          "timestamp": "2024-01-20T10:30:00.000Z",
+          "direction": "receive",
+          "content": "実装完了しました",
+          "type": "success"
+        }
+      ],
       "startedAt": "2024-01-20T10:00:00.000Z",
       "completedAt": "2024-01-20T10:30:00.000Z",
       "updatedAt": "2024-01-20T10:30:00.000Z"
@@ -463,7 +490,7 @@ session.result = 'ログイン機能を実装しました';
 
 **保持期間**:
 
-- アクティブセッション（running/waiting_for_permission/paused）: 永続保持
+- アクティブセッション（running/paused）: 永続保持
 - 完了セッション（completed/failed/cancelled）: 7日間保持後、自動削除（オプション）
 
 ---
@@ -486,9 +513,6 @@ interface Repository {
 
   // 認証
   authToken?: string; // GitHub Personal Access Token（オプション）
-
-  // ローカル情報
-  bareRepoPath: string; // bare repositoryのローカルパス
 
   // タイムスタンプ
   createdAt: string; // 登録日時（ISO 8601形式）
@@ -524,12 +548,7 @@ interface Repository {
 - **用途**: プライベートリポジトリのクローン時に使用
 - **セキュリティ**: MVP時点では平文保存、将来は暗号化を検討
 
-#### bareRepoPath
-
-- **型**: `string`
-- **形式**: 絶対パス
-- **例**: `"/Users/username/tsunagi/minimalcorp/tsunagi"`
-- **生成**: `~/.tsunagi/workspaces/{owner}/{repo}` として自動決定
+**注**: bare repository のパスは `~/.tsunagi/workspaces/{owner}/{repo}/.git/` として `owner` と `repo` から算出されます。データモデルには含めません。
 
 #### createdAt
 
@@ -607,14 +626,8 @@ interface Worktree {
   repo: string; // リポジトリ名
   branch: string; // ブランチ名
 
-  // ローカル情報
-  path: string; // worktreeのパス
-
-  // 状態
-  exists: boolean; // worktreeが存在するか
-
   // タイムスタンプ
-  createdAt?: string; // 作成日時（ファイルシステムから取得）
+  createdAt: string; // 作成日時（ISO 8601形式）
 }
 ```
 
@@ -628,22 +641,16 @@ interface Worktree {
   - `repo: "tsunagi"`
   - `branch: "feat/auth"`
 
-#### path
+**注**:
 
-- **型**: `string`
-- **形式**: 絶対パス
-- **例**: `"/Users/username/tsunagi/minimalcorp/tsunagi/feat/auth"`
-
-#### exists
-
-- **型**: `boolean`
-- **用途**: worktreeが実際に存在するかを確認
+- worktree のパスは `~/.tsunagi/workspaces/{owner}/{repo}/{branch}` として `owner`, `repo`, `branch` から算出されます。データモデルには含めません。
+- worktree の作成状態は `Task.worktreeStatus` で管理されます。このインターフェースは作成済みworktreeの情報表示用です。
 
 #### createdAt
 
-- **型**: `string | undefined`
+- **型**: `string`
 - **形式**: ISO 8601
-- **取得**: ディレクトリの作成日時から取得
+- **説明**: worktree作成日時（`Task.worktreeStatus` が `'created'` になった日時）
 
 ---
 

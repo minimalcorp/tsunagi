@@ -38,13 +38,6 @@ cd feature-auth/   # feature/authブランチ
 └── {owner}/
     └── {repo}/
         ├── .git/           # bare repository
-        │   ├── HEAD
-        │   ├── config
-        │   ├── objects/
-        │   ├── refs/
-        │   └── worktrees/
-        │       ├── main/
-        │       └── feat-auth/
         ├── main/           # mainブランチのworktree
         └── feat-auth/      # feature/authブランチのworktree
 ```

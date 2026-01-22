@@ -2,6 +2,66 @@
 
 Tsunagi API仕様の全体像を説明します。
 
+**MVP注**: この仕様はPhase 4〜6を含む完全版です。MVPでは以下の制限があります:
+
+- **Phase 5（WebSocket）は将来実装**: MVPではREST APIのみを使用
+- **bypass permissions 前提**: 許可関連機能（`session:waiting_for_permission`、`session:respond_permission`）は Phase 6 以降で実装
+
+---
+
+## ドキュメント構成
+
+```
+docs/apis/
+├── overview.md         # 本ファイル: API全体像、設計思想、基本フロー
+├── common.md           # 共通仕様（レスポンス形式、エラー、認証）
+├── tasks.md            # Tasks API詳細
+├── sessions.md         # Claude Sessions API詳細
+├── repositories.md     # Repositories/Owners API詳細
+├── environments.md     # Environment Variables API詳細
+├── websocket.md        # WebSocket API詳細
+└── estimation.md       # Order/Effort Estimation API詳細
+```
+
+---
+
+## クイックスタート
+
+### 1. 全体像を理解する（本ファイル）
+
+- REST API + WebSocket の設計思想
+- 全エンドポイント一覧
+- 全WebSocketイベント一覧
+- 基本フロー
+
+### 2. 共通仕様を確認する
+
+**[common.md](./common.md)** を読んでください。
+
+- レスポンス形式
+- エラーハンドリング
+- HTTPステータスコード
+- WebSocketメッセージ形式
+
+### 3. リソース別の詳細を確認する
+
+必要なリソースのドキュメントを読んでください：
+
+- **タスク管理**: [tasks.md](./tasks.md)
+- **Claude実行**: [sessions.md](./sessions.md)
+- **リポジトリ管理**: [repositories.md](./repositories.md)
+- **環境変数**: [environments.md](./environments.md)
+- **見積もり**: [estimation.md](./estimation.md)
+
+### 4. WebSocket実装を理解する
+
+**[websocket.md](./websocket.md)** を読んでください。
+
+- WebSocket接続方法
+- 再接続処理
+- エラーハンドリング
+- UI実装パターン
+
 ---
 
 ## 設計思想
@@ -330,18 +390,155 @@ ws://localhost:3000/api/ws
 
 ---
 
-## ディレクトリ構成
+## 各ファイルの役割
 
-```
-docs/api-specifications/
-├── overview.md         # 本ファイル（全体像）
-├── common.md           # 共通仕様（レスポンス形式、エラー、認証）
-├── tasks.md            # Tasks API詳細
-├── sessions.md         # Claude Sessions API詳細
-├── repositories.md     # Repositories/Owners API詳細
-├── environments.md     # Environment Variables API詳細
-├── websocket.md        # WebSocket API詳細
-└── estimation.md       # Order/Effort Estimation API詳細
+### [common.md](./common.md)
+
+**対象**: API実装者、フロントエンド開発者
+
+**内容**:
+
+- レスポンス形式
+- エラーハンドリング
+- HTTPステータスコード
+- WebSocketメッセージ形式
+- タイムスタンプ形式
+
+### [tasks.md](./tasks.md)
+
+**対象**: タスク管理機能の実装者
+
+**内容**:
+
+- GET /api/tasks, GET /api/tasks/[id]
+- WebSocketイベント: task:create, task:update, task:delete
+- 自動worktree/branch管理
+- UI実装例
+
+### [sessions.md](./sessions.md)
+
+**対象**: Claude実行機能の実装者（最も複雑）
+
+**内容**:
+
+- GET /api/sessions, GET /api/sessions/[id]
+- WebSocketイベント: session:start, session:send_message, session:interrupt, session:respond_permission, session:resume, session:cancel, etc.
+- Claude Code CLI互換フロー
+- リアルタイムログ配信
+- UI実装例
+
+### [repositories.md](./repositories.md)
+
+**対象**: リポジトリ管理機能の実装者
+
+**内容**:
+
+- GET /api/owners, GET /api/owners/[owner]/repositories, GET /api/owners/[owner]/repositories/[repo]
+- WebSocketイベント: clone:start, repository:update, repository:delete, owner:delete
+- Bare repositoryクローン
+- UI実装例
+
+### [environments.md](./environments.md)
+
+**対象**: 環境変数管理機能の実装者
+
+**内容**:
+
+- GET /api/env (3つのスコープ)
+- WebSocketイベント: env:set, env:delete
+- スコープ優先順位（repository > owner > global）
+- UI実装例
+
+### [websocket.md](./websocket.md)
+
+**対象**: WebSocket通信の実装者、フロントエンド開発者（重要）
+
+**内容**:
+
+- WebSocket接続方法
+- メッセージ形式
+- 全イベント一覧（参照）
+- エラーハンドリング
+- 再接続処理
+- Heartbeat / Ping-Pong
+- UI実装パターン（React Hooks例）
+
+### [estimation.md](./estimation.md)
+
+**対象**: 見積もり機能の実装者
+
+**内容**:
+
+- GET /api/tasks/estimate, GET /api/tasks/[id]/estimate
+- WebSocketイベント: estimate:all, estimate:task
+- 見積もりアルゴリズム
+- プログレス表示
+- UI実装例
+
+---
+
+## 実装の優先順位
+
+1. **WebSocket基盤** ([websocket.md](./websocket.md))
+   - 接続、再接続、エラーハンドリング
+   - グローバル状態管理
+
+2. **リポジトリ管理** ([repositories.md](./repositories.md))
+   - clone:start でbare repositoryをセットアップ
+
+3. **タスク管理** ([tasks.md](./tasks.md))
+   - task:create, task:update, task:delete
+   - 自動worktree/branch作成
+
+4. **Claude実行** ([sessions.md](./sessions.md))
+   - session:start, session:send_message, session:interrupt
+   - リアルタイムログ配信
+   - 許可プロンプト
+
+5. **環境変数** ([environments.md](./environments.md))
+   - env:set, env:delete
+
+6. **見積もり** ([estimation.md](./estimation.md))
+   - estimate:all, estimate:task
+
+---
+
+## Quick Actions（コマンドコピー方式）
+
+Tsunagi UIは、ターミナルやVS Codeを直接起動する代わりに、**コマンドのクリップボードコピー**方式を採用しています。
+
+### 設計思想
+
+- **シンプル**: APIエンドポイント不要、フロントエンドのみで完結
+- **柔軟**: ユーザーが任意のターミナル・エディタを使用可能
+- **セキュア**: サーバー側からホストマシンのプロセス起動が不要
+
+### 提供されるコマンド
+
+#### VS Code起動
+
+```bash
+code ~/.tsunagi/workspaces/{owner}/{repo}/{branch}
 ```
 
-各ファイルの詳細は、それぞれのファイルを参照してください。
+**UI実装**: タスク詳細画面の「📝 Open in VS Code」ボタンをクリック
+
+#### ターミナルで開く
+
+```bash
+cd ~/.tsunagi/workspaces/{owner}/{repo}/{branch}
+```
+
+**UI実装**: タスク詳細画面の「💻 Open in Terminal」ボタンをクリック
+
+#### パスコピー
+
+```bash
+~/.tsunagi/workspaces/{owner}/{repo}/{branch}
+```
+
+**UI実装**: タスク詳細画面の「📋 Copy Path」ボタンをクリック
+
+### 詳細仕様
+
+実装の詳細は [pages/task-detail.md](../pages/task-detail.md#4-quick-actions) を参照してください。

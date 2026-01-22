@@ -1,6 +1,6 @@
 {
   "name": "tsunagi",
-  "dockerComposeFile": "./compose.yml",
+  "dockerComposeFile": "../compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
   "runServices": ["app"],

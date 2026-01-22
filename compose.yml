@@ -1,7 +1,7 @@
 services:
   app:
     build:
-      context: .
+      context: .devcontainer
       dockerfile: Dockerfile
       # ビルドキャッシュを活用
       cache_from:
@@ -9,7 +9,7 @@ services:
     image: devcontainer-app:latest
     volumes:
       # プロジェクトディレクトリ
-      - ..:/workspace:cached
+      - .:/workspace:cached
       # node_modules を名前付きボリュームで高速化
       - node-modules:/workspace/node_modules
       # npm キャッシュの永続化
@@ -33,7 +33,7 @@ services:
     working_dir: /workspace
     volumes:
       # プロジェクトディレクトリ
-      - ..:/workspace:cached
+      - .:/workspace:cached
       # node_modules を名前付きボリュームで高速化
       - node-modules:/workspace/node_modules
       # npm キャッシュの永続化
