@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/task-repository';
+import * as worktreeManager from '@/lib/worktree-manager';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -45,10 +46,26 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
+
+    // タスク情報を取得
+    const task = await taskRepo.getTask(id);
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    // タスクを削除（論理削除）
     const success = await taskRepo.deleteTask(id);
 
     if (!success) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+    }
+
+    // worktreeとブランチを削除（強制削除）
+    try {
+      await worktreeManager.removeWorktree(task.owner, task.repo, task.branch, true);
+    } catch (error) {
+      console.error('Failed to remove worktree:', error);
+      // worktree削除に失敗してもタスク削除は成功とする
     }
 
     return NextResponse.json({ data: { success: true } });

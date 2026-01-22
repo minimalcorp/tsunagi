@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/task-repository';
+import * as worktreeManager from '@/lib/worktree-manager';
 import type { Task } from '@/lib/types';
 
 // GET /api/tasks?status=...&owner=...&repo=...&includeDeleted=false
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // タスクを作成
     const newTask = await taskRepo.createTask({
       title,
       description,
@@ -53,7 +55,20 @@ export async function POST(request: NextRequest) {
       order: body.order,
     });
 
-    return NextResponse.json({ data: newTask }, { status: 201 });
+    // worktreeを自動作成
+    try {
+      await worktreeManager.createWorktree(owner, repo, branch);
+      await taskRepo.updateTask(newTask.id, { worktreeStatus: 'created' });
+    } catch (error) {
+      console.error('Failed to create worktree:', error);
+      await taskRepo.updateTask(newTask.id, { worktreeStatus: 'error' });
+      // worktreeエラーはタスク作成失敗にはしない（後で手動作成可能）
+    }
+
+    // 更新後のタスクを取得
+    const updatedTask = await taskRepo.getTask(newTask.id);
+
+    return NextResponse.json({ data: updatedTask }, { status: 201 });
   } catch (error) {
     console.error('POST /api/tasks error:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
