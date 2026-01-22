@@ -8,13 +8,13 @@ interface EmptyTaskStateProps {
 
 export function EmptyTaskState({ onAddTaskClick }: EmptyTaskStateProps) {
   return (
-    <div className="flex items-center justify-center p-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+    <div className="flex items-center justify-center p-12 bg-theme-hover rounded-lg border-2 border-dashed border-theme">
       <div className="text-center max-w-md">
         <div className="flex justify-center mb-4">
-          <ClipboardList className="w-16 h-16 text-gray-400" />
+          <ClipboardList className="w-16 h-16 text-theme-muted" />
         </div>
-        <h3 className="text-xl font-semibold text-black mb-2">タスクがありません</h3>
-        <p className="text-gray-600 mb-6">
+        <h3 className="text-xl font-semibold text-theme-fg mb-2">タスクがありません</h3>
+        <p className="text-theme-muted mb-6">
           最初のタスクを作成して
           <br />
           Claudeに開発を依頼しましょう

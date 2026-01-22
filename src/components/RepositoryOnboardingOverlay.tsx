@@ -15,11 +15,11 @@ export function RepositoryOnboardingOverlay({
 }: RepositoryOnboardingOverlayProps) {
   return (
     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center">
-      <div className="bg-white rounded-xl p-8 shadow-2xl max-w-xs text-center">
+      <div className="bg-theme-card rounded-xl p-8 shadow-2xl max-w-xs text-center">
         <div className="flex justify-center mb-4">
           <Package className="w-12 h-12 text-blue-500" />
         </div>
-        <h2 className="text-xl font-bold text-black mb-6">セットアップ</h2>
+        <h2 className="text-xl font-bold text-theme-fg mb-6">セットアップ</h2>
 
         <div className="space-y-2 mb-6 text-sm">
           {/* Step 1: リポジトリクローン */}
@@ -73,7 +73,7 @@ export function RepositoryOnboardingOverlay({
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-1 text-xs text-gray-500">
+        <div className="flex items-center justify-center gap-1 text-xs text-theme-muted">
           <span>上部の「Clone Repository」ボタンをクリック</span>
         </div>
       </div>

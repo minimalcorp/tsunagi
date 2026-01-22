@@ -2,6 +2,10 @@ import simpleGit, { SimpleGit } from 'simple-git';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const WORKSPACES_ROOT = path.join(os.homedir(), '.tsunagi', 'workspaces');
 
@@ -19,6 +23,27 @@ export function normalizeBranchName(branch: string): string {
 // bare repositoryのパスを取得
 function getBareRepoPath(owner: string, repo: string): string {
   return path.join(WORKSPACES_ROOT, owner, repo, '.bare');
+}
+
+// gh CLIで認証（GitHub PATを使用）
+export async function authenticateGhCli(githubPat: string): Promise<void> {
+  try {
+    // gh auth statusで認証状態を確認
+    try {
+      await execAsync('gh auth status');
+      // すでに認証されている場合は何もしない
+      return;
+    } catch {
+      // 認証されていない場合は続行
+    }
+
+    // gh auth loginでPATを使用して認証
+    await execAsync(`echo "${githubPat}" | gh auth login --with-token`);
+  } catch (error) {
+    throw new Error(
+      `Failed to authenticate gh CLI: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 // worktreeのパスを取得

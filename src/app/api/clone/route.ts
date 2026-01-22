@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createRepo } from '@/lib/repo-repository';
-import { initBareRepository } from '@/lib/worktree-manager';
+import { initBareRepository, authenticateGhCli } from '@/lib/worktree-manager';
+import { getEnv } from '@/lib/env-repository';
 import * as path from 'path';
 import * as os from 'os';
 
@@ -46,6 +47,17 @@ export async function POST(request: Request) {
     }
 
     const { owner, repo } = parsed;
+
+    // GitHub PATを環境変数から取得してgh認証
+    const envVars = await getEnv('global');
+    if (envVars.GITHUB_PAT) {
+      try {
+        await authenticateGhCli(envVars.GITHUB_PAT);
+      } catch (error) {
+        console.warn('Failed to authenticate gh CLI, continuing with clone:', error);
+        // gh認証に失敗してもcloneは継続
+      }
+    }
 
     // Bare repositoryパスを決定
     const bareRepoPath = path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, '.bare');

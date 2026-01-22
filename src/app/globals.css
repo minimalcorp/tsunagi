@@ -20,27 +20,69 @@
   --error: #d95450;
 }
 
+/* Dark mode via system preference */
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark Mode - Currently using Light Mode theme */
-    /* TODO: Implement dark mode styling in the future */
-    --background: #f4f3ee;
-    --foreground: #1e1e1e;
-    --card-background: #ffffff;
-    --hover-background: #eaeaea;
-    --border: #d0d0d0;
-    --muted: #8c8c8c;
-    --subtle: #6c6c6c;
+  :root:not([data-theme]) {
+    /* Dark Mode */
+    --background: #1a1a1a;
+    --foreground: #e5e5e5;
+    --card-background: #2a2a2a;
+    --hover-background: #333333;
+    --border: #404040;
+    --muted: #a0a0a0;
+    --subtle: #b0b0b0;
 
     /* Accents */
-    --primary: #c15f3c;
-    --primary-hover: #a34c2f;
-    --secondary: #3574d9;
-    --selection: #3574d9;
-    --success: #62a357;
-    --warning: #c7ad3a;
-    --error: #d95450;
+    --primary: #e07856;
+    --primary-hover: #f08a6a;
+    --secondary: #5b9aff;
+    --selection: #5b9aff;
+    --success: #7bc670;
+    --warning: #e5d14f;
+    --error: #ff6b6b;
   }
+}
+
+/* Dark mode via manual selection */
+:root[data-theme='dark'] {
+  /* Dark Mode */
+  --background: #1a1a1a;
+  --foreground: #e5e5e5;
+  --card-background: #2a2a2a;
+  --hover-background: #333333;
+  --border: #404040;
+  --muted: #a0a0a0;
+  --subtle: #b0b0b0;
+
+  /* Accents */
+  --primary: #e07856;
+  --primary-hover: #f08a6a;
+  --secondary: #5b9aff;
+  --selection: #5b9aff;
+  --success: #7bc670;
+  --warning: #e5d14f;
+  --error: #ff6b6b;
+}
+
+/* Light mode via manual selection (overrides system dark mode) */
+:root[data-theme='light'] {
+  /* Light Mode */
+  --background: #f4f3ee;
+  --foreground: #1e1e1e;
+  --card-background: #ffffff;
+  --hover-background: #eaeaea;
+  --border: #d0d0d0;
+  --muted: #8c8c8c;
+  --subtle: #6c6c6c;
+
+  /* Accents */
+  --primary: #c15f3c;
+  --primary-hover: #a34c2f;
+  --secondary: #3574d9;
+  --selection: #3574d9;
+  --success: #62a357;
+  --warning: #c7ad3a;
+  --error: #d95450;
 }
 
 @theme inline {
@@ -66,6 +108,31 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Theme-aware utility classes */
+.bg-theme-bg {
+  background-color: var(--background);
+}
+
+.bg-theme-card {
+  background-color: var(--card-background);
+}
+
+.bg-theme-hover {
+  background-color: var(--hover-background);
+}
+
+.text-theme-fg {
+  color: var(--foreground);
+}
+
+.text-theme-muted {
+  color: var(--muted);
+}
+
+.border-theme {
+  border-color: var(--border);
 }
 
 @keyframes subtle-bounce {

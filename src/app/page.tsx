@@ -187,9 +187,9 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center bg-theme-bg">
         <div className="text-center">
-          <div className="text-2xl">Loading...</div>
+          <div className="text-2xl text-theme-fg">Loading...</div>
         </div>
       </div>
     );

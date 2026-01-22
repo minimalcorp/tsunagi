@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Settings, ArrowUp, Filter } from 'lucide-react';
+import { ThemeToggle } from './ThemeToggle';
 
 interface HeaderProps {
   onCloneClick: () => void;
@@ -86,20 +87,20 @@ export function Header({
       return `${baseStyle} bg-blue-500 text-white hover:bg-blue-600`;
     }
 
-    return `${baseStyle} bg-gray-200 hover:bg-gray-300 text-black`;
+    return `${baseStyle} bg-theme-hover hover:opacity-80 text-theme-fg`;
   };
 
   return (
-    <header className="h-16 border-b flex items-center gap-6 px-6 bg-white">
+    <header className="h-16 border-b border-theme flex items-center gap-6 px-6 bg-theme-card">
       {/* Logo */}
-      <h1 className="text-2xl font-bold text-black flex-shrink-0">Tsunagi</h1>
+      <h1 className="text-2xl font-bold text-theme-fg flex-shrink-0">Tsunagi</h1>
 
       {/* Filters - Desktop (>= 1280px) */}
       <div className="hidden xl:flex gap-4 flex-1 justify-center">
         <select
           value={repoFilter}
           onChange={(e) => handleRepoChange(e.target.value)}
-          className="px-3 py-1.5 border border-gray-200 rounded text-black min-w-48"
+          className="px-3 py-1.5 border border-theme rounded text-theme-fg bg-theme-card min-w-48"
         >
           <option value="">All Repositories</option>
           {repoOptions.map((option) => (
@@ -114,12 +115,15 @@ export function Header({
           placeholder="Search tasks..."
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="px-3 py-1.5 border border-gray-200 rounded w-64 text-black"
+          className="px-3 py-1.5 border border-theme rounded w-64 text-theme-fg bg-theme-card"
         />
       </div>
 
       {/* Spacer for mobile */}
       <div className="flex-1 xl:hidden" />
+
+      {/* Theme Toggle */}
+      <ThemeToggle />
 
       {/* Actions */}
       <div className="flex gap-2 flex-shrink-0">
@@ -127,21 +131,21 @@ export function Header({
         <div className="xl:hidden relative" ref={filterRef}>
           <button
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-black active:scale-95 transition-all"
+            className="px-4 py-2 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-all"
             title="Filters"
           >
             <Filter className="w-5 h-5" />
           </button>
 
           {isFilterOpen && (
-            <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-80 z-50">
+            <div className="absolute top-full right-0 mt-2 bg-theme-card border border-theme rounded-lg shadow-lg p-4 w-80 z-50">
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-black">Repository</label>
+                  <label className="block text-sm font-medium mb-1 text-theme-fg">Repository</label>
                   <select
                     value={repoFilter}
                     onChange={(e) => handleRepoChange(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-gray-200 rounded text-black"
+                    className="w-full px-3 py-1.5 border border-theme rounded text-theme-fg bg-theme-card"
                   >
                     <option value="">All Repositories</option>
                     {repoOptions.map((option) => (
@@ -153,13 +157,13 @@ export function Header({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-black">Search</label>
+                  <label className="block text-sm font-medium mb-1 text-theme-fg">Search</label>
                   <input
                     type="text"
                     placeholder="Search tasks..."
                     value={searchQuery}
                     onChange={(e) => handleSearchChange(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-gray-200 rounded text-black"
+                    className="w-full px-3 py-1.5 border border-theme rounded text-theme-fg bg-theme-card"
                   />
                 </div>
               </div>
@@ -175,17 +179,17 @@ export function Header({
             Clone Repository
           </button>
           {nextStep === 'clone' && !isCloneDialogOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white border-2 border-blue-500 text-black px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-blue-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
               <ArrowUp className="w-5 h-5" />
               Click here first
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white border-l-2 border-t-2 border-blue-500 rotate-45" />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-blue-500 rotate-45" />
             </div>
           )}
         </div>
 
         <button
           onClick={onReload}
-          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-black active:scale-95 transition-all"
+          className="px-4 py-2 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-all"
         >
           Reload
         </button>
@@ -195,10 +199,10 @@ export function Header({
             + Add Task
           </button>
           {nextStep === 'task' && !isAddTaskDialogOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white border-2 border-blue-500 text-black px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-blue-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
               <ArrowUp className="w-5 h-5" />
               Click here
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white border-l-2 border-t-2 border-blue-500 rotate-45" />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-blue-500 rotate-45" />
             </div>
           )}
         </div>
@@ -213,10 +217,10 @@ export function Header({
             Settings
           </button>
           {nextStep === 'env' && !isSettingsDialogOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white border-2 border-blue-500 text-black px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-blue-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
               <ArrowUp className="w-5 h-5" />
               Click here
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white border-l-2 border-t-2 border-blue-500 rotate-45" />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-blue-500 rotate-45" />
             </div>
           )}
         </div>

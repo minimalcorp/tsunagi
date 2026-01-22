@@ -56,47 +56,47 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, owners, repos }: AddTask
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative">
+      <div className="bg-theme-card rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto relative">
         {isLoading && (
-          <div className="absolute inset-0 bg-white bg-opacity-90 rounded-lg flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-theme-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
             <LoadingSpinner size="lg" message="Creating task..." />
           </div>
         )}
 
-        <h2 className="text-xl font-bold mb-4 text-black">Add New Task</h2>
+        <h2 className="text-xl font-bold mb-4 text-theme-fg">Add New Task</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1 text-black">Title *</label>
+            <label className="block text-sm font-medium mb-1 text-theme-fg">Title *</label>
             <input
               type="text"
               required
               maxLength={200}
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-black"
+              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
               disabled={isLoading}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1 text-black">Description</label>
+            <label className="block text-sm font-medium mb-1 text-theme-fg">Description</label>
             <textarea
               maxLength={5000}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded h-24 text-black"
+              className="w-full px-3 py-2 border border-theme rounded h-24 text-theme-fg bg-theme-card"
               disabled={isLoading}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1 text-black">Owner *</label>
+            <label className="block text-sm font-medium mb-1 text-theme-fg">Owner *</label>
             <select
               required
               value={formData.owner}
               onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-black"
+              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
               disabled={isLoading}
             >
               <option value="">Select owner</option>
@@ -109,12 +109,12 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, owners, repos }: AddTask
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1 text-black">Repository *</label>
+            <label className="block text-sm font-medium mb-1 text-theme-fg">Repository *</label>
             <select
               required
               value={formData.repo}
               onChange={(e) => setFormData({ ...formData, repo: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-black"
+              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
               disabled={isLoading}
             >
               <option value="">Select repository</option>
@@ -127,25 +127,25 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, owners, repos }: AddTask
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1 text-black">Branch *</label>
+            <label className="block text-sm font-medium mb-1 text-theme-fg">Branch *</label>
             <input
               type="text"
               required
               maxLength={255}
               value={formData.branch}
               onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-black"
+              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
               placeholder="feature/new-feature"
               disabled={isLoading}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1 text-black">Prompt</label>
+            <label className="block text-sm font-medium mb-1 text-theme-fg">Prompt</label>
             <textarea
               value={formData.prompt}
               onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded h-24 text-black"
+              className="w-full px-3 py-2 border border-theme rounded h-24 text-theme-fg bg-theme-card"
               placeholder="Initial instructions for Claude..."
               disabled={isLoading}
             />
@@ -155,7 +155,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, owners, repos }: AddTask
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-200 rounded text-black active:scale-95 transition-all"
+              className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-all"
               disabled={isLoading}
             >
               Cancel

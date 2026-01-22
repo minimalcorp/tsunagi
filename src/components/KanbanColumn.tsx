@@ -14,11 +14,11 @@ interface KanbanColumnProps {
 
 export function KanbanColumn({ title, status, tasks, sessions, onTaskClick }: KanbanColumnProps) {
   return (
-    <div className="min-w-64 flex flex-col bg-gray-50 rounded-lg p-4 h-full">
+    <div className="min-w-64 flex flex-col bg-theme-hover rounded-lg p-4 h-full">
       {/* ヘッダー */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <span className="text-sm text-gray-500">{tasks.length}</span>
+        <h2 className="text-lg font-semibold text-theme-fg">{title}</h2>
+        <span className="text-sm text-theme-muted">{tasks.length}</span>
       </div>
 
       {/* タスクリスト（縦スクロール） */}

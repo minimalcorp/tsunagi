@@ -34,10 +34,10 @@ export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskC
   return (
     <div
       className={`
-        bg-white border border-gray-200 rounded-lg p-4 cursor-pointer
+        bg-theme-card border border-theme rounded-lg p-4 cursor-pointer
         hover:border-blue-500 transition-colors
         ${isDragging ? 'shadow-xl rotate-2' : ''}
-        ${isClaudeRunning ? 'opacity-50 bg-gray-50' : ''}
+        ${isClaudeRunning ? 'opacity-50 bg-theme-hover' : ''}
       `}
       onClick={() => onTaskClick?.(task.id)}
     >
@@ -53,23 +53,27 @@ export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskC
       )}
 
       {/* タイトル */}
-      <h3 className={`font-semibold mb-2 ${isClaudeRunning ? 'text-gray-500' : 'text-gray-900'}`}>
+      <h3
+        className={`font-semibold mb-2 ${isClaudeRunning ? 'text-theme-muted' : 'text-theme-fg'}`}
+      >
         {task.title}
       </h3>
 
       {/* Owner/Repo/Branch */}
-      <p className={`text-sm mb-2 ${isClaudeRunning ? 'text-gray-400' : 'text-gray-600'}`}>
+      <p
+        className={`text-sm mb-2 ${isClaudeRunning ? 'opacity-60 text-theme-muted' : 'text-theme-muted'}`}
+      >
         {task.owner}/{task.repo} @ {task.branch}
       </p>
 
       {/* Claude状態とメタ情報 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 text-xs text-gray-500">
+        <div className="flex items-center gap-1 text-xs text-theme-muted">
           {stateIcon}
           <span>{task.claudeState}</span>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-theme-muted">
           {/* 工数 */}
           {task.effort && <span className="font-medium">{task.effort}h</span>}
 

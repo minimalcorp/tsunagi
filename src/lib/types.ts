@@ -54,6 +54,7 @@ export interface EnvironmentVariable {
   scope: 'global' | 'owner' | 'repo';
   owner?: string;
   repo?: string;
+  enabled: boolean; // 有効/無効フラグ（デフォルトtrue）
 }
 
 // API Request/Response型
