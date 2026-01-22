@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ data: task });
+    return NextResponse.json({ data: { task } });
   } catch (error) {
     console.error('GET /api/tasks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
@@ -35,7 +35,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ data: updatedTask });
+    return NextResponse.json({ data: { task: updatedTask } });
   } catch (error) {
     console.error('PUT /api/tasks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });

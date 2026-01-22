@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       includeDeleted,
     });
 
-    return NextResponse.json({ data: tasks });
+    return NextResponse.json({ data: { tasks } });
   } catch (error) {
     console.error('GET /api/tasks error:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     // 更新後のタスクを取得
     const updatedTask = await taskRepo.getTask(newTask.id);
 
-    return NextResponse.json({ data: updatedTask }, { status: 201 });
+    return NextResponse.json({ data: { task: updatedTask } }, { status: 201 });
   } catch (error) {
     console.error('POST /api/tasks error:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });

@@ -5,16 +5,9 @@ import * as envRepo from '@/lib/env-repository';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
-    const scope = searchParams.get('scope') as 'global' | 'owner' | 'repo' | null;
+    const scope = (searchParams.get('scope') as 'global' | 'owner' | 'repo' | null) || 'global';
     const owner = searchParams.get('owner');
     const repo = searchParams.get('repo');
-
-    if (!scope) {
-      return NextResponse.json(
-        { error: 'Missing required query parameter: scope' },
-        { status: 400 }
-      );
-    }
 
     if (scope === 'owner' && !owner) {
       return NextResponse.json(
@@ -30,8 +23,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const envVars = await envRepo.getEnv(scope, owner || undefined, repo || undefined);
-    return NextResponse.json({ data: envVars });
+    const env = await envRepo.getEnv(scope, owner || undefined, repo || undefined);
+
+    return NextResponse.json({ data: { env } });
   } catch (error) {
     console.error('GET /api/env error:', error);
     return NextResponse.json({ error: 'Failed to fetch environment variables' }, { status: 500 });

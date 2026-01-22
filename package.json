@@ -15,11 +15,11 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.15",
     "@anthropic-ai/sdk": "^0.71.2",
-    "@headlessui/react": "^2.2.9",
+    "@ark-ui/react": "^5.30.0",
     "@hello-pangea/dnd": "^18.0.1",
-    "@heroicons/react": "^2.2.0",
     "@monaco-editor/react": "^4.7.0",
     "@xyflow/react": "^12.10.0",
+    "lucide-react": "^0.562.0",
     "next": "16.0.10",
     "react": "19.2.1",
     "react-dom": "19.2.1",
