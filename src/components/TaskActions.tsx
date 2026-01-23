@@ -2,8 +2,7 @@
 
 import type { Task } from '@/lib/types';
 import { CommandCopyButton } from './CommandCopyButton';
-import * as path from 'path';
-import * as os from 'os';
+import { Code2, Terminal, Trash2 } from 'lucide-react';
 
 interface TaskActionsProps {
   task: Task;
@@ -11,8 +10,7 @@ interface TaskActionsProps {
 }
 
 function getWorktreePath(task: Task): string {
-  const baseDir = path.join(os.homedir(), '.tsunagi', 'workspaces');
-  return path.join(baseDir, task.owner, task.repo, task.branch);
+  return `~/.tsunagi/workspaces/${task.owner}/${task.repo}/${task.branch}`;
 }
 
 export function TaskActions({ task, onDelete }: TaskActionsProps) {
@@ -26,32 +24,29 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-3 text-theme-fg">Quick Actions</h2>
-
-      {/* Worktree Path */}
-      <div className="mb-4 p-3 bg-theme-hover rounded-lg">
-        <div className="text-xs text-theme-muted mb-1">Worktree Path</div>
-        <div className="font-mono text-sm text-theme-fg break-all">{worktreePath}</div>
-      </div>
-
       {/* Command Copy Buttons */}
-      <div className="space-y-2 mb-4">
+      <div className="grid grid-cols-2 gap-2 mb-4">
         <CommandCopyButton
           command={`code ${worktreePath}`}
-          label="Open in VS Code"
-          icon="📝"
+          label="Copy VS Code Command"
+          icon={<Code2 className="w-4 h-4" />}
           variant="primary"
         />
 
-        <CommandCopyButton command={`cd ${worktreePath}`} label="Open in Terminal" icon="💻" />
+        <CommandCopyButton
+          command={`cd ${worktreePath}`}
+          label="Copy Terminal Command"
+          icon={<Terminal className="w-4 h-4" />}
+        />
       </div>
 
       {/* Delete Button */}
       <button
         onClick={handleDelete}
-        className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+        className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 flex items-center justify-center gap-2"
       >
-        🗑️ Delete Task (+ Worktree/Branch)
+        <Trash2 className="w-4 h-4" />
+        Delete Task (+ Worktree/Branch)
       </button>
     </div>
   );

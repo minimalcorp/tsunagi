@@ -38,8 +38,7 @@ export function TaskInfo({ task, onUpdate }: TaskInfoProps) {
 
   return (
     <div className="border-b border-theme pb-4 mb-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-theme-fg">Task Information</h2>
+      <div className="flex items-center justify-end mb-4">
         {!isEditing ? (
           <button
             onClick={() => setIsEditing(true)}
@@ -145,7 +144,7 @@ export function TaskInfo({ task, onUpdate }: TaskInfoProps) {
           </div>
         </div>
       ) : (
-        <div className="space-y-2 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 text-sm">
           <div>
             <span className="font-medium text-theme-fg">Title:</span>{' '}
             <span className="text-theme-fg">{task.title}</span>
@@ -153,12 +152,6 @@ export function TaskInfo({ task, onUpdate }: TaskInfoProps) {
           <div>
             <span className="font-medium text-theme-fg">Description:</span>{' '}
             <span className="text-theme-fg">{task.description || 'N/A'}</span>
-          </div>
-          <div>
-            <span className="font-medium text-theme-fg">Plan:</span>
-            <pre className="mt-1 whitespace-pre-wrap text-sm text-theme-muted">
-              {task.plan || 'No plan yet'}
-            </pre>
           </div>
           <div>
             <span className="font-medium text-theme-fg">Status:</span>{' '}
@@ -195,6 +188,12 @@ export function TaskInfo({ task, onUpdate }: TaskInfoProps) {
           </div>
           <div className="text-xs text-theme-muted">
             Updated: {new Date(task.updatedAt).toLocaleString()}
+          </div>
+          <div className="md:col-span-2 lg:col-span-3">
+            <span className="font-medium text-theme-fg">Plan:</span>
+            <pre className="mt-1 whitespace-pre-wrap text-sm text-theme-muted">
+              {task.plan || 'No plan yet'}
+            </pre>
           </div>
         </div>
       )}

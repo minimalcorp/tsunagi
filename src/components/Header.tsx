@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Settings, ArrowUp, Filter } from 'lucide-react';
+import { Settings, ArrowUp, Filter, Plus } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 interface HeaderProps {
@@ -93,7 +93,7 @@ export function Header({
   return (
     <header className="h-16 border-b border-theme flex items-center gap-6 px-6 bg-theme-card">
       {/* Logo */}
-      <h1 className="text-2xl font-bold text-theme-fg flex-shrink-0">Tsunagi</h1>
+      <h1 className="text-2xl font-bold text-theme-fg flex-shrink-0">繋</h1>
 
       {/* Filters - Desktop (>= 1280px) */}
       <div className="hidden xl:flex gap-4 flex-1 justify-center">
@@ -196,7 +196,8 @@ export function Header({
 
         <div className="relative">
           <button onClick={onAddTaskClick} className={getButtonStyle('task')}>
-            + Add Task
+            <Plus className="w-4 h-4 inline-block mr-2" />
+            Add Task
           </button>
           {nextStep === 'task' && !isAddTaskDialogOpen && (
             <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-primary text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
@@ -213,7 +214,7 @@ export function Header({
             className={getButtonStyle('env')}
             title="Environment Settings"
           >
-            <Settings className="w-5 h-5 inline-block mr-2" />
+            <Settings className="w-4 h-4 inline-block mr-2" />
             Settings
           </button>
           {nextStep === 'env' && !isSettingsDialogOpen && (

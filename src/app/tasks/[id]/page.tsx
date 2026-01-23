@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import type { Task, ClaudeSession } from '@/lib/types';
 import { TaskInfo } from '@/components/TaskInfo';
 import { SessionTabs } from '@/components/SessionTabs';
@@ -12,12 +13,13 @@ import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 interface TaskDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function TaskDetailPage({ params }: TaskDetailPageProps) {
+  const { id } = use(params);
   const router = useRouter();
   const [task, setTask] = useState<Task | null>(null);
   const [sessions, setSessions] = useState<ClaudeSession[]>([]);
@@ -34,13 +36,13 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       setIsLoading(true);
       try {
         // タスク取得
-        const taskResponse = await fetch(`/api/tasks/${params.id}`);
+        const taskResponse = await fetch(`/api/tasks/${id}`);
         if (!taskResponse.ok) throw new Error('Failed to fetch task');
         const taskData = await taskResponse.json();
         setTask(taskData.data.task);
 
         // セッション取得
-        const sessionsResponse = await fetch(`/api/tasks/${params.id}/sessions`);
+        const sessionsResponse = await fetch(`/api/tasks/${id}/sessions`);
         if (!sessionsResponse.ok) throw new Error('Failed to fetch sessions');
         const sessionsData = await sessionsResponse.json();
         const loadedSessions = sessionsData.data.sessions || [];
@@ -58,7 +60,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     };
 
     loadData();
-  }, [params.id]);
+  }, [id]);
 
   // タスク更新
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
@@ -82,7 +84,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // セッション作成
   const handleSessionCreate = async () => {
     try {
-      const response = await fetch(`/api/tasks/${params.id}/sessions`, {
+      const response = await fetch(`/api/tasks/${id}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -146,6 +148,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     try {
       const response = await fetch(`/api/sessions/${sessionId}/interrupt`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) throw new Error('Failed to interrupt');
@@ -163,6 +167,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     try {
       const response = await fetch(`/api/sessions/${sessionId}/resume`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) throw new Error('Failed to resume');
@@ -207,82 +213,86 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-theme-bg">
-      {/* Back Button */}
-      <div className="p-4 border-b border-theme bg-theme-card">
+    <div className="h-screen flex flex-col bg-theme-bg">
+      {/* Back Button - Fixed at top */}
+      <div className="sticky top-0 z-50 p-4 border-b border-theme bg-theme-card">
         <button
           onClick={() => router.push('/')}
-          className="text-primary-600 hover:text-primary-700 font-medium"
+          className="text-primary-600 hover:text-primary-700 font-medium flex items-center gap-2"
         >
-          ← Back to Board
+          <ArrowLeft className="w-4 h-4" />
+          Back to Board
         </button>
       </div>
 
-      {/* Task Info */}
-      <div className="p-4 border-b border-theme bg-theme-card">
-        <TaskInfo task={task} onUpdate={handleTaskUpdate} />
-      </div>
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Task Info */}
+        <div className="p-4 border-b border-theme bg-theme-card">
+          <TaskInfo task={task} onUpdate={handleTaskUpdate} />
+        </div>
 
-      {/* Session Tabs */}
-      <div className="p-4 bg-theme-card">
-        {sessions.length > 0 ? (
-          <SessionTabs
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            onSessionChange={setActiveSessionId}
-            onSessionCreate={handleSessionCreate}
-            onSessionDelete={handleSessionDelete}
-          />
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-theme-muted mb-4">No sessions yet</p>
-            <button
-              onClick={handleSessionCreate}
-              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-            >
-              + Create First Session
-            </button>
-          </div>
-        )}
-      </div>
-
-      {activeSession && (
-        <>
-          {/* View Toggle */}
-          <div className="px-4 bg-theme-card">
-            <ViewLayoutToggle mode={viewMode} onChange={setViewMode} />
-          </div>
-
-          {/* Editor + Logs (Split or Single) */}
-          <div className="p-4 flex-1 bg-theme-bg">
-            <div
-              className={`
-                h-[600px]
-                ${viewMode === 'split' ? 'grid grid-cols-2 gap-4' : ''}
-              `}
-            >
-              {(viewMode === 'split' || viewMode === 'editor') && (
-                <ClaudePromptEditor
-                  session={activeSession}
-                  prompt={prompts[activeSession.id] || ''}
-                  onExecute={handleExecute}
-                  onInterrupt={handleInterrupt}
-                  onResume={handleResume}
-                  onPromptChange={(prompt) => handlePromptChange(activeSession.id, prompt)}
-                />
-              )}
-
-              {(viewMode === 'split' || viewMode === 'logs') && (
-                <ExecutionLogsChat logs={activeSession.logs} />
-              )}
+        {/* Session Tabs */}
+        <div className="p-4 bg-theme-card">
+          {sessions.length > 0 ? (
+            <SessionTabs
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSessionChange={setActiveSessionId}
+              onSessionCreate={handleSessionCreate}
+              onSessionDelete={handleSessionDelete}
+            />
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-theme-muted mb-4">No sessions yet</p>
+              <button
+                onClick={handleSessionCreate}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                + Create First Session
+              </button>
             </div>
-          </div>
-        </>
-      )}
+          )}
+        </div>
 
-      {/* Quick Actions */}
-      <div className="p-4 border-t border-theme bg-theme-card">
-        <TaskActions task={task} onDelete={handleTaskDelete} />
+        {activeSession && (
+          <>
+            {/* View Toggle */}
+            <div className="px-4 bg-theme-card">
+              <ViewLayoutToggle mode={viewMode} onChange={setViewMode} />
+            </div>
+
+            {/* Editor + Logs (Split or Single) */}
+            <div className="p-4 bg-theme-bg">
+              <div
+                className={`
+                  h-[600px]
+                  ${viewMode === 'split' ? 'grid grid-cols-2 gap-4' : ''}
+                `}
+              >
+                {(viewMode === 'split' || viewMode === 'editor') && (
+                  <ClaudePromptEditor
+                    session={activeSession}
+                    prompt={prompts[activeSession.id] || ''}
+                    onExecute={handleExecute}
+                    onInterrupt={handleInterrupt}
+                    onResume={handleResume}
+                    onPromptChange={(prompt) => handlePromptChange(activeSession.id, prompt)}
+                  />
+                )}
+
+                {(viewMode === 'split' || viewMode === 'logs') && (
+                  <ExecutionLogsChat logs={activeSession.logs} />
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Quick Actions */}
+        <div className="p-4 border-t border-theme bg-theme-card">
+          <TaskActions task={task} onDelete={handleTaskDelete} />
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/task-repository';
+import * as sessionRepo from '@/lib/session-repository';
 import * as worktreeManager from '@/lib/worktree-manager';
 import type { Task } from '@/lib/types';
 
@@ -63,6 +64,18 @@ export async function POST(request: NextRequest) {
       console.error('Failed to create worktree:', error);
       await taskRepo.updateTask(newTask.id, { worktreeStatus: 'error' });
       // worktreeエラーはタスク作成失敗にはしない（後で手動作成可能）
+    }
+
+    // 最初のセッションを自動作成
+    try {
+      await sessionRepo.createSession({
+        taskId: newTask.id,
+        status: 'paused',
+        logs: [],
+      });
+    } catch (error) {
+      console.error('Failed to create initial session:', error);
+      // セッションエラーもタスク作成失敗にはしない
     }
 
     // 更新後のタスクを取得

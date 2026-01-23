@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     }
 
     const sessions = await sessionRepo.getSessions(taskId);
-    return NextResponse.json({ data: sessions });
+    return NextResponse.json({ data: { sessions } });
   } catch (error) {
     console.error('GET /api/tasks/[id]/sessions error:', error);
     return NextResponse.json({ error: 'Failed to fetch sessions' }, { status: 500 });
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       logs: [],
     });
 
-    return NextResponse.json({ data: newSession }, { status: 201 });
+    return NextResponse.json({ data: { session: newSession } }, { status: 201 });
   } catch (error) {
     console.error('POST /api/tasks/[id]/sessions error:', error);
     return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });

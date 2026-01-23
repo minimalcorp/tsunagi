@@ -9,8 +9,15 @@ type Params = {
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const { message } = body;
+    let message: string | undefined;
+
+    try {
+      const body = await request.json();
+      message = body.message;
+    } catch {
+      // Empty body is acceptable
+      message = undefined;
+    }
 
     const session = await sessionRepo.getSession(id);
     if (!session) {

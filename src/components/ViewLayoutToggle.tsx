@@ -1,5 +1,7 @@
 'use client';
 
+import { Columns2, FileEdit, ScrollText } from 'lucide-react';
+
 export type ViewMode = 'split' | 'editor' | 'logs';
 
 interface ViewLayoutToggleProps {
@@ -8,51 +10,31 @@ interface ViewLayoutToggleProps {
 }
 
 export function ViewLayoutToggle({ mode, onChange }: ViewLayoutToggleProps) {
+  const views = [
+    { value: 'split' as const, icon: Columns2, label: 'Split View' },
+    { value: 'editor' as const, icon: FileEdit, label: 'Editor Only' },
+    { value: 'logs' as const, icon: ScrollText, label: 'Logs Only' },
+  ];
+
   return (
-    <div className="flex items-center gap-2 mb-4 p-2 bg-theme-hover rounded-lg">
-      <span className="text-sm font-medium mr-2 text-theme-fg">View:</span>
-
-      <button
-        onClick={() => onChange('split')}
-        className={`
-          px-3 py-1 rounded          ${
-            mode === 'split'
-              ? 'bg-primary text-white'
-              : 'bg-theme-card text-theme-fg hover:bg-theme-hover'
-          }
-        `}
-        title="Split view"
-      >
-        ⚌ Split
-      </button>
-
-      <button
-        onClick={() => onChange('editor')}
-        className={`
-          px-3 py-1 rounded          ${
-            mode === 'editor'
-              ? 'bg-primary text-white'
-              : 'bg-theme-card text-theme-fg hover:bg-theme-hover'
-          }
-        `}
-        title="Editor only"
-      >
-        ◧ Editor
-      </button>
-
-      <button
-        onClick={() => onChange('logs')}
-        className={`
-          px-3 py-1 rounded          ${
-            mode === 'logs'
-              ? 'bg-primary text-white'
-              : 'bg-theme-card text-theme-fg hover:bg-theme-hover'
-          }
-        `}
-        title="Logs only"
-      >
-        ≡ Logs
-      </button>
+    <div className="flex items-center gap-2 mb-4">
+      <span className="text-sm font-medium text-theme-fg">View:</span>
+      <div className="flex items-center gap-1 bg-theme-hover rounded p-1">
+        {views.map(({ value, icon: Icon, label }) => (
+          <button
+            key={value}
+            onClick={() => onChange(value)}
+            className={`px-2 py-1 rounded text-sm ${
+              mode === value
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-theme-muted hover:text-theme-fg'
+            }`}
+            title={label}
+          >
+            <Icon className="w-4 h-4" />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

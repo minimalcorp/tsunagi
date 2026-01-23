@@ -1,6 +1,7 @@
 'use client';
 
 import type { ClaudeSession } from '@/lib/types';
+import { X, Plus } from 'lucide-react';
 
 interface SessionTabsProps {
   sessions: ClaudeSession[];
@@ -19,45 +20,56 @@ export function SessionTabs({
 }: SessionTabsProps) {
   return (
     <div className="flex items-center gap-2 border-b border-theme pb-2 mb-4 overflow-x-auto">
-      {sessions.map((session, index) => (
-        <div
-          key={session.id}
-          className={`
-            flex items-center gap-2 px-4 py-2 rounded-t-lg cursor-pointer flex-shrink-0
-            ${
-              activeSessionId === session.id
-                ? 'bg-primary text-white'
-                : 'bg-theme-hover text-theme-fg hover:opacity-80'
-            }
-          `}
-        >
-          <button onClick={() => onSessionChange(session.id)} className="font-medium">
-            Session {index + 1}
-          </button>
-          {sessions.length > 1 && (
+      {sessions.map((session, index) => {
+        const isActive = activeSessionId === session.id;
+        const isDisabled = session.status === 'running';
+
+        return (
+          <div
+            key={session.id}
+            className={`
+              flex items-center gap-2 px-4 py-2 rounded-t-lg cursor-pointer flex-shrink-0
+              ${
+                isActive
+                  ? 'bg-primary text-white'
+                  : isDisabled
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-[color:var(--primary-600)] text-white hover:bg-primary'
+              }
+            `}
+          >
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm(`Delete Session ${index + 1}?`)) {
-                  onSessionDelete(session.id);
-                }
-              }}
-              className={`text-sm hover:opacity-70 ${
-                activeSessionId === session.id ? 'text-white' : 'text-red-500'
-              }`}
+              onClick={() => !isDisabled && onSessionChange(session.id)}
+              className="font-medium"
+              disabled={isDisabled}
             >
-              ×
+              Session {index + 1}
             </button>
-          )}
-        </div>
-      ))}
+            {sessions.length > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isDisabled && confirm(`Delete Session ${index + 1}?`)) {
+                    onSessionDelete(session.id);
+                  }
+                }}
+                className={`hover:opacity-70 ${isDisabled ? 'text-gray-400' : ''}`}
+                disabled={isDisabled}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        );
+      })}
 
       <button
         onClick={onSessionCreate}
-        className="px-4 py-2 bg-green-500 text-white rounded-t-lg hover:bg-green-600 flex-shrink-0"
+        className="px-4 py-2 bg-primary text-white rounded-t-lg hover:bg-primary-hover flex-shrink-0 flex items-center gap-2"
         title="Create new session"
       >
-        + New Session
+        <Plus className="w-4 h-4" />
+        New Session
       </button>
     </div>
   );

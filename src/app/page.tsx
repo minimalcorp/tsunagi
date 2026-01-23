@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Task, Repository } from '@/lib/types';
 import { Header } from '@/components/Header';
 import { KanbanBoard } from '@/components/KanbanBoard';
@@ -11,6 +12,7 @@ import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
 import { EnvironmentSettingsDialog } from '@/components/EnvironmentSettingsDialog';
 
 export default function Home() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [globalEnv, setGlobalEnv] = useState<Record<string, string>>({});
@@ -185,6 +187,10 @@ export default function Home() {
     setSearchQuery(filters.search);
   };
 
+  const handleTaskClick = (taskId: string) => {
+    router.push(`/tasks/${taskId}`);
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-theme-bg">
@@ -221,7 +227,11 @@ export default function Home() {
 
       {/* カンバンボード（常に表示） */}
       <div className="relative flex-1 overflow-hidden">
-        <KanbanBoard tasks={filteredTasks} onTaskMove={handleTaskMove} />
+        <KanbanBoard
+          tasks={filteredTasks}
+          onTaskMove={handleTaskMove}
+          onTaskClick={handleTaskClick}
+        />
 
         {/* リポジトリ未登録時の半透明オーバーレイ */}
         {onboardingState.nextStep === 'clone' && (

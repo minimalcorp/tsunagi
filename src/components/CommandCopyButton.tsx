@@ -1,18 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { Check } from 'lucide-react';
 
 interface CommandCopyButtonProps {
   command: string;
   label: string;
-  icon?: string;
+  icon?: ReactNode;
   variant?: 'primary' | 'secondary';
 }
 
 export function CommandCopyButton({
   command,
   label,
-  icon = '📋',
+  icon,
   variant = 'secondary',
 }: CommandCopyButtonProps) {
   const [copied, setCopied] = useState(false);
@@ -35,18 +36,22 @@ export function CommandCopyButton({
         ${
           variant === 'primary'
             ? 'bg-primary-600 hover:bg-primary-hover text-white'
-            : 'bg-theme-hover hover:opacity-80 text-theme-fg'
+            : 'bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme'
         }
         ${copied ? 'ring-2 ring-green-500' : ''}
       `}
       title={command}
     >
       {copied ? (
-        <>✓ Copied!</>
+        <span className="flex items-center justify-center gap-2">
+          <Check className="w-4 h-4" />
+          Copied!
+        </span>
       ) : (
-        <>
-          {icon} {label}
-        </>
+        <span className="flex items-center justify-center gap-2">
+          {icon}
+          {label}
+        </span>
       )}
     </button>
   );
