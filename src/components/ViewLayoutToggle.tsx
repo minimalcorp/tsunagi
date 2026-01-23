@@ -24,7 +24,7 @@ export function ViewLayoutToggle({ mode, onChange }: ViewLayoutToggleProps) {
           <button
             key={value}
             onClick={() => onChange(value)}
-            className={`px-2 py-1 rounded text-sm ${
+            className={`px-2 py-1 rounded text-sm cursor-pointer ${
               mode === value
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-theme-muted hover:text-theme-fg'

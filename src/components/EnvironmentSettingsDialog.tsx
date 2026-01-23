@@ -144,7 +144,7 @@ export function EnvironmentSettingsDialog({
                   checked={anthropicEnabled}
                   onChange={(e) => setAnthropicEnabled(e.target.checked)}
                   disabled={isLoading}
-                  className="w-4 h-4"
+                  className="w-4 h-4 cursor-pointer"
                 />
                 <span className="text-xs text-theme-muted">Enabled</span>
               </label>
@@ -182,7 +182,7 @@ export function EnvironmentSettingsDialog({
                   checked={claudeCodeEnabled}
                   onChange={(e) => setClaudeCodeEnabled(e.target.checked)}
                   disabled={isLoading}
-                  className="w-4 h-4"
+                  className="w-4 h-4 cursor-pointer"
                 />
                 <span className="text-xs text-theme-muted">Enabled</span>
               </label>
@@ -218,7 +218,7 @@ export function EnvironmentSettingsDialog({
                   checked={githubEnabled}
                   onChange={(e) => setGithubEnabled(e.target.checked)}
                   disabled={isLoading}
-                  className="w-4 h-4"
+                  className="w-4 h-4 cursor-pointer"
                 />
                 <span className="text-xs text-theme-muted">Enabled</span>
               </label>
@@ -251,14 +251,14 @@ export function EnvironmentSettingsDialog({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-transform"
+              className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-transform cursor-pointer"
               disabled={isLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               disabled={isLoading}
             >
               Save

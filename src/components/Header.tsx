@@ -77,7 +77,7 @@ export function Header({
   // ボタンハイライト用のスタイル関数
   const getButtonStyle = (step: string) => {
     const isHighlighted = nextStep === step;
-    const baseStyle = 'px-4 py-2 rounded transition-transform active:scale-95';
+    const baseStyle = 'px-4 py-2 rounded transition-transform active:scale-95 cursor-pointer';
 
     if (isHighlighted) {
       return `${baseStyle} bg-primary text-white shadow-lg ring-2 ring-primary`;
@@ -131,7 +131,7 @@ export function Header({
         <div className="xl:hidden relative" ref={filterRef}>
           <button
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="px-4 py-2 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform"
+            className="px-4 py-2 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer"
             title="Filters"
           >
             <Filter className="w-5 h-5" />
@@ -189,7 +189,7 @@ export function Header({
 
         <button
           onClick={onReload}
-          className="px-4 py-2 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform"
+          className="px-4 py-2 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer"
         >
           Reload
         </button>

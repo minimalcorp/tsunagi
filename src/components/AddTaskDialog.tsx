@@ -155,14 +155,14 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, owners, repos }: AddTask
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-transform"
+              className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-transform cursor-pointer"
               disabled={isLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               disabled={isLoading}
             >
               Create

@@ -61,7 +61,7 @@ export function TaskInfo({
         {!isEditing ? (
           <button
             onClick={() => setIsEditing(true)}
-            className="p-2 text-primary hover:text-primary-light rounded hover:bg-theme-hover"
+            className="p-2 text-primary hover:text-primary-light rounded hover:bg-theme-hover cursor-pointer"
             title="Edit task"
           >
             <Edit className="w-5 h-5" />
@@ -70,13 +70,13 @@ export function TaskInfo({
           <div className="flex gap-2">
             <button
               onClick={handleSave}
-              className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-hover text-sm"
+              className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-hover text-sm cursor-pointer"
             >
               Save
             </button>
             <button
               onClick={handleCancel}
-              className="px-3 py-1 bg-theme-hover text-theme-fg rounded hover:bg-theme-card text-sm"
+              className="px-3 py-1 bg-theme-hover text-theme-fg rounded hover:bg-theme-card text-sm cursor-pointer"
             >
               Cancel
             </button>
@@ -93,7 +93,7 @@ export function TaskInfo({
           {!isEditing ? (
             <button
               onClick={() => setIsEditing(true)}
-              className="px-3 py-1 text-primary hover:text-primary-600"
+              className="px-3 py-1 text-primary hover:text-primary-600 cursor-pointer"
             >
               Edit
             </button>
@@ -101,13 +101,13 @@ export function TaskInfo({
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
-                className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-hover"
+                className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-hover cursor-pointer"
               >
                 Save
               </button>
               <button
                 onClick={handleCancel}
-                className="px-3 py-1 bg-theme-hover text-theme-fg rounded hover:bg-theme-card"
+                className="px-3 py-1 bg-theme-hover text-theme-fg rounded hover:bg-theme-card cursor-pointer"
               >
                 Cancel
               </button>

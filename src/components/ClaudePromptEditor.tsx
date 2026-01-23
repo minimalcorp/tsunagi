@@ -64,7 +64,7 @@ export function ClaudePromptEditor({
             <button
               onClick={handleExecute}
               disabled={!canExecute}
-              className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50"
+              className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary cursor-pointer"
             >
               ▶ Send
             </button>
@@ -73,7 +73,7 @@ export function ClaudePromptEditor({
           {isRunning && (
             <button
               onClick={handleInterrupt}
-              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-500"
+              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-500 cursor-pointer"
             >
               ■ Interrupt
             </button>

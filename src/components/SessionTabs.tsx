@@ -40,7 +40,7 @@ export function SessionTabs({
           >
             <button
               onClick={() => !isDisabled && onSessionChange(session.id)}
-              className="font-medium"
+              className="font-medium cursor-pointer"
               disabled={isDisabled}
             >
               Session {session.sessionNumber}
@@ -53,7 +53,7 @@ export function SessionTabs({
                     onSessionDelete(session.id);
                   }
                 }}
-                className={`hover:opacity-70 ${isDisabled ? 'text-gray-400' : ''}`}
+                className={`hover:opacity-70 cursor-pointer ${isDisabled ? 'text-gray-400' : ''}`}
                 disabled={isDisabled}
               >
                 <X className="w-4 h-4" />
@@ -65,7 +65,7 @@ export function SessionTabs({
 
       <button
         onClick={onSessionCreate}
-        className="px-4 py-2 h-10 bg-primary text-white rounded-t-lg hover:bg-primary-hover flex-shrink-0 flex items-center justify-center"
+        className="px-4 py-2 h-10 bg-primary text-white rounded-t-lg hover:bg-primary-hover flex-shrink-0 flex items-center justify-center cursor-pointer"
         title="Create new session"
       >
         <Plus className="w-4 h-4" />

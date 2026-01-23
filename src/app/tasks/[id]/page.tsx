@@ -117,6 +117,41 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     };
   }, [activeSessionId, activeSession?.status, task]);
 
+  // グローバルキーボードショートカット
+  useEffect(() => {
+    if (!activeSessionId || !activeSession) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Command + Enter (Mac) or Ctrl + Enter (Windows/Linux) で Send
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        const prompt = prompts[activeSessionId] || '';
+        const isRunning = activeSession.status === 'running';
+        const canExecute = !isRunning && prompt.trim().length > 0;
+
+        if (canExecute) {
+          event.preventDefault();
+          handleExecute(activeSessionId, prompt);
+        }
+      }
+
+      // Esc で Interrupt
+      if (event.key === 'Escape') {
+        const isRunning = activeSession.status === 'running';
+
+        if (isRunning) {
+          event.preventDefault();
+          handleInterrupt(activeSessionId);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeSessionId, activeSession, prompts]);
+
   // タスク更新
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
@@ -267,7 +302,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         <div className="flex items-center justify-between">
           <button
             onClick={() => router.push('/')}
-            className="text-primary-light hover:brightness-110 font-medium flex items-center gap-2"
+            className="text-primary-light hover:brightness-110 font-medium flex items-center gap-2 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Board
@@ -315,7 +350,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               <p className="text-theme-muted mb-4">No sessions yet</p>
               <button
                 onClick={handleSessionCreate}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 cursor-pointer"
               >
                 + Create First Session
               </button>
