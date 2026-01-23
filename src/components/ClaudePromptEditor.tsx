@@ -73,7 +73,7 @@ export function ClaudePromptEditor({
             <button
               onClick={handleResume}
               disabled={isExecuting}
-              className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50 transition-colors"
+              className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50"
             >
               ▶ Resume
             </button>
@@ -81,7 +81,7 @@ export function ClaudePromptEditor({
             <button
               onClick={handleExecute}
               disabled={!canExecute}
-              className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50 transition-colors"
+              className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50"
             >
               ▶ Execute
             </button>
@@ -90,7 +90,7 @@ export function ClaudePromptEditor({
           {isRunning && (
             <button
               onClick={handleInterrupt}
-              className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors"
+              className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
             >
               ■ Interrupt
             </button>

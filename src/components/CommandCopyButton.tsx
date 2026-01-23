@@ -31,7 +31,7 @@ export function CommandCopyButton({
     <button
       onClick={handleClick}
       className={`
-        w-full px-4 py-2 rounded-lg font-medium text-sm transition-all
+        w-full px-4 py-2 rounded-lg font-medium text-sm
         ${
           variant === 'primary'
             ? 'bg-primary-600 hover:bg-primary-hover text-white'

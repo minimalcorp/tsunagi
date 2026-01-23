@@ -23,7 +23,7 @@ export function SessionTabs({
         <div
           key={session.id}
           className={`
-            flex items-center gap-2 px-4 py-2 rounded-t-lg cursor-pointer transition-colors flex-shrink-0
+            flex items-center gap-2 px-4 py-2 rounded-t-lg cursor-pointer flex-shrink-0
             ${
               activeSessionId === session.id
                 ? 'bg-primary text-white'
@@ -54,7 +54,7 @@ export function SessionTabs({
 
       <button
         onClick={onSessionCreate}
-        className="px-4 py-2 bg-green-500 text-white rounded-t-lg hover:bg-green-600 transition-colors flex-shrink-0"
+        className="px-4 py-2 bg-green-500 text-white rounded-t-lg hover:bg-green-600 flex-shrink-0"
         title="Create new session"
       >
         + New Session

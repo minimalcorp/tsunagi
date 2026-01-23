@@ -79,14 +79,14 @@ export function CloneRepositoryDialog({ isOpen, onClose, onClone }: CloneReposit
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-all"
+              className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-transform"
               disabled={isLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading}
             >
               Clone

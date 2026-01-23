@@ -35,7 +35,7 @@ export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskC
     <div
       className={`
         bg-theme-card border border-theme rounded-lg p-4 cursor-pointer
-        hover:border-primary transition-colors
+        hover:border-primary
         ${isDragging ? 'shadow-xl rotate-2' : ''}
         ${isClaudeRunning ? 'opacity-50 bg-theme-hover' : ''}
       `}

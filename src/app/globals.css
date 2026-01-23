@@ -135,6 +135,21 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Global smooth transitions for theme changes */
+* {
+  transition-property: color, background-color, border-color;
+  transition-duration: 200ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Override focus ring color for form inputs */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Theme-aware utility classes */
 .bg-theme-bg {
   background-color: var(--background);

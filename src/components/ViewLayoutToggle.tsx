@@ -15,8 +15,7 @@ export function ViewLayoutToggle({ mode, onChange }: ViewLayoutToggleProps) {
       <button
         onClick={() => onChange('split')}
         className={`
-          px-3 py-1 rounded transition-colors
-          ${
+          px-3 py-1 rounded          ${
             mode === 'split'
               ? 'bg-primary text-white'
               : 'bg-theme-card text-theme-fg hover:bg-theme-hover'
@@ -30,8 +29,7 @@ export function ViewLayoutToggle({ mode, onChange }: ViewLayoutToggleProps) {
       <button
         onClick={() => onChange('editor')}
         className={`
-          px-3 py-1 rounded transition-colors
-          ${
+          px-3 py-1 rounded          ${
             mode === 'editor'
               ? 'bg-primary text-white'
               : 'bg-theme-card text-theme-fg hover:bg-theme-hover'
@@ -45,8 +43,7 @@ export function ViewLayoutToggle({ mode, onChange }: ViewLayoutToggleProps) {
       <button
         onClick={() => onChange('logs')}
         className={`
-          px-3 py-1 rounded transition-colors
-          ${
+          px-3 py-1 rounded          ${
             mode === 'logs'
               ? 'bg-primary text-white'
               : 'bg-theme-card text-theme-fg hover:bg-theme-hover'
