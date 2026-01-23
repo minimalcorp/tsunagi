@@ -46,6 +46,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Get environment variables for this task
     const env = await envRepo.getEnv('repo', task.owner, task.repo);
 
+    // Add user message to logs immediately before execution
+    const userLog: LogEntry = {
+      timestamp: new Date().toISOString(),
+      type: 'message',
+      content: message,
+      metadata: { role: 'user' },
+    };
+    await sessionRepo.updateSession(id, {
+      logs: [...session.logs, userLog],
+    });
+
     // Update session status to running
     await sessionRepo.updateSession(id, { status: 'running' });
 
@@ -71,8 +82,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       onStatusChange: async (status) => {
         // Update session status
         await sessionRepo.updateSession(id, {
-          status: status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'running',
-          ...(status === 'completed' || status === 'failed'
+          status,
+          ...(status === 'success' || status === 'error'
             ? { completedAt: new Date().toISOString() }
             : {}),
         });
@@ -89,7 +100,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }).catch(async (error) => {
       console.error('Claude execution error:', error);
       await sessionRepo.updateSession(id, {
-        status: 'failed',
+        status: 'error',
         completedAt: new Date().toISOString(),
       });
       await taskRepo.updateTask(task.id, { claudeState: 'idle' });

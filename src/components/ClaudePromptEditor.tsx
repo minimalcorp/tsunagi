@@ -2,27 +2,24 @@
 
 import { Editor } from '@monaco-editor/react';
 import { useState } from 'react';
-import type { ClaudeSession, Task } from '@/lib/types';
+import type { ClaudeSession } from '@/lib/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ClaudeState } from '@/components/ClaudeState';
+import { getClaudeStatus } from '@/lib/claude-status';
 
 interface ClaudePromptEditorProps {
   session: ClaudeSession;
-  task: Task;
   prompt: string;
   onExecute: (sessionId: string, prompt: string) => Promise<void>;
   onInterrupt: (sessionId: string) => Promise<void>;
-  onResume: (sessionId: string) => Promise<void>;
   onPromptChange: (prompt: string) => void;
 }
 
 export function ClaudePromptEditor({
   session,
-  task,
   prompt,
   onExecute,
   onInterrupt,
-  onResume,
   onPromptChange,
 }: ClaudePromptEditorProps) {
   const [isExecuting, setIsExecuting] = useState(false);
@@ -48,41 +45,30 @@ export function ClaudePromptEditor({
     }
   };
 
-  const handleResume = async () => {
-    try {
-      setIsExecuting(true);
-      await onResume(session.id);
-    } catch (error) {
-      console.error('Failed to resume:', error);
-    } finally {
-      setIsExecuting(false);
-    }
-  };
-
   const handleEditorChange = (value: string | undefined) => {
     onPromptChange(value || '');
   };
 
-  const isRunning = session.status === 'running';
-  const isPaused = session.status === 'paused';
+  const status = getClaudeStatus(session);
+  const isRunning = status === 'running';
   const canExecute = !isExecuting && !isRunning && prompt.trim().length > 0;
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-2">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <h3 className="text-sm font-semibold text-theme-fg">Prompt</h3>
         <div className="flex items-center gap-2">
-          <ClaudeState task={task} session={session} />
+          <ClaudeState status={status} />
 
-          {isPaused || !isRunning ? (
+          {!isRunning && (
             <button
-              onClick={isPaused ? handleResume : handleExecute}
-              disabled={!canExecute && !isPaused}
+              onClick={handleExecute}
+              disabled={!canExecute}
               className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50"
             >
               ▶ Send
             </button>
-          ) : null}
+          )}
 
           {isRunning && (
             <button
@@ -95,7 +81,7 @@ export function ClaudePromptEditor({
         </div>
       </div>
 
-      <div className="flex-1 border border-theme rounded overflow-hidden">
+      <div className="flex-1 min-h-0 border border-theme rounded overflow-hidden">
         <Editor
           height="100%"
           defaultLanguage="markdown"

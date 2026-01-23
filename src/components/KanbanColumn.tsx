@@ -8,7 +8,7 @@ interface KanbanColumnProps {
   title: string;
   status: 'backlog' | 'planning' | 'tasking' | 'coding' | 'reviewing' | 'done';
   tasks: Task[];
-  sessions?: Record<string, ClaudeSession>; // taskId -> latest session
+  sessions?: Record<string, ClaudeSession[]>; // taskId -> sessions array
   onTaskClick?: (taskId: string) => void;
 }
 
@@ -39,7 +39,7 @@ export function KanbanColumn({ title, status, tasks, sessions, onTaskClick }: Ka
                   >
                     <TaskCard
                       task={task}
-                      latestSession={sessions?.[task.id]}
+                      sessions={sessions?.[task.id] || []}
                       isDragging={snapshot.isDragging}
                       onTaskClick={onTaskClick}
                     />

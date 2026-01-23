@@ -38,7 +38,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const newSession = await sessionRepo.createSession({
       taskId,
-      status: 'paused',
+      status: 'idle',
       logs: [],
     });
 

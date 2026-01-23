@@ -2,16 +2,18 @@
 
 import type { Task, ClaudeSession } from '@/lib/types';
 import { ClaudeState } from '@/components/ClaudeState';
+import { getClaudeStatus } from '@/lib/claude-status';
 
 interface TaskCardProps {
   task: Task;
-  latestSession?: ClaudeSession;
+  sessions: ClaudeSession[];
   isDragging: boolean;
   onTaskClick?: (taskId: string) => void;
 }
 
-export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskCardProps) {
+export function TaskCard({ task, sessions, isDragging, onTaskClick }: TaskCardProps) {
   const isClaudeRunning = task.claudeState === 'running';
+  const totalLogs = sessions.reduce((sum, session) => sum + session.logs.length, 0);
 
   return (
     <div
@@ -50,16 +52,23 @@ export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskC
 
       {/* Claude状態とメタ情報 */}
       <div className="flex items-center justify-between">
-        <ClaudeState task={task} session={latestSession} />
+        {/* セッション状態を横に並べて表示 */}
+        <div className="flex items-center gap-1">
+          {sessions.length > 0 ? (
+            sessions.map((session) => (
+              <ClaudeState key={session.id} status={getClaudeStatus(session)} showLabel={false} />
+            ))
+          ) : (
+            <ClaudeState status="idle" showLabel={false} />
+          )}
+        </div>
 
         <div className="flex items-center gap-2 text-xs text-theme-muted">
           {/* 工数 */}
           {task.effort && <span className="font-medium">{task.effort}h</span>}
 
           {/* ログ数 */}
-          {latestSession && latestSession.logs.length > 0 && (
-            <span>{latestSession.logs.length} logs</span>
-          )}
+          {totalLogs > 0 && <span>{totalLogs} logs</span>}
         </div>
       </div>
     </div>

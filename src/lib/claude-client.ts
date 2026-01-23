@@ -8,7 +8,7 @@ export interface ExecuteOptions {
   env?: Record<string, string>;
   agentSessionId?: string;
   onLog?: (log: LogEntry) => void;
-  onStatusChange?: (status: 'running' | 'completed' | 'failed') => void;
+  onStatusChange?: (status: 'running' | 'success' | 'error') => void;
   onAgentSessionId?: (agentSessionId: string) => void;
 }
 
@@ -35,14 +35,6 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
   try {
     onStatusChange?.('running');
 
-    // Log user message
-    onLog?.({
-      timestamp: new Date().toISOString(),
-      type: 'message',
-      content: prompt,
-      metadata: { role: 'user' },
-    });
-
     // Build query options
     const queryOptions: {
       cwd: string;
@@ -52,9 +44,24 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       cwd: workingDirectory,
     };
 
-    if (env) {
-      queryOptions.env = env;
-    }
+    // Merge custom env with system environment to ensure node and other binaries are accessible
+    // Filter out undefined values from process.env
+    const systemEnv = Object.fromEntries(
+      Object.entries(process.env).filter(([, v]) => v !== undefined)
+    ) as Record<string, string>;
+
+    // Ensure PATH is always set - critical for spawning processes
+    const defaultPath =
+      '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/workspace/node_modules/.bin:/home/node/.local/bin';
+
+    const systemPath = systemEnv.PATH || defaultPath;
+
+    queryOptions.env = {
+      ...systemEnv,
+      ...env,
+      // Ensure PATH is always set after custom env - merge custom PATH with system PATH
+      PATH: env?.PATH ? `${systemPath}:${env.PATH}` : systemPath,
+    };
 
     // If agentSessionId is provided, resume the session
     if (agentSessionId) {
@@ -64,7 +71,11 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
     // Execute query
     const queryResult = query({
       prompt,
-      options: queryOptions,
+      options: {
+        ...queryOptions,
+        // Explicitly specify node executable to avoid spawn errors
+        executable: 'node',
+      },
     });
 
     // Store the query object for interrupt support
@@ -145,6 +156,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
                 num_turns: message.num_turns,
               },
             });
+            onStatusChange?.('success');
           } else {
             // Log errors from error result
             for (const error of message.errors) {
@@ -155,6 +167,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
                 metadata: { subtype: message.subtype },
               });
             }
+            onStatusChange?.('error');
           }
           break;
 
@@ -174,9 +187,8 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       }
     }
 
-    // Session completed successfully
+    // Clean up
     activeQueries.delete(sessionId);
-    onStatusChange?.('completed');
   } catch (error) {
     activeQueries.delete(sessionId);
 
@@ -186,14 +198,20 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       return;
     }
 
+    // Log detailed error information
+    const errorMessage =
+      error instanceof Error
+        ? `${error.message}\n\nStack: ${error.stack}\n\nError details: ${JSON.stringify(error, null, 2)}`
+        : 'Unknown error occurred';
+
     onLog?.({
       timestamp: new Date().toISOString(),
       type: 'error',
-      content: error instanceof Error ? error.message : 'Unknown error occurred',
+      content: errorMessage,
       metadata: { error },
     });
 
-    onStatusChange?.('failed');
+    onStatusChange?.('error');
     throw error;
   }
 }

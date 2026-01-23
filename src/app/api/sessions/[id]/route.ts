@@ -34,12 +34,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // If cancel=true, update status to cancelled before deleting
+    // If cancel=true, interrupt the session before deleting
     if (shouldCancel && session.status === 'running') {
-      await sessionRepo.updateSession(id, {
-        status: 'cancelled',
-        completedAt: new Date().toISOString(),
-      });
+      // Note: We don't update status, just delete the session
+      // The interrupt will be handled by the deletion itself
     }
 
     const success = await sessionRepo.deleteSession(id);

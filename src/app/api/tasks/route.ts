@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     try {
       await sessionRepo.createSession({
         taskId: newTask.id,
-        status: 'paused',
+        status: 'idle',
         logs: [],
       });
     } catch (error) {

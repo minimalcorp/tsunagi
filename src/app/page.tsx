@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Task, Repository } from '@/lib/types';
+import type { Task, Repository, ClaudeSession } from '@/lib/types';
 import { Header } from '@/components/Header';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
@@ -16,6 +16,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [globalEnv, setGlobalEnv] = useState<Record<string, string>>({});
+  const [sessions, setSessions] = useState<Record<string, ClaudeSession[]>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // Dialog states
@@ -79,10 +80,11 @@ export default function Home() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [tasksData, ownersData, envData] = await Promise.all([
+      const [tasksData, ownersData, envData, sessionsData] = await Promise.all([
         fetch('/api/tasks').then((r) => r.json()),
         fetch('/api/owners').then((r) => r.json()),
         fetch('/api/env').then((r) => r.json()),
+        fetch('/api/sessions').then((r) => r.json()),
       ]);
 
       setTasks(tasksData.data.tasks);
@@ -92,6 +94,20 @@ export default function Home() {
       );
       setRepositories(allRepos);
       setGlobalEnv(envData.data.env);
+
+      // セッションをtaskIdでグループ化
+      const allSessions = (sessionsData.data || []) as ClaudeSession[];
+      const groupedSessions = allSessions.reduce(
+        (acc, session) => {
+          if (!acc[session.taskId]) {
+            acc[session.taskId] = [];
+          }
+          acc[session.taskId].push(session);
+          return acc;
+        },
+        {} as Record<string, ClaudeSession[]>
+      );
+      setSessions(groupedSessions);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -229,6 +245,7 @@ export default function Home() {
       <div className="relative flex-1 overflow-hidden">
         <KanbanBoard
           tasks={filteredTasks}
+          sessions={sessions}
           onTaskMove={handleTaskMove}
           onTaskClick={handleTaskClick}
         />

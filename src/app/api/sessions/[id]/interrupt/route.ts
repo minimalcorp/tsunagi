@@ -24,12 +24,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Interrupt the Claude session
     await interruptSession(id);
 
-    // Update session status
-    await sessionRepo.updateSession(id, {
-      status: 'paused',
-    });
+    // Note: Session status remains 'running' as per SDK design
+    // The next message API call will automatically resume the session
 
-    // Update task claudeState
+    // Update task claudeState to idle
     const task = await taskRepo.getTask(session.taskId);
     if (task) {
       await taskRepo.updateTask(task.id, { claudeState: 'idle' });

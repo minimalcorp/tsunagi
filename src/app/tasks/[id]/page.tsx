@@ -87,7 +87,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         if (!response.ok) return;
 
         const data = await response.json();
-        const updatedSession = data.data.session;
+        const updatedSession = data.data;
 
         // セッション情報を更新
         setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSession : s)));
@@ -180,6 +180,26 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // Claude実行
   const handleExecute = async (sessionId: string, prompt: string) => {
     try {
+      // ユーザーメッセージを即座にlogsに追加
+      const userLog = {
+        timestamp: new Date().toISOString(),
+        type: 'message' as const,
+        content: prompt,
+        metadata: { role: 'user' },
+      };
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId
+            ? {
+                ...s,
+                logs: [...s.logs, userLog],
+                status: 'running' as const,
+              }
+            : s
+        )
+      );
+
       const response = await fetch(`/api/sessions/${sessionId}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -187,11 +207,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       });
 
       if (!response.ok) throw new Error('Failed to execute');
-
-      // セッション状態を更新
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, status: 'running' } : s))
-      );
     } catch (error) {
       console.error('Failed to execute:', error);
       throw error;
@@ -209,31 +224,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       if (!response.ok) throw new Error('Failed to interrupt');
 
-      // セッション状態を更新
-      setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, status: 'paused' } : s)));
+      // Note: Session status will be updated by polling
     } catch (error) {
       console.error('Failed to interrupt:', error);
-      throw error;
-    }
-  };
-
-  // Claude再開
-  const handleResume = async (sessionId: string) => {
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}/resume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-
-      if (!response.ok) throw new Error('Failed to resume');
-
-      // セッション状態を更新
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, status: 'running' } : s))
-      );
-    } catch (error) {
-      console.error('Failed to resume:', error);
       throw error;
     }
   };
@@ -348,11 +341,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                 {(viewMode === 'split' || viewMode === 'editor') && (
                   <ClaudePromptEditor
                     session={activeSession}
-                    task={task}
                     prompt={prompts[activeSession.id] || ''}
                     onExecute={handleExecute}
                     onInterrupt={handleInterrupt}
-                    onResume={handleResume}
                     onPromptChange={(prompt) => handlePromptChange(activeSession.id, prompt)}
                   />
                 )}

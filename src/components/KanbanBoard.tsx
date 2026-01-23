@@ -6,7 +6,7 @@ import { KanbanColumn } from './KanbanColumn';
 
 interface KanbanBoardProps {
   tasks: Task[];
-  sessions?: Record<string, ClaudeSession>; // taskId -> latest session
+  sessions?: Record<string, ClaudeSession[]>; // taskId -> sessions array
   onTaskMove: (taskId: string, newStatus: Task['status']) => void;
   onTaskClick?: (taskId: string) => void;
 }

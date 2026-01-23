@@ -19,11 +19,13 @@ export interface Task {
 }
 
 // ClaudeSession型
+export type ClaudeSessionStatus = 'idle' | 'running' | 'success' | 'error';
+
 export interface ClaudeSession {
   id: string; // アプリケーション側のセッションID (UUID)
   taskId: string;
   sessionNumber: number; // タブ表示用の連番（削除されても変わらない）
-  status: 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+  status: ClaudeSessionStatus;
   logs: LogEntry[];
   startedAt: string;
   completedAt?: string;
