@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { LogEntry } from '@/lib/types';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface ExecutionLogsChatProps {
   logs: LogEntry[];
@@ -37,6 +38,8 @@ export function ExecutionLogsChat({ logs }: ExecutionLogsChatProps) {
 
 function ChatMessageItem({ log }: { log: LogEntry }) {
   const [isToolExpanded, setIsToolExpanded] = useState(false);
+  const { effectiveTheme } = useTheme();
+  const isDark = effectiveTheme === 'dark';
 
   // message type
   if (log.type === 'message') {
@@ -86,28 +89,46 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="inline-block text-left rounded-lg p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 max-w-full">
+          <div
+            className={`inline-block text-left rounded-lg p-3 max-w-full ${
+              isDark ? 'bg-purple-900/20 border-purple-700' : 'bg-purple-50 border-purple-200'
+            } border`}
+          >
             {hasInput ? (
               <button
                 onClick={() => setIsToolExpanded(!isToolExpanded)}
                 className="flex items-center gap-2 hover:opacity-70 w-full text-left cursor-pointer"
               >
-                <span className="text-xs font-medium text-gray-900 dark:text-purple-300">
+                <span
+                  className={`text-xs font-medium ${
+                    isDark ? 'text-purple-300' : 'text-purple-950'
+                  }`}
+                >
                   {toolName}
                 </span>
                 {isToolExpanded ? (
-                  <ChevronUp className="w-3 h-3 text-gray-900 dark:text-purple-300" />
+                  <ChevronUp
+                    className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
+                  />
                 ) : (
-                  <ChevronDown className="w-3 h-3 text-gray-900 dark:text-purple-300" />
+                  <ChevronDown
+                    className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
+                  />
                 )}
               </button>
             ) : (
-              <span className="text-xs font-medium text-gray-900 dark:text-purple-300">
+              <span
+                className={`text-xs font-medium ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
+              >
                 {toolName}
               </span>
             )}
             {isToolExpanded && hasInput && (
-              <pre className="text-xs bg-white dark:bg-gray-800 p-2 rounded overflow-x-auto mt-2 max-w-full">
+              <pre
+                className={`text-xs p-2 rounded overflow-x-auto mt-2 max-w-full ${
+                  isDark ? 'bg-gray-800' : 'bg-white'
+                }`}
+              >
                 {JSON.stringify(log.metadata?.input, null, 2)}
               </pre>
             )}
@@ -125,8 +146,16 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="inline-block text-left rounded-lg p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
-            <div className="text-xs text-blue-800 dark:text-blue-300 whitespace-pre-wrap">
+          <div
+            className={`inline-block text-left rounded-lg p-3 border ${
+              isDark ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-200'
+            }`}
+          >
+            <div
+              className={`text-xs whitespace-pre-wrap ${
+                isDark ? 'text-blue-300' : 'text-blue-800'
+              }`}
+            >
               {log.content}
             </div>
           </div>
@@ -143,7 +172,11 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="inline-block text-left rounded-lg p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700">
+          <div
+            className={`inline-block text-left rounded-lg p-3 border ${
+              isDark ? 'bg-primary-900/20 border-primary-700' : 'bg-primary-50 border-primary-200'
+            }`}
+          >
             <div className="text-xs text-theme-fg">{log.content}</div>
           </div>
         </div>
@@ -159,8 +192,16 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="inline-block text-left rounded-lg p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700">
-            <div className="text-xs text-yellow-800 dark:text-yellow-300 whitespace-pre-wrap italic">
+          <div
+            className={`inline-block text-left rounded-lg p-3 border ${
+              isDark ? 'bg-yellow-900/20 border-yellow-700' : 'bg-yellow-50 border-yellow-200'
+            }`}
+          >
+            <div
+              className={`text-xs whitespace-pre-wrap italic ${
+                isDark ? 'text-yellow-300' : 'text-yellow-800'
+              }`}
+            >
               {log.content}
             </div>
           </div>
@@ -177,8 +218,14 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="inline-block text-left rounded-lg p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700">
-            <div className="text-xs text-gray-900 dark:text-red-300 whitespace-pre-wrap">
+          <div
+            className={`inline-block text-left rounded-lg p-3 border ${
+              isDark ? 'bg-red-900/20 border-red-700' : 'bg-red-100 border-red-300'
+            }`}
+          >
+            <div
+              className={`text-xs whitespace-pre-wrap ${isDark ? 'text-red-300' : 'text-red-950'}`}
+            >
               {log.content}
             </div>
           </div>

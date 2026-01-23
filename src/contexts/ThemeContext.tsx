@@ -32,7 +32,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (theme === 'system') {
         const systemTheme = mediaQuery.matches ? 'dark' : 'light';
         setEffectiveTheme(systemTheme);
-        root.removeAttribute('data-theme'); // システム設定に従う
+        root.setAttribute('data-theme', systemTheme); // システム設定の結果を適用
       } else {
         setEffectiveTheme(theme);
         root.setAttribute('data-theme', theme); // 手動選択を適用
