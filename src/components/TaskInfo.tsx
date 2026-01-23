@@ -1,17 +1,36 @@
 'use client';
 
 import { useState } from 'react';
+import { Edit } from 'lucide-react';
 import type { Task } from '@/lib/types';
 
 interface TaskInfoProps {
   task: Task;
   onUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  editOnly?: boolean;
+  isEditing?: boolean;
+  onEditChange?: (isEditing: boolean) => void;
+  hideButtons?: boolean;
 }
 
-export function TaskInfo({ task, onUpdate }: TaskInfoProps) {
-  const [isEditing, setIsEditing] = useState(false);
+export function TaskInfo({
+  task,
+  onUpdate,
+  editOnly = false,
+  isEditing: externalIsEditing,
+  onEditChange,
+  hideButtons = false,
+}: TaskInfoProps) {
+  const [internalIsEditing, setInternalIsEditing] = useState(false);
+  const isEditing = externalIsEditing !== undefined ? externalIsEditing : internalIsEditing;
+  const setIsEditing = (value: boolean) => {
+    if (onEditChange) {
+      onEditChange(value);
+    } else {
+      setInternalIsEditing(value);
+    }
+  };
   const [formData, setFormData] = useState({
-    title: task.title,
     description: task.description,
     plan: task.plan,
     status: task.status,
@@ -26,7 +45,6 @@ export function TaskInfo({ task, onUpdate }: TaskInfoProps) {
 
   const handleCancel = () => {
     setFormData({
-      title: task.title,
       description: task.description,
       plan: task.plan,
       status: task.status,
@@ -36,46 +54,70 @@ export function TaskInfo({ task, onUpdate }: TaskInfoProps) {
     setIsEditing(false);
   };
 
-  return (
-    <div className="border-b border-theme pb-4 mb-4">
-      <div className="flex items-center justify-end mb-4">
+  // editOnlyモードの場合、Editボタンのみを返す
+  if (editOnly) {
+    return (
+      <>
         {!isEditing ? (
           <button
             onClick={() => setIsEditing(true)}
-            className="px-3 py-1 text-primary hover:text-primary-600"
+            className="p-2 text-primary hover:text-primary-light rounded hover:bg-theme-hover"
+            title="Edit task"
           >
-            Edit
+            <Edit className="w-5 h-5" />
           </button>
         ) : (
           <div className="flex gap-2">
             <button
               onClick={handleSave}
-              className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-hover"
+              className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-hover text-sm"
             >
               Save
             </button>
             <button
               onClick={handleCancel}
-              className="px-3 py-1 bg-theme-hover text-theme-fg rounded hover:opacity-80"
+              className="px-3 py-1 bg-theme-hover text-theme-fg rounded hover:bg-theme-card text-sm"
             >
               Cancel
             </button>
           </div>
         )}
-      </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="border-b border-theme pb-4 mb-4">
+      {!hideButtons && (
+        <div className="flex items-center justify-end mb-4">
+          {!isEditing ? (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="px-3 py-1 text-primary hover:text-primary-600"
+            >
+              Edit
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-hover"
+              >
+                Save
+              </button>
+              <button
+                onClick={handleCancel}
+                className="px-3 py-1 bg-theme-hover text-theme-fg rounded hover:bg-theme-card"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {isEditing ? (
         <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">Title</label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium mb-1 text-theme-fg">Description</label>
             <textarea
@@ -144,11 +186,7 @@ export function TaskInfo({ task, onUpdate }: TaskInfoProps) {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 text-sm">
-          <div>
-            <span className="font-medium text-theme-fg">Title:</span>{' '}
-            <span className="text-theme-fg">{task.title}</span>
-          </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div>
             <span className="font-medium text-theme-fg">Description:</span>{' '}
             <span className="text-theme-fg">{task.description || 'N/A'}</span>
@@ -179,17 +217,7 @@ export function TaskInfo({ task, onUpdate }: TaskInfoProps) {
               {task.order !== undefined ? task.order : 'Not set'}
             </span>
           </div>
-          <div>
-            <span className="font-medium text-theme-fg">Claude State:</span>{' '}
-            <span className="text-theme-fg">{task.claudeState}</span>
-          </div>
-          <div className="text-xs text-theme-muted">
-            Created: {new Date(task.createdAt).toLocaleString()}
-          </div>
-          <div className="text-xs text-theme-muted">
-            Updated: {new Date(task.updatedAt).toLocaleString()}
-          </div>
-          <div className="md:col-span-2 lg:col-span-3">
+          <div className="col-span-2">
             <span className="font-medium text-theme-fg">Plan:</span>
             <pre className="mt-1 whitespace-pre-wrap text-sm text-theme-muted">
               {task.plan || 'No plan yet'}

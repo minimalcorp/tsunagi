@@ -27,6 +27,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [prompts, setPrompts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isEditingTask, setIsEditingTask] = useState(false);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
 
@@ -45,7 +46,21 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         const sessionsResponse = await fetch(`/api/tasks/${id}/sessions`);
         if (!sessionsResponse.ok) throw new Error('Failed to fetch sessions');
         const sessionsData = await sessionsResponse.json();
-        const loadedSessions = sessionsData.data.sessions || [];
+        let loadedSessions = sessionsData.data.sessions || [];
+
+        // セッションが0個の場合、自動的に1個作成
+        if (loadedSessions.length === 0) {
+          const createResponse = await fetch(`/api/tasks/${id}/sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          if (createResponse.ok) {
+            const createData = await createResponse.json();
+            loadedSessions = [createData.data.session];
+          }
+        }
+
         setSessions(loadedSessions);
 
         // アクティブセッション設定
@@ -214,22 +229,42 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
   return (
     <div className="h-screen flex flex-col bg-theme-bg">
-      {/* Back Button - Fixed at top */}
+      {/* Header - Fixed at top */}
       <div className="sticky top-0 z-50 p-4 border-b border-theme bg-theme-card">
-        <button
-          onClick={() => router.push('/')}
-          className="text-primary-600 hover:text-primary-700 font-medium flex items-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Board
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => router.push('/')}
+            className="text-primary-light hover:brightness-110 font-medium flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Board
+          </button>
+
+          <h1 className="text-xl font-bold text-theme-fg absolute left-1/2 -translate-x-1/2">
+            {task.title}
+          </h1>
+
+          <TaskInfo
+            task={task}
+            onUpdate={handleTaskUpdate}
+            editOnly
+            isEditing={isEditingTask}
+            onEditChange={setIsEditingTask}
+          />
+        </div>
       </div>
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Task Info */}
+        {/* Task Info Detail Section */}
         <div className="p-4 border-b border-theme bg-theme-card">
-          <TaskInfo task={task} onUpdate={handleTaskUpdate} />
+          <TaskInfo
+            task={task}
+            onUpdate={handleTaskUpdate}
+            isEditing={isEditingTask}
+            onEditChange={setIsEditingTask}
+            hideButtons={true}
+          />
         </div>
 
         {/* Session Tabs */}
@@ -273,6 +308,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                 {(viewMode === 'split' || viewMode === 'editor') && (
                   <ClaudePromptEditor
                     session={activeSession}
+                    task={task}
                     prompt={prompts[activeSession.id] || ''}
                     onExecute={handleExecute}
                     onInterrupt={handleInterrupt}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as sessionRepo from '@/lib/session-repository';
+import { randomUUID } from 'crypto';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -21,18 +22,24 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // TODO: Phase 6 - Implement Claude Agent SDK integration
+    // 最初のメッセージ送信時にagentSessionIdを生成
+    // TODO: Phase 6 - Replace with actual Claude Agent SDK session ID
+    const updates: Partial<typeof session> = {};
+    if (!session.agentSessionId) {
+      updates.agentSessionId = `agent-${randomUUID()}`;
+    }
+
     // For now, just add the message to logs
     const newLog = {
       timestamp: new Date().toISOString(),
       type: 'message' as const,
       content,
-      metadata: {},
+      metadata: { role: 'user' },
     };
 
-    await sessionRepo.updateSession(id, {
-      logs: [...session.logs, newLog],
-    });
+    updates.logs = [...session.logs, newLog];
+
+    await sessionRepo.updateSession(id, updates);
 
     return NextResponse.json({ data: { success: true } });
   } catch (error) {

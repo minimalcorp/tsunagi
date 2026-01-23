@@ -18,7 +18,7 @@ export function ExecutionLogsChat({ logs }: ExecutionLogsChatProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <h3 className="text-sm font-semibold mb-2 text-theme-fg">Execution Logs</h3>
+      <h3 className="text-sm font-semibold mb-2 text-theme-fg">Logs</h3>
 
       <div className="flex-1 overflow-y-auto border border-theme rounded p-4 space-y-3 bg-theme-hover">
         {logs.length === 0 ? (

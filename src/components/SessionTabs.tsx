@@ -20,7 +20,7 @@ export function SessionTabs({
 }: SessionTabsProps) {
   return (
     <div className="flex items-center gap-2 border-b border-theme pb-2 mb-4 overflow-x-auto">
-      {sessions.map((session, index) => {
+      {sessions.map((session) => {
         const isActive = activeSessionId === session.id;
         const isDisabled = session.status === 'running';
 
@@ -28,7 +28,7 @@ export function SessionTabs({
           <div
             key={session.id}
             className={`
-              flex items-center gap-2 px-4 py-2 rounded-t-lg cursor-pointer flex-shrink-0
+              flex items-center gap-2 px-4 py-2 h-10 rounded-t-lg cursor-pointer flex-shrink-0
               ${
                 isActive
                   ? 'bg-primary text-white'
@@ -43,13 +43,13 @@ export function SessionTabs({
               className="font-medium"
               disabled={isDisabled}
             >
-              Session {index + 1}
+              Session {session.sessionNumber}
             </button>
-            {sessions.length > 1 && (
+            {sessions.length > 1 && !session.agentSessionId && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!isDisabled && confirm(`Delete Session ${index + 1}?`)) {
+                  if (!isDisabled && confirm(`Delete Session ${session.sessionNumber}?`)) {
                     onSessionDelete(session.id);
                   }
                 }}
@@ -65,11 +65,10 @@ export function SessionTabs({
 
       <button
         onClick={onSessionCreate}
-        className="px-4 py-2 bg-primary text-white rounded-t-lg hover:bg-primary-hover flex-shrink-0 flex items-center gap-2"
+        className="px-4 py-2 h-10 bg-primary text-white rounded-t-lg hover:bg-primary-hover flex-shrink-0 flex items-center justify-center"
         title="Create new session"
       >
         <Plus className="w-4 h-4" />
-        New Session
       </button>
     </div>
   );

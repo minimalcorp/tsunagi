@@ -2,11 +2,13 @@
 
 import { Editor } from '@monaco-editor/react';
 import { useState } from 'react';
-import type { ClaudeSession } from '@/lib/types';
+import type { ClaudeSession, Task } from '@/lib/types';
 import { useTheme } from '@/contexts/ThemeContext';
+import { ClaudeState } from '@/components/ClaudeState';
 
 interface ClaudePromptEditorProps {
   session: ClaudeSession;
+  task: Task;
   prompt: string;
   onExecute: (sessionId: string, prompt: string) => Promise<void>;
   onInterrupt: (sessionId: string) => Promise<void>;
@@ -16,6 +18,7 @@ interface ClaudePromptEditorProps {
 
 export function ClaudePromptEditor({
   session,
+  task,
   prompt,
   onExecute,
   onInterrupt,
@@ -68,29 +71,23 @@ export function ClaudePromptEditor({
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-theme-fg">Prompt</h3>
-        <div className="flex gap-2">
-          {isPaused ? (
+        <div className="flex items-center gap-2">
+          <ClaudeState task={task} session={session} />
+
+          {isPaused || !isRunning ? (
             <button
-              onClick={handleResume}
-              disabled={isExecuting}
+              onClick={isPaused ? handleResume : handleExecute}
+              disabled={!canExecute && !isPaused}
               className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50"
             >
-              ▶ Resume
+              ▶ Send
             </button>
-          ) : (
-            <button
-              onClick={handleExecute}
-              disabled={!canExecute}
-              className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50"
-            >
-              ▶ Execute
-            </button>
-          )}
+          ) : null}
 
           {isRunning && (
             <button
               onClick={handleInterrupt}
-              className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-500"
             >
               ■ Interrupt
             </button>
@@ -115,13 +112,6 @@ export function ClaudePromptEditor({
           theme={effectiveTheme === 'dark' ? 'vs-dark' : 'vs-light'}
         />
       </div>
-
-      {isRunning && (
-        <div className="mt-2 flex items-center text-primary-600 text-sm">
-          <span className="animate-pulse mr-2">●</span>
-          Running...
-        </div>
-      )}
     </div>
   );
 }

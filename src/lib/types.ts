@@ -20,13 +20,15 @@ export interface Task {
 
 // ClaudeSession型
 export interface ClaudeSession {
-  id: string;
+  id: string; // アプリケーション側のセッションID (UUID)
   taskId: string;
+  sessionNumber: number; // タブ表示用の連番（削除されても変わらない）
   status: 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
   logs: LogEntry[];
   startedAt: string;
   completedAt?: string;
   updatedAt: string;
+  agentSessionId?: string; // Claude Agent SDKのセッションID (最初のプロンプト送信時に設定)
 }
 
 // LogEntry型

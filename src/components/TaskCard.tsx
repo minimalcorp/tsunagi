@@ -1,7 +1,7 @@
 'use client';
 
 import type { Task, ClaudeSession } from '@/lib/types';
-import { Loader2, CheckCircle2, XCircle, PauseCircle, Circle } from 'lucide-react';
+import { ClaudeState } from '@/components/ClaudeState';
 
 interface TaskCardProps {
   task: Task;
@@ -11,24 +11,6 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskCardProps) {
-  // Claude実行状態のアイコン判定
-  const getStateIcon = () => {
-    if (task.claudeState === 'running') {
-      return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
-    }
-    if (!latestSession) {
-      return <Circle className="w-4 h-4 text-gray-300" />;
-    }
-    if (latestSession.status === 'completed') {
-      return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-    }
-    if (latestSession.status === 'failed') {
-      return <XCircle className="w-4 h-4 text-red-500" />;
-    }
-    return <PauseCircle className="w-4 h-4 text-gray-500" />;
-  };
-
-  const stateIcon = getStateIcon();
   const isClaudeRunning = task.claudeState === 'running';
 
   return (
@@ -68,10 +50,7 @@ export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskC
 
       {/* Claude状態とメタ情報 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 text-xs text-theme-muted">
-          {stateIcon}
-          <span>{task.claudeState}</span>
-        </div>
+        <ClaudeState task={task} session={latestSession} />
 
         <div className="flex items-center gap-2 text-xs text-theme-muted">
           {/* 工数 */}

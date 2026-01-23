@@ -212,6 +212,10 @@ select:focus-visible {
   color: var(--primary);
 }
 
+.text-primary-light {
+  color: var(--primary-light);
+}
+
 .text-primary-600 {
   color: var(--primary-600);
 }
@@ -238,6 +242,14 @@ select:focus-visible {
 
 .hover\:bg-primary-hover:hover {
   background-color: var(--primary-hover);
+}
+
+.hover\:text-primary:hover {
+  color: var(--primary);
+}
+
+.hover\:text-primary-light:hover {
+  color: var(--primary-light);
 }
 
 .hover\:text-primary-600:hover {

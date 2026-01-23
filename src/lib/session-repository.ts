@@ -83,14 +83,23 @@ export async function getSession(id: string): Promise<ClaudeSession | null> {
 
 // セッション作成
 export async function createSession(
-  session: Omit<ClaudeSession, 'id' | 'startedAt' | 'updatedAt'>
+  session: Omit<ClaudeSession, 'id' | 'sessionNumber' | 'startedAt' | 'updatedAt'>
 ): Promise<ClaudeSession> {
   return queue.add(async () => {
     const sessions = await readSessions();
     const now = new Date().toISOString();
+
+    // 同じタスクの既存セッションの最大sessionNumberを取得
+    const taskSessions = sessions.filter((s) => s.taskId === session.taskId);
+    const maxSessionNumber = taskSessions.reduce(
+      (max, s) => Math.max(max, s.sessionNumber || 0),
+      0
+    );
+
     const newSession: ClaudeSession = {
       ...session,
       id: crypto.randomUUID(),
+      sessionNumber: maxSessionNumber + 1,
       startedAt: now,
       updatedAt: now,
     };
