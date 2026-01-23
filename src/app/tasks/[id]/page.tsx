@@ -117,41 +117,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     };
   }, [activeSessionId, activeSession?.status, task]);
 
-  // グローバルキーボードショートカット
-  useEffect(() => {
-    if (!activeSessionId || !activeSession) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Command + Enter (Mac) or Ctrl + Enter (Windows/Linux) で Send
-      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-        const prompt = prompts[activeSessionId] || '';
-        const isRunning = activeSession.status === 'running';
-        const canExecute = !isRunning && prompt.trim().length > 0;
-
-        if (canExecute) {
-          event.preventDefault();
-          handleExecute(activeSessionId, prompt);
-        }
-      }
-
-      // Esc で Interrupt
-      if (event.key === 'Escape') {
-        const isRunning = activeSession.status === 'running';
-
-        if (isRunning) {
-          event.preventDefault();
-          handleInterrupt(activeSessionId);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [activeSessionId, activeSession, prompts]);
-
   // タスク更新
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
