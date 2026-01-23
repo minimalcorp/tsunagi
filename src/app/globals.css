@@ -175,6 +175,22 @@ select:focus-visible {
   border-color: var(--border);
 }
 
+.hover\:bg-theme-card:hover {
+  background-color: var(--card-background);
+}
+
+.hover\:bg-theme-hover:hover {
+  background-color: var(--hover-background);
+}
+
+.hover\:text-theme-fg:hover {
+  color: var(--foreground);
+}
+
+.hover\:border-theme-fg:hover {
+  border-color: var(--foreground);
+}
+
 /* Primary color utilities */
 .bg-primary {
   background-color: var(--primary);
