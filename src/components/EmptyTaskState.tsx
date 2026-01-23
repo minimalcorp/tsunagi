@@ -21,7 +21,7 @@ export function EmptyTaskState({ onAddTaskClick }: EmptyTaskStateProps) {
         </p>
         <button
           onClick={onAddTaskClick}
-          className="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-600 transition-colors"
+          className="px-6 py-3 bg-primary text-white font-semibold rounded-lg shadow-lg hover:bg-primary-hover transition-colors"
         >
           + 最初のタスクを作成
         </button>

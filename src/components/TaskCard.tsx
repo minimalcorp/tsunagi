@@ -14,7 +14,7 @@ export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskC
   // Claude実行状態のアイコン判定
   const getStateIcon = () => {
     if (task.claudeState === 'running') {
-      return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+      return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
     }
     if (!latestSession) {
       return <Circle className="w-4 h-4 text-gray-300" />;
@@ -35,7 +35,7 @@ export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskC
     <div
       className={`
         bg-theme-card border border-theme rounded-lg p-4 cursor-pointer
-        hover:border-blue-500 transition-colors
+        hover:border-primary transition-colors
         ${isDragging ? 'shadow-xl rotate-2' : ''}
         ${isClaudeRunning ? 'opacity-50 bg-theme-hover' : ''}
       `}
@@ -45,7 +45,7 @@ export function TaskCard({ task, latestSession, isDragging, onTaskClick }: TaskC
       {task.order !== undefined && (
         <div
           className={`inline-block px-2 py-0.5 text-xs font-medium rounded mb-2 ${
-            isClaudeRunning ? 'bg-gray-200 text-gray-600' : 'bg-blue-100 text-blue-800'
+            isClaudeRunning ? 'bg-gray-200 text-gray-600' : 'bg-primary-100 text-primary-700'
           }`}
         >
           #{task.order}

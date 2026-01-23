@@ -17,7 +17,7 @@ export function RepositoryOnboardingOverlay({
     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center">
       <div className="bg-theme-card rounded-xl p-8 shadow-2xl max-w-xs text-center">
         <div className="flex justify-center mb-4">
-          <Package className="w-12 h-12 text-blue-500" />
+          <Package className="w-12 h-12 text-primary" />
         </div>
         <h2 className="text-xl font-bold text-theme-fg mb-6">セットアップ</h2>
 

@@ -128,7 +128,7 @@ export function EnvironmentSettingsDialog({
 
         <h2 className="text-xl font-bold mb-4 text-theme-fg">Environment Settings</h2>
 
-        <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/50 rounded text-sm text-theme-fg">
+        <div className="mb-4 p-3 bg-primary/10 border border-primary/50 rounded text-sm text-theme-fg">
           どちらか片方の認証情報を設定してください
         </div>
 
@@ -163,7 +163,7 @@ export function EnvironmentSettingsDialog({
                 href="https://console.anthropic.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-500 underline"
+                className="text-primary underline"
               >
                 console.anthropic.com
               </a>
@@ -201,7 +201,7 @@ export function EnvironmentSettingsDialog({
                 href="https://claude.ai/settings/developer"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-500 underline"
+                className="text-primary underline"
               >
                 claude.ai/settings/developer
               </a>
@@ -237,7 +237,7 @@ export function EnvironmentSettingsDialog({
                 href="https://github.com/settings/tokens"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-500 underline"
+                className="text-primary underline"
               >
                 github.com/settings/tokens
               </a>
@@ -258,7 +258,7 @@ export function EnvironmentSettingsDialog({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading}
             >
               Save

@@ -20,7 +20,7 @@ export function ThemeToggle() {
           onClick={() => setTheme(value)}
           className={`px-2 py-1 rounded text-sm transition-all ${
             theme === value
-              ? 'bg-blue-500 text-white shadow-sm'
+              ? 'bg-primary text-white shadow-sm'
               : 'text-theme-muted hover:text-theme-fg'
           }`}
           title={label}

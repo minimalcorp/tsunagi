@@ -27,7 +27,7 @@ export function KanbanColumn({ title, status, tasks, sessions, onTaskClick }: Ka
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex-1 space-y-2 overflow-y-auto ${snapshot.isDraggingOver ? 'bg-blue-50' : ''}`}
+            className={`flex-1 space-y-2 overflow-y-auto ${snapshot.isDraggingOver ? 'bg-primary-50' : ''}`}
           >
             {tasks.map((task, index) => (
               <Draggable key={task.id} draggableId={task.id} index={index}>

@@ -80,11 +80,11 @@ export function Header({
     const baseStyle = 'px-4 py-2 rounded transition-all active:scale-95';
 
     if (isHighlighted) {
-      return `${baseStyle} bg-blue-500 text-white shadow-lg ring-2 ring-blue-500`;
+      return `${baseStyle} bg-primary text-white shadow-lg ring-2 ring-primary`;
     }
 
     if (step === 'task') {
-      return `${baseStyle} bg-blue-500 text-white hover:bg-blue-600`;
+      return `${baseStyle} bg-primary text-white hover:bg-primary-hover`;
     }
 
     return `${baseStyle} bg-theme-hover hover:opacity-80 text-theme-fg`;
@@ -179,10 +179,10 @@ export function Header({
             Clone Repository
           </button>
           {nextStep === 'clone' && !isCloneDialogOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-blue-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-primary text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
               <ArrowUp className="w-5 h-5" />
               Click here first
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-blue-500 rotate-45" />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-primary rotate-45" />
             </div>
           )}
         </div>
@@ -199,10 +199,10 @@ export function Header({
             + Add Task
           </button>
           {nextStep === 'task' && !isAddTaskDialogOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-blue-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-primary text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
               <ArrowUp className="w-5 h-5" />
               Click here
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-blue-500 rotate-45" />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-primary rotate-45" />
             </div>
           )}
         </div>
@@ -217,10 +217,10 @@ export function Header({
             Settings
           </button>
           {nextStep === 'env' && !isSettingsDialogOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-blue-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-primary text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
               <ArrowUp className="w-5 h-5" />
               Click here
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-blue-500 rotate-45" />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-primary rotate-45" />
             </div>
           )}
         </div>

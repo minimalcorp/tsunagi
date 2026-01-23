@@ -162,7 +162,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, owners, repos }: AddTask
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading}
             >
               Create
