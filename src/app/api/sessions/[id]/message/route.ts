@@ -3,8 +3,10 @@ import * as sessionRepo from '@/lib/session-repository';
 import * as taskRepo from '@/lib/task-repository';
 import * as envRepo from '@/lib/env-repository';
 import { executeSession } from '@/lib/claude-client';
+import { normalizeBranchName } from '@/lib/worktree-manager';
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 import type { LogEntry } from '@/lib/types';
 
 type Params = {
@@ -40,8 +42,13 @@ export async function POST(request: NextRequest, { params }: Params) {
       'workspaces',
       task.owner,
       task.repo,
-      task.branch
+      normalizeBranchName(task.branch)
     );
+
+    // Ensure working directory exists
+    if (!fs.existsSync(workingDirectory)) {
+      fs.mkdirSync(workingDirectory, { recursive: true });
+    }
 
     // Get environment variables for this task
     const env = await envRepo.getEnv('repo', task.owner, task.repo);

@@ -39,7 +39,12 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
 
   // message type
   if (log.type === 'message') {
-    const isUser = log.metadata?.role === 'user';
+    // Skip messages without role (metadata information only)
+    if (!log.metadata?.role) {
+      return null;
+    }
+
+    const isUser = log.metadata.role === 'user';
 
     if (isUser) {
       return (
@@ -59,18 +64,14 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
       return (
         <div>
           <div className="flex justify-start items-center gap-2 text-right">
-            <div className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
             <div className="inline-block text-left rounded-lg p-3 bg-theme-card border border-theme">
               <div className="prose prose-sm max-w-none text-theme-fg">
                 <ReactMarkdown>{log.content || ''}</ReactMarkdown>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="w-2 h-2 flex-shrink-0" />
-            <div className="text-xs text-theme-muted">
-              {new Date(log.timestamp).toLocaleString()}
-            </div>
+          <div className="text-xs text-theme-muted mt-1">
+            {new Date(log.timestamp).toLocaleString()}
           </div>
         </div>
       );
@@ -84,7 +85,6 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
           <div className="inline-block text-left rounded-lg p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-medium text-green-700 dark:text-green-400">
@@ -106,9 +106,8 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="w-2 h-2 flex-shrink-0" />
-          <div className="text-xs text-theme-muted">{new Date(log.timestamp).toLocaleString()}</div>
+        <div className="text-xs text-theme-muted mt-1">
+          {new Date(log.timestamp).toLocaleString()}
         </div>
       </div>
     );
@@ -119,16 +118,14 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
           <div className="inline-block text-left rounded-lg p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
             <div className="text-sm text-blue-800 dark:text-blue-300 whitespace-pre-wrap">
               {log.content}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="w-2 h-2 flex-shrink-0" />
-          <div className="text-xs text-theme-muted">{new Date(log.timestamp).toLocaleString()}</div>
+        <div className="text-xs text-theme-muted mt-1">
+          {new Date(log.timestamp).toLocaleString()}
         </div>
       </div>
     );
@@ -139,14 +136,12 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
           <div className="inline-block text-left rounded-lg p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700">
             <div className="text-sm text-theme-fg">{log.content}</div>
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="w-2 h-2 flex-shrink-0" />
-          <div className="text-xs text-theme-muted">{new Date(log.timestamp).toLocaleString()}</div>
+        <div className="text-xs text-theme-muted mt-1">
+          {new Date(log.timestamp).toLocaleString()}
         </div>
       </div>
     );
@@ -157,16 +152,14 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" />
           <div className="inline-block text-left rounded-lg p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700">
             <div className="text-sm text-yellow-800 dark:text-yellow-300 whitespace-pre-wrap italic">
               {log.content}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="w-2 h-2 flex-shrink-0" />
-          <div className="text-xs text-theme-muted">{new Date(log.timestamp).toLocaleString()}</div>
+        <div className="text-xs text-theme-muted mt-1">
+          {new Date(log.timestamp).toLocaleString()}
         </div>
       </div>
     );
@@ -177,16 +170,14 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
     return (
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
-          <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
           <div className="inline-block text-left rounded-lg p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700">
             <div className="text-sm text-red-800 dark:text-red-300 whitespace-pre-wrap">
               {log.content}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="w-2 h-2 flex-shrink-0" />
-          <div className="text-xs text-theme-muted">{new Date(log.timestamp).toLocaleString()}</div>
+        <div className="text-xs text-theme-muted mt-1">
+          {new Date(log.timestamp).toLocaleString()}
         </div>
       </div>
     );
@@ -196,14 +187,12 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
   return (
     <div>
       <div className="flex justify-start items-center gap-2 text-right">
-        <div className="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" />
         <div className="inline-block text-left rounded-lg p-3 bg-theme-card border border-theme">
           <div className="text-sm text-theme-fg">{log.content}</div>
         </div>
       </div>
-      <div className="flex items-center gap-2 mt-1">
-        <div className="w-2 h-2 flex-shrink-0" />
-        <div className="text-xs text-theme-muted">{new Date(log.timestamp).toLocaleString()}</div>
+      <div className="text-xs text-theme-muted mt-1">
+        {new Date(log.timestamp).toLocaleString()}
       </div>
     </div>
   );

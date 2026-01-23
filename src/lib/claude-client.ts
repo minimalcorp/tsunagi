@@ -56,9 +56,19 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
 
     const systemPath = systemEnv.PATH || defaultPath;
 
-    queryOptions.env = {
+    // Merge env and remove all undefined values
+    const mergedEnv = {
       ...systemEnv,
       ...env,
+    };
+
+    // Remove undefined values completely to avoid spawn errors
+    const cleanedEnv = Object.fromEntries(
+      Object.entries(mergedEnv).filter(([, v]) => v !== undefined)
+    ) as Record<string, string>;
+
+    queryOptions.env = {
+      ...cleanedEnv,
       // Ensure PATH is always set after custom env - merge custom PATH with system PATH
       PATH: env?.PATH ? `${systemPath}:${env.PATH}` : systemPath,
     };
@@ -71,11 +81,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
     // Execute query
     const queryResult = query({
       prompt,
-      options: {
-        ...queryOptions,
-        // Explicitly specify node executable to avoid spawn errors
-        executable: 'node',
-      },
+      options: queryOptions,
     });
 
     // Store the query object for interrupt support
@@ -192,10 +198,22 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
   } catch (error) {
     activeQueries.delete(sessionId);
 
-    // Check if this was an abort
-    if (error instanceof Error && error.name === 'AbortError') {
+    // Check if this was an abort/interrupt (intentional)
+    if (
+      error instanceof Error &&
+      (error.name === 'AbortError' || error.message.includes('was aborted'))
+    ) {
       // Session was interrupted, don't treat as error
       return;
+    }
+
+    // Debug logging for spawn error
+    console.error('[Claude Client] Error occurred:');
+    console.error('- Error type:', error instanceof Error ? error.name : typeof error);
+    console.error('- Error message:', error instanceof Error ? error.message : String(error));
+    if (error instanceof Error) {
+      console.error('- Error stack:', error.stack);
+      console.error('- Error details:', JSON.stringify(error, null, 2));
     }
 
     // Log detailed error information
