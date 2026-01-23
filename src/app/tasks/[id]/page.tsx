@@ -77,6 +77,46 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     loadData();
   }, [id]);
 
+  // セッションのポーリング（running状態の場合のみ）
+  useEffect(() => {
+    if (!activeSessionId) return;
+
+    const pollSession = async () => {
+      try {
+        const response = await fetch(`/api/sessions/${activeSessionId}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const updatedSession = data.data.session;
+
+        // セッション情報を更新
+        setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSession : s)));
+
+        // タスクの状態も更新
+        if (task) {
+          const taskResponse = await fetch(`/api/tasks/${task.id}`);
+          if (taskResponse.ok) {
+            const taskData = await taskResponse.json();
+            setTask(taskData.data.task);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to poll session:', error);
+      }
+    };
+
+    // セッションがrunning状態の場合のみポーリング
+    const isRunning = activeSession?.status === 'running';
+    if (!isRunning) return;
+
+    // 1秒ごとにポーリング
+    const intervalId = setInterval(pollSession, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [activeSessionId, activeSession?.status, task]);
+
   // タスク更新
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
