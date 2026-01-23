@@ -257,7 +257,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
         {/* Task Info Detail Section */}
-        <div className="p-4 border-b border-theme bg-theme-card">
+        <div className="p-4 bg-theme-card">
           <TaskInfo
             task={task}
             onUpdate={handleTaskUpdate}
