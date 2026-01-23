@@ -46,7 +46,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
         className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 flex items-center justify-center gap-2"
       >
         <Trash2 className="w-4 h-4" />
-        Delete Task (+ Worktree/Branch)
+        Delete Task
       </button>
     </div>
   );

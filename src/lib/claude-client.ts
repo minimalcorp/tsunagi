@@ -1,189 +1,217 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { query, type Query } from '@anthropic-ai/claude-agent-sdk';
 import type { LogEntry } from './types';
-
-export interface ClaudeClientOptions {
-  apiKey?: string;
-  model?: string;
-  maxTokens?: number;
-}
 
 export interface ExecuteOptions {
   sessionId: string;
   prompt: string;
   workingDirectory: string;
   env?: Record<string, string>;
+  agentSessionId?: string;
   onLog?: (log: LogEntry) => void;
   onStatusChange?: (status: 'running' | 'completed' | 'failed') => void;
+  onAgentSessionId?: (agentSessionId: string) => void;
 }
 
-export class ClaudeClient {
-  private client: Anthropic;
-  private model: string;
-  private maxTokens: number;
-  private abortControllers: Map<string, AbortController>;
+/**
+ * Active Query objects for interrupt support
+ */
+const activeQueries = new Map<string, Query>();
 
-  constructor(options: ClaudeClientOptions = {}) {
-    const apiKey = options.apiKey || process.env.ANTHROPIC_API_KEY;
+/**
+ * Execute a Claude session using the Agent SDK
+ */
+export async function executeSession(options: ExecuteOptions): Promise<void> {
+  const {
+    sessionId,
+    prompt,
+    workingDirectory,
+    env,
+    agentSessionId,
+    onLog,
+    onStatusChange,
+    onAgentSessionId,
+  } = options;
 
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY is required');
+  try {
+    onStatusChange?.('running');
+
+    // Log user message
+    onLog?.({
+      timestamp: new Date().toISOString(),
+      type: 'message',
+      content: prompt,
+      metadata: { role: 'user' },
+    });
+
+    // Build query options
+    const queryOptions: {
+      cwd: string;
+      env?: Record<string, string>;
+      resume?: string;
+    } = {
+      cwd: workingDirectory,
+    };
+
+    if (env) {
+      queryOptions.env = env;
     }
 
-    this.client = new Anthropic({ apiKey });
-    this.model = options.model || 'claude-sonnet-4-5-20250929';
-    this.maxTokens = options.maxTokens || 8192;
-    this.abortControllers = new Map();
-  }
+    // If agentSessionId is provided, resume the session
+    if (agentSessionId) {
+      queryOptions.resume = agentSessionId;
+    }
 
-  /**
-   * Execute a Claude session with streaming
-   */
-  async executeSession(options: ExecuteOptions): Promise<void> {
-    const { sessionId, prompt, workingDirectory, env, onLog, onStatusChange } = options;
+    // Execute query
+    const queryResult = query({
+      prompt,
+      options: queryOptions,
+    });
 
-    // Create abort controller for this session
-    const abortController = new AbortController();
-    this.abortControllers.set(sessionId, abortController);
+    // Store the query object for interrupt support
+    activeQueries.set(sessionId, queryResult);
 
-    try {
-      onStatusChange?.('running');
-
-      // Log user message
-      onLog?.({
-        timestamp: new Date().toISOString(),
-        type: 'message',
-        content: prompt,
-        metadata: { role: 'user' },
-      });
-
-      // Create system prompt with context
-      const systemPrompt = this.buildSystemPrompt(workingDirectory, env);
-
-      // Stream the response
-      const stream = await this.client.messages.create(
-        {
-          model: this.model,
-          max_tokens: this.maxTokens,
-          system: systemPrompt,
-          messages: [
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          stream: true,
-        },
-        {
-          signal: abortController.signal,
-        }
-      );
-
-      let currentContent = '';
-
-      for await (const event of stream) {
-        if (event.type === 'content_block_start') {
-          currentContent = '';
-        } else if (event.type === 'content_block_delta') {
-          if (event.delta.type === 'text_delta') {
-            currentContent += event.delta.text;
+    // Process messages from the stream
+    for await (const message of queryResult) {
+      // Handle different message types
+      switch (message.type) {
+        case 'system':
+          // Extract and store agent session ID from system init message
+          if (message.subtype === 'init' && message.session_id) {
+            onAgentSessionId?.(message.session_id);
           }
-        } else if (event.type === 'content_block_stop') {
-          if (currentContent) {
+          break;
+
+        case 'assistant':
+          // Log assistant message content
+          if (message.message.content) {
+            for (const block of message.message.content) {
+              if (block.type === 'text') {
+                onLog?.({
+                  timestamp: new Date().toISOString(),
+                  type: 'message',
+                  content: block.text,
+                  metadata: { role: 'assistant' },
+                });
+              } else if (block.type === 'tool_use') {
+                // Log tool use
+                onLog?.({
+                  timestamp: new Date().toISOString(),
+                  type: 'tool_use',
+                  content: `Tool: ${block.name}`,
+                  metadata: {
+                    tool: block.name,
+                    input: block.input,
+                    tool_use_id: block.id,
+                  },
+                });
+              }
+            }
+          }
+
+          // Log any errors
+          if (message.error) {
+            onLog?.({
+              timestamp: new Date().toISOString(),
+              type: 'error',
+              content: `Assistant error: ${message.error}`,
+              metadata: { error: message.error },
+            });
+          }
+          break;
+
+        case 'user':
+          // Log user messages (replayed from history)
+          if (message.message.role === 'user' && typeof message.message.content === 'string') {
             onLog?.({
               timestamp: new Date().toISOString(),
               type: 'message',
-              content: currentContent,
-              metadata: { role: 'assistant' },
+              content: message.message.content,
+              metadata: { role: 'user', isReplay: 'isReplay' in message },
             });
-            currentContent = '';
           }
-        } else if (event.type === 'message_stop') {
-          onStatusChange?.('completed');
-        }
-      }
+          break;
 
-      this.abortControllers.delete(sessionId);
-    } catch (error) {
-      this.abortControllers.delete(sessionId);
+        case 'result':
+          // Handle final result
+          if (message.subtype === 'success') {
+            // Log success result
+            onLog?.({
+              timestamp: new Date().toISOString(),
+              type: 'message',
+              content: `Completed successfully: ${message.result}`,
+              metadata: {
+                subtype: message.subtype,
+                duration_ms: message.duration_ms,
+                num_turns: message.num_turns,
+              },
+            });
+          } else {
+            // Log errors from error result
+            for (const error of message.errors) {
+              onLog?.({
+                timestamp: new Date().toISOString(),
+                type: 'error',
+                content: error,
+                metadata: { subtype: message.subtype },
+              });
+            }
+          }
+          break;
 
-      if (error instanceof Error && error.name === 'AbortError') {
-        // Session was interrupted
-        return;
-      }
-
-      onLog?.({
-        timestamp: new Date().toISOString(),
-        type: 'error',
-        content: error instanceof Error ? error.message : 'Unknown error occurred',
-        metadata: { error },
-      });
-
-      onStatusChange?.('failed');
-      throw error;
-    }
-  }
-
-  /**
-   * Interrupt a running session
-   */
-  async interruptSession(sessionId: string): Promise<void> {
-    const abortController = this.abortControllers.get(sessionId);
-    if (abortController) {
-      abortController.abort();
-      this.abortControllers.delete(sessionId);
-    }
-  }
-
-  /**
-   * Resume a paused session (send additional message)
-   */
-  async resumeSession(options: ExecuteOptions): Promise<void> {
-    // For now, resume is the same as execute with a new message
-    // In a full implementation, this would include conversation history
-    return this.executeSession(options);
-  }
-
-  /**
-   * Build system prompt with working directory and environment context
-   */
-  private buildSystemPrompt(workingDirectory: string, env?: Record<string, string>): string {
-    let prompt = `You are Claude, an AI assistant integrated into the Tsunagi task management system.
-
-Working Directory: ${workingDirectory}
-
-You have access to the file system within this directory. When making changes:
-1. Read files before editing them
-2. Make focused, incremental changes
-3. Test your changes when possible
-4. Document your work`;
-
-    if (env && Object.keys(env).length > 0) {
-      prompt += '\n\nAvailable Environment Variables:\n';
-      for (const [key, value] of Object.entries(env)) {
-        // Mask sensitive values
-        const maskedValue =
-          key.includes('KEY') || key.includes('TOKEN') || key.includes('SECRET') ? '***' : value;
-        prompt += `- ${key}=${maskedValue}\n`;
+        case 'tool_progress':
+          // Log tool progress
+          onLog?.({
+            timestamp: new Date().toISOString(),
+            type: 'tool_use',
+            content: `Tool ${message.tool_name} in progress (${message.elapsed_time_seconds}s)`,
+            metadata: {
+              tool_use_id: message.tool_use_id,
+              tool_name: message.tool_name,
+              elapsed_time: message.elapsed_time_seconds,
+            },
+          });
+          break;
       }
     }
 
-    return prompt;
-  }
+    // Session completed successfully
+    activeQueries.delete(sessionId);
+    onStatusChange?.('completed');
+  } catch (error) {
+    activeQueries.delete(sessionId);
 
-  /**
-   * Check if a session is currently running
-   */
-  isSessionRunning(sessionId: string): boolean {
-    return this.abortControllers.has(sessionId);
+    // Check if this was an abort
+    if (error instanceof Error && error.name === 'AbortError') {
+      // Session was interrupted, don't treat as error
+      return;
+    }
+
+    onLog?.({
+      timestamp: new Date().toISOString(),
+      type: 'error',
+      content: error instanceof Error ? error.message : 'Unknown error occurred',
+      metadata: { error },
+    });
+
+    onStatusChange?.('failed');
+    throw error;
   }
 }
 
-// Singleton instance
-let claudeClientInstance: ClaudeClient | null = null;
-
-export function getClaudeClient(options?: ClaudeClientOptions): ClaudeClient {
-  if (!claudeClientInstance) {
-    claudeClientInstance = new ClaudeClient(options);
+/**
+ * Interrupt a running session
+ */
+export async function interruptSession(sessionId: string): Promise<void> {
+  const queryObject = activeQueries.get(sessionId);
+  if (queryObject) {
+    await queryObject.interrupt();
+    activeQueries.delete(sessionId);
   }
-  return claudeClientInstance;
+}
+
+/**
+ * Check if a session is currently running
+ */
+export function isSessionRunning(sessionId: string): boolean {
+  return activeQueries.has(sessionId);
 }

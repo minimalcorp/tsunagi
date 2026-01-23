@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as sessionRepo from '@/lib/session-repository';
 import * as taskRepo from '@/lib/task-repository';
-import { getClaudeClient } from '@/lib/claude-client';
+import { interruptSession } from '@/lib/claude-client';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -22,8 +22,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     // Interrupt the Claude session
-    const claudeClient = getClaudeClient();
-    await claudeClient.interruptSession(id);
+    await interruptSession(id);
 
     // Update session status
     await sessionRepo.updateSession(id, {

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as sessionRepo from '@/lib/session-repository';
 import * as taskRepo from '@/lib/task-repository';
 import * as envRepo from '@/lib/env-repository';
-import { getClaudeClient } from '@/lib/claude-client';
-import { randomUUID } from 'crypto';
+import { executeSession } from '@/lib/claude-client';
 import * as path from 'path';
 import * as os from 'os';
 import type { LogEntry } from '@/lib/types';
@@ -34,12 +33,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // 最初のメッセージ送信時にagentSessionIdを生成
-    const updates: Partial<typeof session> = {};
-    if (!session.agentSessionId) {
-      updates.agentSessionId = `agent-${randomUUID()}`;
-    }
-
     // Get working directory for the task
     const workingDirectory = path.join(
       os.homedir(),
@@ -54,55 +47,53 @@ export async function POST(request: NextRequest, { params }: Params) {
     const env = await envRepo.getEnv('repo', task.owner, task.repo);
 
     // Update session status to running
-    updates.status = 'running';
-    await sessionRepo.updateSession(id, updates);
+    await sessionRepo.updateSession(id, { status: 'running' });
 
     // Update task claudeState to running
     await taskRepo.updateTask(task.id, { claudeState: 'running' });
 
     // Execute Claude in background
-    const claudeClient = getClaudeClient();
-
-    // Execute asynchronously (don't await)
-    claudeClient
-      .executeSession({
-        sessionId: id,
-        prompt: message,
-        workingDirectory,
-        env,
-        onLog: async (log: LogEntry) => {
-          // Add log to session
-          const currentSession = await sessionRepo.getSession(id);
-          if (currentSession) {
-            await sessionRepo.updateSession(id, {
-              logs: [...currentSession.logs, log],
-            });
-          }
-        },
-        onStatusChange: async (status) => {
-          // Update session status
+    executeSession({
+      sessionId: id,
+      prompt: message,
+      workingDirectory,
+      env,
+      agentSessionId: session.agentSessionId,
+      onLog: async (log: LogEntry) => {
+        // Add log to session
+        const currentSession = await sessionRepo.getSession(id);
+        if (currentSession) {
           await sessionRepo.updateSession(id, {
-            status:
-              status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'running',
-            ...(status === 'completed' || status === 'failed'
-              ? { completedAt: new Date().toISOString() }
-              : {}),
+            logs: [...currentSession.logs, log],
           });
-
-          // Update task claudeState
-          await taskRepo.updateTask(task.id, {
-            claudeState: status === 'running' ? 'running' : 'idle',
-          });
-        },
-      })
-      .catch(async (error) => {
-        console.error('Claude execution error:', error);
+        }
+      },
+      onStatusChange: async (status) => {
+        // Update session status
         await sessionRepo.updateSession(id, {
-          status: 'failed',
-          completedAt: new Date().toISOString(),
+          status: status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'running',
+          ...(status === 'completed' || status === 'failed'
+            ? { completedAt: new Date().toISOString() }
+            : {}),
         });
-        await taskRepo.updateTask(task.id, { claudeState: 'idle' });
+
+        // Update task claudeState
+        await taskRepo.updateTask(task.id, {
+          claudeState: status === 'running' ? 'running' : 'idle',
+        });
+      },
+      onAgentSessionId: async (agentSessionId: string) => {
+        // Store the agent session ID for future resume
+        await sessionRepo.updateSession(id, { agentSessionId });
+      },
+    }).catch(async (error) => {
+      console.error('Claude execution error:', error);
+      await sessionRepo.updateSession(id, {
+        status: 'failed',
+        completedAt: new Date().toISOString(),
       });
+      await taskRepo.updateTask(task.id, { claudeState: 'idle' });
+    });
 
     return NextResponse.json({ data: { success: true } });
   } catch (error) {

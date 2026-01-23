@@ -34,7 +34,7 @@ export interface ClaudeSession {
 // LogEntry型
 export interface LogEntry {
   timestamp: string;
-  type: 'tool_use' | 'file_operation' | 'thinking' | 'message' | 'error';
+  type: 'tool_use' | 'tool_result' | 'file_operation' | 'thinking' | 'message' | 'error';
   content: string;
   metadata?: Record<string, unknown>;
 }
