@@ -1,7 +1,7 @@
 'use client';
 
 import { Editor } from '@monaco-editor/react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { editor } from 'monaco-editor';
 import type { ClaudeSession } from '@/lib/types';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -27,7 +27,7 @@ export function ClaudePromptEditor({
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const { effectiveTheme } = useTheme();
 
-  const handleExecute = async () => {
+  const handleExecute = useCallback(async () => {
     const prompt = editorRef.current?.getValue() || '';
     if (!prompt.trim() || isExecuting) return;
     try {
@@ -39,15 +39,27 @@ export function ClaudePromptEditor({
     } finally {
       setIsExecuting(false);
     }
-  };
+  }, [isExecuting, onExecute, session.id]);
 
-  const handleInterrupt = async () => {
+  const handleInterrupt = useCallback(async () => {
     try {
       await onInterrupt(session.id);
     } catch (error) {
       console.error('Failed to interrupt:', error);
     }
-  };
+  }, [onInterrupt, session.id]);
+
+  // 常に最新のハンドラーを参照するためのref
+  const handleExecuteRef = useRef(handleExecute);
+  const handleInterruptRef = useRef(handleInterrupt);
+
+  useEffect(() => {
+    handleExecuteRef.current = handleExecute;
+  }, [handleExecute]);
+
+  useEffect(() => {
+    handleInterruptRef.current = handleInterrupt;
+  }, [handleInterrupt]);
 
   // セッション切り替え時にエディタの内容を更新
   useEffect(() => {
@@ -97,12 +109,25 @@ export function ClaudePromptEditor({
           height="100%"
           defaultLanguage="markdown"
           defaultValue=""
-          onMount={(editor) => {
+          onMount={async (editor) => {
             editorRef.current = editor;
             // マウント時に初期値を設定
             if (prompt) {
               editor.setValue(prompt);
             }
+
+            // monaco-editorの型をインポート
+            const monaco = await import('monaco-editor');
+
+            // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で Send
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+              handleExecuteRef.current();
+            });
+
+            // Esc で Interrupt
+            editor.addCommand(monaco.KeyCode.Escape, () => {
+              handleInterruptRef.current();
+            });
           }}
           onChange={(value) => {
             onPromptChange(value || '');
