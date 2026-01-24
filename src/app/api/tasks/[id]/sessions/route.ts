@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const newSession = await sessionRepo.createSession({
       taskId,
       status: 'idle',
-      logs: [],
+      rawMessages: [],
     });
 
     return NextResponse.json({ data: { session: newSession } }, { status: 201 });

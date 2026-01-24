@@ -180,20 +180,12 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // Claude実行
   const handleExecute = async (sessionId: string, prompt: string) => {
     try {
-      // ユーザーメッセージを即座にlogsに追加
-      const userLog = {
-        timestamp: new Date().toISOString(),
-        type: 'message' as const,
-        content: prompt,
-        metadata: { role: 'user' },
-      };
-
+      // ステータスを即座にrunningに変更
       setSessions((prev) =>
         prev.map((s) =>
           s.id === sessionId
             ? {
                 ...s,
-                logs: [...s.logs, userLog],
                 status: 'running' as const,
               }
             : s
@@ -353,7 +345,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                   )}
 
                   {(viewMode === 'split' || viewMode === 'logs') && (
-                    <ExecutionLogsChat logs={activeSession.logs} />
+                    <ExecutionLogsChat rawMessages={activeSession.rawMessages} />
                   )}
                 </div>
               </div>

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       await sessionRepo.createSession({
         taskId: newTask.id,
         status: 'idle',
-        logs: [],
+        rawMessages: [],
       });
     } catch (error) {
       console.error('Failed to create initial session:', error);

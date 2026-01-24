@@ -7,7 +7,6 @@ import { normalizeBranchName } from '@/lib/worktree-manager';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import type { LogEntry } from '@/lib/types';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -53,15 +52,19 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Get environment variables for this task
     const env = await envRepo.getEnv('repo', task.owner, task.repo);
 
-    // Add user message to logs immediately before execution
-    const userLog: LogEntry = {
-      timestamp: new Date().toISOString(),
-      type: 'message',
-      content: message,
-      metadata: { role: 'user' },
+    // Create user message for rawMessages (SDK format)
+    const userRawMessage = {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: message,
+      },
+      session_id: session.agentSessionId || '',
+      uuid: crypto.randomUUID(),
     };
+
     await sessionRepo.updateSession(id, {
-      logs: [...session.logs, userLog],
+      rawMessages: [...(session.rawMessages || []), userRawMessage],
     });
 
     // Update session status to running
@@ -77,12 +80,12 @@ export async function POST(request: NextRequest, { params }: Params) {
       workingDirectory,
       env,
       agentSessionId: session.agentSessionId,
-      onLog: async (log: LogEntry) => {
-        // Add log to session
+      onRawMessage: async (rawMessage: unknown) => {
+        // Raw messageを永続化
         const currentSession = await sessionRepo.getSession(id);
         if (currentSession) {
           await sessionRepo.updateSession(id, {
-            logs: [...currentSession.logs, log],
+            rawMessages: [...(currentSession.rawMessages || []), rawMessage],
           });
         }
       },

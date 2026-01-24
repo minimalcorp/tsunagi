@@ -13,7 +13,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, sessions, isDragging, onTaskClick }: TaskCardProps) {
   const isClaudeRunning = task.claudeState === 'running';
-  const totalLogs = sessions.reduce((sum, session) => sum + session.logs.length, 0);
+  const totalMessages = sessions.reduce((sum, session) => sum + session.rawMessages.length, 0);
 
   return (
     <div
@@ -68,7 +68,7 @@ export function TaskCard({ task, sessions, isDragging, onTaskClick }: TaskCardPr
           {task.effort && <span className="font-medium">{task.effort}h</span>}
 
           {/* ログ数 */}
-          {totalLogs > 0 && <span>{totalLogs} logs</span>}
+          {totalMessages > 0 && <span>{totalMessages} messages</span>}
         </div>
       </div>
     </div>
