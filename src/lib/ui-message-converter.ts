@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 interface SDKMessageBase {
   type: string;
   uuid?: string;
+  created_at?: string;
 }
 
 interface SDKContentBlock {
@@ -222,7 +223,7 @@ export class UIMessageConverter {
 
     return {
       id: uuidv4(),
-      timestamp: new Date().toISOString(),
+      timestamp: msg.created_at || new Date().toISOString(),
       type: 'user_message',
       content: {
         type: 'user_message',
@@ -312,7 +313,7 @@ export class UIMessageConverter {
 
     return {
       id: uuidv4(),
-      timestamp: new Date().toISOString(),
+      timestamp: msg.created_at || new Date().toISOString(),
       type: 'assistant_message',
       content: {
         type: 'assistant_message',
@@ -325,7 +326,7 @@ export class UIMessageConverter {
   private convertSystemInit(msg: SDKSystemMessage): UIMessage {
     return {
       id: uuidv4(),
-      timestamp: new Date().toISOString(),
+      timestamp: msg.created_at || new Date().toISOString(),
       type: 'system_event',
       content: {
         type: 'system_event',

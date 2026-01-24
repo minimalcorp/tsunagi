@@ -61,6 +61,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       },
       session_id: session.agentSessionId || '',
       uuid: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
     };
 
     await sessionRepo.updateSession(id, {
@@ -81,11 +82,15 @@ export async function POST(request: NextRequest, { params }: Params) {
       env,
       agentSessionId: session.agentSessionId,
       onRawMessage: async (rawMessage: unknown) => {
-        // Raw messageを永続化
+        // Raw messageを永続化（タイムスタンプを追加）
         const currentSession = await sessionRepo.getSession(id);
         if (currentSession) {
+          const messageWithTimestamp =
+            typeof rawMessage === 'object' && rawMessage !== null
+              ? { ...(rawMessage as Record<string, unknown>), created_at: new Date().toISOString() }
+              : rawMessage;
           await sessionRepo.updateSession(id, {
-            rawMessages: [...(currentSession.rawMessages || []), rawMessage],
+            rawMessages: [...(currentSession.rawMessages || []), messageWithTimestamp],
           });
         }
       },
