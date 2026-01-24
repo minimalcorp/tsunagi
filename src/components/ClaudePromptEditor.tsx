@@ -98,7 +98,7 @@ export function ClaudePromptEditor({
           {isRunning && (
             <button
               onClick={handleInterrupt}
-              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-500 cursor-pointer flex items-center gap-1"
+              className="px-3 py-1 bg-red-700 text-white rounded text-sm hover:bg-red-600 cursor-pointer flex items-center gap-1"
             >
               <Square className="w-3 h-3" />
               Interrupt
