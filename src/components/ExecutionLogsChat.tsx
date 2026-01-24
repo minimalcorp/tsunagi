@@ -20,7 +20,9 @@ export function ExecutionLogsChat({ logs }: ExecutionLogsChatProps) {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <h3 className="text-sm font-semibold mb-2 text-theme-fg flex-shrink-0">Logs</h3>
+      <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
+        <h3 className="text-sm font-semibold text-theme-fg">Logs</h3>
+      </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto border border-theme rounded p-4 space-y-3 bg-theme-hover">
         {logs.length === 0 ? (
@@ -54,7 +56,7 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
       return (
         <div className="flex justify-end">
           <div className="text-right">
-            <div className="inline-block text-left rounded-lg p-3 bg-primary text-white">
+            <div className="inline-block text-left rounded-lg p-2 bg-primary text-white">
               <div className="text-xs whitespace-pre-wrap">{log.content}</div>
             </div>
             <div className="text-xs text-theme-muted mt-1 text-right">
@@ -68,7 +70,7 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
       return (
         <div>
           <div className="flex justify-start items-center gap-2 text-right">
-            <div className="inline-block text-left rounded-lg p-3 bg-theme-card border border-theme">
+            <div className="inline-block text-left rounded-lg p-2 bg-theme-card border border-theme">
               <div className="prose max-w-none text-theme-fg text-xs">
                 <ReactMarkdown>{log.content || ''}</ReactMarkdown>
               </div>
@@ -90,7 +92,7 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
           <div
-            className={`inline-block text-left rounded-lg p-3 max-w-full ${
+            className={`inline-block text-left rounded-lg p-2 max-w-full ${
               isDark ? 'bg-purple-900/20 border-purple-700' : 'bg-purple-50 border-purple-200'
             } border`}
           >
@@ -147,7 +149,7 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
           <div
-            className={`inline-block text-left rounded-lg p-3 border ${
+            className={`inline-block text-left rounded-lg p-2 border ${
               isDark ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-200'
             }`}
           >
@@ -173,7 +175,7 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
           <div
-            className={`inline-block text-left rounded-lg p-3 border ${
+            className={`inline-block text-left rounded-lg p-2 border ${
               isDark ? 'bg-primary-900/20 border-primary-700' : 'bg-primary-50 border-primary-200'
             }`}
           >
@@ -193,7 +195,7 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
           <div
-            className={`inline-block text-left rounded-lg p-3 border ${
+            className={`inline-block text-left rounded-lg p-2 border ${
               isDark ? 'bg-yellow-900/20 border-yellow-700' : 'bg-yellow-50 border-yellow-200'
             }`}
           >
@@ -219,7 +221,7 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
       <div>
         <div className="flex justify-start items-center gap-2 text-right">
           <div
-            className={`inline-block text-left rounded-lg p-3 border ${
+            className={`inline-block text-left rounded-lg p-2 border ${
               isDark ? 'bg-red-900/20 border-red-700' : 'bg-red-100 border-red-300'
             }`}
           >
@@ -241,7 +243,7 @@ function ChatMessageItem({ log }: { log: LogEntry }) {
   return (
     <div>
       <div className="flex justify-start items-center gap-2 text-right">
-        <div className="inline-block text-left rounded-lg p-3 bg-theme-card border border-theme">
+        <div className="inline-block text-left rounded-lg p-2 bg-theme-card border border-theme">
           <div className="text-xs text-theme-fg">{log.content}</div>
         </div>
       </div>

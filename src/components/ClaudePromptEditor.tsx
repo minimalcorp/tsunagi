@@ -65,7 +65,7 @@ export function ClaudePromptEditor({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between mb-2 flex-shrink-0">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
         <h3 className="text-sm font-semibold text-theme-fg">Prompt</h3>
         <div className="flex items-center gap-2">
           <ClaudeState status={status} />
