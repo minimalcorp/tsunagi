@@ -22,10 +22,10 @@ export default function SettingsPage() {
       fetch('/api/env/list').then((r) => r.json()),
     ])
       .then(([envData, listData]) => {
-        // 値を設定（ANTHROPIC_API_KEYまたはCLAUDE_CODE_OAUTH_TOKENのどちらか）
+        // 値を設定（CLAUDE_CODE_OAUTH_TOKEN優先、なければANTHROPIC_API_KEY）
         const anthropicApiKey = envData.data.env.ANTHROPIC_API_KEY || '';
         const claudeCodeToken = envData.data.env.CLAUDE_CODE_OAUTH_TOKEN || '';
-        setClaudeToken(anthropicApiKey || claudeCodeToken);
+        setClaudeToken(claudeCodeToken || anthropicApiKey);
         setGithubPat(envData.data.env.GITHUB_PAT || '');
 
         // enabled状態を設定
@@ -36,9 +36,9 @@ export default function SettingsPage() {
         );
         const githubVar = envVars.find((v: { key: string }) => v.key === 'GITHUB_PAT');
 
-        // ANTHROPIC_API_KEYまたはCLAUDE_CODE_OAUTH_TOKENのenabled状態
+        // CLAUDE_CODE_OAUTH_TOKEN優先でenabled状態を取得
         const claudeVarEnabled =
-          anthropicVar?.enabled !== false || claudeCodeVar?.enabled !== false;
+          claudeCodeVar?.enabled !== false || anthropicVar?.enabled !== false;
         setClaudeEnabled(claudeVarEnabled);
         setGithubEnabled(githubVar?.enabled !== false);
       })
@@ -51,10 +51,10 @@ export default function SettingsPage() {
   const detectTokenType = (
     token: string
   ): 'ANTHROPIC_API_KEY' | 'CLAUDE_CODE_OAUTH_TOKEN' | null => {
-    if (token.startsWith('sk-ant-')) {
-      return 'ANTHROPIC_API_KEY';
-    } else if (token.startsWith('oauth_')) {
+    if (token.startsWith('sk-ant-oat')) {
       return 'CLAUDE_CODE_OAUTH_TOKEN';
+    } else if (token.startsWith('sk-ant-api')) {
+      return 'ANTHROPIC_API_KEY';
     }
     return null;
   };
@@ -74,7 +74,7 @@ export default function SettingsPage() {
     const tokenType = detectTokenType(claudeToken);
     if (!tokenType) {
       setError(
-        'Claude Tokenの形式が正しくありません。sk-ant-... または oauth_... で始まる必要があります'
+        'Claude Tokenの形式が正しくありません。sk-ant-api... (API Key) または sk-ant-oat... (OAuth Token) で始まる必要があります'
       );
       return;
     }
@@ -99,6 +99,19 @@ export default function SettingsPage() {
       });
 
       if (!saveResponse.ok) throw new Error('Failed to save Claude token');
+
+      // もう一方のtokenをdisableにする（両方が有効にならないようにする）
+      const otherTokenType =
+        tokenType === 'ANTHROPIC_API_KEY' ? 'CLAUDE_CODE_OAUTH_TOKEN' : 'ANTHROPIC_API_KEY';
+      await fetch('/api/env/toggle', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: otherTokenType,
+          scope: 'global',
+          enabled: false,
+        }),
+      });
 
       // enabled状態を更新
       await fetch('/api/env/toggle', {
@@ -196,14 +209,14 @@ export default function SettingsPage() {
               </div>
               <input
                 type="password"
-                placeholder="sk-ant-xxx or oauth_xxx"
+                placeholder="sk-ant-api... or sk-ant-oat..."
                 value={claudeToken}
                 onChange={(e) => setClaudeToken(e.target.value)}
                 className="w-full px-3 py-2 border border-theme rounded font-mono text-sm text-theme-fg bg-theme-card"
                 disabled={isLoading}
               />
               <p className="text-xs text-theme-muted mt-1">
-                <strong>sk-ant-</strong> で始まる場合はAPI Key、<strong>oauth_</strong>{' '}
+                <strong>sk-ant-api</strong> で始まる場合はAPI Key、<strong>sk-ant-oat</strong>{' '}
                 で始まる場合はOAuth Tokenとして自動判別されます
               </p>
               <p className="text-xs text-theme-muted mt-1">
