@@ -1,115 +1,155 @@
-// ノード設定（settings.json）
-export interface NodeSettings {
-  model: string;
-  arcs: string[];
-  position?: { x: number; y: number };
+// Task型
+export interface Task {
+  id: string; // UUID
+  title: string;
+  description: string;
+  status: 'backlog' | 'planning' | 'coding' | 'reviewing' | 'done';
+  owner: string;
+  repo: string;
+  branch: string;
+  worktreeStatus: 'pending' | 'created' | 'error';
+  claudeState: 'idle' | 'running';
+  plan?: string;
+  effort?: number;
+  order?: number;
+  deleted: boolean;
+  deletedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// セッション状態（session.json）
-export interface NodeSession {
-  session_id?: string;
-  status: 'idle' | 'active';
-  last_active?: string;
-  total_cost_usd: number;
+// ClaudeSession型
+export type ClaudeSessionStatus = 'idle' | 'running' | 'success' | 'error';
+
+export interface ClaudeSession {
+  id: string; // アプリケーション側のセッションID (UUID)
+  taskId: string;
+  sessionNumber: number; // タブ表示用の連番（削除されても変わらない）
+  status: ClaudeSessionStatus;
+  rawMessages: unknown[]; // Claude SDKから返ってきたraw messages（永続化用）
+  startedAt: string;
+  completedAt?: string;
+  updatedAt: string;
+  agentSessionId?: string; // Claude Agent SDKのセッションID (最初のプロンプト送信時に設定)
 }
 
-// ノード全体の情報
-export interface Node {
+// ============================================
+// UIMessage型（新しいデータモデル）
+// ============================================
+
+// UIメッセージのタイプ
+export type UIMessageType =
+  | 'user_message'
+  | 'assistant_message'
+  | 'tool_execution_group'
+  | 'error'
+  | 'system_event';
+
+// UIメッセージ本体
+export interface UIMessage {
   id: string;
-  model: string;
-  arcs: string[];
-  status: 'idle' | 'active';
-  session_id?: string;
-  total_cost_usd: number;
-  position?: { x: number; y: number };
-}
-
-// Claude CLI の出力
-export interface ClaudeResponse {
-  type: string;
-  subtype: string;
-  session_id: string;
-  result: string;
-  total_cost_usd: number;
-  is_error: boolean;
-}
-
-// ログエントリ
-export interface LogEntry {
-  time: string;
-  nodeId: string;
-  direction: 'send' | 'receive';
-  content: string;
-  eventType?: StreamEventType;
-}
-
-// SSEストリームイベントタイプ
-export type StreamEventType =
-  | 'status'
-  | 'message'
-  | 'tool_use'
-  | 'tool_result'
-  | 'complete'
-  | 'error';
-
-// SSEストリームイベント
-export interface StreamEvent {
-  type: StreamEventType;
-  nodeId: string;
-  data: {
-    content?: string;
-    toolName?: string;
-    targetNodeId?: string;
-    cost?: number;
-    sessionId?: string;
-  };
   timestamp: string;
+  type: UIMessageType;
+  content: UIMessageContent;
+  metadata: UIMessageMetadata;
 }
 
-// Claude CLI stream-json イベント
-export interface ClaudeStreamEvent {
-  type: string;
-  subtype?: string;
-  session_id?: string;
-  message?: {
-    role: string;
-    content: string | { type: string; text: string }; // contentはオブジェクトの場合もある
-  };
-  tool_use?: {
-    name: string;
-    input: Record<string, unknown>;
-  };
-  tool_result?: {
-    content: string | { type: string; text: string }; // contentはオブジェクトの場合もある
-  };
+// UIメッセージのコンテンツ（タイプ別）
+export type UIMessageContent =
+  | UserMessageContent
+  | AssistantMessageContent
+  | ToolExecutionGroupContent
+  | ErrorContent
+  | SystemEventContent;
+
+// ユーザーメッセージ
+export interface UserMessageContent {
+  type: 'user_message';
+  text: string;
+}
+
+// アシスタントメッセージ
+export interface AssistantMessageContent {
+  type: 'assistant_message';
+  // blocks配列で順序を保持（thinking → text → tool_use の順）
+  blocks: AssistantMessageBlock[];
+}
+
+export type AssistantMessageBlock =
+  | { type: 'thinking'; content: string; isRedacted?: boolean }
+  | { type: 'text'; content: string }
+  | { type: 'tool_use'; info: ToolExecution };
+
+// ツール実行グループ（複数のツール実行を1ブロックに集約）
+export interface ToolExecutionGroupContent {
+  type: 'tool_execution_group';
+  executions: ToolExecution[];
+  startTime: string;
+  endTime?: string;
+  allCompleted: boolean;
+}
+
+// 個別のツール実行
+export interface ToolExecution {
+  id: string; // tool_use_id
+  toolName: string;
+  input?: Record<string, unknown>;
   result?: string;
-  total_cost_usd?: number;
-  is_error?: boolean;
+  status: 'pending' | 'running' | 'success' | 'error';
+  error?: string;
+  startTime: string;
+  endTime?: string;
 }
 
-// メッセージ送信リクエスト
-export interface MessageRequest {
-  content: string;
-  target?: string;
+// エラー
+export interface ErrorContent {
+  type: 'error';
+  message: string;
+  details?: string;
 }
 
-// メッセージ送信レスポンス
-export interface MessageResponse {
-  response: string;
-  session_id?: string;
-  cost: number;
+// システムイベント
+export interface SystemEventContent {
+  type: 'system_event';
+  event: string;
+  description: string;
 }
 
-// システムプロンプト構築用オプション
-export interface PromptOptions {
-  currentNodeId: string;
-  baseRole: string;
-  connectedNodes: Array<{ nodeId: string; role: string }>;
-  apiEndpoint: string;
+// UIメッセージのメタデータ
+export interface UIMessageMetadata {
+  sdkMessageUuids?: string[]; // 元となったSDKメッセージのUUID
+  updatedAt?: string;
+  role?: 'user' | 'assistant';
+  model?: string;
+  stopReason?: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
 }
 
-// 接続ノード情報
-export interface ConnectedNodeInfo {
-  nodeId: string;
-  role: string;
+// Repository型
+export interface Repository {
+  id: string;
+  owner: string;
+  repo: string;
+  cloneUrl: string;
+  authToken?: string;
+  createdAt: string;
+}
+
+// EnvironmentVariable型
+export interface EnvironmentVariable {
+  key: string;
+  value: string;
+  scope: 'global' | 'owner' | 'repo';
+  owner?: string;
+  repo?: string;
+  enabled: boolean; // 有効/無効フラグ（デフォルトtrue）
+}
+
+// API Request/Response型
+export interface ApiResponse<T> {
+  data: T;
+  error?: string;
 }

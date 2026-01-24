@@ -1,0 +1,52 @@
+services:
+  app:
+    build:
+      context: .devcontainer
+      dockerfile: Dockerfile
+      # ビルドキャッシュを活用
+      cache_from:
+        - devcontainer-app:latest
+    image: devcontainer-app:latest
+    volumes:
+      # プロジェクトディレクトリ
+      - .:/workspace:cached
+      # node_modules を名前付きボリュームで高速化
+      - node-modules:/workspace/node_modules
+      # npm キャッシュの永続化
+      - npm-cache:/home/node/.npm
+    environment:
+      # MCP設定
+      - MCP_FIGMA_HOSTNAME=host.docker.internal
+      # GitHub MCP用環境変数（ホストから引き継ぎ）
+      - GITHUB_PAT=${GITHUB_PAT}
+    command: sleep infinity
+    profiles:
+      - dev-container
+    user: node
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  # 依存関係インストール専用サービス
+  init:
+    image: node:24.12.0
+    working_dir: /workspace
+    volumes:
+      # プロジェクトディレクトリ
+      - .:/workspace:cached
+      # node_modules を名前付きボリュームで高速化
+      - node-modules:/workspace/node_modules
+      # npm キャッシュの永続化
+      - npm-cache:/home/node/.npm
+    command: npm ci --ignore-scripts
+    profiles:
+      - dev-container
+    user: node
+
+volumes:
+  npm-cache:
+  node-modules:
+
+networks:
+  default:
+    name: tsunagi-network

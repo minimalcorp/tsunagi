@@ -1,374 +1,338 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import dynamic from 'next/dynamic';
-import {
-  ArrowPathIcon,
-  PlusIcon,
-  StopIcon,
-  Cog6ToothIcon,
-  DocumentTextIcon,
-} from '@heroicons/react/24/solid';
-import NodeDetail from '@/components/NodeDetail';
-import LogViewer from '@/components/LogViewer';
-import AddNodeDialog from '@/components/AddNodeDialog';
-import type { Node, LogEntry, StreamEvent } from '@/lib/types';
-
-// ReactFlowはSSRに対応していないため、動的インポート
-const NodeGraph = dynamic(() => import('@/components/NodeGraph'), {
-  ssr: false,
-  loading: () => <div className="w-full h-full flex items-center justify-center">Loading...</div>,
-});
-
-type TabType = 'settings' | 'logs';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import type { Task, Repository, ClaudeSession } from '@/lib/types';
+import { Header } from '@/components/Header';
+import { KanbanBoard } from '@/components/KanbanBoard';
+import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
+import { AddTaskDialog } from '@/components/AddTaskDialog';
+import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
+import { useSSE } from '@/hooks/useSSE';
 
 export default function Home() {
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [activeTab, setActiveTab] = useState<TabType>('settings');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const router = useRouter();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [globalEnv, setGlobalEnv] = useState<Record<string, string>>({});
+  const [sessions, setSessions] = useState<Record<string, ClaudeSession[]>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [activeEdgeIds, setActiveEdgeIds] = useState<string[]>([]);
 
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId);
-  const hasActiveNodes = nodes.some((n) => n.status === 'active');
+  // Dialog states
+  const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
+  const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
 
-  // ログを追加
-  const addLog = useCallback((nodeId: string, direction: 'send' | 'receive', content: string) => {
-    const entry: LogEntry = {
-      time: new Date().toISOString(),
-      nodeId,
-      direction,
-      content,
+  // Filter states
+  const [ownerFilter, setOwnerFilter] = useState('');
+  const [repoFilter, setRepoFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 初回ユーザーフローの状態を検出
+  const onboardingState = useMemo(() => {
+    const state = {
+      hasRepositories: repositories.length > 0,
+      hasAnthropicApiKey: Boolean(globalEnv.ANTHROPIC_API_KEY),
+      hasClaudeCodeToken: Boolean(globalEnv.CLAUDE_CODE_OAUTH_TOKEN),
+      hasGithubPat: Boolean(globalEnv.GITHUB_PAT),
+      hasTasks: tasks.length > 0,
     };
-    setLogs((prev) => [...prev, entry]);
-  }, []);
 
-  // ノード一覧を取得
-  const fetchNodes = useCallback(async () => {
+    let nextStep: 'clone' | 'env' | 'task' | 'complete';
+
+    // 最初にAPI keysとGitHub tokenをチェック
+    if ((!state.hasAnthropicApiKey && !state.hasClaudeCodeToken) || !state.hasGithubPat) {
+      nextStep = 'env';
+    } else if (!state.hasRepositories) {
+      nextStep = 'clone';
+    } else if (!state.hasTasks) {
+      nextStep = 'task';
+    } else {
+      nextStep = 'complete';
+    }
+
+    return { state, nextStep };
+  }, [repositories, globalEnv, tasks]);
+
+  // Extract unique owners and repos from repositories
+  const owners = useMemo(() => {
+    const uniqueOwners = [...new Set(repositories.map((r) => r.owner))];
+    return uniqueOwners;
+  }, [repositories]);
+
+  const repos = useMemo(() => {
+    const uniqueRepos = [...new Set(repositories.map((r) => r.repo))];
+    return uniqueRepos;
+  }, [repositories]);
+
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (ownerFilter && task.owner !== ownerFilter) return false;
+      if (repoFilter && task.repo !== repoFilter) return false;
+      if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        return false;
+      return true;
+    });
+  }, [tasks, ownerFilter, repoFilter, searchQuery]);
+
+  // 初回データロード
+  const loadData = async () => {
+    setIsLoading(true);
     try {
-      const res = await fetch('/api/nodes');
-      const data = await res.json();
-      setNodes(data.nodes || []);
-      if (data.nodes?.length > 0 && !selectedNodeId) {
-        setSelectedNodeId(data.nodes[0].id);
-      }
+      const [tasksData, ownersData, envData, sessionsData] = await Promise.all([
+        fetch('/api/tasks').then((r) => r.json()),
+        fetch('/api/owners').then((r) => r.json()),
+        fetch('/api/env').then((r) => r.json()),
+        fetch('/api/sessions').then((r) => r.json()),
+      ]);
+
+      setTasks(tasksData.data.tasks);
+      // ownersからすべてのリポジトリを抽出
+      const allRepos = ownersData.data.owners.flatMap(
+        (o: { repositories: Repository[] }) => o.repositories
+      );
+      setRepositories(allRepos);
+      setGlobalEnv(envData.data.env);
+
+      // セッションをtaskIdでグループ化
+      const allSessions = (sessionsData.data || []) as ClaudeSession[];
+      const groupedSessions = allSessions.reduce(
+        (acc, session) => {
+          if (!acc[session.taskId]) {
+            acc[session.taskId] = [];
+          }
+          acc[session.taskId].push(session);
+          return acc;
+        },
+        {} as Record<string, ClaudeSession[]>
+      );
+      setSessions(groupedSessions);
     } catch (error) {
-      console.error('Failed to fetch nodes:', error);
+      console.error('Failed to load data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedNodeId]);
+  };
 
-  // 初回ロード
   useEffect(() => {
-    fetchNodes();
-  }, [fetchNodes]);
+    loadData();
+  }, []);
 
-  // ノード追加
-  const handleAddNode = async (id: string, model: string) => {
-    try {
-      const res = await fetch('/api/nodes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, model, arcs: [] }),
+  // SSE統合
+  const { eventSource } = useSSE();
+
+  useEffect(() => {
+    if (!eventSource) return;
+
+    // task:created イベント
+    const handleTaskCreated = (event: MessageEvent) => {
+      const task = JSON.parse(event.data) as Task;
+      setTasks((prev) => {
+        // 重複チェック
+        if (prev.some((t) => t.id === task.id)) return prev;
+        return [...prev, task];
       });
-      if (res.ok) {
-        await fetchNodes();
-        setSelectedNodeId(id);
-      }
-    } catch (error) {
-      console.error('Failed to add node:', error);
-    }
-  };
+    };
 
-  // ストリームイベントをログに変換
-  const handleStreamEvent = useCallback(
-    (event: StreamEvent) => {
-      const entry: LogEntry = {
-        time: event.timestamp,
-        nodeId: event.nodeId,
-        direction: 'receive',
-        content: '',
-        eventType: event.type,
-      };
+    // task:updated イベント
+    const handleTaskUpdated = (event: MessageEvent) => {
+      const task = JSON.parse(event.data) as Task;
+      console.log('[SSE] task:updated received:', task.id, 'claudeState:', task.claudeState);
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+    };
 
-      switch (event.type) {
-        case 'status':
-          entry.content = event.data.content || 'Processing...';
-          break;
-        case 'message':
-          entry.content = event.data.content || '';
-          break;
-        case 'tool_use':
-          entry.content = `[Tool: ${event.data.toolName}] ${event.data.content || ''}`;
-          // ターゲットノードへのエッジをアクティブにする
-          if (event.data.targetNodeId) {
-            const edgeId = `${event.nodeId}-${event.data.targetNodeId}`;
-            setActiveEdgeIds((prev) => (prev.includes(edgeId) ? prev : [...prev, edgeId]));
-          }
-          break;
-        case 'tool_result':
-          entry.content = `[Result] ${event.data.content || ''}`;
-          // tool_result後にエッジを非アクティブにする
-          setActiveEdgeIds((prev) => prev.filter((id) => !id.startsWith(`${event.nodeId}-`)));
-          break;
-        case 'complete':
-          entry.content = event.data.content || 'Completed';
-          // 完了時にエッジをクリア
-          setActiveEdgeIds((prev) => prev.filter((id) => !id.startsWith(`${event.nodeId}-`)));
-          fetchNodes();
-          break;
-        case 'error':
-          entry.content = `[Error] ${event.data.content || 'Unknown error'}`;
-          // エラー時にエッジをクリア
-          setActiveEdgeIds((prev) => prev.filter((id) => !id.startsWith(`${event.nodeId}-`)));
-          fetchNodes();
-          break;
-      }
+    // task:deleted イベント
+    const handleTaskDeleted = (event: MessageEvent) => {
+      const { id } = JSON.parse(event.data) as { id: string };
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    };
 
-      if (entry.content) {
-        setLogs((prev) => [...prev, entry]);
-      }
-    },
-    [fetchNodes]
-  );
+    // session:created イベント
+    const handleSessionCreated = (event: MessageEvent) => {
+      const session = JSON.parse(event.data) as ClaudeSession;
+      console.log('[SSE] session:created received:', session.id);
+      setSessions((prev) => ({
+        ...prev,
+        [session.taskId]: [...(prev[session.taskId] || []), session],
+      }));
+    };
 
-  // メッセージ送信（ストリーミング）
-  const handleSendMessage = async (content: string) => {
-    if (!selectedNodeId) return;
+    // session:updated イベント
+    const handleSessionUpdated = (event: MessageEvent) => {
+      const session = JSON.parse(event.data) as ClaudeSession;
+      console.log('[SSE] session:updated received:', session.id, 'status:', session.status);
+      setSessions((prev) => ({
+        ...prev,
+        [session.taskId]: (prev[session.taskId] || []).map((s) =>
+          s.id === session.id ? session : s
+        ),
+      }));
+    };
 
-    // 送信ログを追加
-    addLog(selectedNodeId, 'send', content);
-
-    // 即座にノードをactive状態に更新（オプティミスティック更新）
-    setNodes((prev) =>
-      prev.map((node) =>
-        node.id === selectedNodeId ? { ...node, status: 'active' as const } : node
-      )
-    );
-
-    try {
-      const res = await fetch(`/api/nodes/${selectedNodeId}/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      });
-
-      if (!res.ok) {
-        addLog(selectedNodeId, 'receive', '[Error] Failed to start stream');
-        await fetchNodes();
-        return;
-      }
-
-      // SSEストリームを読み取る
-      const reader = res.body?.getReader();
-      if (!reader) {
-        addLog(selectedNodeId, 'receive', '[Error] No stream available');
-        await fetchNodes();
-        return;
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // SSEイベントをパース
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const event = JSON.parse(line.slice(6)) as StreamEvent;
-              handleStreamEvent(event);
-            } catch {
-              console.error('Failed to parse SSE event:', line);
-            }
-          }
+    // session:deleted イベント
+    const handleSessionDeleted = (event: MessageEvent) => {
+      const { id } = JSON.parse(event.data) as { id: string };
+      console.log('[SSE] session:deleted received:', id);
+      setSessions((prev) => {
+        const newSessions = { ...prev };
+        for (const taskId in newSessions) {
+          newSessions[taskId] = newSessions[taskId].filter((s) => s.id !== id);
         }
-      }
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      addLog(selectedNodeId, 'receive', '[Error] Request failed');
-      await fetchNodes();
-    }
-  };
-
-  // セッションクリア
-  const handleClear = async () => {
-    if (!selectedNodeId) return;
-
-    try {
-      await fetch(`/api/nodes/${selectedNodeId}/clear`, {
-        method: 'POST',
+        return newSessions;
       });
-      await fetchNodes();
-    } catch (error) {
-      console.error('Failed to clear session:', error);
-    }
-  };
+    };
 
-  // ノード削除
-  const handleDelete = async () => {
-    if (!selectedNodeId) return;
-    if (!confirm(`Node "${selectedNodeId}" を削除しますか？`)) return;
+    eventSource.addEventListener('task:created', handleTaskCreated);
+    eventSource.addEventListener('task:updated', handleTaskUpdated);
+    eventSource.addEventListener('task:deleted', handleTaskDeleted);
+    eventSource.addEventListener('session:created', handleSessionCreated);
+    eventSource.addEventListener('session:updated', handleSessionUpdated);
+    eventSource.addEventListener('session:deleted', handleSessionDeleted);
 
+    return () => {
+      eventSource.removeEventListener('task:created', handleTaskCreated);
+      eventSource.removeEventListener('task:updated', handleTaskUpdated);
+      eventSource.removeEventListener('task:deleted', handleTaskDeleted);
+      eventSource.removeEventListener('session:created', handleSessionCreated);
+      eventSource.removeEventListener('session:updated', handleSessionUpdated);
+      eventSource.removeEventListener('session:deleted', handleSessionDeleted);
+    };
+  }, [eventSource]);
+
+  // Handler functions
+  const handleTaskMove = async (taskId: string, newStatus: Task['status']) => {
     try {
-      await fetch(`/api/nodes/${selectedNodeId}`, {
-        method: 'DELETE',
-      });
-      setSelectedNodeId(undefined);
-      await fetchNodes();
-    } catch (error) {
-      console.error('Failed to delete node:', error);
-    }
-  };
-
-  // 設定更新
-  const handleUpdateSettings = async (model: string, arcs: string[]) => {
-    if (!selectedNodeId) return;
-
-    try {
-      await fetch(`/api/nodes/${selectedNodeId}`, {
+      const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, arcs }),
+        body: JSON.stringify({ status: newStatus }),
       });
-      await fetchNodes();
+
+      if (!response.ok) throw new Error('Failed to update task');
+
+      // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
     } catch (error) {
-      console.error('Failed to update settings:', error);
+      console.error('Failed to move task:', error);
     }
   };
 
-  // 全停止
-  const handleStopAll = async () => {
+  const handleAddTask = async (formData: {
+    title: string;
+    description: string;
+    owner: string;
+    repo: string;
+    branch: string;
+    baseBranch: string;
+  }) => {
     try {
-      await fetch('/api/stop', { method: 'POST' });
-      await fetchNodes();
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) throw new Error('Failed to create task');
+
+      // SSE経由でtask:createdイベントが配信されるため、ここではstateを更新しない
     } catch (error) {
-      console.error('Failed to stop all:', error);
+      console.error('Failed to add task:', error);
+      throw error;
     }
+  };
+
+  const handleCloneRepository = async (cloneData: { gitUrl: string; authToken?: string }) => {
+    try {
+      const response = await fetch('/api/clone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cloneData),
+      });
+
+      if (!response.ok) throw new Error('Failed to clone repository');
+
+      const data = await response.json();
+      setRepositories((prev) => [...prev, data.data.repository]);
+    } catch (error) {
+      console.error('Failed to clone repository:', error);
+      throw error;
+    }
+  };
+
+  const handleFilterChange = (filters: { owner: string; repo: string; search: string }) => {
+    setOwnerFilter(filters.owner);
+    setRepoFilter(filters.repo);
+    setSearchQuery(filters.search);
+  };
+
+  const handleTaskClick = (taskId: string) => {
+    router.push(`/tasks/${taskId}`);
   };
 
   if (isLoading) {
-    return <div className="h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="h-screen flex items-center justify-center bg-theme-bg">
+        <div className="text-center">
+          <div className="text-2xl text-theme-fg">Loading...</div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      {/* ヘッダー */}
-      <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card">
-        <h1 className="text-xl font-bold text-foreground">Solo</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => fetchNodes()}
-            className="px-3 py-1.5 bg-subtle text-white rounded hover:opacity-90 flex items-center gap-1.5"
-            title="設定を再読み込み"
-          >
-            <ArrowPathIcon className="w-4 h-4" />
-            Reload
-          </button>
-          <button
-            onClick={() => setIsAddDialogOpen(true)}
-            className="px-3 py-1.5 bg-secondary text-white rounded hover:opacity-90 flex items-center gap-1.5"
-          >
-            <PlusIcon className="w-4 h-4" />
-            Add Node
-          </button>
-          <button
-            onClick={handleStopAll}
-            disabled={!hasActiveNodes}
-            className={`px-3 py-1.5 rounded flex items-center gap-1.5 ${
-              hasActiveNodes
-                ? 'bg-error text-white hover:opacity-90'
-                : 'bg-subtle text-muted cursor-not-allowed'
-            }`}
-          >
-            <StopIcon className="w-4 h-4" />
-            Stop All
-          </button>
-        </div>
-      </header>
+    <div className="h-screen flex flex-col">
+      <Header
+        onCloneClick={() => setIsCloneDialogOpen(true)}
+        onSettingsClick={() => router.push('/settings')}
+        onReload={loadData}
+        nextStep={onboardingState.nextStep}
+        owners={owners}
+        repos={repos}
+        onFilterChange={handleFilterChange}
+        isCloneDialogOpen={isCloneDialogOpen}
+      />
 
-      {/* メインコンテンツ */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* 左側: ノードグラフ */}
-        <div className="flex-1 border-r border-border bg-background">
-          {nodes.length > 0 ? (
-            <NodeGraph
-              nodes={nodes}
-              selectedNodeId={selectedNodeId}
-              onNodeSelect={setSelectedNodeId}
-              activeEdgeIds={activeEdgeIds}
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center text-muted">
-              ノードがありません。「+ Add Node」で追加してください。
-            </div>
-          )}
-        </div>
+      {/* カンバンボード（常に表示） */}
+      <div className="relative flex-1 overflow-hidden">
+        <KanbanBoard
+          tasks={filteredTasks}
+          sessions={sessions}
+          onTaskMove={handleTaskMove}
+          onTaskClick={handleTaskClick}
+          onAddTaskClick={() => setIsAddTaskDialogOpen(true)}
+          nextStep={onboardingState.nextStep}
+          isAddTaskDialogOpen={isAddTaskDialogOpen}
+          hasApiKey={
+            onboardingState.state.hasAnthropicApiKey || onboardingState.state.hasClaudeCodeToken
+          }
+        />
 
-        {/* 右側: 詳細パネル */}
-        <div className="w-96 flex flex-col bg-card">
-          {/* タブ */}
-          <div className="flex border-b border-border">
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`flex-1 py-2 text-center flex items-center justify-center gap-1.5 ${
-                activeTab === 'settings'
-                  ? 'border-b-2 border-secondary font-medium text-secondary'
-                  : 'text-muted hover:text-subtle'
-              }`}
-            >
-              <Cog6ToothIcon className="w-4 h-4" />
-              Settings
-            </button>
-            <button
-              onClick={() => setActiveTab('logs')}
-              className={`flex-1 py-2 text-center flex items-center justify-center gap-1.5 ${
-                activeTab === 'logs'
-                  ? 'border-b-2 border-secondary font-medium text-secondary'
-                  : 'text-muted hover:text-subtle'
-              }`}
-            >
-              <DocumentTextIcon className="w-4 h-4" />
-              Logs
-            </button>
-          </div>
-
-          {/* タブコンテンツ */}
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === 'settings' && selectedNode ? (
-              <NodeDetail
-                key={selectedNode.id}
-                node={selectedNode}
-                allNodes={nodes}
-                onSendMessage={handleSendMessage}
-                onClear={handleClear}
-                onDelete={handleDelete}
-                onUpdateSettings={handleUpdateSettings}
-              />
-            ) : activeTab === 'settings' && !selectedNode ? (
-              <div className="p-4 text-muted">ノードを選択してください</div>
-            ) : (
-              <LogViewer logs={logs} filterNodeId={selectedNodeId} />
-            )}
-          </div>
-        </div>
+        {/* 初回セットアップ時の半透明オーバーレイ */}
+        {onboardingState.nextStep === 'env' && (
+          <RepositoryOnboardingOverlay
+            hasRepositories={onboardingState.state.hasRepositories}
+            hasEnvVars={
+              (onboardingState.state.hasAnthropicApiKey ||
+                onboardingState.state.hasClaudeCodeToken) &&
+              onboardingState.state.hasGithubPat
+            }
+            hasTasks={onboardingState.state.hasTasks}
+          />
+        )}
       </div>
 
-      {/* ダイアログ */}
-      <AddNodeDialog
-        isOpen={isAddDialogOpen}
-        onClose={() => setIsAddDialogOpen(false)}
-        onAdd={handleAddNode}
+      {/* Dialogs */}
+      <CloneRepositoryDialog
+        isOpen={isCloneDialogOpen}
+        onClose={() => setIsCloneDialogOpen(false)}
+        onClone={handleCloneRepository}
+        isOnboarding={onboardingState.nextStep === 'clone'}
+      />
+
+      <AddTaskDialog
+        isOpen={isAddTaskDialogOpen}
+        onClose={() => setIsAddTaskDialogOpen(false)}
+        onAdd={handleAddTask}
+        repositories={repositories}
       />
     </div>
   );

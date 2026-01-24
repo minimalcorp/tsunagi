@@ -1,6 +1,6 @@
 {
   "name": "tsunagi",
-  "dockerComposeFile": "./compose.yml",
+  "dockerComposeFile": "../compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
   "runServices": ["app"],
@@ -68,7 +68,9 @@
     // SSH認証（一時的な場所にマウント）
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/tmp/host-ssh,type=bind,readonly",
     // Git設定
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/node/.gitconfig,type=bind,readonly"
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/node/.gitconfig,type=bind,readonly",
+    // tsunagi設定ディレクトリ
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.tsunagi,target=/home/node/.tsunagi,type=bind"
   ],
 
   // 機能の追加
