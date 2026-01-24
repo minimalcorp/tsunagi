@@ -34,16 +34,16 @@ export function KanbanColumn({
       <div className="relative flex items-center justify-between mb-4 flex-shrink-0">
         <h2 className="text-lg font-semibold text-theme-fg">{title}</h2>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-theme-muted">{tasks.length}</span>
           {showAddButton && (
             <button
               onClick={onAddTaskClick}
-              className="p-1 rounded bg-primary text-white hover:bg-primary-hover active:scale-95 transition-transform cursor-pointer"
+              className="px-3 py-1 rounded bg-primary text-white hover:bg-primary-hover active:scale-95 transition-transform cursor-pointer"
               title="Add Task"
             >
               <Plus className="w-4 h-4" />
             </button>
           )}
+          <span className="text-sm text-theme-muted">{tasks.length}</span>
         </div>
         {nextStep === 'task' && status === 'backlog' && !isAddTaskDialogOpen && (
           <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-primary text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
