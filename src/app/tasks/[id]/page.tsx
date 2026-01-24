@@ -345,7 +345,10 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                   )}
 
                   {(viewMode === 'split' || viewMode === 'logs') && (
-                    <ExecutionLogsChat rawMessages={activeSession.rawMessages} />
+                    <ExecutionLogsChat
+                      rawMessages={activeSession.rawMessages}
+                      sessionId={activeSession.id}
+                    />
                   )}
                 </div>
               </div>

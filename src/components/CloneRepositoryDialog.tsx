@@ -6,23 +6,21 @@ import { LoadingSpinner } from './LoadingSpinner';
 interface CloneRepositoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onClone: (data: { gitUrl: string; authToken?: string }) => Promise<void>;
+  onClone: (data: { gitUrl: string }) => Promise<void>;
 }
 
 export function CloneRepositoryDialog({ isOpen, onClose, onClone }: CloneRepositoryDialogProps) {
   const [gitUrl, setGitUrl] = useState('');
-  const [authToken, setAuthToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await onClone({ gitUrl, authToken: authToken || undefined });
+      await onClone({ gitUrl });
       onClose();
       // Reset form
       setGitUrl('');
-      setAuthToken('');
     } catch (error) {
       console.error('Failed to clone repository:', error);
     } finally {
@@ -58,21 +56,6 @@ export function CloneRepositoryDialog({ isOpen, onClose, onClone }: CloneReposit
             <p className="text-xs text-theme-muted mt-1">
               HTTPS or SSH形式のGit URLを入力してください
             </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">
-              Auth Token (Optional)
-            </label>
-            <input
-              type="password"
-              placeholder="ghp_xxx or oauth token"
-              value={authToken}
-              onChange={(e) => setAuthToken(e.target.value)}
-              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
-              disabled={isLoading}
-            />
-            <p className="text-xs text-theme-muted mt-1">プライベートリポジトリの場合に必要です</p>
           </div>
 
           <div className="flex justify-end gap-2">

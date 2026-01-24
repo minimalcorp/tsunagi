@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Settings, ArrowUp, Filter, Plus } from 'lucide-react';
+import { Settings, ArrowUp, Filter, RefreshCw, ListPlus } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 interface HeaderProps {
@@ -15,7 +15,6 @@ interface HeaderProps {
   onFilterChange: (filters: { owner: string; repo: string; search: string }) => void;
   isCloneDialogOpen?: boolean;
   isAddTaskDialogOpen?: boolean;
-  isSettingsDialogOpen?: boolean;
 }
 
 export function Header({
@@ -29,7 +28,6 @@ export function Header({
   onFilterChange,
   isCloneDialogOpen = false,
   isAddTaskDialogOpen = false,
-  isSettingsDialogOpen = false,
 }: HeaderProps) {
   const [repoFilter, setRepoFilter] = useState<string>(''); // "owner/repo" format
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -190,13 +188,14 @@ export function Header({
         <button
           onClick={onReload}
           className="px-4 py-2 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer"
+          title="Reload"
         >
-          Reload
+          <RefreshCw className="w-5 h-5" />
         </button>
 
         <div className="relative">
           <button onClick={onAddTaskClick} className={getButtonStyle('task')}>
-            <Plus className="w-4 h-4 inline-block mr-2" />
+            <ListPlus className="w-4 h-4 inline-block mr-2" />
             Add Task
           </button>
           {nextStep === 'task' && !isAddTaskDialogOpen && (
@@ -214,10 +213,9 @@ export function Header({
             className={getButtonStyle('env')}
             title="Environment Settings"
           >
-            <Settings className="w-4 h-4 inline-block mr-2" />
-            Settings
+            <Settings className="w-5 h-5" />
           </button>
-          {nextStep === 'env' && !isSettingsDialogOpen && (
+          {nextStep === 'env' && (
             <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-primary text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
               <ArrowUp className="w-5 h-5" />
               Click here

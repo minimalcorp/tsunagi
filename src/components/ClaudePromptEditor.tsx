@@ -57,7 +57,8 @@ export function ClaudePromptEditor({
         editorRef.current.setValue(prompt);
       }
     }
-  }, [session.id, prompt]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id]);
 
   const status = getClaudeStatus(session);
   const isRunning = status === 'running';

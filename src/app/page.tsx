@@ -9,7 +9,6 @@ import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOv
 import { EnvironmentNotification } from '@/components/EnvironmentNotification';
 import { AddTaskDialog } from '@/components/AddTaskDialog';
 import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
-import { EnvironmentSettingsDialog } from '@/components/EnvironmentSettingsDialog';
 
 export default function Home() {
   const router = useRouter();
@@ -22,7 +21,6 @@ export default function Home() {
   // Dialog states
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
-  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
 
   // Filter states
   const [ownerFilter, setOwnerFilter] = useState('');
@@ -180,23 +178,6 @@ export default function Home() {
     }
   };
 
-  const handleSaveEnvVar = async (key: string, value: string) => {
-    try {
-      const response = await fetch('/api/env', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value, scope: 'global' }),
-      });
-
-      if (!response.ok) throw new Error('Failed to save environment variable');
-
-      setGlobalEnv((prev) => ({ ...prev, [key]: value }));
-    } catch (error) {
-      console.error('Failed to save environment variable:', error);
-      throw error;
-    }
-  };
-
   const handleFilterChange = (filters: { owner: string; repo: string; search: string }) => {
     setOwnerFilter(filters.owner);
     setRepoFilter(filters.repo);
@@ -222,7 +203,7 @@ export default function Home() {
       <Header
         onCloneClick={() => setIsCloneDialogOpen(true)}
         onAddTaskClick={() => setIsAddTaskDialogOpen(true)}
-        onSettingsClick={() => setIsSettingsDialogOpen(true)}
+        onSettingsClick={() => router.push('/settings')}
         onReload={loadData}
         nextStep={onboardingState.nextStep}
         owners={owners}
@@ -230,7 +211,6 @@ export default function Home() {
         onFilterChange={handleFilterChange}
         isCloneDialogOpen={isCloneDialogOpen}
         isAddTaskDialogOpen={isAddTaskDialogOpen}
-        isSettingsDialogOpen={isSettingsDialogOpen}
       />
 
       {/* 環境変数未設定時の通知バナー（onboarding優先順位に従って表示） */}
@@ -275,12 +255,6 @@ export default function Home() {
         onAdd={handleAddTask}
         owners={owners}
         repos={repos}
-      />
-
-      <EnvironmentSettingsDialog
-        isOpen={isSettingsDialogOpen}
-        onClose={() => setIsSettingsDialogOpen(false)}
-        onSave={handleSaveEnvVar}
       />
     </div>
   );

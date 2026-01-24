@@ -9,10 +9,14 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 interface ExecutionLogsChatProps {
   rawMessages?: unknown[]; // SDK messages
+  sessionId?: string; // セッション切り替え検知用
 }
 
-export function ExecutionLogsChat({ rawMessages }: ExecutionLogsChatProps) {
+export function ExecutionLogsChat({ rawMessages, sessionId }: ExecutionLogsChatProps) {
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const prevSessionIdRef = useRef<string | undefined>(sessionId);
 
   // rawMessagesをUIMessagesに変換
   const uiMessages = useMemo(() => {
@@ -21,10 +25,36 @@ export function ExecutionLogsChat({ rawMessages }: ExecutionLogsChatProps) {
     return converter.convert(rawMessages);
   }, [rawMessages]);
 
-  // 新規メッセージ追加時に自動スクロール
+  // スクロール位置の監視
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [uiMessages]);
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isBottom = scrollHeight - scrollTop - clientHeight < 10; // 10px以内を最下部とみなす
+      setIsAtBottom(isBottom);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // スクロール制御
+  useEffect(() => {
+    const sessionChanged = prevSessionIdRef.current !== sessionId;
+    prevSessionIdRef.current = sessionId;
+
+    if (sessionChanged) {
+      // セッション切り替え時: 即座にスクロール
+      logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+      // Note: setIsAtBottomはスクロールイベントで自動的に更新される
+    } else if (isAtBottom) {
+      // 最下部にいる状態で新規メッセージ: スムーズスクロール
+      logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    // 最下部以外にいる場合: スクロールしない
+  }, [uiMessages, sessionId, isAtBottom]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -32,7 +62,10 @@ export function ExecutionLogsChat({ rawMessages }: ExecutionLogsChatProps) {
         <h3 className="text-sm font-semibold text-theme-fg">Logs</h3>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto border border-theme rounded p-4 space-y-3 bg-theme-hover">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto border border-theme rounded p-4 space-y-3 bg-theme-hover"
+      >
         {uiMessages.length === 0 ? (
           <p className="text-theme-muted text-sm text-center mt-8">
             No logs yet. Execute a prompt to start.
@@ -58,9 +91,11 @@ function UIMessageItem({ message }: { message: UIMessage }) {
 
     return (
       <div className="flex justify-end">
-        <div className="text-right">
-          <div className="inline-block text-left rounded-lg p-2 bg-primary text-white">
-            <div className="text-xs whitespace-pre-wrap">{content.text}</div>
+        <div className="text-right max-w-full">
+          <div className="inline-block text-left rounded-lg p-2 bg-primary text-white max-w-full">
+            <div className="text-xs whitespace-pre-wrap break-words overflow-wrap-anywhere">
+              {content.text}
+            </div>
           </div>
           <div className="text-xs text-theme-muted mt-1 text-right">
             {new Date(message.timestamp).toLocaleString()}
@@ -108,8 +143,8 @@ function UIMessageItem({ message }: { message: UIMessage }) {
             return (
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
-                  <div className="inline-block text-left rounded-lg p-2 bg-theme-card border border-theme">
-                    <div className="prose max-w-none text-theme-fg text-xs">
+                  <div className="inline-block text-left rounded-lg p-2 bg-theme-card border border-theme max-w-full">
+                    <div className="prose max-w-none text-theme-fg text-xs break-words overflow-wrap-anywhere">
                       <ReactMarkdown>{block.content}</ReactMarkdown>
                     </div>
                   </div>
@@ -178,7 +213,7 @@ function UIMessageItem({ message }: { message: UIMessage }) {
                     )}
                     {isExpanded && tool.result && (
                       <div
-                        className={`text-xs mt-2 p-2 rounded ${
+                        className={`text-xs mt-2 p-2 rounded break-words overflow-wrap-anywhere ${
                           tool.status === 'error'
                             ? isDark
                               ? 'bg-red-900/20 text-red-300'
