@@ -24,7 +24,9 @@ export function ClaudeState({ status, showLabel = true }: ClaudeStateProps) {
 
   return (
     <div className="flex items-center gap-1 text-xs text-theme-muted">
-      {getStateIcon()}
+      <div className="w-4 h-4 flex items-center justify-center overflow-hidden flex-shrink-0">
+        {getStateIcon()}
+      </div>
       {showLabel && <span>{status}</span>}
     </div>
   );

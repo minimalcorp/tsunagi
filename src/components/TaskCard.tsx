@@ -54,7 +54,7 @@ export function TaskCard({ task, sessions, isDragging, onTaskClick }: TaskCardPr
       {/* Claude状態とメタ情報 */}
       <div className="flex items-center justify-between gap-2">
         {/* セッション状態を横に並べて表示（横スクロール対応） */}
-        <div className="flex items-center gap-1 overflow-x-auto flex-shrink min-w-0">
+        <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-shrink min-w-0">
           {sessions.length > 0 ? (
             sessions.map((session) => (
               <ClaudeState key={session.id} status={getClaudeStatus(session)} showLabel={false} />
