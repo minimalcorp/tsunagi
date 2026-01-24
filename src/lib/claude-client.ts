@@ -39,8 +39,10 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       cwd: string;
       env?: Record<string, string>;
       resume?: string;
+      bypassPermissions?: boolean;
     } = {
       cwd: workingDirectory,
+      bypassPermissions: true,
     };
 
     // Merge custom env with system environment to ensure node and other binaries are accessible

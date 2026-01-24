@@ -42,7 +42,6 @@ export function KanbanBoard({
 
   const backlogTasks = tasks.filter((t) => t.status === 'backlog').sort(sortTasks);
   const planningTasks = tasks.filter((t) => t.status === 'planning').sort(sortTasks);
-  const taskingTasks = tasks.filter((t) => t.status === 'tasking').sort(sortTasks);
   const codingTasks = tasks.filter((t) => t.status === 'coding').sort(sortTasks);
   const reviewingTasks = tasks.filter((t) => t.status === 'reviewing').sort(sortTasks);
   const doneTasks = tasks.filter((t) => t.status === 'done').sort(sortTasks);
@@ -79,13 +78,6 @@ export function KanbanBoard({
           title="Planning"
           status="planning"
           tasks={planningTasks}
-          sessions={sessions}
-          onTaskClick={onTaskClick}
-        />
-        <KanbanColumn
-          title="Tasking"
-          status="tasking"
-          tasks={taskingTasks}
           sessions={sessions}
           onTaskClick={onTaskClick}
         />

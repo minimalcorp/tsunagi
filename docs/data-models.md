@@ -83,17 +83,18 @@ interface Task {
 
 #### status
 
-- **型**: `'backlog' | 'planning' | 'tasking' | 'coding' | 'reviewing' | 'done'`
+- **型**: `'backlog' | 'planning' | 'coding' | 'reviewing' | 'done'`
 - **初期値**: `'backlog'`
 - **意味**:
-  - `backlog`: タスク作成済み、未着手
-  - `planning`: 要件定義・仕様作成中（成果物: docs以下のドキュメント）
-  - `tasking`: 実装計画作成中（成果物: ステップバイステップの実装手順書）
-  - `coding`: 実装中（成果物: ソースコード）
-  - `reviewing`: 動作確認中（成果物: テスト結果、レビューコメント）
-  - `done`: 完了
+  - `backlog`: タスク作成済み、未着手（planは入力不可）
+  - `planning`: 計画・仕様作成中（Claudeと対話して仕様や作業計画を作成、plan is not nullならこの状態）
+  - `coding`: 実装中（planが完了してClaudeに実装依頼、成果物: ソースコード）
+  - `reviewing`: レビュー・修正中（Claudeがcodingセッション終了で遷移、PRレビュー対応まで含む）
+  - `done`: 完了（PRマージ完了）
 - **推奨遷移**:
-  - `backlog` → `planning` → `tasking` → `coding` → `reviewing` → `done`
+  - `backlog` → `planning` → `coding` → `reviewing` → `done`
+  - 修正が必要な場合: `reviewing` → `coding` または `reviewing` → `planning`
+  - 要件見直しの場合: `planning` → `backlog`
   - 任意の状態から任意の状態へ変更可能（ドラッグ&ドロップで柔軟に移動）
 
 #### owner / repo / branch
@@ -852,7 +853,7 @@ interface WSEvent {
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "title": "ログイン機能の実装",
   "description": "JWT認証を使用したログイン機能を実装する",
-  "status": "coding",
+  "status": "reviewing",
   "owner": "minimalcorp",
   "repo": "tsunagi",
   "branch": "feat/auth",

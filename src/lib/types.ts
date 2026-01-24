@@ -3,7 +3,7 @@ export interface Task {
   id: string; // UUID
   title: string;
   description: string;
-  status: 'backlog' | 'planning' | 'tasking' | 'coding' | 'reviewing' | 'done';
+  status: 'backlog' | 'planning' | 'coding' | 'reviewing' | 'done';
   owner: string;
   repo: string;
   branch: string;

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Brain, Wrench, Info, XCircle } from 'lucide-react';
 import type { UIMessage } from '@/lib/types';
 import { UIMessageConverter } from '@/lib/ui-message-converter';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -127,11 +127,12 @@ function UIMessageItem({ message }: { message: UIMessage }) {
                     }`}
                   >
                     <div
-                      className={`text-xs whitespace-pre-wrap italic ${
+                      className={`text-xs whitespace-pre-wrap italic flex items-start gap-1 ${
                         isDark ? 'text-yellow-300' : 'text-yellow-800'
                       }`}
                     >
-                      💭 {block.content}
+                      <Brain className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                      <span>{block.content}</span>
                     </div>
                   </div>
                 </div>
@@ -143,7 +144,11 @@ function UIMessageItem({ message }: { message: UIMessage }) {
             return (
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
-                  <div className="inline-block text-left rounded-lg p-2 bg-theme-card border border-theme max-w-full">
+                  <div
+                    className={`inline-block text-left rounded-lg p-2 bg-theme-card max-w-full ${
+                      isDark ? 'border border-gray-800' : 'border border-theme'
+                    }`}
+                  >
                     <div className="prose max-w-none text-theme-fg text-xs break-words overflow-wrap-anywhere">
                       <ReactMarkdown>{block.content}</ReactMarkdown>
                     </div>
@@ -177,11 +182,12 @@ function UIMessageItem({ message }: { message: UIMessage }) {
                         className="flex items-center gap-2 hover:opacity-70 w-full text-left cursor-pointer"
                       >
                         <span
-                          className={`text-xs font-medium ${
+                          className={`text-xs font-medium flex items-center gap-1 ${
                             isDark ? 'text-purple-300' : 'text-purple-950'
                           }`}
                         >
-                          🔧 {tool.toolName}
+                          <Wrench className="w-3 h-3" />
+                          {tool.toolName}
                         </span>
                         {isExpanded ? (
                           <ChevronUp
@@ -195,11 +201,12 @@ function UIMessageItem({ message }: { message: UIMessage }) {
                       </button>
                     ) : (
                       <div
-                        className={`text-xs font-medium ${
+                        className={`text-xs font-medium flex items-center gap-1 ${
                           isDark ? 'text-purple-300' : 'text-purple-950'
                         }`}
                       >
-                        🔧 {tool.toolName}
+                        <Wrench className="w-3 h-3" />
+                        {tool.toolName}
                       </div>
                     )}
                     {isExpanded && tool.input && (
@@ -257,9 +264,10 @@ function UIMessageItem({ message }: { message: UIMessage }) {
             }`}
           >
             <div
-              className={`text-xs whitespace-pre-wrap ${isDark ? 'text-red-300' : 'text-red-950'}`}
+              className={`text-xs whitespace-pre-wrap flex items-start gap-1 ${isDark ? 'text-red-300' : 'text-red-950'}`}
             >
-              ❌ {content.message}
+              <XCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              <span>{content.message}</span>
             </div>
             {content.details && (
               <div className="text-xs text-theme-muted mt-1">{content.details}</div>
@@ -281,7 +289,10 @@ function UIMessageItem({ message }: { message: UIMessage }) {
       <div>
         <div className="flex justify-start items-center gap-2">
           <div className="inline-block text-left rounded-lg p-2 bg-theme-hover border border-theme">
-            <div className="text-xs text-theme-muted">ℹ️ {content.description}</div>
+            <div className="text-xs text-theme-muted flex items-start gap-1">
+              <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              <span>{content.description}</span>
+            </div>
           </div>
         </div>
         <div className="text-xs text-theme-muted mt-1">

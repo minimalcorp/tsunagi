@@ -7,7 +7,7 @@ import { TaskCard } from './TaskCard';
 
 interface KanbanColumnProps {
   title: string;
-  status: 'backlog' | 'planning' | 'tasking' | 'coding' | 'reviewing' | 'done';
+  status: 'backlog' | 'planning' | 'coding' | 'reviewing' | 'done';
   tasks: Task[];
   sessions?: Record<string, ClaudeSession[]>; // taskId -> sessions array
   onTaskClick?: (taskId: string) => void;
