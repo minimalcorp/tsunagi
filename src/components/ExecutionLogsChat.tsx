@@ -120,10 +120,8 @@ function UIMessageItem({ message }: { message: UIMessage }) {
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
                   <div
-                    className={`inline-block text-left rounded-lg p-2 border ${
-                      isDark
-                        ? 'bg-yellow-900/20 border-yellow-700'
-                        : 'bg-yellow-50 border-yellow-200'
+                    className={`inline-block text-left rounded-lg p-2 ${
+                      isDark ? 'bg-yellow-900/20' : 'bg-yellow-50'
                     }`}
                   >
                     <div
@@ -144,11 +142,7 @@ function UIMessageItem({ message }: { message: UIMessage }) {
             return (
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
-                  <div
-                    className={`inline-block text-left rounded-lg p-2 bg-theme-card max-w-full ${
-                      isDark ? 'border border-gray-800' : 'border border-theme'
-                    }`}
-                  >
+                  <div className="inline-block text-left rounded-lg p-2 bg-theme-card max-w-full">
                     <div className="prose max-w-none text-theme-fg text-xs break-words overflow-wrap-anywhere">
                       <ReactMarkdown>{block.content}</ReactMarkdown>
                     </div>
@@ -168,10 +162,8 @@ function UIMessageItem({ message }: { message: UIMessage }) {
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
                   <div
-                    className={`inline-block text-left rounded-lg p-2 border max-w-full ${
-                      isDark
-                        ? 'bg-purple-900/20 border-purple-700'
-                        : 'bg-purple-50 border-purple-200'
+                    className={`inline-block text-left rounded-lg p-2 max-w-full ${
+                      isDark ? 'bg-purple-900/20' : 'bg-purple-50'
                     }`}
                   >
                     {hasDetails ? (
