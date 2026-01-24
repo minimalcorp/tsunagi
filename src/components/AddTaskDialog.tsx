@@ -184,7 +184,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
           <div>
             <label className="block text-sm font-medium mb-1 text-theme-fg">Base Branch *</label>
             {isFetchingBranches ? (
-              <div className="w-full px-3 py-2 border border-theme rounded text-theme-muted bg-theme-card flex items-center gap-2">
+              <div className="w-full h-10 px-3 border border-theme rounded text-theme-muted bg-theme-card flex items-center gap-2">
                 <LoadingSpinner size="sm" />
                 <span className="text-xs">Loading branches...</span>
               </div>
@@ -193,7 +193,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
                 required
                 value={formData.baseBranch}
                 onChange={(e) => setFormData({ ...formData, baseBranch: e.target.value })}
-                className="w-full pl-3 pr-10 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+                className="w-full h-10 pl-3 pr-10 border border-theme rounded text-theme-fg bg-theme-card"
                 disabled={isLoading}
               >
                 {branches.map((branch) => (
@@ -204,7 +204,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
                 ))}
               </select>
             ) : (
-              <div className="text-sm text-theme-muted">
+              <div className="w-full h-10 px-3 border border-theme rounded text-sm text-theme-muted bg-theme-card flex items-center">
                 {branchError || 'Select repository first'}
               </div>
             )}
