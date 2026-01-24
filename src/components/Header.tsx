@@ -86,8 +86,8 @@ export function Header({
       {/* Logo */}
       <h1 className="text-2xl font-bold text-theme-fg flex-shrink-0">繋</h1>
 
-      {/* Filters - Desktop (>= 1280px) */}
-      <div className="hidden xl:flex gap-4 flex-1 justify-center">
+      {/* Filters - Desktop (>= 1024px) */}
+      <div className="hidden lg:flex gap-4 flex-1 justify-center">
         <select
           value={repoFilter}
           onChange={(e) => handleRepoChange(e.target.value)}
@@ -111,15 +111,15 @@ export function Header({
       </div>
 
       {/* Spacer for mobile */}
-      <div className="flex-1 xl:hidden" />
+      <div className="flex-1 lg:hidden" />
 
       {/* Theme Toggle */}
       <ThemeToggle />
 
       {/* Actions */}
       <div className="flex gap-2 flex-shrink-0">
-        {/* Filters - Mobile/Tablet (< 1280px) */}
-        <div className="xl:hidden relative" ref={filterRef}>
+        {/* Filters - Mobile/Tablet (< 1024px) */}
+        <div className="lg:hidden relative" ref={filterRef}>
           <button
             onClick={() => setIsFilterOpen(!isFilterOpen)}
             className="px-4 h-10 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer flex items-center justify-center"
