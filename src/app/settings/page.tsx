@@ -79,6 +79,12 @@ export default function SettingsPage() {
       return;
     }
 
+    // GITHUB_PATが入力されていない場合
+    if (!githubPat) {
+      setError('GITHUB_PAT は必須です');
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Claude Tokenを適切な環境変数として保存
@@ -105,31 +111,29 @@ export default function SettingsPage() {
         }),
       });
 
-      // GitHub PATが入力されている場合は保存
-      if (githubPat) {
-        const githubResponse = await fetch('/api/env', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            key: 'GITHUB_PAT',
-            value: githubPat,
-            scope: 'global',
-          }),
-        });
+      // GitHub PATを保存
+      const githubResponse = await fetch('/api/env', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'GITHUB_PAT',
+          value: githubPat,
+          scope: 'global',
+        }),
+      });
 
-        if (!githubResponse.ok) throw new Error('Failed to save GitHub PAT');
+      if (!githubResponse.ok) throw new Error('Failed to save GitHub PAT');
 
-        // enabled状態を更新
-        await fetch('/api/env/toggle', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            key: 'GITHUB_PAT',
-            scope: 'global',
-            enabled: githubEnabled,
-          }),
-        });
-      }
+      // enabled状態を更新
+      await fetch('/api/env/toggle', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'GITHUB_PAT',
+          scope: 'global',
+          enabled: githubEnabled,
+        }),
+      });
 
       setSuccess('設定を保存しました');
       setTimeout(() => {
@@ -226,7 +230,7 @@ export default function SettingsPage() {
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-sm font-medium text-theme-fg">GITHUB_PAT (Optional)</label>
+                <label className="text-sm font-medium text-theme-fg">GITHUB_PAT *</label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -256,7 +260,7 @@ export default function SettingsPage() {
                 >
                   github.com/settings/tokens
                 </a>
-                から取得）
+                から取得）。Docker環境でリポジトリをcloneするために必要です。
               </p>
             </div>
 

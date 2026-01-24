@@ -32,16 +32,17 @@ export default function Home() {
       hasRepositories: repositories.length > 0,
       hasAnthropicApiKey: Boolean(globalEnv.ANTHROPIC_API_KEY),
       hasClaudeCodeToken: Boolean(globalEnv.CLAUDE_CODE_OAUTH_TOKEN),
+      hasGithubPat: Boolean(globalEnv.GITHUB_PAT),
       hasTasks: tasks.length > 0,
     };
 
     let nextStep: 'clone' | 'env' | 'task' | 'complete';
 
-    if (!state.hasRepositories) {
-      nextStep = 'clone';
-    } else if (!state.hasAnthropicApiKey && !state.hasClaudeCodeToken) {
-      // どちらか片方があればOK
+    // 最初にAPI keysとGitHub tokenをチェック
+    if ((!state.hasAnthropicApiKey && !state.hasClaudeCodeToken) || !state.hasGithubPat) {
       nextStep = 'env';
+    } else if (!state.hasRepositories) {
+      nextStep = 'clone';
     } else if (!state.hasTasks) {
       nextStep = 'task';
     } else {
@@ -225,12 +226,14 @@ export default function Home() {
           }
         />
 
-        {/* リポジトリ未登録時の半透明オーバーレイ */}
-        {onboardingState.nextStep === 'clone' && (
+        {/* 初回セットアップ時の半透明オーバーレイ */}
+        {onboardingState.nextStep === 'env' && (
           <RepositoryOnboardingOverlay
             hasRepositories={onboardingState.state.hasRepositories}
             hasEnvVars={
-              onboardingState.state.hasAnthropicApiKey && onboardingState.state.hasClaudeCodeToken
+              (onboardingState.state.hasAnthropicApiKey ||
+                onboardingState.state.hasClaudeCodeToken) &&
+              onboardingState.state.hasGithubPat
             }
             hasTasks={onboardingState.state.hasTasks}
           />
