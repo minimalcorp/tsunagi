@@ -1,7 +1,8 @@
 'use client';
 
 import { Editor } from '@monaco-editor/react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import type { editor } from 'monaco-editor';
 import type { ClaudeSession } from '@/lib/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ClaudeState } from '@/components/ClaudeState';
@@ -23,13 +24,16 @@ export function ClaudePromptEditor({
   onPromptChange,
 }: ClaudePromptEditorProps) {
   const [isExecuting, setIsExecuting] = useState(false);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const { effectiveTheme } = useTheme();
 
   const handleExecute = async () => {
+    const prompt = editorRef.current?.getValue() || '';
     if (!prompt.trim() || isExecuting) return;
     try {
       setIsExecuting(true);
       await onExecute(session.id, prompt);
+      // 親コンポーネントがpromptsをクリアし、useEffectがエディタを更新
     } catch (error) {
       console.error('Failed to execute:', error);
     } finally {
@@ -45,13 +49,19 @@ export function ClaudePromptEditor({
     }
   };
 
-  const handleEditorChange = (value: string | undefined) => {
-    onPromptChange(value || '');
-  };
+  // セッション切り替え時にエディタの内容を更新
+  useEffect(() => {
+    if (editorRef.current) {
+      const currentValue = editorRef.current.getValue();
+      if (currentValue !== prompt) {
+        editorRef.current.setValue(prompt);
+      }
+    }
+  }, [session.id, prompt]);
 
   const status = getClaudeStatus(session);
   const isRunning = status === 'running';
-  const canExecute = !isExecuting && !isRunning && prompt.trim().length > 0;
+  const canExecute = !isExecuting && !isRunning;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -85,8 +95,17 @@ export function ClaudePromptEditor({
         <Editor
           height="100%"
           defaultLanguage="markdown"
-          value={prompt}
-          onChange={handleEditorChange}
+          defaultValue=""
+          onMount={(editor) => {
+            editorRef.current = editor;
+            // マウント時に初期値を設定
+            if (prompt) {
+              editor.setValue(prompt);
+            }
+          }}
+          onChange={(value) => {
+            onPromptChange(value || '');
+          }}
           options={{
             minimap: { enabled: false },
             lineNumbers: 'on',

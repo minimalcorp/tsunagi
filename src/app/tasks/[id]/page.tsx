@@ -207,6 +207,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       });
 
       if (!response.ok) throw new Error('Failed to execute');
+
+      // 実行成功後にプロンプトをクリア
+      setPrompts((prev) => ({ ...prev, [sessionId]: '' }));
     } catch (error) {
       console.error('Failed to execute:', error);
       throw error;
