@@ -141,7 +141,7 @@ export default function Home() {
     owner: string;
     repo: string;
     branch: string;
-    prompt: string;
+    baseBranch: string;
   }) => {
     try {
       const response = await fetch('/api/tasks', {
@@ -254,8 +254,7 @@ export default function Home() {
         isOpen={isAddTaskDialogOpen}
         onClose={() => setIsAddTaskDialogOpen(false)}
         onAdd={handleAddTask}
-        owners={owners}
-        repos={repos}
+        repositories={repositories}
       />
     </div>
   );

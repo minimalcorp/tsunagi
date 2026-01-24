@@ -18,7 +18,7 @@ export function ThemeToggle() {
         <button
           key={value}
           onClick={() => setTheme(value)}
-          className={`px-2 py-1 rounded text-sm cursor-pointer ${
+          className={`px-2 h-8 rounded text-sm cursor-pointer flex items-center justify-center ${
             theme === value
               ? 'bg-primary text-white shadow-sm'
               : 'text-theme-muted hover:text-theme-fg'

@@ -144,7 +144,7 @@ export function TaskInfo({
               onChange={(e) =>
                 setFormData({ ...formData, status: e.target.value as Task['status'] })
               }
-              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+              className="w-full pl-3 pr-10 py-2 border border-theme rounded text-theme-fg bg-theme-card"
             >
               <option value="backlog">Backlog</option>
               <option value="planning">Planning</option>

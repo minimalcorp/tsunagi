@@ -101,8 +101,47 @@ export async function ensureBareRepository(owner: string, repo: string): Promise
   }
 }
 
+// リモートの状態を取得（fetch --prune）
+export async function fetchRemote(owner: string, repo: string): Promise<void> {
+  const bareRepoPath = await ensureBareRepository(owner, repo);
+  const git: SimpleGit = simpleGit(bareRepoPath);
+  // bare repositoryでは、リモートブランチを直接refs/heads/に取得
+  await git.fetch('origin', '+refs/heads/*:refs/heads/*', { '--prune': null });
+}
+
+// リモートブランチの一覧を取得
+export async function getRemoteBranches(owner: string, repo: string): Promise<string[]> {
+  const bareRepoPath = await ensureBareRepository(owner, repo);
+  const git: SimpleGit = simpleGit(bareRepoPath);
+  // bare repositoryでは、リモートブランチはrefs/heads/に格納されている
+  const branches = await git.branch();
+  return branches.all.filter((b) => !b.includes('HEAD'));
+}
+
+// デフォルトブランチを取得
+export async function getDefaultBranch(owner: string, repo: string): Promise<string> {
+  const bareRepoPath = await ensureBareRepository(owner, repo);
+  const git: SimpleGit = simpleGit(bareRepoPath);
+  try {
+    // bare repositoryではHEADがデフォルトブランチを指す
+    const result = await git.raw(['symbolic-ref', 'HEAD']);
+    return result.trim().replace('refs/heads/', '');
+  } catch {
+    // Fallback: main > master > first branch
+    const branches = await getRemoteBranches(owner, repo);
+    if (branches.includes('main')) return 'main';
+    if (branches.includes('master')) return 'master';
+    return branches[0] || 'main';
+  }
+}
+
 // worktreeを作成
-export async function createWorktree(owner: string, repo: string, branch: string): Promise<string> {
+export async function createWorktree(
+  owner: string,
+  repo: string,
+  branch: string,
+  baseBranch?: string
+): Promise<string> {
   const bareRepoPath = await ensureBareRepository(owner, repo);
   const worktreePath = getWorktreePath(owner, repo, branch);
 
@@ -126,8 +165,13 @@ export async function createWorktree(owner: string, repo: string, branch: string
     // 既存ブランチをチェックアウト
     await git.raw(['worktree', 'add', worktreePath, branch]);
   } else {
-    // 新規ブランチを作成（デフォルトブランチから分岐）
-    await git.raw(['worktree', 'add', '-b', branch, worktreePath]);
+    if (baseBranch) {
+      // 指定されたベースブランチから新規ブランチを作成
+      await git.raw(['worktree', 'add', '-b', branch, worktreePath, baseBranch]);
+    } else {
+      // Legacy: HEADから新規ブランチを作成
+      await git.raw(['worktree', 'add', '-b', branch, worktreePath]);
+    }
   }
 
   return worktreePath;

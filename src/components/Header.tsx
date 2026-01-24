@@ -71,7 +71,8 @@ export function Header({
   // ボタンハイライト用のスタイル関数
   const getButtonStyle = (step: string) => {
     const isHighlighted = nextStep === step;
-    const baseStyle = 'px-4 py-2 rounded transition-transform active:scale-95 cursor-pointer';
+    const baseStyle =
+      'px-4 h-10 rounded transition-transform active:scale-95 cursor-pointer flex items-center justify-center';
 
     if (isHighlighted) {
       return `${baseStyle} bg-primary text-white shadow-lg ring-2 ring-primary`;
@@ -90,7 +91,7 @@ export function Header({
         <select
           value={repoFilter}
           onChange={(e) => handleRepoChange(e.target.value)}
-          className="px-3 py-1.5 border border-theme rounded text-theme-fg bg-theme-card min-w-48"
+          className="pl-3 pr-10 py-1.5 border border-theme rounded text-theme-fg bg-theme-card min-w-48"
         >
           <option value="">All Repositories</option>
           {repoOptions.map((option) => (
@@ -121,7 +122,7 @@ export function Header({
         <div className="xl:hidden relative" ref={filterRef}>
           <button
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="px-4 py-2 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer"
+            className="px-4 h-10 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer flex items-center justify-center"
             title="Filters"
           >
             <Filter className="w-5 h-5" />
@@ -135,7 +136,7 @@ export function Header({
                   <select
                     value={repoFilter}
                     onChange={(e) => handleRepoChange(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-theme rounded text-theme-fg bg-theme-card"
+                    className="w-full pl-3 pr-10 py-1.5 border border-theme rounded text-theme-fg bg-theme-card"
                   >
                     <option value="">All Repositories</option>
                     {repoOptions.map((option) => (
@@ -179,7 +180,7 @@ export function Header({
 
         <button
           onClick={onReload}
-          className="px-4 py-2 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer"
+          className="px-4 h-10 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer flex items-center justify-center"
           title="Reload"
         >
           <RefreshCw className="w-5 h-5" />

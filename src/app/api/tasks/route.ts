@@ -31,12 +31,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, owner, repo, branch } = body;
+    const { title, description, owner, repo, branch, baseBranch } = body;
 
     // Validation
-    if (!title || !description || !owner || !repo || !branch) {
+    if (!title || !owner || !repo || !branch) {
       return NextResponse.json(
-        { error: 'Missing required fields: title, description, owner, repo, branch' },
+        { error: 'Missing required fields: title, owner, repo, branch' },
         { status: 400 }
       );
     }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // タスクを作成
     const newTask = await taskRepo.createTask({
       title,
-      description,
+      description: description || '',
       status: 'backlog',
       owner,
       repo,
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // worktreeを自動作成
     try {
-      await worktreeManager.createWorktree(owner, repo, branch);
+      await worktreeManager.createWorktree(owner, repo, branch, baseBranch);
       await taskRepo.updateTask(newTask.id, { worktreeStatus: 'created' });
     } catch (error) {
       console.error('Failed to create worktree:', error);
