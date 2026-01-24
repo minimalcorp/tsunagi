@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as sessionRepo from '@/lib/session-repository';
 import * as taskRepo from '@/lib/task-repository';
 import { interruptSession } from '@/lib/claude-client';
+import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -31,6 +32,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     const task = await taskRepo.getTask(session.taskId);
     if (task) {
       await taskRepo.updateTask(task.id, { claudeState: 'idle' });
+
+      // SSE broadcast (task claudeState changed)
+      const updatedTask = await taskRepo.getTask(task.id);
+      if (updatedTask) {
+        sseManager.broadcast('task:updated', updatedTask);
+      }
     }
 
     return NextResponse.json({ data: { success: true } });

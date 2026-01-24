@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as sessionRepo from '@/lib/session-repository';
+import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -45,6 +46,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     if (!success) {
       return NextResponse.json({ error: 'Failed to delete session' }, { status: 500 });
     }
+
+    // SSE broadcast
+    sseManager.broadcast('session:deleted', { id });
 
     return NextResponse.json({ data: { success: true } });
   } catch (error) {

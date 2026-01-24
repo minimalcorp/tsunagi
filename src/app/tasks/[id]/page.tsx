@@ -11,6 +11,7 @@ import { ClaudePromptEditor } from '@/components/ClaudePromptEditor';
 import { ExecutionLogsChat } from '@/components/ExecutionLogsChat';
 import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useSSE } from '@/hooks/useSSE';
 
 interface TaskDetailPageProps {
   params: Promise<{
@@ -30,6 +31,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [isEditingTask, setIsEditingTask] = useState(false);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
+
+  // SSE統合
+  const { eventSource, isConnected } = useSSE();
 
   // データロード
   useEffect(() => {
@@ -77,8 +81,68 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     loadData();
   }, [id]);
 
-  // セッションのポーリング（running状態の場合のみ）
+  // SSEイベントリスナー
   useEffect(() => {
+    if (!eventSource) return;
+
+    // session:updated イベント
+    const handleSessionUpdated = (event: MessageEvent) => {
+      const session = JSON.parse(event.data) as ClaudeSession;
+      // このタスクのセッションのみ更新
+      setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)));
+    };
+
+    // session:deleted イベント
+    const handleSessionDeleted = (event: MessageEvent) => {
+      const { id: sessionId } = JSON.parse(event.data) as { id: string };
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+
+      // アクティブセッションが削除された場合、次のセッションを選択
+      if (activeSessionId === sessionId) {
+        const remaining = sessions.filter((s) => s.id !== sessionId);
+        setActiveSessionId(remaining[0]?.id);
+      }
+    };
+
+    // session:created イベント
+    const handleSessionCreated = (event: MessageEvent) => {
+      const session = JSON.parse(event.data) as ClaudeSession;
+      // このタスクのセッションのみ追加
+      if (session.taskId === id) {
+        setSessions((prev) => {
+          // 重複チェック
+          if (prev.some((s) => s.id === session.id)) return prev;
+          return [...prev, session];
+        });
+      }
+    };
+
+    // task:updated イベント
+    const handleTaskUpdated = (event: MessageEvent) => {
+      const updatedTask = JSON.parse(event.data) as Task;
+      // このタスクのみ更新
+      if (updatedTask.id === id) {
+        setTask(updatedTask);
+      }
+    };
+
+    eventSource.addEventListener('session:updated', handleSessionUpdated);
+    eventSource.addEventListener('session:deleted', handleSessionDeleted);
+    eventSource.addEventListener('session:created', handleSessionCreated);
+    eventSource.addEventListener('task:updated', handleTaskUpdated);
+
+    return () => {
+      eventSource.removeEventListener('session:updated', handleSessionUpdated);
+      eventSource.removeEventListener('session:deleted', handleSessionDeleted);
+      eventSource.removeEventListener('session:created', handleSessionCreated);
+      eventSource.removeEventListener('task:updated', handleTaskUpdated);
+    };
+  }, [eventSource, id, activeSessionId, sessions]);
+
+  // セッションのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
+  useEffect(() => {
+    // SSE接続済みの場合はポーリング不要
+    if (isConnected) return;
     if (!activeSessionId) return;
 
     const pollSession = async () => {
@@ -115,7 +179,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     return () => {
       clearInterval(intervalId);
     };
-  }, [activeSessionId, activeSession?.status, task]);
+  }, [isConnected, activeSessionId, activeSession?.status, task]);
 
   // タスク更新
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
@@ -128,8 +192,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       if (!response.ok) throw new Error('Failed to update task');
 
-      const data = await response.json();
-      setTask(data.data.task);
+      // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
     } catch (error) {
       console.error('Failed to update task:', error);
       throw error;
@@ -149,7 +212,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       const data = await response.json();
       const newSession = data.data.session;
-      setSessions((prev) => [...prev, newSession]);
+
+      // SSE経由でsession:createdイベントが配信されるため、sessionsは更新しない
+      // ただし、アクティブセッションIDは即座に設定
       setActiveSessionId(newSession.id);
     } catch (error) {
       console.error('Failed to create session:', error);
@@ -165,8 +230,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       if (!response.ok) throw new Error('Failed to delete session');
 
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-
+      // SSE経由でsession:deletedイベントが配信されるため、sessionsは更新しない
       // アクティブセッションが削除された場合、次のセッションを選択
       if (activeSessionId === sessionId) {
         const remaining = sessions.filter((s) => s.id !== sessionId);
@@ -180,18 +244,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // Claude実行
   const handleExecute = async (sessionId: string, prompt: string) => {
     try {
-      // ステータスを即座にrunningに変更
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionId
-            ? {
-                ...s,
-                status: 'running' as const,
-              }
-            : s
-        )
-      );
-
       const response = await fetch(`/api/sessions/${sessionId}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -200,6 +252,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       if (!response.ok) throw new Error('Failed to execute');
 
+      // SSE経由でsession:updatedイベントが配信されるため、sessionは更新しない
       // 実行成功後にプロンプトをクリア
       setPrompts((prev) => ({ ...prev, [sessionId]: '' }));
     } catch (error) {
@@ -219,7 +272,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       if (!response.ok) throw new Error('Failed to interrupt');
 
-      // Note: Session status will be updated by polling
+      // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
     } catch (error) {
       console.error('Failed to interrupt:', error);
       throw error;

@@ -8,6 +8,7 @@ import { KanbanBoard } from '@/components/KanbanBoard';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
 import { AddTaskDialog } from '@/components/AddTaskDialog';
 import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
+import { useSSE } from '@/hooks/useSSE';
 
 export default function Home() {
   const router = useRouter();
@@ -117,6 +118,87 @@ export default function Home() {
     loadData();
   }, []);
 
+  // SSE統合
+  const { eventSource } = useSSE();
+
+  useEffect(() => {
+    if (!eventSource) return;
+
+    // task:created イベント
+    const handleTaskCreated = (event: MessageEvent) => {
+      const task = JSON.parse(event.data) as Task;
+      setTasks((prev) => {
+        // 重複チェック
+        if (prev.some((t) => t.id === task.id)) return prev;
+        return [...prev, task];
+      });
+    };
+
+    // task:updated イベント
+    const handleTaskUpdated = (event: MessageEvent) => {
+      const task = JSON.parse(event.data) as Task;
+      console.log('[SSE] task:updated received:', task.id, 'claudeState:', task.claudeState);
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+    };
+
+    // task:deleted イベント
+    const handleTaskDeleted = (event: MessageEvent) => {
+      const { id } = JSON.parse(event.data) as { id: string };
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    };
+
+    // session:created イベント
+    const handleSessionCreated = (event: MessageEvent) => {
+      const session = JSON.parse(event.data) as ClaudeSession;
+      console.log('[SSE] session:created received:', session.id);
+      setSessions((prev) => ({
+        ...prev,
+        [session.taskId]: [...(prev[session.taskId] || []), session],
+      }));
+    };
+
+    // session:updated イベント
+    const handleSessionUpdated = (event: MessageEvent) => {
+      const session = JSON.parse(event.data) as ClaudeSession;
+      console.log('[SSE] session:updated received:', session.id, 'status:', session.status);
+      setSessions((prev) => ({
+        ...prev,
+        [session.taskId]: (prev[session.taskId] || []).map((s) =>
+          s.id === session.id ? session : s
+        ),
+      }));
+    };
+
+    // session:deleted イベント
+    const handleSessionDeleted = (event: MessageEvent) => {
+      const { id } = JSON.parse(event.data) as { id: string };
+      console.log('[SSE] session:deleted received:', id);
+      setSessions((prev) => {
+        const newSessions = { ...prev };
+        for (const taskId in newSessions) {
+          newSessions[taskId] = newSessions[taskId].filter((s) => s.id !== id);
+        }
+        return newSessions;
+      });
+    };
+
+    eventSource.addEventListener('task:created', handleTaskCreated);
+    eventSource.addEventListener('task:updated', handleTaskUpdated);
+    eventSource.addEventListener('task:deleted', handleTaskDeleted);
+    eventSource.addEventListener('session:created', handleSessionCreated);
+    eventSource.addEventListener('session:updated', handleSessionUpdated);
+    eventSource.addEventListener('session:deleted', handleSessionDeleted);
+
+    return () => {
+      eventSource.removeEventListener('task:created', handleTaskCreated);
+      eventSource.removeEventListener('task:updated', handleTaskUpdated);
+      eventSource.removeEventListener('task:deleted', handleTaskDeleted);
+      eventSource.removeEventListener('session:created', handleSessionCreated);
+      eventSource.removeEventListener('session:updated', handleSessionUpdated);
+      eventSource.removeEventListener('session:deleted', handleSessionDeleted);
+    };
+  }, [eventSource]);
+
   // Handler functions
   const handleTaskMove = async (taskId: string, newStatus: Task['status']) => {
     try {
@@ -128,8 +210,7 @@ export default function Home() {
 
       if (!response.ok) throw new Error('Failed to update task');
 
-      const data = await response.json();
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? data.data.task : t)));
+      // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
     } catch (error) {
       console.error('Failed to move task:', error);
     }
@@ -152,8 +233,7 @@ export default function Home() {
 
       if (!response.ok) throw new Error('Failed to create task');
 
-      const data = await response.json();
-      setTasks((prev) => [...prev, data.data.task]);
+      // SSE経由でtask:createdイベントが配信されるため、ここではstateを更新しない
     } catch (error) {
       console.error('Failed to add task:', error);
       throw error;

@@ -7,6 +7,7 @@ import { normalizeBranchName } from '@/lib/worktree-manager';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -71,6 +72,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Update session status to running
     await sessionRepo.updateSession(id, { status: 'running' });
 
+    // SSE broadcast (session updated with user message)
+    const updatedSession = await sessionRepo.getSession(id);
+    if (updatedSession) {
+      sseManager.broadcast('session:updated', updatedSession);
+    }
+
     // Update task claudeState to running
     await taskRepo.updateTask(task.id, { claudeState: 'running' });
 
@@ -92,6 +99,12 @@ export async function POST(request: NextRequest, { params }: Params) {
           await sessionRepo.updateSession(id, {
             rawMessages: [...(currentSession.rawMessages || []), messageWithTimestamp],
           });
+
+          // SSE broadcast (session updated with new message)
+          const updatedSession = await sessionRepo.getSession(id);
+          if (updatedSession) {
+            sseManager.broadcast('session:updated', updatedSession);
+          }
         }
       },
       onStatusChange: async (status) => {
@@ -107,6 +120,18 @@ export async function POST(request: NextRequest, { params }: Params) {
         await taskRepo.updateTask(task.id, {
           claudeState: status === 'running' ? 'running' : 'idle',
         });
+
+        // SSE broadcast (session status changed)
+        const updatedSession = await sessionRepo.getSession(id);
+        if (updatedSession) {
+          sseManager.broadcast('session:updated', updatedSession);
+        }
+
+        // SSE broadcast (task claudeState changed)
+        const updatedTask = await taskRepo.getTask(task.id);
+        if (updatedTask) {
+          sseManager.broadcast('task:updated', updatedTask);
+        }
       },
       onAgentSessionId: async (agentSessionId: string) => {
         // Store the agent session ID for future resume

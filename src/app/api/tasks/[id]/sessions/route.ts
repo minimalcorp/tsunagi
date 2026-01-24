@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as sessionRepo from '@/lib/session-repository';
 import * as taskRepo from '@/lib/task-repository';
+import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -41,6 +42,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       status: 'idle',
       rawMessages: [],
     });
+
+    // SSE broadcast
+    sseManager.broadcast('session:created', newSession);
 
     return NextResponse.json({ data: { session: newSession } }, { status: 201 });
   } catch (error) {
