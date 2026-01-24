@@ -7,12 +7,14 @@ interface EnvironmentSettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (key: string, value: string) => Promise<void>;
+  isOnboarding?: boolean;
 }
 
 export function EnvironmentSettingsDialog({
   isOpen,
   onClose,
   onSave,
+  isOnboarding = false,
 }: EnvironmentSettingsDialogProps) {
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
   const [claudeCodeToken, setClaudeCodeToken] = useState('');
@@ -118,8 +120,14 @@ export function EnvironmentSettingsDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-theme-card rounded-lg p-6 w-full max-w-md relative">
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+      onClick={!isOnboarding && !isLoading ? onClose : undefined}
+    >
+      <div
+        className="bg-theme-card rounded-lg p-6 w-full max-w-md relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         {isLoading && (
           <div className="absolute inset-0 bg-theme-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
             <LoadingSpinner size="lg" message="Saving settings..." />

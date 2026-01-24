@@ -122,8 +122,14 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-theme-card rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-theme-card rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         {isLoading && (
           <div className="absolute inset-0 bg-theme-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
             <LoadingSpinner size="lg" message="Creating task..." />

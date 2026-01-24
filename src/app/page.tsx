@@ -242,6 +242,7 @@ export default function Home() {
         isOpen={isCloneDialogOpen}
         onClose={() => setIsCloneDialogOpen(false)}
         onClone={handleCloneRepository}
+        isOnboarding={onboardingState.nextStep === 'clone'}
       />
 
       <AddTaskDialog
