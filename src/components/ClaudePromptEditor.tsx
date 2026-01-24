@@ -7,6 +7,7 @@ import type { ClaudeSession } from '@/lib/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
+import { Send, Square } from 'lucide-react';
 
 interface ClaudePromptEditorProps {
   session: ClaudeSession;
@@ -87,18 +88,20 @@ export function ClaudePromptEditor({
             <button
               onClick={handleExecute}
               disabled={!canExecute}
-              className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary cursor-pointer"
+              className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary cursor-pointer flex items-center gap-1"
             >
-              ▶ Send
+              <Send className="w-3 h-3" />
+              Send
             </button>
           )}
 
           {isRunning && (
             <button
               onClick={handleInterrupt}
-              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-500 cursor-pointer"
+              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-500 cursor-pointer flex items-center gap-1"
             >
-              ■ Interrupt
+              <Square className="w-3 h-3" />
+              Interrupt
             </button>
           )}
         </div>

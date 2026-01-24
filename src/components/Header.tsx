@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Settings, ArrowUp, Filter, RefreshCw } from 'lucide-react';
+import { Settings, Filter, RefreshCw, FolderDown } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 interface HeaderProps {
@@ -164,16 +164,19 @@ export function Header({
         <div className="relative">
           <button
             onClick={onCloneClick}
-            className={getButtonStyle('clone')}
+            className={`px-4 h-10 rounded transition-transform active:scale-95 cursor-pointer flex items-center justify-center ${
+              nextStep === 'clone'
+                ? 'bg-primary text-white shadow-lg ring-2 ring-primary'
+                : 'bg-theme-hover hover:opacity-80 text-theme-fg'
+            }`}
             title="Clone Repository"
           >
-            Clone Repository
+            <FolderDown className="w-5 h-5" />
           </button>
           {nextStep === 'clone' && !isCloneDialogOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-primary text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
-              <ArrowUp className="w-5 h-5" />
-              Click here first
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-primary rotate-45" />
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-tooltip backdrop-blur-sm border-2 border-amber-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
+              Clone a repository
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-tooltip backdrop-blur-sm border-l-2 border-t-2 border-amber-500 rotate-45" />
             </div>
           )}
         </div>
@@ -195,10 +198,9 @@ export function Header({
             <Settings className="w-5 h-5" />
           </button>
           {nextStep === 'env' && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-primary text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
-              <ArrowUp className="w-5 h-5" />
-              Click here
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-primary rotate-45" />
+            <div className="absolute top-full mt-2 right-[-1px] bg-tooltip backdrop-blur-sm border-2 border-amber-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
+              Set up API keys
+              <div className="absolute -top-1 right-[21px] w-2 h-2 bg-tooltip backdrop-blur-sm border-l-2 border-t-2 border-amber-500 rotate-45" />
             </div>
           )}
         </div>

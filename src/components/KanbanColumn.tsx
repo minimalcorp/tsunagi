@@ -14,6 +14,7 @@ interface KanbanColumnProps {
   onAddTaskClick?: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isAddTaskDialogOpen?: boolean;
+  hasApiKey?: boolean;
 }
 
 export function KanbanColumn({
@@ -25,6 +26,7 @@ export function KanbanColumn({
   onAddTaskClick,
   nextStep,
   isAddTaskDialogOpen = false,
+  hasApiKey = false,
 }: KanbanColumnProps) {
   const showAddButton = status === 'backlog' && onAddTaskClick;
 
@@ -38,15 +40,16 @@ export function KanbanColumn({
             <div className="relative">
               <button
                 onClick={onAddTaskClick}
-                className="px-3 py-1 rounded bg-primary text-white hover:bg-primary-hover active:scale-95 transition-transform cursor-pointer"
+                className="px-3 py-1 rounded bg-primary text-white hover:bg-primary-hover active:scale-95 transition-transform cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Add Task"
+                disabled={!hasApiKey}
               >
                 <Plus className="w-4 h-4" />
               </button>
               {nextStep === 'task' && status === 'backlog' && !isAddTaskDialogOpen && (
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-2 border-amber-500 text-amber-900 dark:text-amber-100 px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-tooltip backdrop-blur-sm border-2 border-amber-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
                   Create a task
-                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-l-2 border-t-2 border-amber-500 rotate-45" />
+                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-tooltip backdrop-blur-sm border-l-2 border-t-2 border-amber-500 rotate-45" />
                 </div>
               )}
             </div>

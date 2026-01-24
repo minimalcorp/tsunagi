@@ -127,6 +127,18 @@
   --color-error: var(--error);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Standard color palette for Tailwind utilities */
+  --color-white: #ffffff;
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+  --color-green-50: #f0fdf4;
+  --color-green-200: #bbf7d0;
+  --color-green-500: #22c55e;
 }
 
 body {
@@ -294,4 +306,19 @@ select {
 
 .animate-subtle-bounce {
   animation: subtle-bounce 1.1s ease-in-out infinite;
+}
+
+/* Tooltip background colors - ensure proper theme support */
+.bg-tooltip {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bg-tooltip {
+    background-color: rgba(17, 24, 39, 0.9);
+  }
+}
+
+:root[data-theme='dark'] .bg-tooltip {
+  background-color: rgba(17, 24, 39, 0.9);
 }

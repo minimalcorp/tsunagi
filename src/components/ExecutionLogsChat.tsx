@@ -2,10 +2,29 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ChevronDown, ChevronUp, Brain, Wrench, Info, XCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Brain, Wrench, Info, XCircle, Loader2, Ban } from 'lucide-react';
 import type { UIMessage } from '@/lib/types';
 import { UIMessageConverter } from '@/lib/ui-message-converter';
 import { useTheme } from '@/contexts/ThemeContext';
+
+// セッション完了状態を判定するヘルパー関数
+function isSessionCompleted(rawMessages?: unknown[]): boolean {
+  if (!rawMessages || rawMessages.length === 0) return false;
+  const lastMessage = rawMessages[rawMessages.length - 1];
+
+  // 型ガードを使って型安全にチェック
+  if (
+    lastMessage &&
+    typeof lastMessage === 'object' &&
+    'type' in lastMessage &&
+    lastMessage.type === 'result' &&
+    'subtype' in lastMessage &&
+    (lastMessage.subtype === 'success' || lastMessage.subtype === 'error')
+  ) {
+    return true;
+  }
+  return false;
+}
 
 interface ExecutionLogsChatProps {
   rawMessages?: unknown[]; // SDK messages
@@ -17,6 +36,9 @@ export function ExecutionLogsChat({ rawMessages, sessionId }: ExecutionLogsChatP
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const prevSessionIdRef = useRef<string | undefined>(sessionId);
+
+  // セッション完了状態を判定
+  const sessionCompleted = useMemo(() => isSessionCompleted(rawMessages), [rawMessages]);
 
   // rawMessagesをUIMessagesに変換
   const uiMessages = useMemo(() => {
@@ -71,7 +93,9 @@ export function ExecutionLogsChat({ rawMessages, sessionId }: ExecutionLogsChatP
             No logs yet. Execute a prompt to start.
           </p>
         ) : (
-          uiMessages.map((msg) => <UIMessageItem key={msg.id} message={msg} />)
+          uiMessages.map((msg) => (
+            <UIMessageItem key={msg.id} message={msg} sessionCompleted={sessionCompleted} />
+          ))
         )}
         <div ref={logsEndRef} />
       </div>
@@ -80,7 +104,13 @@ export function ExecutionLogsChat({ rawMessages, sessionId }: ExecutionLogsChatP
 }
 
 // UIMessage用のコンポーネント
-function UIMessageItem({ message }: { message: UIMessage }) {
+function UIMessageItem({
+  message,
+  sessionCompleted,
+}: {
+  message: UIMessage;
+  sessionCompleted: boolean;
+}) {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
@@ -158,6 +188,16 @@ function UIMessageItem({ message }: { message: UIMessage }) {
             const isExpanded = expandedTools[toolKey] ?? false;
             const hasDetails = Boolean(tool.input) || Boolean(tool.result);
 
+            // Status icon for pending state
+            const statusIcon =
+              tool.status === 'pending' ? (
+                sessionCompleted ? (
+                  <Ban className="w-3 h-3" />
+                ) : (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                )
+              ) : null;
+
             return (
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
@@ -171,16 +211,21 @@ function UIMessageItem({ message }: { message: UIMessage }) {
                         onClick={() =>
                           setExpandedTools((prev) => ({ ...prev, [toolKey]: !isExpanded }))
                         }
-                        className="flex items-center gap-2 hover:opacity-70 w-full text-left cursor-pointer"
+                        className="flex items-center gap-1 hover:opacity-70 w-full text-left cursor-pointer"
                       >
+                        <Wrench className="w-3 h-3" />
                         <span
-                          className={`text-xs font-medium flex items-center gap-1 ${
+                          className={`text-xs font-medium ${
                             isDark ? 'text-purple-300' : 'text-purple-950'
                           }`}
                         >
-                          <Wrench className="w-3 h-3" />
                           {tool.toolName}
                         </span>
+                        {statusIcon && (
+                          <span className={`${isDark ? 'text-purple-300' : 'text-purple-950'}`}>
+                            {statusIcon}
+                          </span>
+                        )}
                         {isExpanded ? (
                           <ChevronUp
                             className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
@@ -199,6 +244,7 @@ function UIMessageItem({ message }: { message: UIMessage }) {
                       >
                         <Wrench className="w-3 h-3" />
                         {tool.toolName}
+                        {statusIcon}
                       </div>
                     )}
                     {isExpanded && tool.input && (
@@ -224,9 +270,6 @@ function UIMessageItem({ message }: { message: UIMessage }) {
                       >
                         {tool.status === 'success' ? '✓' : '✗'} {tool.result}
                       </div>
-                    )}
-                    {tool.status === 'pending' && (
-                      <div className="text-xs mt-2 text-theme-muted">Pending...</div>
                     )}
                   </div>
                 </div>

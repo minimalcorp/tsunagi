@@ -6,7 +6,6 @@ import type { Task, Repository, ClaudeSession } from '@/lib/types';
 import { Header } from '@/components/Header';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
-import { EnvironmentNotification } from '@/components/EnvironmentNotification';
 import { AddTaskDialog } from '@/components/AddTaskDialog';
 import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
 
@@ -211,14 +210,6 @@ export default function Home() {
         isCloneDialogOpen={isCloneDialogOpen}
       />
 
-      {/* 環境変数未設定時の通知バナー（onboarding優先順位に従って表示） */}
-      {onboardingState.nextStep === 'env' && (
-        <EnvironmentNotification
-          hasAnthropicApiKey={onboardingState.state.hasAnthropicApiKey}
-          hasClaudeCodeToken={onboardingState.state.hasClaudeCodeToken}
-        />
-      )}
-
       {/* カンバンボード（常に表示） */}
       <div className="relative flex-1 overflow-hidden">
         <KanbanBoard
@@ -229,6 +220,9 @@ export default function Home() {
           onAddTaskClick={() => setIsAddTaskDialogOpen(true)}
           nextStep={onboardingState.nextStep}
           isAddTaskDialogOpen={isAddTaskDialogOpen}
+          hasApiKey={
+            onboardingState.state.hasAnthropicApiKey || onboardingState.state.hasClaudeCodeToken
+          }
         />
 
         {/* リポジトリ未登録時の半透明オーバーレイ */}

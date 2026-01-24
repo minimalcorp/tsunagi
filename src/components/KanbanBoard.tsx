@@ -12,6 +12,7 @@ interface KanbanBoardProps {
   onAddTaskClick?: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isAddTaskDialogOpen?: boolean;
+  hasApiKey?: boolean;
 }
 
 export function KanbanBoard({
@@ -22,6 +23,7 @@ export function KanbanBoard({
   onAddTaskClick,
   nextStep,
   isAddTaskDialogOpen = false,
+  hasApiKey = false,
 }: KanbanBoardProps) {
   // タスクソート: 人間タスク（上）→ Claude実行中タスク（下、グレーアウト）、それぞれ order 昇順
   const sortTasks = (a: Task, b: Task) => {
@@ -73,6 +75,7 @@ export function KanbanBoard({
           onAddTaskClick={onAddTaskClick}
           nextStep={nextStep}
           isAddTaskDialogOpen={isAddTaskDialogOpen}
+          hasApiKey={hasApiKey}
         />
         <KanbanColumn
           title="Planning"
