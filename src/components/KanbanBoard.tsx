@@ -9,9 +9,20 @@ interface KanbanBoardProps {
   sessions?: Record<string, ClaudeSession[]>; // taskId -> sessions array
   onTaskMove: (taskId: string, newStatus: Task['status']) => void;
   onTaskClick?: (taskId: string) => void;
+  onAddTaskClick?: () => void;
+  nextStep?: 'clone' | 'env' | 'task' | 'complete';
+  isAddTaskDialogOpen?: boolean;
 }
 
-export function KanbanBoard({ tasks, sessions, onTaskMove, onTaskClick }: KanbanBoardProps) {
+export function KanbanBoard({
+  tasks,
+  sessions,
+  onTaskMove,
+  onTaskClick,
+  onAddTaskClick,
+  nextStep,
+  isAddTaskDialogOpen = false,
+}: KanbanBoardProps) {
   // タスクソート: 人間タスク（上）→ Claude実行中タスク（下、グレーアウト）、それぞれ order 昇順
   const sortTasks = (a: Task, b: Task) => {
     const aIsClaudeRunning = a.claudeState === 'running';
@@ -60,6 +71,9 @@ export function KanbanBoard({ tasks, sessions, onTaskMove, onTaskClick }: Kanban
           tasks={backlogTasks}
           sessions={sessions}
           onTaskClick={onTaskClick}
+          onAddTaskClick={onAddTaskClick}
+          nextStep={nextStep}
+          isAddTaskDialogOpen={isAddTaskDialogOpen}
         />
         <KanbanColumn
           title="Planning"

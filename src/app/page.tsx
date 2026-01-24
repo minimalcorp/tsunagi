@@ -202,7 +202,6 @@ export default function Home() {
     <div className="h-screen flex flex-col">
       <Header
         onCloneClick={() => setIsCloneDialogOpen(true)}
-        onAddTaskClick={() => setIsAddTaskDialogOpen(true)}
         onSettingsClick={() => router.push('/settings')}
         onReload={loadData}
         nextStep={onboardingState.nextStep}
@@ -210,7 +209,6 @@ export default function Home() {
         repos={repos}
         onFilterChange={handleFilterChange}
         isCloneDialogOpen={isCloneDialogOpen}
-        isAddTaskDialogOpen={isAddTaskDialogOpen}
       />
 
       {/* 環境変数未設定時の通知バナー（onboarding優先順位に従って表示） */}
@@ -228,6 +226,9 @@ export default function Home() {
           sessions={sessions}
           onTaskMove={handleTaskMove}
           onTaskClick={handleTaskClick}
+          onAddTaskClick={() => setIsAddTaskDialogOpen(true)}
+          nextStep={onboardingState.nextStep}
+          isAddTaskDialogOpen={isAddTaskDialogOpen}
         />
 
         {/* リポジトリ未登録時の半透明オーバーレイ */}

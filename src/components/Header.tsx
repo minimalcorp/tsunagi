@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Settings, ArrowUp, Filter, RefreshCw, ListPlus } from 'lucide-react';
+import { Settings, ArrowUp, Filter, RefreshCw } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 interface HeaderProps {
   onCloneClick: () => void;
-  onAddTaskClick: () => void;
   onSettingsClick: () => void;
   onReload: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
@@ -14,12 +13,10 @@ interface HeaderProps {
   repos: string[];
   onFilterChange: (filters: { owner: string; repo: string; search: string }) => void;
   isCloneDialogOpen?: boolean;
-  isAddTaskDialogOpen?: boolean;
 }
 
 export function Header({
   onCloneClick,
-  onAddTaskClick,
   onSettingsClick,
   onReload,
   nextStep = 'complete',
@@ -27,7 +24,6 @@ export function Header({
   repos,
   onFilterChange,
   isCloneDialogOpen = false,
-  isAddTaskDialogOpen = false,
 }: HeaderProps) {
   const [repoFilter, setRepoFilter] = useState<string>(''); // "owner/repo" format
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -79,10 +75,6 @@ export function Header({
 
     if (isHighlighted) {
       return `${baseStyle} bg-primary text-white shadow-lg ring-2 ring-primary`;
-    }
-
-    if (step === 'task') {
-      return `${baseStyle} bg-primary text-white hover:bg-primary-hover`;
     }
 
     return `${baseStyle} bg-theme-hover hover:opacity-80 text-theme-fg`;
@@ -192,20 +184,6 @@ export function Header({
         >
           <RefreshCw className="w-5 h-5" />
         </button>
-
-        <div className="relative">
-          <button onClick={onAddTaskClick} className={getButtonStyle('task')}>
-            <ListPlus className="w-4 h-4 inline-block mr-2" />
-            Add Task
-          </button>
-          {nextStep === 'task' && !isAddTaskDialogOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-theme-card border-2 border-primary text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg flex items-center gap-2">
-              <ArrowUp className="w-5 h-5" />
-              Click here
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-theme-card border-l-2 border-t-2 border-primary rotate-45" />
-            </div>
-          )}
-        </div>
 
         <div className="relative">
           <button
