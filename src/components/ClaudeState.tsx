@@ -18,7 +18,7 @@ export function ClaudeState({ status, showLabel = true }: ClaudeStateProps) {
       case 'error':
         return <XCircle className="w-4 h-4 text-red-500" />;
       case 'idle':
-        return <Circle className="w-4 h-4 text-gray-300" />;
+        return <Circle className="w-4 h-4 text-gray-500" />;
     }
   };
 
