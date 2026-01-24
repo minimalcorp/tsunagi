@@ -17,8 +17,7 @@ export function ViewLayoutToggle({ mode, onChange }: ViewLayoutToggleProps) {
   ];
 
   return (
-    <div className="flex items-center gap-2 mb-4">
-      <span className="text-sm font-medium text-theme-fg">View:</span>
+    <div className="flex items-center gap-2">
       <div className="flex items-center gap-1 bg-theme-hover rounded p-1">
         {views.map(({ value, icon: Icon, label }) => (
           <button

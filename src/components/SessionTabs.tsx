@@ -19,7 +19,7 @@ export function SessionTabs({
   onSessionDelete,
 }: SessionTabsProps) {
   return (
-    <div className="flex items-center gap-2 border-b border-theme pb-2 mb-4 overflow-x-auto">
+    <div className="flex items-center gap-2 overflow-x-auto">
       {sessions.map((session) => {
         const isActive = activeSessionId === session.id;
         const isDisabled = session.status === 'running';
