@@ -83,6 +83,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
 
     // If agentSessionId is provided, resume the session
     if (agentSessionId) {
+      console.log('[Session] Resuming session:', { sessionId, agentSessionId });
       queryOptions.resume = agentSessionId;
     }
 
@@ -117,6 +118,10 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
         case 'system':
           // Extract and store agent session ID from system init message
           if (message.subtype === 'init' && message.session_id) {
+            console.log('[Session] Agent session ID stored:', {
+              sessionId,
+              agentSessionId: message.session_id,
+            });
             onAgentSessionId?.(message.session_id);
           }
           break;

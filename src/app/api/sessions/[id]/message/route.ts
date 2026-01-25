@@ -53,30 +53,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Get environment variables for this task
     const env = await envRepo.getEnv('repo', task.owner, task.repo);
 
-    // Create user message for rawMessages (SDK format)
-    const userRawMessage = {
-      type: 'user',
-      message: {
-        role: 'user',
-        content: message,
-      },
-      session_id: session.agentSessionId || '',
-      uuid: crypto.randomUUID(),
-      created_at: new Date().toISOString(),
-    };
-
-    await sessionRepo.updateSession(id, {
-      rawMessages: [...(session.rawMessages || []), userRawMessage],
-    });
-
     // Update session status to running
     await sessionRepo.updateSession(id, { status: 'running' });
-
-    // SSE broadcast (session updated with user message)
-    const updatedSession = await sessionRepo.getSession(id);
-    if (updatedSession) {
-      sseManager.broadcast('session:updated', updatedSession);
-    }
 
     // Update task claudeState to running
     await taskRepo.updateTask(task.id, { claudeState: 'running' });
@@ -89,15 +67,11 @@ export async function POST(request: NextRequest, { params }: Params) {
       env,
       agentSessionId: session.agentSessionId,
       onRawMessage: async (rawMessage: unknown) => {
-        // Raw messageを永続化（タイムスタンプを追加）
+        // Raw messageを永続化（SDKの生データをそのまま保存）
         const currentSession = await sessionRepo.getSession(id);
         if (currentSession) {
-          const messageWithTimestamp =
-            typeof rawMessage === 'object' && rawMessage !== null
-              ? { ...(rawMessage as Record<string, unknown>), created_at: new Date().toISOString() }
-              : rawMessage;
           await sessionRepo.updateSession(id, {
-            rawMessages: [...(currentSession.rawMessages || []), messageWithTimestamp],
+            rawMessages: [...(currentSession.rawMessages || []), rawMessage],
           });
 
           // SSE broadcast (session updated with new message)
