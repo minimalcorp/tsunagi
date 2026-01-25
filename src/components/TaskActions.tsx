@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import type { Task } from '@/lib/types';
-import { CommandCopyButton } from './CommandCopyButton';
+import { normalizeBranchName } from '@/lib/branch-utils';
 import { Code2, Terminal, Trash2 } from 'lucide-react';
 
 interface TaskActionsProps {
@@ -10,11 +11,40 @@ interface TaskActionsProps {
 }
 
 function getWorktreePath(task: Task): string {
-  return `~/.tsunagi/workspaces/${task.owner}/${task.repo}/${task.branch}`;
+  const normalizedBranch = normalizeBranchName(task.branch);
+  return `~/.tsunagi/workspaces/${task.owner}/${task.repo}/${normalizedBranch}`;
 }
 
 export function TaskActions({ task, onDelete }: TaskActionsProps) {
   const worktreePath = getWorktreePath(task);
+  const [isExecuting, setIsExecuting] = useState<string | null>(null);
+
+  const handleCommand = async (commandType: 'vscode' | 'terminal') => {
+    setIsExecuting(commandType);
+    try {
+      const response = await fetch('/api/commands/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commandType,
+          owner: task.owner,
+          repo: task.repo,
+          branch: task.branch,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Command execution failed');
+      }
+    } catch {
+      // フォールバック: クリップボードにコピー
+      const command = commandType === 'vscode' ? `code ${worktreePath}` : `cd ${worktreePath}`;
+      await navigator.clipboard.writeText(command);
+      alert('Command execution failed. Command copied to clipboard instead.');
+    } finally {
+      setIsExecuting(null);
+    }
+  };
 
   const handleDelete = async () => {
     if (confirm(`Delete task "${task.title}"?\n\nThis will also delete the worktree and branch.`)) {
@@ -24,20 +54,35 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
 
   return (
     <div>
-      {/* Command Copy Buttons */}
+      {/* Command Buttons */}
       <div className="grid grid-cols-2 gap-2 mb-4">
-        <CommandCopyButton
-          command={`code ${worktreePath}`}
-          label="Copy VS Code Command"
-          icon={<Code2 className="w-4 h-4" />}
-          variant="primary"
-        />
+        <button
+          onClick={() => handleCommand('vscode')}
+          disabled={isExecuting !== null}
+          className={`
+            w-full px-4 py-2 rounded-lg font-medium text-sm cursor-pointer
+            bg-primary-600 hover:bg-primary-hover text-white
+            disabled:opacity-50 disabled:cursor-not-allowed
+            flex items-center justify-center gap-2
+          `}
+        >
+          <Code2 className="w-4 h-4" />
+          {isExecuting === 'vscode' ? 'Opening...' : 'Open VS Code'}
+        </button>
 
-        <CommandCopyButton
-          command={`cd ${worktreePath}`}
-          label="Copy Terminal Command"
-          icon={<Terminal className="w-4 h-4" />}
-        />
+        <button
+          onClick={() => handleCommand('terminal')}
+          disabled={isExecuting !== null}
+          className={`
+            w-full px-4 py-2 rounded-lg font-medium text-sm cursor-pointer
+            bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme
+            disabled:opacity-50 disabled:cursor-not-allowed
+            flex items-center justify-center gap-2
+          `}
+        >
+          <Terminal className="w-4 h-4" />
+          {isExecuting === 'terminal' ? 'Opening...' : 'Open Terminal'}
+        </button>
       </div>
 
       {/* Delete Button */}

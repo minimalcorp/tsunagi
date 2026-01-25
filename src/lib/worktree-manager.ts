@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { normalizeBranchName } from './branch-utils';
 
 const execAsync = promisify(exec);
 
@@ -13,11 +14,6 @@ export interface WorktreeInfo {
   branch: string;
   path: string;
   commit: string;
-}
-
-// ブランチ名をディレクトリ名に正規化（スラッシュをハイフンに変換）
-export function normalizeBranchName(branch: string): string {
-  return branch.replace(/\//g, '-');
 }
 
 // bare repositoryのパスを取得

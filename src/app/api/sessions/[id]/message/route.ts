@@ -3,7 +3,7 @@ import * as sessionRepo from '@/lib/session-repository';
 import * as taskRepo from '@/lib/task-repository';
 import * as envRepo from '@/lib/env-repository';
 import { executeSession } from '@/lib/claude-client';
-import { normalizeBranchName } from '@/lib/worktree-manager';
+import { normalizeBranchName } from '@/lib/branch-utils';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
