@@ -161,13 +161,10 @@ export async function createWorktree(
     // 既存ブランチをチェックアウト
     await git.raw(['worktree', 'add', worktreePath, branch]);
   } else {
-    if (baseBranch) {
-      // 指定されたベースブランチから新規ブランチを作成
-      await git.raw(['worktree', 'add', '-b', branch, worktreePath, baseBranch]);
-    } else {
-      // Legacy: HEADから新規ブランチを作成
-      await git.raw(['worktree', 'add', '-b', branch, worktreePath]);
-    }
+    // baseBranchが指定されていない場合はデフォルトブランチを使用
+    const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
+    // 指定されたベースブランチから新規ブランチを作成
+    await git.raw(['worktree', 'add', '-b', branch, worktreePath, effectiveBaseBranch]);
   }
 
   return worktreePath;
