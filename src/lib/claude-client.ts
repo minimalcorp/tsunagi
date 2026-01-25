@@ -39,10 +39,17 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       cwd: string;
       env?: Record<string, string>;
       resume?: string;
+      permissionMode?: 'bypassPermissions';
+      allowDangerouslySkipPermissions?: boolean;
       bypassPermissions?: boolean;
     } = {
       cwd: workingDirectory,
-      bypassPermissions: true,
+      permissionMode:
+        process.env.CLAUDE_BYPASS_PERMISSIONS !== 'false'
+          ? ('bypassPermissions' as const)
+          : undefined,
+      allowDangerouslySkipPermissions: process.env.CLAUDE_BYPASS_PERMISSIONS !== 'false',
+      bypassPermissions: process.env.CLAUDE_BYPASS_PERMISSIONS !== 'false',
     };
 
     // Merge custom env with system environment to ensure node and other binaries are accessible
@@ -77,6 +84,18 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
     // If agentSessionId is provided, resume the session
     if (agentSessionId) {
       queryOptions.resume = agentSessionId;
+    }
+
+    // Debug logging
+    if (process.env.CLAUDE_DEBUG_MODE === 'true') {
+      console.log('[DEBUG] Query options:', {
+        sessionId,
+        cwd: queryOptions.cwd,
+        permissionMode: queryOptions.permissionMode,
+        allowDangerouslySkipPermissions: queryOptions.allowDangerouslySkipPermissions,
+        bypassPermissions: queryOptions.bypassPermissions,
+        hasResume: !!queryOptions.resume,
+      });
     }
 
     // Execute query
@@ -123,17 +142,35 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       error instanceof Error &&
       (error.name === 'AbortError' || error.message.includes('was aborted'))
     ) {
-      // Session was interrupted, don't treat as error
       return;
     }
 
-    // Debug logging for spawn error
+    // 権限エラーの特定
+    const isPermissionError =
+      error instanceof Error &&
+      (error.message.toLowerCase().includes('permission') ||
+        error.message.includes('EACCES') ||
+        error.message.includes('EPERM'));
+
+    if (isPermissionError) {
+      console.error('[ERROR] Permission denied:', {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+        hint: 'Check bypassPermissions settings in src/lib/claude-client.ts:38-53',
+      });
+      onStatusChange?.('error');
+      throw new Error(
+        `Permission error: ${error instanceof Error ? error.message : String(error)}. ` +
+          'Check bypassPermissions settings in claude-client.ts'
+      );
+    }
+
+    // Debug logging for other errors
     console.error('[Claude Client] Error occurred:');
     console.error('- Error type:', error instanceof Error ? error.name : typeof error);
     console.error('- Error message:', error instanceof Error ? error.message : String(error));
     if (error instanceof Error) {
       console.error('- Error stack:', error.stack);
-      console.error('- Error details:', JSON.stringify(error, null, 2));
     }
 
     onStatusChange?.('error');
