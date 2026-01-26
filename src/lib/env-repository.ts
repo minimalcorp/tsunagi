@@ -70,24 +70,22 @@ export async function getAllEnv(
 ): Promise<EnvironmentVariable[]> {
   return queue.add(async () => {
     const envVars = await readEnvVars();
-    const result: EnvironmentVariable[] = [];
 
-    // グローバル変数を取得
-    result.push(...envVars.filter((env) => env.scope === 'global'));
-
-    // owner変数を取得
-    if (scope === 'owner' || scope === 'repo') {
-      result.push(...envVars.filter((env) => env.scope === 'owner' && env.owner === owner));
-    }
-
-    // repo変数を取得
-    if (scope === 'repo') {
-      result.push(
-        ...envVars.filter((env) => env.scope === 'repo' && env.owner === owner && env.repo === repo)
+    // 選択されたスコープに対応する環境変数のみを取得
+    if (scope === 'global') {
+      // グローバルスコープの変数のみ
+      return envVars.filter((env) => env.scope === 'global');
+    } else if (scope === 'owner') {
+      // 指定されたownerスコープの変数のみ
+      return envVars.filter((env) => env.scope === 'owner' && env.owner === owner);
+    } else if (scope === 'repo') {
+      // 指定されたrepoスコープの変数のみ
+      return envVars.filter(
+        (env) => env.scope === 'repo' && env.owner === owner && env.repo === repo
       );
     }
 
-    return result;
+    return [];
   });
 }
 
@@ -154,10 +152,14 @@ export async function setEnv(
 
     // 既存の変数を削除
     const filtered = envVars.filter((env) => {
+      // keyが異なる場合は残す
       if (env.key !== key) return true;
+      // scopeが異なる場合は残す
       if (env.scope !== scope) return true;
-      if (scope === 'owner' && env.owner !== owner) return true;
-      if (scope === 'repo' && (env.owner !== owner || env.repo !== repo)) return true;
+      // scopeが一致する場合、owner/repoもチェック
+      if (env.scope === 'owner' && env.owner !== owner) return true;
+      if (env.scope === 'repo' && (env.owner !== owner || env.repo !== repo)) return true;
+      // 上記の条件を通過した場合は削除対象
       return false;
     });
 
@@ -188,10 +190,14 @@ export async function deleteEnv(
     const initialLength = envVars.length;
 
     const filtered = envVars.filter((env) => {
+      // keyが異なる場合は残す
       if (env.key !== key) return true;
+      // scopeが異なる場合は残す
       if (env.scope !== scope) return true;
-      if (scope === 'owner' && env.owner !== owner) return true;
-      if (scope === 'repo' && (env.owner !== owner || env.repo !== repo)) return true;
+      // scopeが一致する場合、owner/repoもチェック
+      if (env.scope === 'owner' && env.owner !== owner) return true;
+      if (env.scope === 'repo' && (env.owner !== owner || env.repo !== repo)) return true;
+      // 上記の条件を通過した場合は削除対象
       return false;
     });
 
@@ -215,12 +221,15 @@ export async function toggleEnv(
 
     const updated = envVars.map((env) => {
       // 対象の環境変数を見つける
+      // keyが異なる場合はそのまま
       if (env.key !== key) return env;
+      // scopeが異なる場合はそのまま
       if (env.scope !== scope) return env;
-      if (scope === 'owner' && env.owner !== owner) return env;
-      if (scope === 'repo' && (env.owner !== owner || env.repo !== repo)) return env;
+      // scopeが一致する場合、owner/repoもチェック
+      if (env.scope === 'owner' && env.owner !== owner) return env;
+      if (env.scope === 'repo' && (env.owner !== owner || env.repo !== repo)) return env;
 
-      // enabledフラグを更新
+      // 上記の条件を通過した場合は対象の環境変数なのでenabledフラグを更新
       return { ...env, enabled };
     });
 
