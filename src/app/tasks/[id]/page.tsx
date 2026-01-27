@@ -2,9 +2,10 @@
 
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Edit } from 'lucide-react';
 import type { Task, Tab, MergedMessage } from '@/lib/types';
-import { TaskInfo } from '@/components/TaskInfo';
+import { TaskDialog } from '@/components/TaskDialog';
+import { CollapsibleTaskInfo } from '@/components/CollapsibleTaskInfo';
 import { SessionTabs } from '@/components/SessionTabs';
 import { ViewLayoutToggle, type ViewMode } from '@/components/ViewLayoutToggle';
 import { ClaudePromptEditor, type ClaudePromptEditorHandle } from '@/components/ClaudePromptEditor';
@@ -28,7 +29,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [tabMessages, setTabMessages] = useState<Record<string, MergedMessage[]>>({});
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [isLoading, setIsLoading] = useState(true);
-  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Prompts管理をstateからrefに変更（再レンダリングを防止）
   const promptsRef = useRef<Record<string, string>>({});
@@ -273,9 +274,10 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       if (!response.ok) throw new Error('Failed to update task');
 
       // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
+      return { success: true };
     } catch (error) {
       console.error('Failed to update task:', error);
-      throw error;
+      return { success: false, errors: [{ field: 'global', message: 'Failed to update task' }] };
     }
   };
 
@@ -406,13 +408,13 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             {task.title}
           </h1>
 
-          <TaskInfo
-            task={task}
-            onUpdate={handleTaskUpdate}
-            editOnly
-            isEditing={isEditingTask}
-            onEditChange={setIsEditingTask}
-          />
+          <button
+            onClick={() => setIsEditDialogOpen(true)}
+            className="p-2 text-primary hover:text-primary-light rounded hover:bg-theme-hover cursor-pointer"
+            title="Edit task"
+          >
+            <Edit className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
@@ -420,13 +422,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       <div className="flex-1 flex flex-col min-h-0">
         {/* Task Info Detail Section */}
         <div className="p-4 bg-theme-card flex-shrink-0">
-          <TaskInfo
-            task={task}
-            onUpdate={handleTaskUpdate}
-            isEditing={isEditingTask}
-            onEditChange={setIsEditingTask}
-            hideButtons={true}
-          />
+          <CollapsibleTaskInfo task={task} defaultExpanded={false} />
         </div>
 
         {/* Tab Navigation & Content */}
@@ -494,6 +490,15 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
           <TaskActions task={task} onDelete={handleTaskDelete} />
         </div>
       </div>
+
+      {/* Edit Task Dialog */}
+      <TaskDialog
+        mode="edit"
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        task={task}
+        onUpdate={handleTaskUpdate}
+      />
     </div>
   );
 }
