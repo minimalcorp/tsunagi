@@ -92,6 +92,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       workingDirectory,
       env,
       agentSessionId: tab.session_id,
+      owner: task.owner,
+      repo: task.repo,
       onRawMessage: async (rawMessage: unknown) => {
         // Raw messageをsessions.jsonに追加
         await tabRepo.appendMessage(tab_id, rawMessage);
