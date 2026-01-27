@@ -13,7 +13,11 @@ export async function GET(request: NextRequest, { params }: Params) {
     // Repository層でマージ済みメッセージを取得
     const messages = await tabRepo.getMergedMessages(tab_id);
 
-    return NextResponse.json({ data: { messages } });
+    // ユーザーメッセージ数を取得
+    const sessionData = await tabRepo.getSessionData(tab_id);
+    const userPromptCount = sessionData?.userPrompts?.length ?? 0;
+
+    return NextResponse.json({ data: { messages, userPromptCount } });
   } catch (error) {
     console.error('GET /api/tabs/[tab_id]/messages error:', error);
     return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
