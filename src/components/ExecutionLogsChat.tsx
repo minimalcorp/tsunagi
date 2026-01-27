@@ -72,8 +72,8 @@ export function ExecutionLogsChat({ rawMessages, tabId }: ExecutionLogsChatProps
       logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
       // Note: setIsAtBottomはスクロールイベントで自動的に更新される
     } else if (isAtBottom) {
-      // 最下部にいる状態で新規メッセージ: スムーズスクロール
-      logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // 最下部にいる状態で新規メッセージ: 即座にスクロール
+      logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
     }
     // 最下部以外にいる場合: スクロールしない
   }, [uiMessages, tabId, isAtBottom]);
