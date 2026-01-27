@@ -155,6 +155,25 @@ body {
   transition-timing-function: ease-in-out;
 }
 
+/* Dark theme: Brighten all interactive elements on hover */
+@media (prefers-color-scheme: dark) {
+  button:hover:not(:disabled),
+  input:hover:not(:focus):not(:disabled),
+  textarea:hover:not(:focus):not(:disabled),
+  select:hover:not(:focus):not(:disabled) {
+    filter: brightness(1.2);
+  }
+}
+
+:root[data-theme='dark'] {
+  button:hover:not(:disabled),
+  input:hover:not(:focus):not(:disabled),
+  textarea:hover:not(:focus):not(:disabled),
+  select:hover:not(:focus):not(:disabled) {
+    filter: brightness(1.2);
+  }
+}
+
 /* Scrollbar customization - Firefox */
 * {
   scrollbar-width: thin;

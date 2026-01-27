@@ -431,7 +431,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         <div className="flex items-center justify-between">
           <button
             onClick={() => router.push('/')}
-            className="text-primary-light hover:brightness-110 font-medium flex items-center gap-2 cursor-pointer"
+            className="text-primary-light font-medium flex items-center gap-2 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Board

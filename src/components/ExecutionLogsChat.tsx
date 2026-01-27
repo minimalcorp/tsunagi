@@ -211,7 +211,7 @@ function UIMessageItem({
                         onClick={() =>
                           setExpandedTools((prev) => ({ ...prev, [toolKey]: !isExpanded }))
                         }
-                        className="flex items-center gap-1 hover:opacity-70 w-full text-left cursor-pointer"
+                        className="flex items-center gap-1 w-full text-left cursor-pointer"
                       >
                         <Wrench className="w-3 h-3" />
                         <span

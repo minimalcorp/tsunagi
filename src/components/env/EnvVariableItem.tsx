@@ -132,7 +132,7 @@ export function EnvVariableItem({
             </button>
             <button
               onClick={handleSaveEdit}
-              className="px-3 py-1.5 bg-primary text-white rounded hover:brightness-110 active:scale-95 transition-transform cursor-pointer text-sm"
+              className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer text-sm"
             >
               <Check className="w-4 h-4" />
             </button>

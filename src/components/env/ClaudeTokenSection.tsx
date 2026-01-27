@@ -272,7 +272,7 @@ export function ClaudeTokenSection({
         {!isAdding && tokens.length === 0 && (
           <button
             onClick={() => setIsAdding(true)}
-            className="px-3 py-1.5 bg-primary text-white rounded hover:brightness-110 active:scale-95 transition-transform cursor-pointer flex items-center gap-2 text-sm"
+            className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer flex items-center gap-2 text-sm"
           >
             <Plus className="w-4 h-4" />
             Add Token
@@ -292,7 +292,7 @@ export function ClaudeTokenSection({
           {onSwitchToGlobal && (
             <button
               onClick={onSwitchToGlobal}
-              className="px-3 py-1.5 bg-amber-600 text-white rounded hover:brightness-110 active:scale-95 transition-transform cursor-pointer text-sm whitespace-nowrap"
+              className="px-3 py-1.5 bg-amber-600 text-white rounded active:scale-95 transition-transform cursor-pointer text-sm whitespace-nowrap"
             >
               Switch to Global
             </button>
@@ -330,7 +330,7 @@ export function ClaudeTokenSection({
                 <button
                   onClick={handleAddToken}
                   disabled={!detectedKey || !!addError}
-                  className="px-3 py-1.5 bg-primary text-white rounded hover:brightness-110 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
+                  className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
                 >
                   <Check className="w-4 h-4" />
                 </button>
@@ -375,7 +375,7 @@ export function ClaudeTokenSection({
                     <button
                       onClick={() => handleSaveEdit(token.key)}
                       disabled={!editDetectedKey || !!editError}
-                      className="px-3 py-1.5 bg-primary text-white rounded hover:brightness-110 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
+                      className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
                     >
                       <Check className="w-4 h-4" />
                     </button>
