@@ -9,8 +9,7 @@ interface HeaderProps {
   onSettingsClick: () => void;
   onReload: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
-  owners: string[];
-  repos: string[];
+  repositories: Array<{ owner: string; repo: string }>;
   onFilterChange: (filters: { owner: string; repo: string; search: string }) => void;
   isCloneDialogOpen?: boolean;
 }
@@ -20,8 +19,7 @@ export function Header({
   onSettingsClick,
   onReload,
   nextStep = 'complete',
-  owners,
-  repos,
+  repositories,
   onFilterChange,
   isCloneDialogOpen = false,
 }: HeaderProps) {
@@ -48,9 +46,10 @@ export function Header({
   }, [isFilterOpen]);
 
   // Create combined owner/repo list
-  const repoOptions = owners.flatMap((owner) =>
-    repos.map((repo) => ({ value: `${owner}/${repo}`, label: `${owner}/${repo}` }))
-  );
+  const repoOptions = repositories.map((repository) => ({
+    value: `${repository.owner}/${repository.repo}`,
+    label: `${repository.owner}/${repository.repo}`,
+  }));
 
   const handleRepoChange = (value: string) => {
     setRepoFilter(value);
