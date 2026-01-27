@@ -260,7 +260,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
         {!isAdding && (
           <button
             onClick={() => setIsAdding(true)}
-            className="px-3 py-1.5 bg-primary text-white rounded hover:brightness-110 active:scale-95 transition-transform cursor-pointer flex items-center gap-2 text-sm"
+            className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer flex items-center gap-2 text-sm"
           >
             <Plus className="w-4 h-4" />
             Add Variable
@@ -298,7 +298,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
               </button>
               <button
                 onClick={handleAdd}
-                className="px-3 py-1.5 bg-primary text-white rounded hover:brightness-110 active:scale-95 transition-transform cursor-pointer text-sm"
+                className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer text-sm"
               >
                 <Check className="w-4 h-4" />
               </button>

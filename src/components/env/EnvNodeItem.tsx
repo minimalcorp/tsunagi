@@ -70,7 +70,10 @@ export function EnvNodeItem({
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
     >
       {hasChildren && (
-        <button onClick={handleChevronClick} className="p-0 hover:opacity-70 cursor-pointer">
+        <button
+          onClick={handleChevronClick}
+          className="p-0 hover:bg-theme-hover rounded cursor-pointer"
+        >
           {isExpanded ? (
             <ChevronDown className="w-3 h-3 text-theme-muted" />
           ) : (

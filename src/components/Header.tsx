@@ -77,7 +77,7 @@ export function Header({
       return `${baseStyle} bg-primary text-white shadow-lg ring-2 ring-primary`;
     }
 
-    return `${baseStyle} bg-theme-hover hover:opacity-80 text-theme-fg`;
+    return `${baseStyle} bg-theme-hover text-theme-fg`;
   };
 
   return (
@@ -121,7 +121,7 @@ export function Header({
         <div className="lg:hidden relative" ref={filterRef}>
           <button
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="px-4 h-10 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer flex items-center justify-center"
+            className="px-4 h-10 bg-theme-hover rounded text-theme-fg active:scale-95 cursor-pointer flex items-center justify-center"
             title="Filters"
           >
             <Filter className="w-5 h-5" />
@@ -163,10 +163,10 @@ export function Header({
         <div className="relative">
           <button
             onClick={onCloneClick}
-            className={`px-4 h-10 rounded transition-transform active:scale-95 cursor-pointer flex items-center justify-center ${
+            className={`px-4 h-10 rounded active:scale-95 cursor-pointer flex items-center justify-center ${
               nextStep === 'clone'
                 ? 'bg-primary text-white shadow-lg ring-2 ring-primary'
-                : 'bg-theme-hover hover:opacity-80 text-theme-fg'
+                : 'bg-theme-hover text-theme-fg'
             }`}
             title="Clone Repository"
           >
@@ -182,7 +182,7 @@ export function Header({
 
         <button
           onClick={onReload}
-          className="px-4 h-10 bg-theme-hover rounded hover:opacity-80 text-theme-fg active:scale-95 transition-transform cursor-pointer flex items-center justify-center"
+          className="px-4 h-10 bg-theme-hover rounded text-theme-fg active:scale-95 cursor-pointer flex items-center justify-center"
           title="Reload"
         >
           <RefreshCw className="w-5 h-5" />

@@ -142,7 +142,7 @@ export function EnvAddDialog({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary text-white rounded hover:brightness-110 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Adding...' : 'Add'}

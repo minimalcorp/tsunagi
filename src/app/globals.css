@@ -149,9 +149,29 @@ body {
 
 /* Global smooth transitions for theme changes */
 * {
-  transition-property: color, background-color, border-color;
+  transition-property:
+    color, background-color, border-color, opacity, transform, outline, outline-color;
   transition-duration: 200ms;
   transition-timing-function: ease-in-out;
+}
+
+/* Dark theme: Brighten all interactive elements on hover */
+@media (prefers-color-scheme: dark) {
+  button:hover:not(:disabled),
+  input:hover:not(:focus):not(:disabled),
+  textarea:hover:not(:focus):not(:disabled),
+  select:hover:not(:focus):not(:disabled) {
+    filter: brightness(1.2);
+  }
+}
+
+:root[data-theme='dark'] {
+  button:hover:not(:disabled),
+  input:hover:not(:focus):not(:disabled),
+  textarea:hover:not(:focus):not(:disabled),
+  select:hover:not(:focus):not(:disabled) {
+    filter: brightness(1.2);
+  }
 }
 
 /* Scrollbar customization - Firefox */
@@ -160,12 +180,31 @@ body {
   scrollbar-color: var(--muted) var(--background);
 }
 
+/* Hover state for form inputs */
+input:hover:not(:focus):not(:disabled),
+textarea:hover:not(:focus):not(:disabled),
+select:hover:not(:focus):not(:disabled) {
+  border-color: var(--primary-light);
+  background-color: var(--hover-background);
+}
+
+/* Active state for form inputs */
+input:active:not(:disabled),
+textarea:active:not(:disabled),
+select:active:not(:disabled) {
+  border-color: var(--primary);
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Override focus ring color for form inputs */
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+  border-color: var(--primary);
+  background-color: var(--card-background);
 }
 
 /* Error state focus ring color */
