@@ -19,12 +19,20 @@ class SSEManager {
     }
   }
 
-  broadcast(event: string, data: unknown): void {
-    const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  broadcast(event: string, data: unknown, eventId?: string): void {
+    // SSEメッセージの構築（eventIdがあればidフィールドを追加）
+    let message = `event: ${event}\n`;
+    if (eventId) {
+      message += `id: ${eventId}\n`;
+    }
+    message += `data: ${JSON.stringify(data)}\n\n`;
+
     const encoder = new TextEncoder();
     const encoded = encoder.encode(message);
 
-    console.log(`[SSE] Broadcasting ${event} to ${this.clients.size} clients`);
+    console.log(`[SSE] Broadcasting ${event} to ${this.clients.size} clients`, {
+      eventId,
+    });
 
     for (const client of this.clients) {
       try {

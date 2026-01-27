@@ -80,6 +80,7 @@ export async function createSessionData(tab_id: string): Promise<SessionData> {
     const newSessionData: SessionData = {
       rawMessages: [],
       userPrompts: [],
+      nextSequence: 1, // シーケンス番号を1から開始
     };
     sessions[tab_id] = newSessionData;
     await writeSessions(sessions);
@@ -118,22 +119,36 @@ export async function deleteSessionData(tab_id: string): Promise<boolean> {
 }
 
 // メッセージ追加
-export async function appendMessage(tab_id: string, message: unknown): Promise<SessionData | null> {
+export async function appendMessage(
+  tab_id: string,
+  message: unknown
+): Promise<{ sessionData: SessionData | null; sequence: number }> {
   return queue.add(async () => {
     const sessions = await readSessions();
-    if (!sessions[tab_id]) return null;
+    if (!sessions[tab_id]) return { sessionData: null, sequence: -1 };
 
-    // タイムスタンプを付与（既存のフィールドがない場合のみ）
+    // nextSequenceを初期化（既存データの互換性対応）
+    if (sessions[tab_id].nextSequence === undefined) {
+      sessions[tab_id].nextSequence = 1;
+    }
+
+    // シーケンス番号を取得・インクリメント
+    const sequence = sessions[tab_id].nextSequence!;
+    sessions[tab_id].nextSequence = sequence + 1;
+
+    // タイムスタンプとシーケンス番号を付与
     if (typeof message === 'object' && message !== null) {
-      const msg = message as { created_at?: string };
+      const msg = message as { created_at?: string; _sequence?: number };
       if (!msg.created_at) {
         (msg as { created_at: string }).created_at = new Date().toISOString();
       }
+      // シーケンス番号を追加（SDKメッセージそのままに_sequenceプロパティを追加）
+      (msg as { _sequence: number })._sequence = sequence;
     }
 
     sessions[tab_id].rawMessages.push(message);
     await writeSessions(sessions);
-    return sessions[tab_id];
+    return { sessionData: sessions[tab_id], sequence };
   });
 }
 
@@ -141,29 +156,39 @@ export async function appendMessage(tab_id: string, message: unknown): Promise<S
 export async function appendUserPrompt(
   tab_id: string,
   prompt: string
-): Promise<SessionData | null> {
+): Promise<{ sessionData: SessionData | null; sequence: number }> {
   return queue.add(async () => {
     const sessions = await readSessions();
-    if (!sessions[tab_id]) return null;
+    if (!sessions[tab_id]) return { sessionData: null, sequence: -1 };
 
     // 後方互換性のため、userPromptsが存在しない場合は初期化
     if (!sessions[tab_id].userPrompts) {
       sessions[tab_id].userPrompts = [];
     }
 
+    // nextSequenceを初期化（既存データの互換性対応）
+    if (sessions[tab_id].nextSequence === undefined) {
+      sessions[tab_id].nextSequence = 1;
+    }
+
+    // シーケンス番号を取得・インクリメント
+    const sequence = sessions[tab_id].nextSequence!;
+    sessions[tab_id].nextSequence = sequence + 1;
+
     sessions[tab_id].userPrompts.push({
       created_at: new Date().toISOString(),
       prompt,
+      _sequence: sequence, // シーケンス番号を追加
     });
 
     await writeSessions(sessions);
-    return sessions[tab_id];
+    return { sessionData: sessions[tab_id], sequence };
   });
 }
 
 /**
  * タブのマージ済みメッセージを取得
- * userPromptsとrawMessagesをマージし、タイムスタンプでソート
+ * userPromptsとrawMessagesをマージし、シーケンス番号でソート
  */
 export async function getMergedMessages(tab_id: string): Promise<MergedMessage[]> {
   const sessionData = await getSessionData(tab_id);
@@ -171,12 +196,14 @@ export async function getMergedMessages(tab_id: string): Promise<MergedMessage[]
 
   // UserPromptをpromptメッセージ形式に変換
   const userMessages: (SimplifiedUserMessage & {
+    _sequence: number;
     _sourceIndex: number;
     _source: 'userPrompt';
   })[] = sessionData.userPrompts.map((up, index) => ({
     type: 'prompt' as const,
     created_at: up.created_at,
     message: { content: up.prompt },
+    _sequence: up._sequence ?? index + 1, // フォールバック: 既存データは配列順
     _sourceIndex: index,
     _source: 'userPrompt' as const,
   }));
@@ -184,65 +211,42 @@ export async function getMergedMessages(tab_id: string): Promise<MergedMessage[]
   // rawMessagesにメタデータを付与
   const rawMessagesWithMeta = sessionData.rawMessages.map((msg, index) => {
     if (typeof msg === 'object' && msg !== null) {
+      const msgObj = msg as Record<string, unknown>;
       return {
-        ...(msg as Record<string, unknown>),
+        ...msgObj,
+        _sequence:
+          (msgObj._sequence as number | undefined) ?? index + sessionData.userPrompts.length + 1, // フォールバック
         _sourceIndex: index,
         _source: 'rawMessage' as const,
       };
     }
     return {
+      _sequence: index + sessionData.userPrompts.length + 1,
       _sourceIndex: index,
       _source: 'rawMessage' as const,
     };
   });
 
-  // マージしてタイムスタンプでソート
+  // マージしてシーケンス番号でソート
   const messages = [...userMessages, ...rawMessagesWithMeta];
 
   messages.sort((a, b) => {
-    const getTimestamp = (msg: unknown): string => {
-      if (typeof msg === 'object' && msg !== null) {
-        const obj = msg as { created_at?: string; started_at?: string };
-        return obj.created_at || obj.started_at || '';
-      }
-      return '';
-    };
-
-    const timeA = getTimestamp(a);
-    const timeB = getTimestamp(b);
-
-    // 両方にタイムスタンプがある場合：タイムスタンプでソート
-    if (timeA && timeB) {
-      return timeA.localeCompare(timeB);
-    }
-
-    // 片方だけタイムスタンプがある場合：タイムスタンプがある方を先に
-    if (timeA && !timeB) return -1;
-    if (!timeA && timeB) return 1;
-
-    // 両方タイムスタンプがない場合：元の配列順序を維持
-    const metaA = a as { _source: 'userPrompt' | 'rawMessage'; _sourceIndex: number };
-    const metaB = b as { _source: 'userPrompt' | 'rawMessage'; _sourceIndex: number };
-
-    // 同じソースの場合はインデックス順
-    if (metaA._source === metaB._source) {
-      return metaA._sourceIndex - metaB._sourceIndex;
-    }
-
-    // 異なるソースの場合：rawMessageを先に（既存の動作を維持）
-    return metaA._source === 'rawMessage' ? -1 : 1;
+    const seqA = (a as { _sequence?: number })._sequence || 0;
+    const seqB = (b as { _sequence?: number })._sequence || 0;
+    return seqA - seqB;
   });
 
-  // メタデータを削除
+  // メタデータを削除（_sequenceは保持）
   return messages.map((msg) => {
     if (typeof msg === 'object' && msg !== null) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { _sourceIndex, _source, ...rest } = msg as {
         _sourceIndex: number;
         _source: string;
+        _sequence: number;
       };
-      return rest;
+      return rest as MergedMessage; // _sequenceを含む
     }
-    return msg;
+    return msg as MergedMessage;
   });
 }

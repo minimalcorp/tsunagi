@@ -76,17 +76,26 @@ export async function POST(request: NextRequest, { params }: Params) {
     await taskRepo.updateTask(task.id, { claudeState: 'running' });
 
     // ユーザープロンプトをsessions.jsonに保存
-    await tabRepo.appendUserPrompt(tab_id, message);
+    const result = await tabRepo.appendUserPrompt(tab_id, message);
+    if (!result.sessionData) {
+      return NextResponse.json({ error: 'Failed to save user prompt' }, { status: 500 });
+    }
 
-    // SSE経由でブロードキャスト（マージ済みメッセージ）
+    // SSE経由で差分ブロードキャスト
     const messages = await tabRepo.getMergedMessages(tab_id);
-    const sessionData = await tabRepo.getSessionData(tab_id);
-    const userPromptCount = sessionData?.userPrompts?.length ?? 0;
-    sseManager.broadcast('tab:messages:updated', {
-      tab_id,
-      messages,
-      userPromptCount,
-    });
+    const newMessage = messages.find((m) => m._sequence === result.sequence);
+
+    if (newMessage) {
+      sseManager.broadcast(
+        'tab:message:added',
+        {
+          tab_id,
+          message: newMessage,
+          sequence: result.sequence,
+        },
+        result.sequence.toString() // SSE event id
+      );
+    }
 
     // Execute Claude in background
     executeSession({
@@ -99,17 +108,24 @@ export async function POST(request: NextRequest, { params }: Params) {
       repo: task.repo,
       onRawMessage: async (rawMessage: unknown) => {
         // Raw messageをsessions.jsonに追加
-        await tabRepo.appendMessage(tab_id, rawMessage);
+        const result = await tabRepo.appendMessage(tab_id, rawMessage);
+        if (!result.sessionData) return;
 
-        // SSE broadcast (tab messages updated)
+        // SSE broadcast (差分更新)
         const messages = await tabRepo.getMergedMessages(tab_id);
-        const sessionData = await tabRepo.getSessionData(tab_id);
-        const userPromptCount = sessionData?.userPrompts?.length ?? 0;
-        sseManager.broadcast('tab:messages:updated', {
-          tab_id,
-          messages,
-          userPromptCount,
-        });
+        const newMessage = messages.find((m) => m._sequence === result.sequence);
+
+        if (newMessage) {
+          sseManager.broadcast(
+            'tab:message:added',
+            {
+              tab_id,
+              message: newMessage,
+              sequence: result.sequence,
+            },
+            result.sequence.toString() // SSE event id
+          );
+        }
       },
       onStatusChange: async (status) => {
         // Update tab status
