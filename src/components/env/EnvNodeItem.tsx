@@ -44,16 +44,24 @@ export function EnvNodeItem({
     }
   };
 
-  const handleClick = () => {
+  const handleChevronClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggle) {
+      onToggle();
+    }
+  };
+
+  const handleNameClick = () => {
     onSelect();
-    if (hasChildren && onToggle) {
+    // 名前クリックは開く動作のみ（閉じない）
+    if (hasChildren && onToggle && !isExpanded) {
       onToggle();
     }
   };
 
   return (
     <div
-      onClick={handleClick}
+      onClick={handleNameClick}
       className={`
         flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer
         transition-colors
@@ -62,7 +70,7 @@ export function EnvNodeItem({
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
     >
       {hasChildren && (
-        <button onClick={(e) => e.stopPropagation()} className="p-0">
+        <button onClick={handleChevronClick} className="p-0 hover:opacity-70 cursor-pointer">
           {isExpanded ? (
             <ChevronDown className="w-3 h-3 text-theme-muted" />
           ) : (
