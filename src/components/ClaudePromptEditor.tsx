@@ -158,8 +158,7 @@ export const ClaudePromptEditor = memo(
   (prevProps, nextProps) => {
     // タブIDと実行状態が変わらなければ再レンダリングしない
     return (
-      prevProps.tab.tab_id === nextProps.tab.tab_id &&
-      prevProps.tab.status === nextProps.tab.status
+      prevProps.tab.tab_id === nextProps.tab.tab_id && prevProps.tab.status === nextProps.tab.status
     );
   }
 );

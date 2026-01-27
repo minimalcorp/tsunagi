@@ -44,7 +44,7 @@ interface ClaudePromptEditorProps {
   prompt: string;
   onExecute: (tabId: string, prompt: string) => Promise<void>;
   onInterrupt: (tabId: string) => Promise<void>;
-  onPromptChange: (prompt: string) => void;  // 削除
+  onPromptChange: (prompt: string) => void; // 削除
 }
 
 // AFTER
@@ -68,21 +68,20 @@ export interface ClaudePromptEditorHandle {
 ```typescript
 import { forwardRef, useImperativeHandle } from 'react';
 
-export const ClaudePromptEditor = forwardRef<
-  ClaudePromptEditorHandle,
-  ClaudePromptEditorProps
->(({ tab, onExecute, onInterrupt }, ref) => {
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+export const ClaudePromptEditor = forwardRef<ClaudePromptEditorHandle, ClaudePromptEditorProps>(
+  ({ tab, onExecute, onInterrupt }, ref) => {
+    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
-  // 親コンポーネントに公開するメソッド
-  useImperativeHandle(ref, () => ({
-    getCurrentPrompt: () => editorRef.current?.getValue() || '',
-    setPrompt: (value: string) => editorRef.current?.setValue(value),
-    clearPrompt: () => editorRef.current?.setValue(''),
-  }));
+    // 親コンポーネントに公開するメソッド
+    useImperativeHandle(ref, () => ({
+      getCurrentPrompt: () => editorRef.current?.getValue() || '',
+      setPrompt: (value: string) => editorRef.current?.setValue(value),
+      clearPrompt: () => editorRef.current?.setValue(''),
+    }));
 
-  // ... 残りの実装
-});
+    // ... 残りの実装
+  }
+);
 ```
 
 #### 1.3 onChange の削除
@@ -130,8 +129,7 @@ export const ClaudePromptEditor = memo(
   (prevProps, nextProps) => {
     // タブID、実行状態が変わらなければ再レンダリングしない
     return (
-      prevProps.tab.tab_id === nextProps.tab.tab_id &&
-      prevProps.tab.status === nextProps.tab.status
+      prevProps.tab.tab_id === nextProps.tab.tab_id && prevProps.tab.status === nextProps.tab.status
     );
   }
 );
@@ -162,16 +160,19 @@ const editorRef = useRef<ClaudePromptEditorHandle | null>(null);
 
 ```typescript
 // タブ切り替え時に現在の値を保存
-const handleTabChange = useCallback((newTabId: string) => {
-  // 現在のタブのプロンプトを保存
-  if (activeTabId && editorRef.current) {
-    const currentPrompt = editorRef.current.getCurrentPrompt();
-    promptsRef.current[activeTabId] = currentPrompt;
-  }
+const handleTabChange = useCallback(
+  (newTabId: string) => {
+    // 現在のタブのプロンプトを保存
+    if (activeTabId && editorRef.current) {
+      const currentPrompt = editorRef.current.getCurrentPrompt();
+      promptsRef.current[activeTabId] = currentPrompt;
+    }
 
-  // タブIDを切り替え
-  setActiveTabId(newTabId);
-}, [activeTabId]);
+    // タブIDを切り替え
+    setActiveTabId(newTabId);
+  },
+  [activeTabId]
+);
 
 // タブ切り替え後にエディタの値を復元
 useEffect(() => {
@@ -205,29 +206,26 @@ const handleExecute = async (tab_id: string, prompt: string) => {
 };
 
 // AFTER
-const handleExecute = useCallback(
-  async (tab_id: string, prompt: string) => {
-    try {
-      const response = await fetch(`/api/tabs/${tab_id}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt }),
-      });
+const handleExecute = useCallback(async (tab_id: string, prompt: string) => {
+  try {
+    const response = await fetch(`/api/tabs/${tab_id}/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: prompt }),
+    });
 
-      if (!response.ok) throw new Error('Failed to execute');
+    if (!response.ok) throw new Error('Failed to execute');
 
-      // 実行成功後にエディタとRefの両方をクリア
-      if (editorRef.current) {
-        editorRef.current.clearPrompt();
-      }
-      promptsRef.current[tab_id] = '';
-    } catch (error) {
-      console.error('Failed to execute:', error);
-      throw error;
+    // 実行成功後にエディタとRefの両方をクリア
+    if (editorRef.current) {
+      editorRef.current.clearPrompt();
     }
-  },
-  []
-);
+    promptsRef.current[tab_id] = '';
+  } catch (error) {
+    console.error('Failed to execute:', error);
+    throw error;
+  }
+}, []);
 ```
 
 #### 2.4 ClaudePromptEditor の呼び出し修正
@@ -287,12 +285,9 @@ const handleTabDeleted = (event: MessageEvent) => {
 #### 2.6 useCallback の活用
 
 ```typescript
-const handleInterrupt = useCallback(
-  async (tab_id: string) => {
-    // ... 実装
-  },
-  []
-);
+const handleInterrupt = useCallback(async (tab_id: string) => {
+  // ... 実装
+}, []);
 ```
 
 ---
@@ -307,10 +302,7 @@ export const ExecutionLogsChat = memo(
     // ... 既存の実装
   },
   (prevProps, nextProps) => {
-    return (
-      prevProps.tabId === nextProps.tabId &&
-      prevProps.rawMessages === nextProps.rawMessages
-    );
+    return prevProps.tabId === nextProps.tabId && prevProps.rawMessages === nextProps.rawMessages;
   }
 );
 ```
@@ -320,6 +312,7 @@ export const ExecutionLogsChat = memo(
 ## 実装順序
 
 ### Step 1: ClaudePromptEditor の変更
+
 1. ✅ forwardRef と useImperativeHandle の追加
 2. ✅ Props インターフェースから onPromptChange を削除
 3. ✅ onChange の削除
@@ -327,6 +320,7 @@ export const ExecutionLogsChat = memo(
 5. ✅ React.memo の追加
 
 ### Step 2: TaskDetailPage の変更
+
 1. ✅ prompts を state から ref に変更
 2. ✅ handlePromptChange の削除
 3. ✅ editorRef の追加
@@ -335,14 +329,17 @@ export const ExecutionLogsChat = memo(
 6. ✅ ClaudePromptEditor の呼び出し修正
 
 ### Step 3: Execute/Interrupt 処理の修正
+
 1. ✅ handleExecute でのクリア処理変更
 2. ✅ useCallback の追加
 3. ✅ タブ削除時のクリーンアップ追加
 
 ### Step 4: 追加の最適化（オプション）
+
 1. ✅ ExecutionLogsChat の memo 化
 
 ### Step 5: テストと検証
+
 1. 各タブでの編集と切り替え
 2. Execute 実行とクリア動作
 3. タブ削除

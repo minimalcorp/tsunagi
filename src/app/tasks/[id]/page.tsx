@@ -326,51 +326,45 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   };
 
   // Claude実行
-  const handleExecute = useCallback(
-    async (tab_id: string, prompt: string) => {
-      try {
-        const response = await fetch(`/api/tabs/${tab_id}/message`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: prompt }),
-        });
+  const handleExecute = useCallback(async (tab_id: string, prompt: string) => {
+    try {
+      const response = await fetch(`/api/tabs/${tab_id}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: prompt }),
+      });
 
-        if (!response.ok) throw new Error('Failed to execute');
+      if (!response.ok) throw new Error('Failed to execute');
 
-        // SSE経由でtab:updatedイベントが配信されるため、tabは更新しない
-        // 実行成功後にエディタとRefの両方をクリア
-        if (editorRef.current) {
-          editorRef.current.clearPrompt();
-        }
-        promptsRef.current[tab_id] = '';
-      } catch (error) {
-        console.error('Failed to execute:', error);
-        throw error;
+      // SSE経由でtab:updatedイベントが配信されるため、tabは更新しない
+      // 実行成功後にエディタとRefの両方をクリア
+      if (editorRef.current) {
+        editorRef.current.clearPrompt();
       }
-    },
-    []
-  );
+      promptsRef.current[tab_id] = '';
+    } catch (error) {
+      console.error('Failed to execute:', error);
+      throw error;
+    }
+  }, []);
 
   // Claude中断
-  const handleInterrupt = useCallback(
-    async (tab_id: string) => {
-      try {
-        const response = await fetch(`/api/tabs/${tab_id}/interrupt`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
+  const handleInterrupt = useCallback(async (tab_id: string) => {
+    try {
+      const response = await fetch(`/api/tabs/${tab_id}/interrupt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
 
-        if (!response.ok) throw new Error('Failed to interrupt');
+      if (!response.ok) throw new Error('Failed to interrupt');
 
-        // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
-      } catch (error) {
-        console.error('Failed to interrupt:', error);
-        throw error;
-      }
-    },
-    []
-  );
+      // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
+    } catch (error) {
+      console.error('Failed to interrupt:', error);
+      throw error;
+    }
+  }, []);
 
   // タスク削除
   const handleTaskDelete = async (taskId: string) => {
