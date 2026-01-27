@@ -66,7 +66,6 @@ export function SessionTabs({
             `}
           >
             <div className="font-medium flex items-center gap-2">
-              <span>{tab.sessionNumber}</span>
               <ClaudeState status={tab.status} showLabel={true} />
             </div>
             {tabs.length > 1 && (
@@ -75,8 +74,8 @@ export function SessionTabs({
                   e.stopPropagation();
                   const confirmMessage =
                     tab.status === 'running'
-                      ? `Tab ${tab.sessionNumber} is running. Are you sure you want to delete it?`
-                      : `Delete Tab ${tab.sessionNumber}?`;
+                      ? `This tab is running. Are you sure you want to delete it?`
+                      : `Delete this tab?`;
                   if (confirm(confirmMessage)) {
                     onTabDelete(tab.tab_id);
                   }
