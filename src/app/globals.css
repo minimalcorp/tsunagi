@@ -168,6 +168,23 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+/* Error state focus ring color */
+/* Auto-detect error state by border-red-* class */
+input[class*='border-red']:focus-visible,
+textarea[class*='border-red']:focus-visible,
+select[class*='border-red']:focus-visible {
+  outline: 2px solid var(--error);
+  outline-offset: 2px;
+}
+
+/* Explicit error state with .input-error class */
+input.input-error:focus-visible,
+textarea.input-error:focus-visible,
+select.input-error:focus-visible {
+  outline: 2px solid var(--error);
+  outline-offset: 2px;
+}
+
 /* Custom select chevron styling */
 select {
   appearance: none;
