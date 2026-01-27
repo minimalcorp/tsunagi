@@ -30,9 +30,16 @@ export interface Tab {
   session_id?: string; // Claude Agent SDKのセッションID（初回プロンプト後に設定）
 }
 
+// UserPrompt型（ユーザーが送信したプロンプト）
+export interface UserPrompt {
+  created_at: string; // ISO8601形式
+  prompt: string; // ユーザーのプロンプトテキスト
+}
+
 // SessionData型（sessions.jsonの値型）
 export interface SessionData {
   rawMessages: unknown[];
+  userPrompts: UserPrompt[];
 }
 
 // ============================================

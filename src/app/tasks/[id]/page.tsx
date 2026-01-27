@@ -72,7 +72,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             const response = await fetch(`/api/tabs/${tab.tab_id}/messages`);
             if (response.ok) {
               const data = await response.json();
-              return { tab_id: tab.tab_id, messages: data.data.rawMessages };
+              // APIは'rawMessages'ではなく'messages'を返す
+              return { tab_id: tab.tab_id, messages: data.data.messages };
             }
           } catch (error) {
             console.error(`Failed to load messages for tab ${tab.tab_id}:`, error);
@@ -149,11 +150,13 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
     // tab:messages:updated イベント
     const handleTabMessagesUpdated = (event: MessageEvent) => {
-      const { tab_id, rawMessages } = JSON.parse(event.data) as {
+      const { tab_id, messages } = JSON.parse(event.data) as {
         tab_id: string;
-        rawMessages: unknown[];
+        messages: unknown[];
       };
-      setTabMessages((prev) => ({ ...prev, [tab_id]: rawMessages }));
+
+      // Backend側でマージ・ソート済みなのでそのまま使用
+      setTabMessages((prev) => ({ ...prev, [tab_id]: messages }));
     };
 
     // task:updated イベント
@@ -209,7 +212,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
           const messagesData = await messagesResponse.json();
           setTabMessages((prev) => ({
             ...prev,
-            [activeTabId]: messagesData.data.rawMessages,
+            [activeTabId]: messagesData.data.messages, // rawMessagesから変更
           }));
         }
       } catch (error) {

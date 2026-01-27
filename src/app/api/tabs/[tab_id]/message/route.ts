@@ -75,6 +75,16 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Update task claudeState to running
     await taskRepo.updateTask(task.id, { claudeState: 'running' });
 
+    // ユーザープロンプトをsessions.jsonに保存
+    await tabRepo.appendUserPrompt(tab_id, message);
+
+    // SSE経由でブロードキャスト（マージ済みメッセージ）
+    const messages = await tabRepo.getMergedMessages(tab_id);
+    sseManager.broadcast('tab:messages:updated', {
+      tab_id,
+      messages,
+    });
+
     // Execute Claude in background
     executeSession({
       sessionId: tab_id,
@@ -87,13 +97,11 @@ export async function POST(request: NextRequest, { params }: Params) {
         await tabRepo.appendMessage(tab_id, rawMessage);
 
         // SSE broadcast (tab messages updated)
-        const sessionData = await tabRepo.getSessionData(tab_id);
-        if (sessionData) {
-          sseManager.broadcast('tab:messages:updated', {
-            tab_id,
-            rawMessages: sessionData.rawMessages,
-          });
-        }
+        const messages = await tabRepo.getMergedMessages(tab_id);
+        sseManager.broadcast('tab:messages:updated', {
+          tab_id,
+          messages,
+        });
       },
       onStatusChange: async (status) => {
         // Update tab status

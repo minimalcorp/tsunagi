@@ -77,7 +77,10 @@ export async function getSessionData(tab_id: string): Promise<SessionData | null
 export async function createSessionData(tab_id: string): Promise<SessionData> {
   return queue.add(async () => {
     const sessions = await readSessions();
-    const newSessionData: SessionData = { rawMessages: [] };
+    const newSessionData: SessionData = {
+      rawMessages: [],
+      userPrompts: [],
+    };
     sessions[tab_id] = newSessionData;
     await writeSessions(sessions);
     return newSessionData;
@@ -120,8 +123,123 @@ export async function appendMessage(tab_id: string, message: unknown): Promise<S
     const sessions = await readSessions();
     if (!sessions[tab_id]) return null;
 
+    // タイムスタンプを付与（既存のフィールドがない場合のみ）
+    if (typeof message === 'object' && message !== null) {
+      const msg = message as { created_at?: string };
+      if (!msg.created_at) {
+        (msg as { created_at: string }).created_at = new Date().toISOString();
+      }
+    }
+
     sessions[tab_id].rawMessages.push(message);
     await writeSessions(sessions);
     return sessions[tab_id];
+  });
+}
+
+// ユーザープロンプト追加
+export async function appendUserPrompt(
+  tab_id: string,
+  prompt: string
+): Promise<SessionData | null> {
+  return queue.add(async () => {
+    const sessions = await readSessions();
+    if (!sessions[tab_id]) return null;
+
+    // 後方互換性のため、userPromptsが存在しない場合は初期化
+    if (!sessions[tab_id].userPrompts) {
+      sessions[tab_id].userPrompts = [];
+    }
+
+    sessions[tab_id].userPrompts.push({
+      created_at: new Date().toISOString(),
+      prompt,
+    });
+
+    await writeSessions(sessions);
+    return sessions[tab_id];
+  });
+}
+
+/**
+ * タブのマージ済みメッセージを取得
+ * userPromptsとrawMessagesをマージし、タイムスタンプでソート
+ */
+export async function getMergedMessages(tab_id: string): Promise<unknown[]> {
+  const sessionData = await getSessionData(tab_id);
+  if (!sessionData) return [];
+
+  // UserPromptをSDK user message形式に変換
+  const userMessages = sessionData.userPrompts.map((up, index) => ({
+    type: 'user',
+    created_at: up.created_at,
+    message: { content: up.prompt },
+    _sourceIndex: index,
+    _source: 'userPrompt' as const,
+  }));
+
+  // rawMessagesにメタデータを付与
+  const rawMessagesWithMeta = sessionData.rawMessages.map((msg, index) => {
+    if (typeof msg === 'object' && msg !== null) {
+      return {
+        ...(msg as Record<string, unknown>),
+        _sourceIndex: index,
+        _source: 'rawMessage' as const,
+      };
+    }
+    return {
+      _sourceIndex: index,
+      _source: 'rawMessage' as const,
+    };
+  });
+
+  // マージしてタイムスタンプでソート
+  const messages = [...userMessages, ...rawMessagesWithMeta];
+
+  messages.sort((a, b) => {
+    const getTimestamp = (msg: unknown): string => {
+      if (typeof msg === 'object' && msg !== null) {
+        const obj = msg as { created_at?: string; started_at?: string };
+        return obj.created_at || obj.started_at || '';
+      }
+      return '';
+    };
+
+    const timeA = getTimestamp(a);
+    const timeB = getTimestamp(b);
+
+    // 両方にタイムスタンプがある場合：タイムスタンプでソート
+    if (timeA && timeB) {
+      return timeA.localeCompare(timeB);
+    }
+
+    // 片方だけタイムスタンプがある場合：タイムスタンプがある方を先に
+    if (timeA && !timeB) return -1;
+    if (!timeA && timeB) return 1;
+
+    // 両方タイムスタンプがない場合：元の配列順序を維持
+    const metaA = a as { _source: 'userPrompt' | 'rawMessage'; _sourceIndex: number };
+    const metaB = b as { _source: 'userPrompt' | 'rawMessage'; _sourceIndex: number };
+
+    // 同じソースの場合はインデックス順
+    if (metaA._source === metaB._source) {
+      return metaA._sourceIndex - metaB._sourceIndex;
+    }
+
+    // 異なるソースの場合：rawMessageを先に（既存の動作を維持）
+    return metaA._source === 'rawMessage' ? -1 : 1;
+  });
+
+  // メタデータを削除
+  return messages.map((msg) => {
+    if (typeof msg === 'object' && msg !== null) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { _sourceIndex, _source, ...rest } = msg as {
+        _sourceIndex: number;
+        _source: string;
+      };
+      return rest;
+    }
+    return msg;
   });
 }
