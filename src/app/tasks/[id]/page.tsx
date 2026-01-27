@@ -214,7 +214,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       eventSource.removeEventListener('tab:messages:updated', handleTabMessagesUpdated);
       eventSource.removeEventListener('task:updated', handleTaskUpdated);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventSource, id, activeTabId, tabs]);
 
   // タブのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
