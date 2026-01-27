@@ -28,6 +28,7 @@ export interface Tab {
   completedAt?: string;
   updatedAt: string;
   session_id?: string; // Claude Agent SDKのセッションID（初回プロンプト後に設定）
+  userPromptCount?: number; // ユーザーが送信したメッセージ数
 }
 
 // UserPrompt型（ユーザーが送信したプロンプト）

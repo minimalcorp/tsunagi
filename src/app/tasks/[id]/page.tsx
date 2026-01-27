@@ -75,7 +75,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         const loadedTask = taskData.data.task;
         setTask(loadedTask);
 
-        // タスクからタブを取得
+        // タスクからタブを取得（既にuserPromptCountを含む）
         let loadedTabs = loadedTask.tabs || [];
 
         // タブが0個の場合、自動的に1個作成
@@ -99,7 +99,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             const response = await fetch(`/api/tabs/${tab.tab_id}/messages`);
             if (response.ok) {
               const data = await response.json();
-              // APIは'rawMessages'ではなく'messages'を返す
               return { tab_id: tab.tab_id, messages: data.data.messages };
             }
           } catch (error) {
@@ -180,13 +179,21 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
     // tab:messages:updated イベント
     const handleTabMessagesUpdated = (event: MessageEvent) => {
-      const { tab_id, messages } = JSON.parse(event.data) as {
+      const { tab_id, messages, userPromptCount } = JSON.parse(event.data) as {
         tab_id: string;
         messages: MergedMessage[];
+        userPromptCount?: number;
       };
 
       // Backend側でマージ・ソート済みなのでそのまま使用
       setTabMessages((prev) => ({ ...prev, [tab_id]: messages }));
+
+      // タブのuserPromptCountを更新
+      if (userPromptCount !== undefined) {
+        setTabs((prevTabs) =>
+          prevTabs.map((tab) => (tab.tab_id === tab_id ? { ...tab, userPromptCount } : tab))
+        );
+      }
     };
 
     // task:updated イベント

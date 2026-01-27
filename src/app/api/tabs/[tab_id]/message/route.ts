@@ -80,9 +80,12 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // SSE経由でブロードキャスト（マージ済みメッセージ）
     const messages = await tabRepo.getMergedMessages(tab_id);
+    const sessionData = await tabRepo.getSessionData(tab_id);
+    const userPromptCount = sessionData?.userPrompts?.length ?? 0;
     sseManager.broadcast('tab:messages:updated', {
       tab_id,
       messages,
+      userPromptCount,
     });
 
     // Execute Claude in background
@@ -100,9 +103,12 @@ export async function POST(request: NextRequest, { params }: Params) {
 
         // SSE broadcast (tab messages updated)
         const messages = await tabRepo.getMergedMessages(tab_id);
+        const sessionData = await tabRepo.getSessionData(tab_id);
+        const userPromptCount = sessionData?.userPrompts?.length ?? 0;
         sseManager.broadcast('tab:messages:updated', {
           tab_id,
           messages,
+          userPromptCount,
         });
       },
       onStatusChange: async (status) => {

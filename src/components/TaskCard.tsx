@@ -14,7 +14,7 @@ interface TaskCardProps {
 export function TaskCard({ task, isDragging, onTaskClick }: TaskCardProps) {
   const isClaudeRunning = task.claudeState === 'running';
   const tabs = task.tabs || [];
-  const totalTabs = tabs.length;
+  const totalUserMessages = tabs.reduce((sum, tab) => sum + (tab.userPromptCount ?? 0), 0);
 
   return (
     <div
@@ -68,10 +68,10 @@ export function TaskCard({ task, isDragging, onTaskClick }: TaskCardProps) {
           {/* 工数 */}
           {task.effort && <span className="font-medium">{task.effort}h</span>}
 
-          {/* タブ数 */}
-          {totalTabs > 0 && (
+          {/* ユーザーメッセージ数 */}
+          {totalUserMessages > 0 && (
             <div className="flex items-center gap-1">
-              <span>{totalTabs}</span>
+              <span>{totalUserMessages}</span>
               <MessageCircle className="w-3 h-3" />
             </div>
           )}
