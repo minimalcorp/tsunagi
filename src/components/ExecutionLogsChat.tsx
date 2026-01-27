@@ -2,7 +2,17 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ChevronDown, ChevronUp, Brain, Wrench, Info, XCircle, Loader2, Ban } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Brain,
+  Wrench,
+  Info,
+  XCircle,
+  Loader2,
+  Ban,
+  CircleCheck,
+} from 'lucide-react';
 import type { UIMessage } from '@/lib/types';
 import { UIMessageConverter } from '@/lib/ui-message-converter';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -101,6 +111,15 @@ export function ExecutionLogsChat({ rawMessages, tabId }: ExecutionLogsChatProps
       </div>
     </div>
   );
+}
+
+// グループステータス判定ヘルパー関数
+function getGroupStatus(executions: { status: string }[]) {
+  const hasRunning = executions.some((e) => e.status === 'pending');
+  const hasError = executions.some((e) => e.status === 'error');
+  const allCompleted = executions.every((e) => e.status === 'success' || e.status === 'error');
+
+  return { hasRunning, hasError, allCompleted };
 }
 
 // UIMessage用のコンポーネント
@@ -282,6 +301,22 @@ function UIMessageItem({
             const isGroupExpanded = expandedTools[groupKey] ?? false;
             const executions = block.executions;
 
+            // グループ全体のステータスを判定
+            const groupStatus = getGroupStatus(executions);
+
+            // グループ全体のステータスアイコン
+            const groupStatusIcon = groupStatus.hasRunning ? (
+              sessionCompleted ? (
+                <Ban className="w-3 h-3" />
+              ) : (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              )
+            ) : groupStatus.hasError ? (
+              <XCircle className="w-3 h-3" />
+            ) : groupStatus.allCompleted ? (
+              <CircleCheck className="w-3 h-3" />
+            ) : null;
+
             return (
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
@@ -304,6 +339,11 @@ function UIMessageItem({
                       >
                         Tool Uses ({executions.length})
                       </span>
+                      {groupStatusIcon && (
+                        <span className={`${isDark ? 'text-purple-300' : 'text-purple-950'}`}>
+                          {groupStatusIcon}
+                        </span>
+                      )}
                       {isGroupExpanded ? (
                         <ChevronUp
                           className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
