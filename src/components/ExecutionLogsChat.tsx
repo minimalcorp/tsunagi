@@ -2,7 +2,17 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ChevronDown, ChevronUp, Brain, Wrench, Info, XCircle, Loader2, Ban } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Brain,
+  Wrench,
+  Info,
+  XCircle,
+  Loader2,
+  Ban,
+  CircleCheck,
+} from 'lucide-react';
 import type { UIMessage } from '@/lib/types';
 import { UIMessageConverter } from '@/lib/ui-message-converter';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -101,6 +111,15 @@ export function ExecutionLogsChat({ rawMessages, tabId }: ExecutionLogsChatProps
       </div>
     </div>
   );
+}
+
+// グループステータス判定ヘルパー関数
+function getGroupStatus(executions: { status: string }[]) {
+  const hasRunning = executions.some((e) => e.status === 'pending');
+  const hasError = executions.some((e) => e.status === 'error');
+  const allCompleted = executions.every((e) => e.status === 'success' || e.status === 'error');
+
+  return { hasRunning, hasError, allCompleted };
 }
 
 // UIMessage用のコンポーネント
@@ -269,6 +288,166 @@ function UIMessageItem({
                         }`}
                       >
                         {tool.status === 'success' ? '✓' : '✗'} {tool.result}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (block.type === 'tool_use_group') {
+            const groupKey = `${message.id}-group-${index}`;
+            const isGroupExpanded = expandedTools[groupKey] ?? false;
+            const executions = block.executions;
+
+            // グループ全体のステータスを判定
+            const groupStatus = getGroupStatus(executions);
+
+            // グループ全体のステータスアイコン
+            const groupStatusIcon = groupStatus.hasRunning ? (
+              sessionCompleted ? (
+                <Ban className="w-3 h-3" />
+              ) : (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              )
+            ) : groupStatus.hasError ? (
+              <XCircle className="w-3 h-3" />
+            ) : groupStatus.allCompleted ? (
+              <CircleCheck className="w-3 h-3" />
+            ) : null;
+
+            return (
+              <div key={index}>
+                <div className="flex justify-start items-center gap-2">
+                  <div
+                    className={`inline-block text-left rounded-lg p-2 max-w-full ${
+                      isDark ? 'bg-purple-900/20' : 'bg-purple-50'
+                    }`}
+                  >
+                    <button
+                      onClick={() =>
+                        setExpandedTools((prev) => ({ ...prev, [groupKey]: !isGroupExpanded }))
+                      }
+                      className="flex items-center gap-1 hover:opacity-70 w-full text-left cursor-pointer"
+                    >
+                      <Wrench className="w-3 h-3" />
+                      <span
+                        className={`text-xs font-medium ${
+                          isDark ? 'text-purple-300' : 'text-purple-950'
+                        }`}
+                      >
+                        Tool Uses ({executions.length})
+                      </span>
+                      {groupStatusIcon && (
+                        <span className={`${isDark ? 'text-purple-300' : 'text-purple-950'}`}>
+                          {groupStatusIcon}
+                        </span>
+                      )}
+                      {isGroupExpanded ? (
+                        <ChevronUp
+                          className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
+                        />
+                      ) : (
+                        <ChevronDown
+                          className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
+                        />
+                      )}
+                    </button>
+
+                    {isGroupExpanded && (
+                      <div className="mt-2 space-y-2">
+                        {executions.map((exec, execIndex) => {
+                          const toolKey = `${groupKey}-${execIndex}`;
+                          const isToolExpanded = expandedTools[toolKey] ?? false;
+                          const hasDetails = Boolean(exec.input) || Boolean(exec.result);
+
+                          // Status icon for pending state
+                          const statusIcon =
+                            exec.status === 'pending' ? (
+                              sessionCompleted ? (
+                                <Ban className="w-3 h-3" />
+                              ) : (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              )
+                            ) : null;
+
+                          return (
+                            <div
+                              key={execIndex}
+                              className={`p-2 rounded ${isDark ? 'bg-gray-800/50' : 'bg-white/50'}`}
+                            >
+                              {hasDetails ? (
+                                <button
+                                  onClick={() =>
+                                    setExpandedTools((prev) => ({
+                                      ...prev,
+                                      [toolKey]: !isToolExpanded,
+                                    }))
+                                  }
+                                  className="flex items-center gap-1 hover:opacity-70 w-full text-left cursor-pointer"
+                                >
+                                  <span
+                                    className={`text-xs font-medium ${
+                                      isDark ? 'text-purple-300' : 'text-purple-950'
+                                    }`}
+                                  >
+                                    {exec.toolName}
+                                  </span>
+                                  {statusIcon && (
+                                    <span
+                                      className={`${isDark ? 'text-purple-300' : 'text-purple-950'}`}
+                                    >
+                                      {statusIcon}
+                                    </span>
+                                  )}
+                                  {isToolExpanded ? (
+                                    <ChevronUp
+                                      className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
+                                    />
+                                  ) : (
+                                    <ChevronDown
+                                      className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
+                                    />
+                                  )}
+                                </button>
+                              ) : (
+                                <div
+                                  className={`text-xs font-medium flex items-center gap-1 ${
+                                    isDark ? 'text-purple-300' : 'text-purple-950'
+                                  }`}
+                                >
+                                  {exec.toolName}
+                                  {statusIcon}
+                                </div>
+                              )}
+                              {isToolExpanded && exec.input && (
+                                <pre
+                                  className={`text-xs p-2 rounded overflow-x-auto mt-2 ${
+                                    isDark ? 'bg-gray-900' : 'bg-gray-50'
+                                  }`}
+                                >
+                                  {JSON.stringify(exec.input, null, 2)}
+                                </pre>
+                              )}
+                              {isToolExpanded && exec.result && (
+                                <div
+                                  className={`text-xs mt-2 p-2 rounded break-words overflow-wrap-anywhere ${
+                                    exec.status === 'error'
+                                      ? isDark
+                                        ? 'bg-red-900/20 text-red-300'
+                                        : 'bg-red-50 text-red-800'
+                                      : isDark
+                                        ? 'bg-green-900/20 text-green-300'
+                                        : 'bg-green-50 text-green-800'
+                                  }`}
+                                >
+                                  {exec.status === 'success' ? '✓' : '✗'} {exec.result}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

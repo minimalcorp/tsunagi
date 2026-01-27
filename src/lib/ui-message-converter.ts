@@ -89,11 +89,171 @@ type SDKMessage =
  */
 export class UIMessageConverter {
   /**
+   * assistantメッセージがtool_useのみで構成されているかチェック
+   */
+  private isToolUseOnlyMessage(msg: SDKAssistantMessage): boolean {
+    if (!msg.message || !Array.isArray(msg.message.content)) {
+      return false;
+    }
+    const content = msg.message.content;
+    if (content.length === 0) {
+      return false;
+    }
+    // すべてのブロックがtool_useである場合のみtrue
+    return content.every((block) => block.type === 'tool_use');
+  }
+
+  /**
+   * assistantメッセージからToolExecution配列を抽出
+   */
+  private extractToolExecutions(msg: SDKAssistantMessage): ToolExecution[] {
+    const executions: ToolExecution[] = [];
+    if (!msg.message || !Array.isArray(msg.message.content)) {
+      return executions;
+    }
+
+    for (const block of msg.message.content) {
+      if (block.type === 'tool_use') {
+        const toolUseBlock = block as SDKToolUseBlock;
+        executions.push({
+          id: toolUseBlock.id,
+          toolName: toolUseBlock.name,
+          input: toolUseBlock.input,
+          status: 'pending',
+          startTime: new Date().toISOString(),
+        });
+      }
+    }
+
+    return executions;
+  }
+
+  /**
+   * 単一のtool_useメッセージからtool_use_groupを含むUIMessageを作成
+   */
+  private createToolUseGroupMessage(toolUseMsg: SDKAssistantMessage): UIMessage {
+    const executions = this.extractToolExecutions(toolUseMsg);
+
+    // 常にtool_use_groupとして作成（単一でもexecutions配列）
+    const blocks: AssistantMessageBlock[] = [
+      {
+        type: 'tool_use_group',
+        executions: executions,
+      },
+    ];
+
+    const metadata: UIMessageMetadata = {
+      sdkMessageUuids: toolUseMsg.uuid ? [toolUseMsg.uuid] : [],
+      role: 'assistant',
+      model: toolUseMsg.message?.model,
+      stopReason: toolUseMsg.message?.stop_reason,
+    };
+
+    if (toolUseMsg.message?.usage) {
+      metadata.usage = {
+        inputTokens: toolUseMsg.message.usage.input_tokens || 0,
+        outputTokens: toolUseMsg.message.usage.output_tokens || 0,
+      };
+    }
+
+    return {
+      id: uuidv4(),
+      timestamp: toolUseMsg.created_at || new Date().toISOString(),
+      type: 'assistant_message',
+      content: {
+        type: 'assistant_message',
+        blocks,
+      },
+      metadata,
+    };
+  }
+
+  /**
+   * UIMessageがtool_use関連メッセージかチェック
+   */
+  private isToolUseGroupMessage(msg: UIMessage): boolean {
+    if (msg.type !== 'assistant_message' || msg.content.type !== 'assistant_message') {
+      return false;
+    }
+
+    return msg.content.blocks.some((block) => block.type === 'tool_use_group');
+  }
+
+  /**
+   * 既存のtool_use_groupに新しいtool_useを追加
+   */
+  private addToolToGroup(lastMsg: UIMessage, toolUseMsg: SDKAssistantMessage): void {
+    if (lastMsg.type !== 'assistant_message' || lastMsg.content.type !== 'assistant_message') {
+      return;
+    }
+
+    const executions = this.extractToolExecutions(toolUseMsg);
+
+    for (const block of lastMsg.content.blocks) {
+      if (block.type === 'tool_use_group') {
+        block.executions.push(...executions);
+        return;
+      }
+    }
+  }
+
+  /**
+   * tool_resultでtool_useのstatusを更新
+   */
+  private updateToolStatus(uiMessages: UIMessage[], toolResultMsg: SDKUserMessage): void {
+    if (!toolResultMsg.message || !Array.isArray(toolResultMsg.message.content)) {
+      return;
+    }
+
+    for (const block of toolResultMsg.message.content) {
+      if (block.type === 'tool_result') {
+        const toolResultBlock = block as {
+          type: 'tool_result';
+          tool_use_id: string;
+          content: string | Array<{ type: string; [key: string]: unknown }>;
+          is_error?: boolean;
+        };
+
+        const toolUseId = toolResultBlock.tool_use_id;
+        const isError = toolResultBlock.is_error || false;
+
+        // Extract result content
+        let resultContent = '';
+        if (typeof toolResultBlock.content === 'string') {
+          resultContent = toolResultBlock.content;
+        } else if (Array.isArray(toolResultBlock.content)) {
+          resultContent = toolResultBlock.content
+            .map((c) => (c.type === 'text' ? (c as { text?: string }).text || '' : ''))
+            .join('\n');
+        }
+
+        // uiMessagesを逆順に走査して対応するtool_useを探す
+        for (let i = uiMessages.length - 1; i >= 0; i--) {
+          const uiMsg = uiMessages[i];
+          if (uiMsg.type === 'assistant_message' && uiMsg.content.type === 'assistant_message') {
+            for (const block of uiMsg.content.blocks) {
+              if (block.type === 'tool_use_group') {
+                const exec = block.executions.find((e) => e.id === toolUseId);
+                if (exec) {
+                  exec.status = isError ? 'error' : 'success';
+                  exec.result = resultContent;
+                  exec.error = isError ? resultContent : undefined;
+                  exec.endTime = new Date().toISOString();
+                  return;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Raw messages配列からUIMessages配列に変換
    */
   convert(rawMessages: unknown[]): UIMessage[] {
     const uiMessages: UIMessage[] = [];
-    const toolExecutionMap = new Map<string, ToolExecution>();
 
     for (const rawMsg of rawMessages) {
       const msg = rawMsg as SDKMessage;
@@ -109,24 +269,40 @@ export class UIMessageConverter {
 
         case 'user': {
           const userMsg = msg as SDKUserMessage;
-          // Skip tool_result messages (they will be processed separately)
+
           if (this.isToolResultMessage(userMsg)) {
-            this.processToolResult(userMsg, toolExecutionMap, uiMessages);
+            // tool_resultの場合、uiMessagesを走査してstatusを更新
+            this.updateToolStatus(uiMessages, userMsg);
           } else {
+            // 通常のuserメッセージ
             uiMessages.push(this.convertUserMessage(userMsg));
           }
           break;
         }
 
-        case 'assistant':
-          const assistantMsg = this.convertAssistantMessage(
-            msg as SDKAssistantMessage,
-            toolExecutionMap
-          );
-          if (assistantMsg) {
-            uiMessages.push(assistantMsg);
+        case 'assistant': {
+          const assistantMsg = msg as SDKAssistantMessage;
+
+          if (this.isToolUseOnlyMessage(assistantMsg)) {
+            // tool_useのみのメッセージ
+            const lastMsg = uiMessages[uiMessages.length - 1];
+
+            if (lastMsg && this.isToolUseGroupMessage(lastMsg)) {
+              // 既存のtool_use_groupに追加
+              this.addToolToGroup(lastMsg, assistantMsg);
+            } else {
+              // 新しいtool_use_groupを作成
+              uiMessages.push(this.createToolUseGroupMessage(assistantMsg));
+            }
+          } else {
+            // thinking/textを含むメッセージ
+            const convertedMsg = this.convertAssistantMessage(assistantMsg);
+            if (convertedMsg) {
+              uiMessages.push(convertedMsg);
+            }
           }
           break;
+        }
 
         case 'system':
           if ((msg as SDKSystemMessage).subtype === 'init') {
@@ -151,78 +327,6 @@ export class UIMessageConverter {
       return false;
     }
     return msg.message.content.some((block) => block.type === 'tool_result');
-  }
-
-  private processToolResult(
-    msg: SDKUserMessage,
-    toolExecutionMap: Map<string, ToolExecution>,
-    uiMessages: UIMessage[]
-  ): void {
-    if (!msg.message || !Array.isArray(msg.message.content)) {
-      return;
-    }
-
-    for (const block of msg.message.content) {
-      if (block.type === 'tool_result') {
-        const toolResultBlock = block as {
-          type: 'tool_result';
-          tool_use_id: string;
-          content: string | Array<{ type: string; [key: string]: unknown }>;
-          is_error?: boolean;
-        };
-
-        const toolUseId = toolResultBlock.tool_use_id;
-        const isError = toolResultBlock.is_error || false;
-
-        // Extract result content
-        let resultContent = '';
-        if (typeof toolResultBlock.content === 'string') {
-          resultContent = toolResultBlock.content;
-        } else if (Array.isArray(toolResultBlock.content)) {
-          resultContent = toolResultBlock.content
-            .map((c) => (c.type === 'text' ? (c as { text?: string }).text || '' : ''))
-            .join('\n');
-        }
-
-        // Find and update the corresponding tool_use in uiMessages
-        for (let i = uiMessages.length - 1; i >= 0; i--) {
-          const uiMsg = uiMessages[i];
-          if (uiMsg.type === 'assistant_message' && uiMsg.content.type === 'assistant_message') {
-            // Check if this message contains the target tool_use
-            const hasTargetToolUse = uiMsg.content.blocks.some(
-              (block) => block.type === 'tool_use' && block.info.id === toolUseId
-            );
-
-            if (hasTargetToolUse) {
-              const updatedBlocks = uiMsg.content.blocks.map((block) => {
-                if (block.type === 'tool_use' && block.info.id === toolUseId) {
-                  return {
-                    ...block,
-                    info: {
-                      ...block.info,
-                      result: resultContent,
-                      status: isError ? ('error' as const) : ('success' as const),
-                      error: isError ? resultContent : undefined,
-                      endTime: new Date().toISOString(),
-                    },
-                  };
-                }
-                return block;
-              });
-
-              uiMessages[i] = {
-                ...uiMsg,
-                content: {
-                  ...uiMsg.content,
-                  blocks: updatedBlocks,
-                },
-              };
-              break;
-            }
-          }
-        }
-      }
-    }
   }
 
   private convertPromptMessage(msg: SDKPromptMessage): UIMessage {
@@ -275,10 +379,7 @@ export class UIMessageConverter {
     };
   }
 
-  private convertAssistantMessage(
-    msg: SDKAssistantMessage,
-    toolExecutionMap: Map<string, ToolExecution>
-  ): UIMessage | null {
+  private convertAssistantMessage(msg: SDKAssistantMessage): UIMessage | null {
     const blocks: AssistantMessageBlock[] = [];
 
     if (!msg.message || !msg.message.content) {
@@ -291,9 +392,31 @@ export class UIMessageConverter {
       return null;
     }
 
-    // content配列を順番に処理
+    // content配列を順番に処理し、連続するtool_useをグループ化
+    let toolUseBuffer: ToolExecution[] = [];
+
+    const flushToolUseBuffer = () => {
+      if (toolUseBuffer.length > 0) {
+        if (toolUseBuffer.length === 1) {
+          // 単一のtool_useはそのまま追加
+          blocks.push({
+            type: 'tool_use',
+            info: toolUseBuffer[0],
+          });
+        } else {
+          // 複数のtool_useはtool_use_groupとして追加
+          blocks.push({
+            type: 'tool_use_group',
+            executions: toolUseBuffer,
+          });
+        }
+        toolUseBuffer = [];
+      }
+    };
+
     for (const block of content) {
       if (block.type === 'thinking') {
+        flushToolUseBuffer(); // tool_useバッファをフラッシュ
         const thinkingBlock = block as SDKThinkingBlock;
         blocks.push({
           type: 'thinking',
@@ -301,12 +424,14 @@ export class UIMessageConverter {
           isRedacted: false,
         });
       } else if (block.type === 'redacted_thinking') {
+        flushToolUseBuffer(); // tool_useバッファをフラッシュ
         blocks.push({
           type: 'thinking',
           content: '[Redacted for safety]',
           isRedacted: true,
         });
       } else if (block.type === 'text') {
+        flushToolUseBuffer(); // tool_useバッファをフラッシュ
         const textBlock = block as SDKTextBlock;
         blocks.push({
           type: 'text',
@@ -322,15 +447,13 @@ export class UIMessageConverter {
           startTime: new Date().toISOString(),
         };
 
-        // tool_use_idでマップに保存（後でtool_resultと紐付け）
-        toolExecutionMap.set(toolUseBlock.id, toolExecution);
-
-        blocks.push({
-          type: 'tool_use',
-          info: toolExecution,
-        });
+        // バッファに追加（連続するtool_useを集める）
+        toolUseBuffer.push(toolExecution);
       }
     }
+
+    // 残りのtool_useをフラッシュ
+    flushToolUseBuffer();
 
     if (blocks.length === 0) {
       return null;
@@ -419,47 +542,4 @@ export class UIMessageConverter {
       };
     }
   }
-}
-
-/**
- * Tool resultを使ってToolExecutionのstatusを更新する
- */
-export function updateToolExecutionStatus(
-  uiMessages: UIMessage[],
-  toolUseId: string,
-  result: string,
-  isError: boolean
-): UIMessage[] {
-  return uiMessages.map((msg) => {
-    if (msg.type === 'assistant_message' && msg.content.type === 'assistant_message') {
-      const blocks = msg.content.blocks.map((block) => {
-        if (block.type === 'tool_use' && block.info.id === toolUseId) {
-          return {
-            ...block,
-            info: {
-              ...block.info,
-              result,
-              status: isError ? ('error' as const) : ('success' as const),
-              error: isError ? result : undefined,
-              endTime: new Date().toISOString(),
-            },
-          };
-        }
-        return block;
-      });
-
-      return {
-        ...msg,
-        content: {
-          ...msg.content,
-          blocks,
-        },
-        metadata: {
-          ...msg.metadata,
-          updatedAt: new Date().toISOString(),
-        },
-      };
-    }
-    return msg;
-  });
 }

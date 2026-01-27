@@ -103,7 +103,8 @@ export interface AssistantMessageContent {
 export type AssistantMessageBlock =
   | { type: 'thinking'; content: string; isRedacted?: boolean }
   | { type: 'text'; content: string }
-  | { type: 'tool_use'; info: ToolExecution };
+  | { type: 'tool_use'; info: ToolExecution }
+  | { type: 'tool_use_group'; executions: ToolExecution[] };
 
 // ツール実行グループ（複数のツール実行を1ブロックに集約）
 export interface ToolExecutionGroupContent {
