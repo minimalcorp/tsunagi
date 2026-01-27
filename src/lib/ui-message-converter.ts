@@ -32,6 +32,13 @@ interface SDKToolUseBlock extends SDKContentBlock {
   input: Record<string, unknown>;
 }
 
+interface SDKPromptMessage extends SDKMessageBase {
+  type: 'prompt';
+  message: {
+    content: string;
+  };
+}
+
 interface SDKUserMessage extends SDKMessageBase {
   type: 'user';
   message: {
@@ -70,7 +77,12 @@ interface SDKResultMessage extends SDKMessageBase {
   };
 }
 
-type SDKMessage = SDKUserMessage | SDKAssistantMessage | SDKSystemMessage | SDKResultMessage;
+type SDKMessage =
+  | SDKPromptMessage
+  | SDKUserMessage
+  | SDKAssistantMessage
+  | SDKSystemMessage
+  | SDKResultMessage;
 
 /**
  * Claude SDKのraw messagesをUI表示用のUIMessagesに変換するクラス
@@ -89,6 +101,12 @@ export class UIMessageConverter {
       if (!msg || !msg.type) continue;
 
       switch (msg.type) {
+        case 'prompt': {
+          const promptMsg = msg as SDKPromptMessage;
+          uiMessages.push(this.convertPromptMessage(promptMsg));
+          break;
+        }
+
         case 'user': {
           const userMsg = msg as SDKUserMessage;
           // Skip tool_result messages (they will be processed separately)
@@ -205,6 +223,25 @@ export class UIMessageConverter {
         }
       }
     }
+  }
+
+  private convertPromptMessage(msg: SDKPromptMessage): UIMessage {
+    // PromptメッセージはuserPromptsから生成され、contentは常に文字列
+    const text = msg.message.content;
+
+    return {
+      id: uuidv4(),
+      timestamp: msg.created_at || new Date().toISOString(),
+      type: 'user_message',
+      content: {
+        type: 'user_message',
+        text,
+      },
+      metadata: {
+        sdkMessageUuids: msg.uuid ? [msg.uuid] : [],
+        role: 'user',
+      },
+    };
   }
 
   private convertUserMessage(msg: SDKUserMessage): UIMessage {

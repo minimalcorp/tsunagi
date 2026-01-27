@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import type { SessionData } from './types';
+import type { SessionData, MergedMessage, SimplifiedUserMessage } from './types';
 
 const SESSIONS_FILE = path.join(os.homedir(), '.tsunagi', 'state', 'sessions.json');
 
@@ -165,13 +165,16 @@ export async function appendUserPrompt(
  * タブのマージ済みメッセージを取得
  * userPromptsとrawMessagesをマージし、タイムスタンプでソート
  */
-export async function getMergedMessages(tab_id: string): Promise<unknown[]> {
+export async function getMergedMessages(tab_id: string): Promise<MergedMessage[]> {
   const sessionData = await getSessionData(tab_id);
   if (!sessionData) return [];
 
-  // UserPromptをSDK user message形式に変換
-  const userMessages = sessionData.userPrompts.map((up, index) => ({
-    type: 'user',
+  // UserPromptをpromptメッセージ形式に変換
+  const userMessages: (SimplifiedUserMessage & {
+    _sourceIndex: number;
+    _source: 'userPrompt';
+  })[] = sessionData.userPrompts.map((up, index) => ({
+    type: 'prompt' as const,
     created_at: up.created_at,
     message: { content: up.prompt },
     _sourceIndex: index,

@@ -43,6 +43,22 @@ export interface SessionData {
 }
 
 // ============================================
+// Merged Message型（getMergedMessagesの返り値）
+// ============================================
+
+// UserPromptから変換されたメッセージ
+export interface SimplifiedUserMessage {
+  type: 'prompt';
+  created_at: string;
+  message: { content: string };
+}
+
+// getMergedMessagesが返すメッセージ型
+// - SimplifiedUserMessage: userPromptsから変換されたメッセージ
+// - unknown: rawMessagesからのSDKメッセージ（SDKMessage型だが、型定義をimportせずにunknownとする）
+export type MergedMessage = SimplifiedUserMessage | Record<string, unknown>;
+
+// ============================================
 // UIMessage型（新しいデータモデル）
 // ============================================
 
