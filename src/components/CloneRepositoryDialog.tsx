@@ -74,7 +74,7 @@ export function CloneRepositoryDialog({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-transform cursor-pointer"
+              className="px-4 py-2 border border-theme rounded text-theme-fg hover:bg-theme-card active:scale-95 cursor-pointer"
               disabled={isLoading}
             >
               Cancel
