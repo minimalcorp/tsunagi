@@ -36,8 +36,35 @@ export async function POST(request: NextRequest) {
     // Validation
     if (!title || !owner || !repo || !branch) {
       return NextResponse.json(
-        { error: 'Missing required fields: title, owner, repo, branch' },
+        {
+          errors: [
+            {
+              field: 'global',
+              message: 'Missing required fields: title, owner, repo, branch',
+            },
+          ],
+        },
         { status: 400 }
+      );
+    }
+
+    // ブランチ名重複チェック
+    const existingTasks = await taskRepo.getTasks({ includeDeleted: false });
+    const duplicateTask = existingTasks.find(
+      (task) => task.owner === owner && task.repo === repo && task.branch === branch
+    );
+
+    if (duplicateTask) {
+      return NextResponse.json(
+        {
+          errors: [
+            {
+              field: 'branch',
+              message: `Branch "${branch}" already exists. Task "${duplicateTask.title}" (ID: ${duplicateTask.id}) is already using this branch.`,
+            },
+          ],
+        },
+        { status: 409 }
       );
     }
 

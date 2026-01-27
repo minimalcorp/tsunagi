@@ -178,20 +178,20 @@ export default function Home() {
     branch: string;
     baseBranch: string;
   }) => {
-    try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+    const response = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
 
-      if (!response.ok) throw new Error('Failed to create task');
-
-      // SSE経由でtask:createdイベントが配信されるため、ここではstateを更新しない
-    } catch (error) {
-      console.error('Failed to add task:', error);
-      throw error;
+    if (!response.ok) {
+      const data = await response.json();
+      // APIエラーレスポンス（正常なレスポンス）
+      return { success: false, errors: data.errors };
     }
+
+    // SSE経由でtask:createdイベントが配信されるため、ここではstateを更新しない
+    return { success: true };
   };
 
   const handleCloneRepository = async (cloneData: { gitUrl: string; authToken?: string }) => {

@@ -4,6 +4,11 @@ import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import type { Repository } from '@/lib/types';
 import { LoadingSpinner } from './LoadingSpinner';
 
+interface FieldError {
+  field: string;
+  message: string;
+}
+
 interface AddTaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,7 +19,7 @@ interface AddTaskDialogProps {
     repo: string;
     branch: string;
     baseBranch: string;
-  }) => Promise<void>;
+  }) => Promise<{ success: boolean; errors?: FieldError[] }>;
   repositories: Repository[];
 }
 
@@ -33,6 +38,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
   const [defaultBranch, setDefaultBranch] = useState('');
   const [isFetchingBranches, setIsFetchingBranches] = useState(false);
   const [branchError, setBranchError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const repoOptions = useMemo(() => {
     return repositories.map((repo) => ({
@@ -98,22 +104,37 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setFieldErrors({});
 
     try {
-      await onAdd(formData);
-      onClose();
-      // Reset form
-      setCombinedRepo('');
-      setFormData({
-        title: '',
-        description: '',
-        owner: '',
-        repo: '',
-        branch: '',
-        baseBranch: '',
-      });
+      const result = await onAdd(formData);
+
+      if (result.success) {
+        onClose();
+        // Reset form
+        setCombinedRepo('');
+        setFormData({
+          title: '',
+          description: '',
+          owner: '',
+          repo: '',
+          branch: '',
+          baseBranch: '',
+        });
+      } else if (result.errors) {
+        // APIからのエラーレスポンス（正常なレスポンス）
+        const errorsMap: Record<string, string> = {};
+        result.errors.forEach((err) => {
+          errorsMap[err.field] = err.message;
+        });
+        setFieldErrors(errorsMap);
+      }
     } catch (error) {
+      // 本当のエラー（ネットワークエラーなど）
       console.error('Failed to create task:', error);
+      setFieldErrors({
+        global: error instanceof Error ? error.message : 'Failed to create task. Please try again.',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -137,6 +158,12 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
         )}
 
         <h2 className="text-xl font-bold mb-4 text-theme-fg">Add New Task</h2>
+
+        {fieldErrors.global && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded text-red-500 text-sm">
+            {fieldErrors.global}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -223,13 +250,20 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
               maxLength={255}
               value={formData.branch}
               onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+              className={`w-full px-3 py-2 border rounded text-theme-fg bg-theme-card ${
+                fieldErrors.branch ? 'border-red-500' : 'border-theme'
+              }`}
               placeholder="feature/new-feature"
               disabled={isLoading}
             />
-            <p className="text-xs text-theme-muted mt-1">
-              Will be created from {formData.baseBranch || 'base branch'}
-            </p>
+            {fieldErrors.branch && (
+              <p className="text-xs text-red-500 mt-1">{fieldErrors.branch}</p>
+            )}
+            {!fieldErrors.branch && (
+              <p className="text-xs text-theme-muted mt-1">
+                Will be created from {formData.baseBranch || 'base branch'}
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end gap-2">
