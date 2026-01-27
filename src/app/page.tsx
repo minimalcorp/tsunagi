@@ -6,7 +6,7 @@ import type { Task, Repository } from '@/lib/types';
 import { Header } from '@/components/Header';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
-import { AddTaskDialog } from '@/components/AddTaskDialog';
+import { TaskDialog } from '@/components/TaskDialog';
 import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
 import { useSSE } from '@/hooks/useSSE';
 
@@ -267,7 +267,8 @@ export default function Home() {
         isOnboarding={onboardingState.nextStep === 'clone'}
       />
 
-      <AddTaskDialog
+      <TaskDialog
+        mode="create"
         isOpen={isAddTaskDialogOpen}
         onClose={() => setIsAddTaskDialogOpen(false)}
         onAdd={handleAddTask}
