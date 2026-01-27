@@ -1,13 +1,13 @@
 'use client';
 
-import { use, useState, useEffect, useRef } from 'react';
+import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import type { Task, Tab, MergedMessage } from '@/lib/types';
 import { TaskInfo } from '@/components/TaskInfo';
 import { SessionTabs } from '@/components/SessionTabs';
 import { ViewLayoutToggle, type ViewMode } from '@/components/ViewLayoutToggle';
-import { ClaudePromptEditor, type ClaudePromptEditorRef } from '@/components/ClaudePromptEditor';
+import { ClaudePromptEditor, type ClaudePromptEditorHandle } from '@/components/ClaudePromptEditor';
 import { ExecutionLogsChat } from '@/components/ExecutionLogsChat';
 import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -27,18 +27,40 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
   const [tabMessages, setTabMessages] = useState<Record<string, MergedMessage[]>>({});
   const [viewMode, setViewMode] = useState<ViewMode>('split');
-  const [initialPrompts, setInitialPrompts] = useState<Record<string, string>>({});
-  const [pendingPrompts, setPendingPrompts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isEditingTask, setIsEditingTask] = useState(false);
 
-  // エディタのrefを保持
-  const editorRef = useRef<ClaudePromptEditorRef>(null);
+  // Prompts管理をstateからrefに変更（再レンダリングを防止）
+  const promptsRef = useRef<Record<string, string>>({});
+  const editorRef = useRef<ClaudePromptEditorHandle | null>(null);
 
   const activeTab = tabs.find((t) => t.tab_id === activeTabId);
 
   // SSE統合
   const { eventSource, isConnected } = useSSE();
+
+  // タブ切り替え時の処理（現在のプロンプトを保存）
+  const handleTabChange = useCallback(
+    (newTabId: string) => {
+      // 現在のタブのプロンプトを保存
+      if (activeTabId && editorRef.current) {
+        const currentPrompt = editorRef.current.getCurrentPrompt();
+        promptsRef.current[activeTabId] = currentPrompt;
+      }
+
+      // タブIDを切り替え
+      setActiveTabId(newTabId);
+    },
+    [activeTabId]
+  );
+
+  // タブ切り替え後にエディタの値を復元
+  useEffect(() => {
+    if (activeTabId && editorRef.current) {
+      const savedPrompt = promptsRef.current[activeTabId] || '';
+      editorRef.current.setPrompt(savedPrompt);
+    }
+  }, [activeTabId]);
 
   // データロード
   useEffect(() => {
@@ -130,6 +152,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
           return newMessages;
         });
 
+        // promptsRefからも削除
+        delete promptsRef.current[tab_id];
+
         // アクティブタブが削除された場合、次のタブを選択
         if (activeTabId === tab_id) {
           const remaining = tabs.filter((t) => t.tab_id !== tab_id);
@@ -158,56 +183,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         tab_id: string;
         messages: MergedMessage[];
       };
-
-      // pendingPromptがある場合のみチェック
-      const pendingPrompt = pendingPrompts[tab_id];
-
-      if (pendingPrompt && tab_id === activeTabId) {
-        const prevMessages = tabMessages[tab_id] || [];
-
-        // 新しいメッセージの中に、送信したプロンプトと一致するものがあるか確認
-        if (messages.length > prevMessages.length) {
-          const matchFound = messages.some((msg) => {
-            // type: 'prompt'メッセージのみチェック（userPromptsから生成されたメッセージ）
-            if (!('type' in msg) || msg.type !== 'prompt') {
-              return false;
-            }
-
-            // messageフィールドとcontentフィールドの存在確認
-            if (!('message' in msg) || typeof msg.message !== 'object' || msg.message === null) {
-              return false;
-            }
-
-            const message = msg.message as Record<string, unknown>;
-            if (!('content' in message)) {
-              return false;
-            }
-
-            const content = message.content;
-
-            // type: 'prompt'メッセージのcontentは常に文字列
-            if (typeof content !== 'string') {
-              return false;
-            }
-
-            return content === pendingPrompt;
-          });
-
-          if (matchFound) {
-            // エディタを直接クリア（アクティブタブの場合のみ）
-            if (tab_id === activeTabId) {
-              editorRef.current?.clearEditor();
-            }
-
-            // pendingPromptを削除
-            setPendingPrompts((prev) => {
-              const next = { ...prev };
-              delete next[tab_id];
-              return next;
-            });
-          }
-        }
-      }
 
       // Backend側でマージ・ソート済みなのでそのまま使用
       setTabMessages((prev) => ({ ...prev, [tab_id]: messages }));
@@ -336,6 +311,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       if (!response.ok) throw new Error('Failed to delete tab');
 
+      // promptsRefからも削除
+      delete promptsRef.current[tab_id];
+
       // SSE経由でtab:deletedイベントが配信されるため、tabsは更新しない
       // アクティブタブが削除された場合、次のタブを選択
       if (activeTabId === tab_id) {
@@ -348,57 +326,51 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   };
 
   // Claude実行
-  const handleExecute = async (tab_id: string, prompt: string) => {
-    try {
-      // 送信前にプロンプトを記録
-      setPendingPrompts((prev) => ({ ...prev, [tab_id]: prompt }));
-
-      const response = await fetch(`/api/tabs/${tab_id}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt }),
-      });
-
-      if (!response.ok) {
-        // 失敗時は記録を削除
-        setPendingPrompts((prev) => {
-          const next = { ...prev };
-          delete next[tab_id];
-          return next;
+  const handleExecute = useCallback(
+    async (tab_id: string, prompt: string) => {
+      try {
+        const response = await fetch(`/api/tabs/${tab_id}/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: prompt }),
         });
-        throw new Error('Failed to execute');
-      }
 
-      // SSE経由でtab:updatedイベントが配信されるため、tabは更新しない
-      // プロンプトのクリアはSSEイベント受信時に実施（handleTabMessagesUpdated）
-    } catch (error) {
-      console.error('Failed to execute:', error);
-      throw error;
-    }
-  };
+        if (!response.ok) throw new Error('Failed to execute');
+
+        // SSE経由でtab:updatedイベントが配信されるため、tabは更新しない
+        // 実行成功後にエディタとRefの両方をクリア
+        if (editorRef.current) {
+          editorRef.current.clearPrompt();
+        }
+        promptsRef.current[tab_id] = '';
+      } catch (error) {
+        console.error('Failed to execute:', error);
+        throw error;
+      }
+    },
+    []
+  );
 
   // Claude中断
-  const handleInterrupt = async (tab_id: string) => {
-    try {
-      const response = await fetch(`/api/tabs/${tab_id}/interrupt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
+  const handleInterrupt = useCallback(
+    async (tab_id: string) => {
+      try {
+        const response = await fetch(`/api/tabs/${tab_id}/interrupt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
 
-      if (!response.ok) throw new Error('Failed to interrupt');
+        if (!response.ok) throw new Error('Failed to interrupt');
 
-      // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
-    } catch (error) {
-      console.error('Failed to interrupt:', error);
-      throw error;
-    }
-  };
-
-  // プロンプト変更
-  const handlePromptChange = (tab_id: string, prompt: string) => {
-    setInitialPrompts((prev) => ({ ...prev, [tab_id]: prompt }));
-  };
+        // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
+      } catch (error) {
+        console.error('Failed to interrupt:', error);
+        throw error;
+      }
+    },
+    []
+  );
 
   // タスク削除
   const handleTaskDelete = async (taskId: string) => {
@@ -471,7 +443,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               <SessionTabs
                 tabs={tabs}
                 activeTabId={activeTabId}
-                onTabChange={setActiveTabId}
+                onTabChange={handleTabChange}
                 onTabCreate={handleTabCreate}
                 onTabDelete={handleTabDelete}
               />
@@ -507,10 +479,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                     <ClaudePromptEditor
                       ref={editorRef}
                       tab={activeTab}
-                      initialPrompt={initialPrompts[activeTab.tab_id] || ''}
                       onExecute={handleExecute}
                       onInterrupt={handleInterrupt}
-                      onPromptChange={(prompt) => handlePromptChange(activeTab.tab_id, prompt)}
                     />
                   )}
 
