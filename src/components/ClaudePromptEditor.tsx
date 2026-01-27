@@ -3,22 +3,22 @@
 import { Editor } from '@monaco-editor/react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { editor } from 'monaco-editor';
-import type { ClaudeSession } from '@/lib/types';
+import type { Tab } from '@/lib/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
 import { Send, Square } from 'lucide-react';
 
 interface ClaudePromptEditorProps {
-  session: ClaudeSession;
+  tab: Tab;
   prompt: string;
-  onExecute: (sessionId: string, prompt: string) => Promise<void>;
-  onInterrupt: (sessionId: string) => Promise<void>;
+  onExecute: (tabId: string, prompt: string) => Promise<void>;
+  onInterrupt: (tabId: string) => Promise<void>;
   onPromptChange: (prompt: string) => void;
 }
 
 export function ClaudePromptEditor({
-  session,
+  tab,
   prompt,
   onExecute,
   onInterrupt,
@@ -33,22 +33,22 @@ export function ClaudePromptEditor({
     if (!prompt.trim() || isExecuting) return;
     try {
       setIsExecuting(true);
-      await onExecute(session.id, prompt);
+      await onExecute(tab.tab_id, prompt);
       // 親コンポーネントがpromptsをクリアし、useEffectがエディタを更新
     } catch (error) {
       console.error('Failed to execute:', error);
     } finally {
       setIsExecuting(false);
     }
-  }, [isExecuting, onExecute, session.id]);
+  }, [isExecuting, onExecute, tab.tab_id]);
 
   const handleInterrupt = useCallback(async () => {
     try {
-      await onInterrupt(session.id);
+      await onInterrupt(tab.tab_id);
     } catch (error) {
       console.error('Failed to interrupt:', error);
     }
-  }, [onInterrupt, session.id]);
+  }, [onInterrupt, tab.tab_id]);
 
   // 常に最新のハンドラーを参照するためのref
   const handleExecuteRef = useRef(handleExecute);
@@ -62,7 +62,7 @@ export function ClaudePromptEditor({
     handleInterruptRef.current = handleInterrupt;
   }, [handleInterrupt]);
 
-  // セッション切り替え時にエディタの内容を更新
+  // タブ切り替え時にエディタの内容を更新
   useEffect(() => {
     if (editorRef.current) {
       const currentValue = editorRef.current.getValue();
@@ -71,9 +71,9 @@ export function ClaudePromptEditor({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.id]);
+  }, [tab.tab_id]);
 
-  const status = getClaudeStatus(session);
+  const status = getClaudeStatus(tab);
   const isRunning = status === 'running';
   const canExecute = !isExecuting && !isRunning;
 

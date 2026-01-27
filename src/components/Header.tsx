@@ -198,7 +198,7 @@ export function Header({
             <Settings className="w-5 h-5" />
           </button>
           {nextStep === 'env' && (
-            <div className="absolute top-full mt-2 right-[-1px] bg-tooltip backdrop-blur-sm border-2 border-amber-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
+            <div className="absolute top-full mt-2 right-[-2px] bg-tooltip backdrop-blur-sm border-2 border-amber-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
               Set up tokens
               <div className="absolute -top-1 right-[21px] w-2 h-2 bg-tooltip backdrop-blur-sm border-l-2 border-t-2 border-amber-500 rotate-45" />
             </div>

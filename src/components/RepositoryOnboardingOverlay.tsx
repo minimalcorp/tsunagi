@@ -36,7 +36,7 @@ export function RepositoryOnboardingOverlay({
               {hasEnvVars ? <Check className="w-3 h-3" /> : '1'}
             </span>
             <span className={hasEnvVars ? 'text-green-700' : 'font-medium text-gray-700'}>
-              認証設定
+              認証設定（Global）
             </span>
           </div>
 

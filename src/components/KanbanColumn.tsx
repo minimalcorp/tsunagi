@@ -2,14 +2,13 @@
 
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus } from 'lucide-react';
-import type { Task, ClaudeSession } from '@/lib/types';
+import type { Task } from '@/lib/types';
 import { TaskCard } from './TaskCard';
 
 interface KanbanColumnProps {
   title: string;
   status: 'backlog' | 'planning' | 'coding' | 'reviewing' | 'done';
   tasks: Task[];
-  sessions?: Record<string, ClaudeSession[]>; // taskId -> sessions array
   onTaskClick?: (taskId: string) => void;
   onAddTaskClick?: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
@@ -21,7 +20,6 @@ export function KanbanColumn({
   title,
   status,
   tasks,
-  sessions,
   onTaskClick,
   onAddTaskClick,
   nextStep,
@@ -76,7 +74,6 @@ export function KanbanColumn({
                   >
                     <TaskCard
                       task={task}
-                      sessions={sessions?.[task.id] || []}
                       isDragging={snapshot.isDragging}
                       onTaskClick={onTaskClick}
                     />

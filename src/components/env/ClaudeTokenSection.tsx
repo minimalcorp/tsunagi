@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Pencil, Plus, X, Check } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Plus, X, Check, AlertCircle } from 'lucide-react';
 import { LoadingSpinner } from '../LoadingSpinner';
 import type { SelectedNode } from './EnvTreeNavigation';
 
@@ -26,9 +26,15 @@ function detectTokenKey(value: string): string | null {
 
 interface ClaudeTokenSectionProps {
   selectedNode: SelectedNode;
+  onboardingStatus?: { completed: boolean; hasGlobalToken: boolean };
+  onSwitchToGlobal?: () => void;
 }
 
-export function ClaudeTokenSection({ selectedNode }: ClaudeTokenSectionProps) {
+export function ClaudeTokenSection({
+  selectedNode,
+  onboardingStatus,
+  onSwitchToGlobal,
+}: ClaudeTokenSectionProps) {
   const [tokens, setTokens] = useState<TokenItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -256,6 +262,9 @@ export function ClaudeTokenSection({ selectedNode }: ClaudeTokenSectionProps) {
     );
   }
 
+  const showWarning =
+    onboardingStatus && !onboardingStatus.completed && selectedNode.scope !== 'global';
+
   return (
     <div className="border-2 border-primary rounded-lg p-4 bg-theme-card">
       <div className="flex items-center justify-between mb-4">
@@ -270,6 +279,26 @@ export function ClaudeTokenSection({ selectedNode }: ClaudeTokenSectionProps) {
           </button>
         )}
       </div>
+
+      {/* Warning Banner */}
+      {showWarning && (
+        <div className="mb-4 border-2 border-amber-500 bg-amber-50/50 rounded-lg p-3 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm text-amber-900">
+              オンボーディングを完了するには、Globalスコープにトークンを追加してください
+            </p>
+          </div>
+          {onSwitchToGlobal && (
+            <button
+              onClick={onSwitchToGlobal}
+              className="px-3 py-1.5 bg-amber-600 text-white rounded hover:brightness-110 active:scale-95 transition-transform cursor-pointer text-sm whitespace-nowrap"
+            >
+              Switch to Global
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3">
         {/* Add Token Form */}

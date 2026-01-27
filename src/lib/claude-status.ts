@@ -1,23 +1,25 @@
-import type { ClaudeSession, ClaudeSessionStatus } from './types';
+import type { Tab } from './types';
+
+export type TabStatus = 'idle' | 'running' | 'success' | 'error';
 
 /**
- * Get the current Claude session status
- * Returns the status directly from the session object
+ * Get the current Claude tab status
+ * Returns the status directly from the tab object
  */
-export function getClaudeStatus(session: ClaudeSession): ClaudeSessionStatus {
-  return session.status;
+export function getClaudeStatus(tab: Tab): TabStatus {
+  return tab.status;
 }
 
 /**
- * Check if a session is in a terminal state (success or error)
+ * Check if a tab is in a terminal state (success or error)
  */
-export function isTerminalState(status: ClaudeSessionStatus): boolean {
+export function isTerminalState(status: TabStatus): boolean {
   return status === 'success' || status === 'error';
 }
 
 /**
- * Check if a session can accept new messages
+ * Check if a tab can accept new messages
  */
-export function canSendMessage(session: ClaudeSession): boolean {
-  return session.status !== 'running';
+export function canSendMessage(tab: Tab): boolean {
+  return tab.status !== 'running';
 }

@@ -3,7 +3,7 @@
 import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import type { Task, ClaudeSession } from '@/lib/types';
+import type { Task, Tab } from '@/lib/types';
 import { TaskInfo } from '@/components/TaskInfo';
 import { SessionTabs } from '@/components/SessionTabs';
 import { ViewLayoutToggle, type ViewMode } from '@/components/ViewLayoutToggle';
@@ -23,14 +23,15 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const { id } = use(params);
   const router = useRouter();
   const [task, setTask] = useState<Task | null>(null);
-  const [sessions, setSessions] = useState<ClaudeSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | undefined>();
+  const [tabMessages, setTabMessages] = useState<Record<string, unknown[]>>({});
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [prompts, setPrompts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isEditingTask, setIsEditingTask] = useState(false);
 
-  const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const activeTab = tabs.find((t) => t.tab_id === activeTabId);
 
   // SSE統合
   const { eventSource, isConnected } = useSSE();
@@ -44,32 +45,51 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         const taskResponse = await fetch(`/api/tasks/${id}`);
         if (!taskResponse.ok) throw new Error('Failed to fetch task');
         const taskData = await taskResponse.json();
-        setTask(taskData.data.task);
+        const loadedTask = taskData.data.task;
+        setTask(loadedTask);
 
-        // セッション取得
-        const sessionsResponse = await fetch(`/api/tasks/${id}/sessions`);
-        if (!sessionsResponse.ok) throw new Error('Failed to fetch sessions');
-        const sessionsData = await sessionsResponse.json();
-        let loadedSessions = sessionsData.data.sessions || [];
+        // タスクからタブを取得
+        let loadedTabs = loadedTask.tabs || [];
 
-        // セッションが0個の場合、自動的に1個作成
-        if (loadedSessions.length === 0) {
-          const createResponse = await fetch(`/api/tasks/${id}/sessions`, {
+        // タブが0個の場合、自動的に1個作成
+        if (loadedTabs.length === 0) {
+          const createResponse = await fetch(`/api/tasks/${id}/tabs`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
           });
           if (createResponse.ok) {
             const createData = await createResponse.json();
-            loadedSessions = [createData.data.session];
+            loadedTabs = [createData.data.tab];
           }
         }
 
-        setSessions(loadedSessions);
+        setTabs(loadedTabs);
 
-        // アクティブセッション設定
-        if (loadedSessions.length > 0) {
-          setActiveSessionId(loadedSessions[0].id);
+        // 各タブのメッセージを取得
+        const messagesPromises = loadedTabs.map(async (tab: Tab) => {
+          try {
+            const response = await fetch(`/api/tabs/${tab.tab_id}/messages`);
+            if (response.ok) {
+              const data = await response.json();
+              return { tab_id: tab.tab_id, messages: data.data.rawMessages };
+            }
+          } catch (error) {
+            console.error(`Failed to load messages for tab ${tab.tab_id}:`, error);
+          }
+          return { tab_id: tab.tab_id, messages: [] };
+        });
+
+        const messagesResults = await Promise.all(messagesPromises);
+        const messagesMap: Record<string, unknown[]> = {};
+        messagesResults.forEach((result) => {
+          messagesMap[result.tab_id] = result.messages;
+        });
+        setTabMessages(messagesMap);
+
+        // アクティブタブ設定
+        if (loadedTabs.length > 0) {
+          setActiveTabId(loadedTabs[0].tab_id);
         }
       } catch (error) {
         console.error('Failed to load data:', error);
@@ -85,36 +105,55 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   useEffect(() => {
     if (!eventSource) return;
 
-    // session:updated イベント
-    const handleSessionUpdated = (event: MessageEvent) => {
-      const session = JSON.parse(event.data) as ClaudeSession;
-      // このタスクのセッションのみ更新
-      setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)));
-    };
-
-    // session:deleted イベント
-    const handleSessionDeleted = (event: MessageEvent) => {
-      const { id: sessionId } = JSON.parse(event.data) as { id: string };
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-
-      // アクティブセッションが削除された場合、次のセッションを選択
-      if (activeSessionId === sessionId) {
-        const remaining = sessions.filter((s) => s.id !== sessionId);
-        setActiveSessionId(remaining[0]?.id);
+    // tab:updated イベント
+    const handleTabUpdated = (event: MessageEvent) => {
+      const { taskId, tab } = JSON.parse(event.data) as { taskId: string; tab: Tab };
+      // このタスクのタブのみ更新
+      if (taskId === id) {
+        setTabs((prev) => prev.map((t) => (t.tab_id === tab.tab_id ? tab : t)));
       }
     };
 
-    // session:created イベント
-    const handleSessionCreated = (event: MessageEvent) => {
-      const session = JSON.parse(event.data) as ClaudeSession;
-      // このタスクのセッションのみ追加
-      if (session.taskId === id) {
-        setSessions((prev) => {
-          // 重複チェック
-          if (prev.some((s) => s.id === session.id)) return prev;
-          return [...prev, session];
+    // tab:deleted イベント
+    const handleTabDeleted = (event: MessageEvent) => {
+      const { taskId, tab_id } = JSON.parse(event.data) as { taskId: string; tab_id: string };
+      if (taskId === id) {
+        setTabs((prev) => prev.filter((t) => t.tab_id !== tab_id));
+        setTabMessages((prev) => {
+          const newMessages = { ...prev };
+          delete newMessages[tab_id];
+          return newMessages;
         });
+
+        // アクティブタブが削除された場合、次のタブを選択
+        if (activeTabId === tab_id) {
+          const remaining = tabs.filter((t) => t.tab_id !== tab_id);
+          setActiveTabId(remaining[0]?.tab_id);
+        }
       }
+    };
+
+    // tab:created イベント
+    const handleTabCreated = (event: MessageEvent) => {
+      const { taskId, tab } = JSON.parse(event.data) as { taskId: string; tab: Tab };
+      // このタスクのタブのみ追加
+      if (taskId === id) {
+        setTabs((prev) => {
+          // 重複チェック
+          if (prev.some((t) => t.tab_id === tab.tab_id)) return prev;
+          return [...prev, tab];
+        });
+        setTabMessages((prev) => ({ ...prev, [tab.tab_id]: [] }));
+      }
+    };
+
+    // tab:messages:updated イベント
+    const handleTabMessagesUpdated = (event: MessageEvent) => {
+      const { tab_id, rawMessages } = JSON.parse(event.data) as {
+        tab_id: string;
+        rawMessages: unknown[];
+      };
+      setTabMessages((prev) => ({ ...prev, [tab_id]: rawMessages }));
     };
 
     // task:updated イベント
@@ -123,63 +162,72 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       // このタスクのみ更新
       if (updatedTask.id === id) {
         setTask(updatedTask);
+        // タスクにタブ情報が含まれている場合、タブも更新
+        if (updatedTask.tabs) {
+          setTabs(updatedTask.tabs);
+        }
       }
     };
 
-    eventSource.addEventListener('session:updated', handleSessionUpdated);
-    eventSource.addEventListener('session:deleted', handleSessionDeleted);
-    eventSource.addEventListener('session:created', handleSessionCreated);
+    eventSource.addEventListener('tab:updated', handleTabUpdated);
+    eventSource.addEventListener('tab:deleted', handleTabDeleted);
+    eventSource.addEventListener('tab:created', handleTabCreated);
+    eventSource.addEventListener('tab:messages:updated', handleTabMessagesUpdated);
     eventSource.addEventListener('task:updated', handleTaskUpdated);
 
     return () => {
-      eventSource.removeEventListener('session:updated', handleSessionUpdated);
-      eventSource.removeEventListener('session:deleted', handleSessionDeleted);
-      eventSource.removeEventListener('session:created', handleSessionCreated);
+      eventSource.removeEventListener('tab:updated', handleTabUpdated);
+      eventSource.removeEventListener('tab:deleted', handleTabDeleted);
+      eventSource.removeEventListener('tab:created', handleTabCreated);
+      eventSource.removeEventListener('tab:messages:updated', handleTabMessagesUpdated);
       eventSource.removeEventListener('task:updated', handleTaskUpdated);
     };
-  }, [eventSource, id, activeSessionId, sessions]);
+  }, [eventSource, id, activeTabId, tabs]);
 
-  // セッションのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
+  // タブのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
   useEffect(() => {
     // SSE接続済みの場合はポーリング不要
     if (isConnected) return;
-    if (!activeSessionId) return;
+    if (!activeTabId || !task) return;
 
-    const pollSession = async () => {
+    const pollTab = async () => {
       try {
-        const response = await fetch(`/api/sessions/${activeSessionId}`);
-        if (!response.ok) return;
-
-        const data = await response.json();
-        const updatedSession = data.data;
-
-        // セッション情報を更新
-        setSessions((prev) => prev.map((s) => (s.id === activeSessionId ? updatedSession : s)));
-
-        // タスクの状態も更新
-        if (task) {
-          const taskResponse = await fetch(`/api/tasks/${task.id}`);
-          if (taskResponse.ok) {
-            const taskData = await taskResponse.json();
-            setTask(taskData.data.task);
+        // タスクを再取得してタブ情報を更新
+        const taskResponse = await fetch(`/api/tasks/${task.id}`);
+        if (taskResponse.ok) {
+          const taskData = await taskResponse.json();
+          const updatedTask = taskData.data.task;
+          setTask(updatedTask);
+          if (updatedTask.tabs) {
+            setTabs(updatedTask.tabs);
           }
         }
+
+        // メッセージも更新
+        const messagesResponse = await fetch(`/api/tabs/${activeTabId}/messages`);
+        if (messagesResponse.ok) {
+          const messagesData = await messagesResponse.json();
+          setTabMessages((prev) => ({
+            ...prev,
+            [activeTabId]: messagesData.data.rawMessages,
+          }));
+        }
       } catch (error) {
-        console.error('Failed to poll session:', error);
+        console.error('Failed to poll tab:', error);
       }
     };
 
-    // セッションがrunning状態の場合のみポーリング
-    const isRunning = activeSession?.status === 'running';
+    // タブがrunning状態の場合のみポーリング
+    const isRunning = activeTab?.status === 'running';
     if (!isRunning) return;
 
     // 1秒ごとにポーリング
-    const intervalId = setInterval(pollSession, 1000);
+    const intervalId = setInterval(pollTab, 1000);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [isConnected, activeSessionId, activeSession?.status, task]);
+  }, [isConnected, activeTabId, activeTab?.status, task]);
 
   // タスク更新
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
@@ -199,52 +247,52 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     }
   };
 
-  // セッション作成
-  const handleSessionCreate = async () => {
+  // タブ作成
+  const handleTabCreate = async () => {
     try {
-      const response = await fetch(`/api/tasks/${id}/sessions`, {
+      const response = await fetch(`/api/tasks/${id}/tabs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
 
-      if (!response.ok) throw new Error('Failed to create session');
+      if (!response.ok) throw new Error('Failed to create tab');
 
       const data = await response.json();
-      const newSession = data.data.session;
+      const newTab = data.data.tab;
 
-      // SSE経由でsession:createdイベントが配信されるため、sessionsは更新しない
-      // ただし、アクティブセッションIDは即座に設定
-      setActiveSessionId(newSession.id);
+      // SSE経由でtab:createdイベントが配信されるため、tabsは更新しない
+      // ただし、アクティブタブIDは即座に設定
+      setActiveTabId(newTab.tab_id);
     } catch (error) {
-      console.error('Failed to create session:', error);
+      console.error('Failed to create tab:', error);
     }
   };
 
-  // セッション削除
-  const handleSessionDelete = async (sessionId: string) => {
+  // タブ削除
+  const handleTabDelete = async (tab_id: string) => {
     try {
-      const response = await fetch(`/api/sessions/${sessionId}`, {
+      const response = await fetch(`/api/tasks/${id}/tabs/${tab_id}`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) throw new Error('Failed to delete session');
+      if (!response.ok) throw new Error('Failed to delete tab');
 
-      // SSE経由でsession:deletedイベントが配信されるため、sessionsは更新しない
-      // アクティブセッションが削除された場合、次のセッションを選択
-      if (activeSessionId === sessionId) {
-        const remaining = sessions.filter((s) => s.id !== sessionId);
-        setActiveSessionId(remaining[0]?.id);
+      // SSE経由でtab:deletedイベントが配信されるため、tabsは更新しない
+      // アクティブタブが削除された場合、次のタブを選択
+      if (activeTabId === tab_id) {
+        const remaining = tabs.filter((t) => t.tab_id !== tab_id);
+        setActiveTabId(remaining[0]?.tab_id);
       }
     } catch (error) {
-      console.error('Failed to delete session:', error);
+      console.error('Failed to delete tab:', error);
     }
   };
 
   // Claude実行
-  const handleExecute = async (sessionId: string, prompt: string) => {
+  const handleExecute = async (tab_id: string, prompt: string) => {
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/message`, {
+      const response = await fetch(`/api/tabs/${tab_id}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: prompt }),
@@ -252,9 +300,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       if (!response.ok) throw new Error('Failed to execute');
 
-      // SSE経由でsession:updatedイベントが配信されるため、sessionは更新しない
+      // SSE経由でtab:updatedイベントが配信されるため、tabは更新しない
       // 実行成功後にプロンプトをクリア
-      setPrompts((prev) => ({ ...prev, [sessionId]: '' }));
+      setPrompts((prev) => ({ ...prev, [tab_id]: '' }));
     } catch (error) {
       console.error('Failed to execute:', error);
       throw error;
@@ -262,9 +310,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   };
 
   // Claude中断
-  const handleInterrupt = async (sessionId: string) => {
+  const handleInterrupt = async (tab_id: string) => {
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/interrupt`, {
+      const response = await fetch(`/api/tabs/${tab_id}/interrupt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -280,8 +328,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   };
 
   // プロンプト変更
-  const handlePromptChange = (sessionId: string, prompt: string) => {
-    setPrompts((prev) => ({ ...prev, [sessionId]: prompt }));
+  const handlePromptChange = (tab_id: string, prompt: string) => {
+    setPrompts((prev) => ({ ...prev, [tab_id]: prompt }));
   };
 
   // タスク削除
@@ -348,31 +396,31 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
           />
         </div>
 
-        {/* Session Tabs & Content */}
+        {/* Tab Navigation & Content */}
         <div className="bg-theme-card flex flex-col flex-1 min-h-0">
           <div className="px-4 pt-4">
-            {sessions.length > 0 ? (
+            {tabs.length > 0 ? (
               <SessionTabs
-                sessions={sessions}
-                activeSessionId={activeSessionId}
-                onSessionChange={setActiveSessionId}
-                onSessionCreate={handleSessionCreate}
-                onSessionDelete={handleSessionDelete}
+                tabs={tabs}
+                activeTabId={activeTabId}
+                onTabChange={setActiveTabId}
+                onTabCreate={handleTabCreate}
+                onTabDelete={handleTabDelete}
               />
             ) : (
               <div className="text-center py-8">
-                <p className="text-theme-muted mb-4">No sessions yet</p>
+                <p className="text-theme-muted mb-4">No tabs yet</p>
                 <button
-                  onClick={handleSessionCreate}
+                  onClick={handleTabCreate}
                   className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 cursor-pointer"
                 >
-                  + Create First Session
+                  + Create First Tab
                 </button>
               </div>
             )}
           </div>
 
-          {activeSession && (
+          {activeTab && (
             <>
               {/* View Toggle */}
               <div className="px-4 pt-2">
@@ -389,18 +437,18 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                 >
                   {(viewMode === 'split' || viewMode === 'editor') && (
                     <ClaudePromptEditor
-                      session={activeSession}
-                      prompt={prompts[activeSession.id] || ''}
+                      tab={activeTab}
+                      prompt={prompts[activeTab.tab_id] || ''}
                       onExecute={handleExecute}
                       onInterrupt={handleInterrupt}
-                      onPromptChange={(prompt) => handlePromptChange(activeSession.id, prompt)}
+                      onPromptChange={(prompt) => handlePromptChange(activeTab.tab_id, prompt)}
                     />
                   )}
 
                   {(viewMode === 'split' || viewMode === 'logs') && (
                     <ExecutionLogsChat
-                      rawMessages={activeSession.rawMessages}
-                      sessionId={activeSession.id}
+                      rawMessages={tabMessages[activeTab.tab_id] || []}
+                      tabId={activeTab.tab_id}
                     />
                   )}
                 </div>

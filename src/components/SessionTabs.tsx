@@ -1,31 +1,31 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import type { ClaudeSession } from '@/lib/types';
+import type { Tab } from '@/lib/types';
 import { X, Plus } from 'lucide-react';
 import { ClaudeState } from '@/components/ClaudeState';
 
 interface SessionTabsProps {
-  sessions: ClaudeSession[];
-  activeSessionId?: string;
-  onSessionChange: (sessionId: string) => void;
-  onSessionCreate: () => void;
-  onSessionDelete: (sessionId: string) => void;
+  tabs: Tab[];
+  activeTabId?: string;
+  onTabChange: (tabId: string) => void;
+  onTabCreate: () => void;
+  onTabDelete: (tabId: string) => void;
 }
 
 export function SessionTabs({
-  sessions,
-  activeSessionId,
-  onSessionChange,
-  onSessionCreate,
-  onSessionDelete,
+  tabs,
+  activeTabId,
+  onTabChange,
+  onTabCreate,
+  onTabDelete,
 }: SessionTabsProps) {
   const tabRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
 
   // アクティブタブのインジケーター位置を更新
   useEffect(() => {
-    const activeIndex = sessions.findIndex((s) => s.id === activeSessionId);
+    const activeIndex = tabs.findIndex((t) => t.tab_id === activeTabId);
     if (activeIndex !== -1 && tabRefs.current[activeIndex]) {
       const tabElement = tabRefs.current[activeIndex];
       if (tabElement) {
@@ -39,46 +39,46 @@ export function SessionTabs({
         });
       }
     }
-  }, [activeSessionId, sessions]);
+  }, [activeTabId, tabs]);
 
   return (
     <div className="relative flex items-center gap-2 overflow-x-auto border-b border-theme">
-      {sessions.map((session, index) => {
-        const isActive = activeSessionId === session.id;
-        const isDisabled = session.status === 'running';
+      {tabs.map((tab, index) => {
+        const isActive = activeTabId === tab.tab_id;
+        const isRunning = tab.status === 'running';
 
         return (
           <div
-            key={session.id}
+            key={tab.tab_id}
             ref={(el) => {
               tabRefs.current[index] = el;
             }}
-            onClick={() => !isDisabled && onSessionChange(session.id)}
+            onClick={() => onTabChange(tab.tab_id)}
             className={`
-              flex items-center gap-2 px-4 py-2 h-12 flex-shrink-0 transition-colors
+              flex items-center gap-2 px-4 py-2 h-12 flex-shrink-0 transition-colors cursor-pointer
               ${
                 isActive
                   ? 'text-primary'
-                  : isDisabled
-                    ? 'text-gray-400 cursor-not-allowed'
-                    : 'text-theme-muted hover:text-theme-fg cursor-pointer'
+                  : isRunning
+                    ? 'text-primary-light'
+                    : 'text-theme-muted hover:text-theme-fg'
               }
             `}
           >
             <div className="font-medium flex items-center gap-2">
-              <span>{session.sessionNumber}</span>
-              <ClaudeState status={session.status} showLabel={true} />
+              <span>{tab.sessionNumber}</span>
+              <ClaudeState status={tab.status} showLabel={true} />
             </div>
-            {sessions.length > 1 && (
+            {tabs.length > 1 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   const confirmMessage =
-                    session.status === 'running'
-                      ? `Session ${session.sessionNumber} is running. Are you sure you want to delete it?`
-                      : `Delete Session ${session.sessionNumber}?`;
+                    tab.status === 'running'
+                      ? `Tab ${tab.sessionNumber} is running. Are you sure you want to delete it?`
+                      : `Delete Tab ${tab.sessionNumber}?`;
                   if (confirm(confirmMessage)) {
-                    onSessionDelete(session.id);
+                    onTabDelete(tab.tab_id);
                   }
                 }}
                 className="hover:opacity-70 cursor-pointer"
@@ -91,9 +91,9 @@ export function SessionTabs({
       })}
 
       <button
-        onClick={onSessionCreate}
+        onClick={onTabCreate}
         className="px-4 py-2 h-12 text-primary hover:text-primary-hover flex-shrink-0 flex items-center justify-center cursor-pointer transition-colors"
-        title="Create new session"
+        title="Create new tab"
       >
         <Plus className="w-4 h-4" />
       </button>

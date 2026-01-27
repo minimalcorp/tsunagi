@@ -28,14 +28,14 @@ function isSessionCompleted(rawMessages?: unknown[]): boolean {
 
 interface ExecutionLogsChatProps {
   rawMessages?: unknown[]; // SDK messages
-  sessionId?: string; // セッション切り替え検知用
+  tabId?: string; // タブ切り替え検知用
 }
 
-export function ExecutionLogsChat({ rawMessages, sessionId }: ExecutionLogsChatProps) {
+export function ExecutionLogsChat({ rawMessages, tabId }: ExecutionLogsChatProps) {
   const logsEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const prevSessionIdRef = useRef<string | undefined>(sessionId);
+  const prevTabIdRef = useRef<string | undefined>(tabId);
 
   // セッション完了状態を判定
   const sessionCompleted = useMemo(() => isSessionCompleted(rawMessages), [rawMessages]);
@@ -64,11 +64,11 @@ export function ExecutionLogsChat({ rawMessages, sessionId }: ExecutionLogsChatP
 
   // スクロール制御
   useEffect(() => {
-    const sessionChanged = prevSessionIdRef.current !== sessionId;
-    prevSessionIdRef.current = sessionId;
+    const tabChanged = prevTabIdRef.current !== tabId;
+    prevTabIdRef.current = tabId;
 
-    if (sessionChanged) {
-      // セッション切り替え時: 即座にスクロール
+    if (tabChanged) {
+      // タブ切り替え時: 即座にスクロール
       logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
       // Note: setIsAtBottomはスクロールイベントで自動的に更新される
     } else if (isAtBottom) {
@@ -76,7 +76,7 @@ export function ExecutionLogsChat({ rawMessages, sessionId }: ExecutionLogsChatP
       logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
     // 最下部以外にいる場合: スクロールしない
-  }, [uiMessages, sessionId, isAtBottom]);
+  }, [uiMessages, tabId, isAtBottom]);
 
   return (
     <div className="flex flex-col h-full min-h-0">

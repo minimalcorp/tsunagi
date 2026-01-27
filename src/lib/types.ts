@@ -16,21 +16,23 @@ export interface Task {
   deletedAt?: string;
   createdAt: string;
   updatedAt: string;
+  tabs: Tab[]; // タブ管理（Phase 1で追加）
 }
 
-// ClaudeSession型
-export type ClaudeSessionStatus = 'idle' | 'running' | 'success' | 'error';
-
-export interface ClaudeSession {
-  id: string; // アプリケーション側のセッションID (UUID)
-  taskId: string;
-  sessionNumber: number; // タブ表示用の連番（削除されても変わらない）
-  status: ClaudeSessionStatus;
-  rawMessages: unknown[]; // Claude SDKから返ってきたraw messages（永続化用）
+// Tab型（タブとメッセージ履歴を分離）
+export interface Tab {
+  tab_id: string; // UUID（タブ作成時に生成）
+  sessionNumber: number; // タブ表示用の連番
+  status: 'idle' | 'running' | 'success' | 'error';
   startedAt: string;
   completedAt?: string;
   updatedAt: string;
-  agentSessionId?: string; // Claude Agent SDKのセッションID (最初のプロンプト送信時に設定)
+  session_id?: string; // Claude Agent SDKのセッションID（初回プロンプト後に設定）
+}
+
+// SessionData型（sessions.jsonの値型）
+export interface SessionData {
+  rawMessages: unknown[];
 }
 
 // ============================================

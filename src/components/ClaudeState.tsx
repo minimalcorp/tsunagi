@@ -1,10 +1,10 @@
 'use client';
 
 import { Loader2, CheckCircle2, XCircle, Circle } from 'lucide-react';
-import type { ClaudeSessionStatus } from '@/lib/types';
+import type { TabStatus } from '@/lib/claude-status';
 
 interface ClaudeStateProps {
-  status: ClaudeSessionStatus;
+  status: TabStatus;
   showLabel?: boolean;
 }
 

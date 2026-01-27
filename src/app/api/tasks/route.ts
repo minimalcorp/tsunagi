@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/task-repository';
-import * as sessionRepo from '@/lib/session-repository';
 import * as worktreeManager from '@/lib/worktree-manager';
 import type { Task } from '@/lib/types';
 import { sseManager } from '@/lib/sse-manager';
@@ -67,16 +66,12 @@ export async function POST(request: NextRequest) {
       // worktreeエラーはタスク作成失敗にはしない（後で手動作成可能）
     }
 
-    // 最初のセッションを自動作成
+    // 最初のタブを自動作成
     try {
-      await sessionRepo.createSession({
-        taskId: newTask.id,
-        status: 'idle',
-        rawMessages: [],
-      });
+      await taskRepo.createTab(newTask.id);
     } catch (error) {
-      console.error('Failed to create initial session:', error);
-      // セッションエラーもタスク作成失敗にはしない
+      console.error('Failed to create initial tab:', error);
+      // タブエラーもタスク作成失敗にはしない
     }
 
     // 更新後のタスクを取得

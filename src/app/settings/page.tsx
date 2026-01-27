@@ -29,11 +29,29 @@ export default function SettingsPage() {
   };
 
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
+  const [onboardingStatus, setOnboardingStatus] = useState({
+    completed: true,
+    hasGlobalToken: true,
+  });
 
   // Initialize on mount (one-time initialization from localStorage)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedNode(getInitialNode());
+    fetch('/api/onboarding/status')
+      .then((r) => r.json())
+      .then((data) => {
+        const status = data.data;
+        setOnboardingStatus(status);
+
+        if (!status.completed && !status.hasGlobalToken) {
+          setSelectedNode({ scope: 'global', label: 'Global' });
+        } else {
+          setSelectedNode(getInitialNode());
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to fetch onboarding status:', error);
+        setSelectedNode(getInitialNode());
+      });
   }, []);
 
   // 選択ノードを localStorage に保存
@@ -45,6 +63,10 @@ export default function SettingsPage() {
 
   const handleNodeSelect = (node: SelectedNode) => {
     setSelectedNode(node);
+  };
+
+  const handleSwitchToGlobal = () => {
+    setSelectedNode({ scope: 'global', label: 'Global' });
   };
 
   return (
@@ -78,7 +100,11 @@ export default function SettingsPage() {
           {selectedNode ? (
             <div className="space-y-6">
               {/* Claude Token Section (All scopes) */}
-              <ClaudeTokenSection selectedNode={selectedNode} />
+              <ClaudeTokenSection
+                selectedNode={selectedNode}
+                onboardingStatus={onboardingStatus}
+                onSwitchToGlobal={handleSwitchToGlobal}
+              />
 
               {/* Environment Variables Section */}
               <EnvVariableEditor selectedNode={selectedNode} />

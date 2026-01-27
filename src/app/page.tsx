@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Task, Repository, ClaudeSession } from '@/lib/types';
+import type { Task, Repository } from '@/lib/types';
 import { Header } from '@/components/Header';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
@@ -15,7 +15,6 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [globalEnv, setGlobalEnv] = useState<Record<string, string>>({});
-  const [sessions, setSessions] = useState<Record<string, ClaudeSession[]>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // Dialog states
@@ -78,11 +77,10 @@ export default function Home() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [tasksData, ownersData, envData, sessionsData] = await Promise.all([
+      const [tasksData, ownersData, envData] = await Promise.all([
         fetch('/api/tasks').then((r) => r.json()),
         fetch('/api/owners').then((r) => r.json()),
         fetch('/api/env').then((r) => r.json()),
-        fetch('/api/sessions').then((r) => r.json()),
       ]);
 
       setTasks(tasksData.data.tasks);
@@ -92,20 +90,6 @@ export default function Home() {
       );
       setRepositories(allRepos);
       setGlobalEnv(envData.data.env);
-
-      // セッションをtaskIdでグループ化
-      const allSessions = (sessionsData.data || []) as ClaudeSession[];
-      const groupedSessions = allSessions.reduce(
-        (acc, session) => {
-          if (!acc[session.taskId]) {
-            acc[session.taskId] = [];
-          }
-          acc[session.taskId].push(session);
-          return acc;
-        },
-        {} as Record<string, ClaudeSession[]>
-      );
-      setSessions(groupedSessions);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -115,6 +99,18 @@ export default function Home() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Reload data when returning from Settings
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   // SSE統合
@@ -146,55 +142,14 @@ export default function Home() {
       setTasks((prev) => prev.filter((t) => t.id !== id));
     };
 
-    // session:created イベント
-    const handleSessionCreated = (event: MessageEvent) => {
-      const session = JSON.parse(event.data) as ClaudeSession;
-      console.log('[SSE] session:created received:', session.id);
-      setSessions((prev) => ({
-        ...prev,
-        [session.taskId]: [...(prev[session.taskId] || []), session],
-      }));
-    };
-
-    // session:updated イベント
-    const handleSessionUpdated = (event: MessageEvent) => {
-      const session = JSON.parse(event.data) as ClaudeSession;
-      console.log('[SSE] session:updated received:', session.id, 'status:', session.status);
-      setSessions((prev) => ({
-        ...prev,
-        [session.taskId]: (prev[session.taskId] || []).map((s) =>
-          s.id === session.id ? session : s
-        ),
-      }));
-    };
-
-    // session:deleted イベント
-    const handleSessionDeleted = (event: MessageEvent) => {
-      const { id } = JSON.parse(event.data) as { id: string };
-      console.log('[SSE] session:deleted received:', id);
-      setSessions((prev) => {
-        const newSessions = { ...prev };
-        for (const taskId in newSessions) {
-          newSessions[taskId] = newSessions[taskId].filter((s) => s.id !== id);
-        }
-        return newSessions;
-      });
-    };
-
     eventSource.addEventListener('task:created', handleTaskCreated);
     eventSource.addEventListener('task:updated', handleTaskUpdated);
     eventSource.addEventListener('task:deleted', handleTaskDeleted);
-    eventSource.addEventListener('session:created', handleSessionCreated);
-    eventSource.addEventListener('session:updated', handleSessionUpdated);
-    eventSource.addEventListener('session:deleted', handleSessionDeleted);
 
     return () => {
       eventSource.removeEventListener('task:created', handleTaskCreated);
       eventSource.removeEventListener('task:updated', handleTaskUpdated);
       eventSource.removeEventListener('task:deleted', handleTaskDeleted);
-      eventSource.removeEventListener('session:created', handleSessionCreated);
-      eventSource.removeEventListener('session:updated', handleSessionUpdated);
-      eventSource.removeEventListener('session:deleted', handleSessionDeleted);
     };
   }, [eventSource]);
 
@@ -294,7 +249,6 @@ export default function Home() {
       <div className="relative flex-1 overflow-hidden">
         <KanbanBoard
           tasks={filteredTasks}
-          sessions={sessions}
           onTaskMove={handleTaskMove}
           onTaskClick={handleTaskClick}
           onAddTaskClick={() => setIsAddTaskDialogOpen(true)}

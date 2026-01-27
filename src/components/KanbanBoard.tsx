@@ -1,12 +1,11 @@
 'use client';
 
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
-import type { Task, ClaudeSession } from '@/lib/types';
+import type { Task } from '@/lib/types';
 import { KanbanColumn } from './KanbanColumn';
 
 interface KanbanBoardProps {
   tasks: Task[];
-  sessions?: Record<string, ClaudeSession[]>; // taskId -> sessions array
   onTaskMove: (taskId: string, newStatus: Task['status']) => void;
   onTaskClick?: (taskId: string) => void;
   onAddTaskClick?: () => void;
@@ -17,7 +16,6 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({
   tasks,
-  sessions,
   onTaskMove,
   onTaskClick,
   onAddTaskClick,
@@ -70,7 +68,6 @@ export function KanbanBoard({
           title="Backlog"
           status="backlog"
           tasks={backlogTasks}
-          sessions={sessions}
           onTaskClick={onTaskClick}
           onAddTaskClick={onAddTaskClick}
           nextStep={nextStep}
@@ -81,30 +78,21 @@ export function KanbanBoard({
           title="Planning"
           status="planning"
           tasks={planningTasks}
-          sessions={sessions}
           onTaskClick={onTaskClick}
         />
         <KanbanColumn
           title="Coding"
           status="coding"
           tasks={codingTasks}
-          sessions={sessions}
           onTaskClick={onTaskClick}
         />
         <KanbanColumn
           title="Reviewing"
           status="reviewing"
           tasks={reviewingTasks}
-          sessions={sessions}
           onTaskClick={onTaskClick}
         />
-        <KanbanColumn
-          title="Done"
-          status="done"
-          tasks={doneTasks}
-          sessions={sessions}
-          onTaskClick={onTaskClick}
-        />
+        <KanbanColumn title="Done" status="done" tasks={doneTasks} onTaskClick={onTaskClick} />
       </div>
     </DragDropContext>
   );

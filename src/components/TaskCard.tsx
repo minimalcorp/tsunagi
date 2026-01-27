@@ -1,20 +1,20 @@
 'use client';
 
-import type { Task, ClaudeSession } from '@/lib/types';
+import type { Task } from '@/lib/types';
 import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
 import { MessageCircle } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
-  sessions: ClaudeSession[];
   isDragging: boolean;
   onTaskClick?: (taskId: string) => void;
 }
 
-export function TaskCard({ task, sessions, isDragging, onTaskClick }: TaskCardProps) {
+export function TaskCard({ task, isDragging, onTaskClick }: TaskCardProps) {
   const isClaudeRunning = task.claudeState === 'running';
-  const totalMessages = sessions.reduce((sum, session) => sum + session.rawMessages.length, 0);
+  const tabs = task.tabs || [];
+  const totalTabs = tabs.length;
 
   return (
     <div
@@ -53,11 +53,11 @@ export function TaskCard({ task, sessions, isDragging, onTaskClick }: TaskCardPr
 
       {/* Claude状態とメタ情報 */}
       <div className="flex items-center justify-between gap-2">
-        {/* セッション状態を横に並べて表示（横スクロール対応） */}
+        {/* タブ状態を横に並べて表示（横スクロール対応） */}
         <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-shrink min-w-0">
-          {sessions.length > 0 ? (
-            sessions.map((session) => (
-              <ClaudeState key={session.id} status={getClaudeStatus(session)} showLabel={false} />
+          {tabs.length > 0 ? (
+            tabs.map((tab) => (
+              <ClaudeState key={tab.tab_id} status={getClaudeStatus(tab)} showLabel={false} />
             ))
           ) : (
             <ClaudeState status="idle" showLabel={false} />
@@ -68,10 +68,10 @@ export function TaskCard({ task, sessions, isDragging, onTaskClick }: TaskCardPr
           {/* 工数 */}
           {task.effort && <span className="font-medium">{task.effort}h</span>}
 
-          {/* ログ数 */}
-          {totalMessages > 0 && (
+          {/* タブ数 */}
+          {totalTabs > 0 && (
             <div className="flex items-center gap-1">
-              <span>{totalMessages}</span>
+              <span>{totalTabs}</span>
               <MessageCircle className="w-3 h-3" />
             </div>
           )}
