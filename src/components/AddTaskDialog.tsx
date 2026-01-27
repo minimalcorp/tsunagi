@@ -251,7 +251,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
               value={formData.branch}
               onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
               className={`w-full px-3 py-2 border rounded text-theme-fg bg-theme-card ${
-                fieldErrors.branch ? 'border-red-500' : 'border-theme'
+                fieldErrors.branch ? 'border-red-500 input-error' : 'border-theme'
               }`}
               placeholder="feature/new-feature"
               disabled={isLoading}
