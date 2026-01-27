@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNavigation';
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
 import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
+import { ClaudeSettingsEditor } from '@/components/settings/ClaudeSettingsEditor';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -105,6 +106,9 @@ export default function SettingsPage() {
                 onboardingStatus={onboardingStatus}
                 onSwitchToGlobal={handleSwitchToGlobal}
               />
+
+              {/* Claude Settings Sources Section (Global scope only) */}
+              {selectedNode.scope === 'global' && <ClaudeSettingsEditor scope="global" />}
 
               {/* Environment Variables Section */}
               <EnvVariableEditor selectedNode={selectedNode} />

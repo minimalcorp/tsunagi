@@ -1,4 +1,5 @@
 import { query, type Query } from '@anthropic-ai/claude-agent-sdk';
+import * as settingsRepo from './claude-settings-repository';
 
 export interface ExecuteOptions {
   sessionId: string;
@@ -9,6 +10,8 @@ export interface ExecuteOptions {
   onRawMessage?: (message: unknown) => void; // Raw messagesの永続化用
   onStatusChange?: (status: 'running' | 'success' | 'error') => void;
   onAgentSessionId?: (agentSessionId: string) => void;
+  owner?: string; // タスクのowner
+  repo?: string; // タスクのrepo
 }
 
 /**
@@ -29,10 +32,23 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
     onRawMessage,
     onStatusChange,
     onAgentSessionId,
+    owner,
+    repo,
   } = options;
 
   try {
     onStatusChange?.('running');
+
+    // settingSourcesをプロジェクト設定から取得
+    let settingSources: Array<'user' | 'project' | 'local'> | undefined;
+
+    if (owner && repo) {
+      const resolvedSettings = await settingsRepo.resolveSettings({ owner, repo });
+      settingSources = resolvedSettings.settingSources;
+    } else {
+      // owner/repoが指定されていない場合はglobal設定を使用
+      settingSources = await settingsRepo.getSettingSources('global');
+    }
 
     // Build query options
     const queryOptions: {
@@ -42,6 +58,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       permissionMode?: 'bypassPermissions';
       allowDangerouslySkipPermissions?: boolean;
       bypassPermissions?: boolean;
+      settingSources?: Array<'user' | 'project' | 'local'>;
     } = {
       cwd: workingDirectory,
       permissionMode:
@@ -50,6 +67,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
           : undefined,
       allowDangerouslySkipPermissions: process.env.CLAUDE_BYPASS_PERMISSIONS !== 'false',
       bypassPermissions: process.env.CLAUDE_BYPASS_PERMISSIONS !== 'false',
+      settingSources, // 追加（undefinedの場合はisolationモード）
     };
 
     // Merge custom env with system environment to ensure node and other binaries are accessible
@@ -96,6 +114,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
         allowDangerouslySkipPermissions: queryOptions.allowDangerouslySkipPermissions,
         bypassPermissions: queryOptions.bypassPermissions,
         hasResume: !!queryOptions.resume,
+        settingSources: queryOptions.settingSources,
       });
     }
 

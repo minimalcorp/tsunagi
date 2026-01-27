@@ -173,6 +173,23 @@ export interface EnvironmentVariable {
   enabled: boolean; // 有効/無効フラグ（デフォルトtrue）
 }
 
+// Claude Agent SDK Settings Sources設定
+export type SettingSource = 'user' | 'project' | 'local';
+
+export interface ClaudeSettingSources {
+  scope: 'global' | 'owner' | 'repo';
+  owner?: string;
+  repo?: string;
+  sources: SettingSource[]; // ['user', 'project', 'local']の組み合わせ
+  enabled: boolean; // 有効/無効フラグ
+}
+
+// resolveSettings関数の戻り値型
+export interface ResolvedSettings {
+  settingSources?: SettingSource[]; // undefinedの場合はisolationモード
+  env: Record<string, string>; // 環境変数（Claude Tokenを含む）
+}
+
 // API Request/Response型
 export interface ApiResponse<T> {
   data: T;
