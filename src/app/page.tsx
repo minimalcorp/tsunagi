@@ -51,17 +51,6 @@ export default function Home() {
     return { state, nextStep };
   }, [repositories, globalEnv, tasks]);
 
-  // Extract unique owners and repos from repositories
-  const owners = useMemo(() => {
-    const uniqueOwners = [...new Set(repositories.map((r) => r.owner))];
-    return uniqueOwners;
-  }, [repositories]);
-
-  const repos = useMemo(() => {
-    const uniqueRepos = [...new Set(repositories.map((r) => r.repo))];
-    return uniqueRepos;
-  }, [repositories]);
-
   // Filter tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -239,8 +228,7 @@ export default function Home() {
         onSettingsClick={() => router.push('/settings')}
         onReload={loadData}
         nextStep={onboardingState.nextStep}
-        owners={owners}
-        repos={repos}
+        repositories={repositories}
         onFilterChange={handleFilterChange}
         isCloneDialogOpen={isCloneDialogOpen}
       />
