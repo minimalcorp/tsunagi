@@ -86,7 +86,7 @@ export function ExecutionLogsChat({ rawMessages, tabId }: ExecutionLogsChatProps
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto border border-theme rounded p-4 space-y-3 bg-theme-hover"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-theme rounded p-4 space-y-3 bg-theme-hover"
       >
         {uiMessages.length === 0 ? (
           <p className="text-theme-muted text-sm text-center mt-8">
@@ -150,7 +150,7 @@ function UIMessageItem({
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
                   <div
-                    className={`inline-block text-left rounded-lg p-2 ${
+                    className={`inline-block text-left rounded-lg p-2 max-w-full ${
                       isDark ? 'bg-yellow-900/20' : 'bg-yellow-50'
                     }`}
                   >
@@ -160,7 +160,7 @@ function UIMessageItem({
                       }`}
                     >
                       <Brain className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                      <span>{block.content}</span>
+                      <span className="break-words overflow-wrap-anywhere">{block.content}</span>
                     </div>
                   </div>
                 </div>
@@ -173,7 +173,7 @@ function UIMessageItem({
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
                   <div className="inline-block text-left rounded-lg p-2 bg-theme-card max-w-full">
-                    <div className="prose max-w-none text-theme-fg text-xs break-words overflow-wrap-anywhere">
+                    <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-theme-fg text-xs break-words overflow-wrap-anywhere">
                       <ReactMarkdown>{block.content}</ReactMarkdown>
                     </div>
                   </div>
@@ -294,7 +294,7 @@ function UIMessageItem({
       <div>
         <div className="flex justify-start items-center gap-2">
           <div
-            className={`inline-block text-left rounded-lg p-2 border ${
+            className={`inline-block text-left rounded-lg p-2 border max-w-full ${
               isDark ? 'bg-red-900/20 border-red-700' : 'bg-red-100 border-red-300'
             }`}
           >
@@ -302,10 +302,10 @@ function UIMessageItem({
               className={`text-xs whitespace-pre-wrap flex items-start gap-1 ${isDark ? 'text-red-300' : 'text-red-950'}`}
             >
               <XCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
-              <span>{content.message}</span>
+              <span className="break-words overflow-wrap-anywhere">{content.message}</span>
             </div>
             {content.details && (
-              <div className="text-xs text-theme-muted mt-1">{content.details}</div>
+              <div className="text-xs text-theme-muted mt-1 break-words overflow-wrap-anywhere">{content.details}</div>
             )}
           </div>
         </div>
@@ -323,10 +323,10 @@ function UIMessageItem({
     return (
       <div>
         <div className="flex justify-start items-center gap-2">
-          <div className="inline-block text-left rounded-lg p-2 bg-theme-hover border border-theme">
+          <div className="inline-block text-left rounded-lg p-2 bg-theme-hover border border-theme max-w-full">
             <div className="text-xs text-theme-muted flex items-start gap-1">
               <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
-              <span>{content.description}</span>
+              <span className="break-words overflow-wrap-anywhere">{content.description}</span>
             </div>
           </div>
         </div>
