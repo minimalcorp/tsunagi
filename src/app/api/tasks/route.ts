@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
 
     // worktreeを自動作成
     try {
+      // 最新のremote情報を取得
+      await worktreeManager.fetchRemote(owner, repo);
       await worktreeManager.createWorktree(owner, repo, branch, baseBranch);
       await taskRepo.updateTask(newTask.id, { worktreeStatus: 'created' });
     } catch (error) {

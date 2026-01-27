@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // worktreeを作成
+    // 最新のremote情報を取得してからworktreeを作成
+    await worktreeManager.fetchRemote(owner, repo);
     const worktreePath = await worktreeManager.createWorktree(owner, repo, branch);
 
     return NextResponse.json({ data: { worktreePath, success: true } }, { status: 201 });

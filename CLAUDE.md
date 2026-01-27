@@ -59,6 +59,6 @@ npm run type-check
 
 ## 実装計画
 
-- **実装計画は `.claude/plans/procedures.md` で管理**
+- **実装計画は、ホームディレクトリではなく、必ずプロジェクトディレクトリの `{project root directory}/.claude/plans/procedures.md` で管理**
 - 実装の進捗や計画変更があった場合、このファイルを更新する
 - タスクの完了状況、追加要件、設計変更などを記録

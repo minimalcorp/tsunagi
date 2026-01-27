@@ -82,6 +82,16 @@ export async function initBareRepository(
   const git = simpleGit();
   await git.clone(authCloneUrl, bareRepoPath, ['--bare']);
 
+  // 標準的なfetch refspecを設定
+  const bareGit = simpleGit(bareRepoPath);
+  await bareGit.addConfig('remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*');
+
+  // Remote tracking branchesを作成
+  await bareGit.fetch();
+
+  // origin/HEADを設定
+  await bareGit.raw(['remote', 'set-head', 'origin', '--auto']);
+
   return bareRepoPath;
 }
 
@@ -101,17 +111,19 @@ export async function ensureBareRepository(owner: string, repo: string): Promise
 export async function fetchRemote(owner: string, repo: string): Promise<void> {
   const bareRepoPath = await ensureBareRepository(owner, repo);
   const git: SimpleGit = simpleGit(bareRepoPath);
-  // bare repositoryでは、リモートブランチを直接refs/heads/に取得
-  await git.fetch('origin', '+refs/heads/*:refs/heads/*', { '--prune': null });
+  // Git configに設定されたfetch refspecを使用
+  await git.fetch('origin', { '--prune': null });
 }
 
 // リモートブランチの一覧を取得
 export async function getRemoteBranches(owner: string, repo: string): Promise<string[]> {
   const bareRepoPath = await ensureBareRepository(owner, repo);
   const git: SimpleGit = simpleGit(bareRepoPath);
-  // bare repositoryでは、リモートブランチはrefs/heads/に格納されている
-  const branches = await git.branch();
-  return branches.all.filter((b) => !b.includes('HEAD'));
+  // Remote branchesのみ取得
+  const branches = await git.branch(['-r']);
+  return branches.all
+    .filter((b) => b.startsWith('origin/') && !b.includes('HEAD'))
+    .map((b) => b.replace('origin/', ''));
 }
 
 // デフォルトブランチを取得
@@ -119,9 +131,9 @@ export async function getDefaultBranch(owner: string, repo: string): Promise<str
   const bareRepoPath = await ensureBareRepository(owner, repo);
   const git: SimpleGit = simpleGit(bareRepoPath);
   try {
-    // bare repositoryではHEADがデフォルトブランチを指す
-    const result = await git.raw(['symbolic-ref', 'HEAD']);
-    return result.trim().replace('refs/heads/', '');
+    // Remote tracking branchの参照からデフォルトブランチを取得
+    const result = await git.raw(['symbolic-ref', 'refs/remotes/origin/HEAD']);
+    return result.trim().replace('refs/remotes/origin/', '');
   } catch {
     // Fallback: main > master > first branch
     const branches = await getRemoteBranches(owner, repo);
@@ -153,18 +165,23 @@ export async function createWorktree(
 
   const git: SimpleGit = simpleGit(bareRepoPath);
 
-  // ブランチが存在するか確認
-  const branches = await git.branch();
-  const branchExists = branches.all.some((b) => b === branch || b === `origin/${branch}`);
+  // ブランチが存在するか確認（local + remote）
+  const branches = await git.branch(['-a']);
+  const localBranchExists = branches.all.some((b) => b === branch);
+  const remoteBranchExists = branches.all.some(
+    (b) => b === `remotes/origin/${branch}` || b === `origin/${branch}`
+  );
 
-  if (branchExists) {
-    // 既存ブランチをチェックアウト
+  if (localBranchExists) {
+    // Local branchが存在する場合は直接チェックアウト
     await git.raw(['worktree', 'add', worktreePath, branch]);
+  } else if (remoteBranchExists) {
+    // Remote branchが存在する場合はlocal tracking branchを作成
+    await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${branch}`]);
   } else {
-    // baseBranchが指定されていない場合はデフォルトブランチを使用
+    // 新規ブランチを作成（常にorigin/baseBranchから）
     const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
-    // 指定されたベースブランチから新規ブランチを作成
-    await git.raw(['worktree', 'add', '-b', branch, worktreePath, effectiveBaseBranch]);
+    await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${effectiveBaseBranch}`]);
   }
 
   return worktreePath;
