@@ -1,13 +1,13 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import type { Task, Tab } from '@/lib/types';
+import type { Task, Tab, MergedMessage } from '@/lib/types';
 import { TaskInfo } from '@/components/TaskInfo';
 import { SessionTabs } from '@/components/SessionTabs';
 import { ViewLayoutToggle, type ViewMode } from '@/components/ViewLayoutToggle';
-import { ClaudePromptEditor } from '@/components/ClaudePromptEditor';
+import { ClaudePromptEditor, type ClaudePromptEditorRef } from '@/components/ClaudePromptEditor';
 import { ExecutionLogsChat } from '@/components/ExecutionLogsChat';
 import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -25,11 +25,15 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [task, setTask] = useState<Task | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
-  const [tabMessages, setTabMessages] = useState<Record<string, unknown[]>>({});
+  const [tabMessages, setTabMessages] = useState<Record<string, MergedMessage[]>>({});
   const [viewMode, setViewMode] = useState<ViewMode>('split');
-  const [prompts, setPrompts] = useState<Record<string, string>>({});
+  const [initialPrompts, setInitialPrompts] = useState<Record<string, string>>({});
+  const [pendingPrompts, setPendingPrompts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isEditingTask, setIsEditingTask] = useState(false);
+
+  // エディタのrefを保持
+  const editorRef = useRef<ClaudePromptEditorRef>(null);
 
   const activeTab = tabs.find((t) => t.tab_id === activeTabId);
 
@@ -82,7 +86,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         });
 
         const messagesResults = await Promise.all(messagesPromises);
-        const messagesMap: Record<string, unknown[]> = {};
+        const messagesMap: Record<string, MergedMessage[]> = {};
         messagesResults.forEach((result) => {
           messagesMap[result.tab_id] = result.messages;
         });
@@ -152,8 +156,58 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     const handleTabMessagesUpdated = (event: MessageEvent) => {
       const { tab_id, messages } = JSON.parse(event.data) as {
         tab_id: string;
-        messages: unknown[];
+        messages: MergedMessage[];
       };
+
+      // pendingPromptがある場合のみチェック
+      const pendingPrompt = pendingPrompts[tab_id];
+
+      if (pendingPrompt && tab_id === activeTabId) {
+        const prevMessages = tabMessages[tab_id] || [];
+
+        // 新しいメッセージの中に、送信したプロンプトと一致するものがあるか確認
+        if (messages.length > prevMessages.length) {
+          const matchFound = messages.some((msg) => {
+            // type: 'prompt'メッセージのみチェック（userPromptsから生成されたメッセージ）
+            if (!('type' in msg) || msg.type !== 'prompt') {
+              return false;
+            }
+
+            // messageフィールドとcontentフィールドの存在確認
+            if (!('message' in msg) || typeof msg.message !== 'object' || msg.message === null) {
+              return false;
+            }
+
+            const message = msg.message as Record<string, unknown>;
+            if (!('content' in message)) {
+              return false;
+            }
+
+            const content = message.content;
+
+            // type: 'prompt'メッセージのcontentは常に文字列
+            if (typeof content !== 'string') {
+              return false;
+            }
+
+            return content === pendingPrompt;
+          });
+
+          if (matchFound) {
+            // エディタを直接クリア（アクティブタブの場合のみ）
+            if (tab_id === activeTabId) {
+              editorRef.current?.clearEditor();
+            }
+
+            // pendingPromptを削除
+            setPendingPrompts((prev) => {
+              const next = { ...prev };
+              delete next[tab_id];
+              return next;
+            });
+          }
+        }
+      }
 
       // Backend側でマージ・ソート済みなのでそのまま使用
       setTabMessages((prev) => ({ ...prev, [tab_id]: messages }));
@@ -185,6 +239,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       eventSource.removeEventListener('tab:messages:updated', handleTabMessagesUpdated);
       eventSource.removeEventListener('task:updated', handleTaskUpdated);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventSource, id, activeTabId, tabs]);
 
   // タブのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
@@ -295,17 +350,27 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // Claude実行
   const handleExecute = async (tab_id: string, prompt: string) => {
     try {
+      // 送信前にプロンプトを記録
+      setPendingPrompts((prev) => ({ ...prev, [tab_id]: prompt }));
+
       const response = await fetch(`/api/tabs/${tab_id}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: prompt }),
       });
 
-      if (!response.ok) throw new Error('Failed to execute');
+      if (!response.ok) {
+        // 失敗時は記録を削除
+        setPendingPrompts((prev) => {
+          const next = { ...prev };
+          delete next[tab_id];
+          return next;
+        });
+        throw new Error('Failed to execute');
+      }
 
       // SSE経由でtab:updatedイベントが配信されるため、tabは更新しない
-      // 実行成功後にプロンプトをクリア
-      setPrompts((prev) => ({ ...prev, [tab_id]: '' }));
+      // プロンプトのクリアはSSEイベント受信時に実施（handleTabMessagesUpdated）
     } catch (error) {
       console.error('Failed to execute:', error);
       throw error;
@@ -332,7 +397,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
   // プロンプト変更
   const handlePromptChange = (tab_id: string, prompt: string) => {
-    setPrompts((prev) => ({ ...prev, [tab_id]: prompt }));
+    setInitialPrompts((prev) => ({ ...prev, [tab_id]: prompt }));
   };
 
   // タスク削除
@@ -440,8 +505,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                 >
                   {(viewMode === 'split' || viewMode === 'editor') && (
                     <ClaudePromptEditor
+                      ref={editorRef}
                       tab={activeTab}
-                      prompt={prompts[activeTab.tab_id] || ''}
+                      initialPrompt={initialPrompts[activeTab.tab_id] || ''}
                       onExecute={handleExecute}
                       onInterrupt={handleInterrupt}
                       onPromptChange={(prompt) => handlePromptChange(activeTab.tab_id, prompt)}
