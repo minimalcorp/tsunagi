@@ -4,6 +4,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const encoder = new TextEncoder();
+  const lastEventId = request.headers.get('Last-Event-ID');
+
+  console.log('[SSE] Client connecting', { lastEventId });
 
   const stream = new ReadableStream({
     start(controller) {
@@ -16,6 +19,14 @@ export async function GET(request: Request) {
       controller.enqueue(
         encoder.encode(`event: connected\ndata: ${JSON.stringify({ clientId })}\n\n`)
       );
+
+      // Last-Event-IDがある場合（再接続）、クライアントに再同期ヒントを送信
+      if (lastEventId) {
+        console.log('[SSE] Reconnection detected, sending resync hint');
+        controller.enqueue(
+          encoder.encode(`event: resync:hint\ndata: ${JSON.stringify({ lastEventId })}\n\n`)
+        );
+      }
 
       // Heartbeat設定（30秒ごと）
       const heartbeat = setInterval(() => {

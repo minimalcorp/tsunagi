@@ -27,6 +27,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
   const [tabMessages, setTabMessages] = useState<Record<string, MergedMessage[]>>({});
+  const [tabSequences, setTabSequences] = useState<Record<string, number>>({});
+  const [isResyncing, setIsResyncing] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -109,10 +111,17 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
         const messagesResults = await Promise.all(messagesPromises);
         const messagesMap: Record<string, MergedMessage[]> = {};
+        const sequencesMap: Record<string, number> = {};
         messagesResults.forEach((result) => {
           messagesMap[result.tab_id] = result.messages;
+          // 最終シーケンス番号を初期化
+          const lastMessage = result.messages[result.messages.length - 1];
+          if (lastMessage?._sequence) {
+            sequencesMap[result.tab_id] = lastMessage._sequence;
+          }
         });
         setTabMessages(messagesMap);
+        setTabSequences(sequencesMap);
 
         // アクティブタブ設定
         if (loadedTabs.length > 0) {
@@ -127,6 +136,45 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
     loadData();
   }, [id]);
+
+  // 全体再同期関数
+  const triggerFullResync = useCallback(
+    async (tab_id: string) => {
+      if (isResyncing.has(tab_id)) {
+        console.log(`[Resync] Already resyncing tab ${tab_id}`);
+        return;
+      }
+
+      console.log(`[Resync] Triggering full resync for tab ${tab_id}`);
+      setIsResyncing((prev) => new Set(prev).add(tab_id));
+
+      try {
+        const response = await fetch(`/api/tabs/${tab_id}/messages`);
+        if (response.ok) {
+          const data = await response.json();
+          const messages = data.data.messages as MergedMessage[];
+
+          // メッセージを置き換え
+          setTabMessages((prev) => ({ ...prev, [tab_id]: messages }));
+
+          // シーケンスを更新
+          const lastMessage = messages[messages.length - 1];
+          if (lastMessage?._sequence) {
+            setTabSequences((prev) => ({ ...prev, [tab_id]: lastMessage._sequence }));
+          }
+        }
+      } catch (error) {
+        console.error(`[Resync] Failed to resync tab ${tab_id}:`, error);
+      } finally {
+        setIsResyncing((prev) => {
+          const next = new Set(prev);
+          next.delete(tab_id);
+          return next;
+        });
+      }
+    },
+    [isResyncing]
+  );
 
   // SSEイベントリスナー
   useEffect(() => {
@@ -177,7 +225,47 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       }
     };
 
-    // tab:messages:updated イベント
+    // tab:message:added イベント（差分更新）
+    const handleTabMessageAdded = (event: MessageEvent) => {
+      const { tab_id, message, sequence } = JSON.parse(event.data) as {
+        tab_id: string;
+        message: MergedMessage;
+        sequence: number;
+      };
+
+      setTabMessages((prev) => {
+        const currentMessages = prev[tab_id] || [];
+        const lastSequence = tabSequences[tab_id] || 0;
+
+        // ギャップ検知
+        if (sequence !== lastSequence + 1) {
+          console.warn(`[SSE] Gap detected for tab ${tab_id}`, {
+            expected: lastSequence + 1,
+            received: sequence,
+          });
+          // 全体再同期をトリガー
+          triggerFullResync(tab_id);
+          return prev; // メッセージを追加せず、再同期を待つ
+        }
+
+        // 重複検知
+        if (currentMessages.some((m) => m._sequence === sequence)) {
+          console.log(`[SSE] Duplicate message ignored for tab ${tab_id}`, { sequence });
+          return prev;
+        }
+
+        // メッセージを差分追加
+        return {
+          ...prev,
+          [tab_id]: [...currentMessages, message],
+        };
+      });
+
+      // シーケンスを更新
+      setTabSequences((prev) => ({ ...prev, [tab_id]: sequence }));
+    };
+
+    // tab:messages:updated イベント（全体同期）
     const handleTabMessagesUpdated = (event: MessageEvent) => {
       const { tab_id, messages, userPromptCount } = JSON.parse(event.data) as {
         tab_id: string;
@@ -185,7 +273,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         userPromptCount?: number;
       };
 
-      // Backend側でマージ・ソート済みなのでそのまま使用
+      console.log(`[SSE] Full sync for tab ${tab_id}`, { count: messages.length });
+
+      // 全メッセージを置き換え
       setTabMessages((prev) => ({ ...prev, [tab_id]: messages }));
 
       // タブのuserPromptCountを更新
@@ -193,6 +283,30 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         setTabs((prevTabs) =>
           prevTabs.map((tab) => (tab.tab_id === tab_id ? { ...tab, userPromptCount } : tab))
         );
+      }
+
+      // シーケンスを更新
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?._sequence) {
+        setTabSequences((prev) => ({ ...prev, [tab_id]: lastMessage._sequence }));
+      }
+
+      // 再同期フラグをクリア
+      setIsResyncing((prev) => {
+        const next = new Set(prev);
+        next.delete(tab_id);
+        return next;
+      });
+    };
+
+    // resync:hint イベント（再接続時）
+    const handleResyncHint = (event: MessageEvent) => {
+      const { lastEventId } = JSON.parse(event.data) as { lastEventId: string };
+      console.log('[SSE] Resync hint received', { lastEventId });
+
+      // アクティブタブの全体再同期をトリガー
+      if (activeTabId) {
+        triggerFullResync(activeTabId);
       }
     };
 
@@ -212,17 +326,21 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     eventSource.addEventListener('tab:updated', handleTabUpdated);
     eventSource.addEventListener('tab:deleted', handleTabDeleted);
     eventSource.addEventListener('tab:created', handleTabCreated);
+    eventSource.addEventListener('tab:message:added', handleTabMessageAdded);
     eventSource.addEventListener('tab:messages:updated', handleTabMessagesUpdated);
+    eventSource.addEventListener('resync:hint', handleResyncHint);
     eventSource.addEventListener('task:updated', handleTaskUpdated);
 
     return () => {
       eventSource.removeEventListener('tab:updated', handleTabUpdated);
       eventSource.removeEventListener('tab:deleted', handleTabDeleted);
       eventSource.removeEventListener('tab:created', handleTabCreated);
+      eventSource.removeEventListener('tab:message:added', handleTabMessageAdded);
       eventSource.removeEventListener('tab:messages:updated', handleTabMessagesUpdated);
+      eventSource.removeEventListener('resync:hint', handleResyncHint);
       eventSource.removeEventListener('task:updated', handleTaskUpdated);
     };
-  }, [eventSource, id, activeTabId, tabs]);
+  }, [eventSource, id, activeTabId, tabs, tabSequences, triggerFullResync]);
 
   // タブのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
   useEffect(() => {

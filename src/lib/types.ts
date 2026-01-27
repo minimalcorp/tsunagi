@@ -35,12 +35,14 @@ export interface Tab {
 export interface UserPrompt {
   created_at: string; // ISO8601形式
   prompt: string; // ユーザーのプロンプトテキスト
+  _sequence?: number; // タブ内の連番（オプショナル、既存データ互換性のため）
 }
 
 // SessionData型（sessions.jsonの値型）
 export interface SessionData {
   rawMessages: unknown[];
   userPrompts: UserPrompt[];
+  nextSequence?: number; // タブごとの連番カウンター（オプショナル、既存データ互換性のため）
 }
 
 // ============================================
@@ -54,10 +56,17 @@ export interface SimplifiedUserMessage {
   message: { content: string };
 }
 
+// SequencedMessage型（シーケンス番号付きメッセージ）
+export interface SequencedMessage extends Record<string, unknown> {
+  _sequence: number; // タブ内の連番
+  created_at?: string;
+  type?: string;
+}
+
 // getMergedMessagesが返すメッセージ型
 // - SimplifiedUserMessage: userPromptsから変換されたメッセージ
 // - unknown: rawMessagesからのSDKメッセージ（SDKMessage型だが、型定義をimportせずにunknownとする）
-export type MergedMessage = SimplifiedUserMessage | Record<string, unknown>;
+export type MergedMessage = SequencedMessage;
 
 // ============================================
 // UIMessage型（新しいデータモデル）
