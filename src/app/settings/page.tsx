@@ -5,37 +5,35 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNavigation';
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
-import { EnvAddDialog } from '@/components/env/EnvAddDialog';
+import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [existingKeys, setExistingKeys] = useState<string[]>([]);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // localStorage から選択ノードを復元
-  useEffect(() => {
-    const saved = localStorage.getItem('tsunagi:env-selected-node');
-    if (saved) {
-      try {
-        const node = JSON.parse(saved);
-        setSelectedNode(node);
-      } catch (e) {
-        console.error('Failed to parse selected node:', e);
-        // デフォルトで Global を選択
-        setSelectedNode({
-          scope: 'global',
-          label: 'Global',
-        });
+  // Initialize selectedNode from localStorage or default to Global
+  const getInitialNode = (): SelectedNode => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tsunagi:env-selected-node');
+      if (saved) {
+        try {
+          return JSON.parse(saved) as SelectedNode;
+        } catch (e) {
+          console.error('Failed to parse selected node:', e);
+        }
       }
-    } else {
-      // デフォルトで Global を選択
-      setSelectedNode({
-        scope: 'global',
-        label: 'Global',
-      });
     }
+    return {
+      scope: 'global',
+      label: 'Global',
+    };
+  };
+
+  const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
+
+  // Initialize on mount (one-time initialization from localStorage)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedNode(getInitialNode());
   }, []);
 
   // 選択ノードを localStorage に保存
@@ -47,54 +45,6 @@ export default function SettingsPage() {
 
   const handleNodeSelect = (node: SelectedNode) => {
     setSelectedNode(node);
-  };
-
-  // 既存キーを取得
-  useEffect(() => {
-    if (!selectedNode) return;
-
-    const loadExistingKeys = async () => {
-      try {
-        const params = new URLSearchParams({ scope: selectedNode.scope });
-        if (selectedNode.owner) params.set('owner', selectedNode.owner);
-        if (selectedNode.repo) params.set('repo', selectedNode.repo);
-
-        const response = await fetch(`/api/env/list?${params}`);
-        if (!response.ok) throw new Error('Failed to fetch environment variables');
-
-        const data = await response.json();
-        const keys = (data.data.envVars || []).map((v: { key: string }) => v.key);
-        setExistingKeys(keys);
-      } catch (err) {
-        console.error('Failed to load existing keys:', err);
-      }
-    };
-
-    loadExistingKeys();
-  }, [selectedNode, refreshTrigger]);
-
-  const handleAddVariable = async (key: string, value: string) => {
-    try {
-      const response = await fetch('/api/env', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key,
-          value,
-          scope: selectedNode!.scope,
-          owner: selectedNode!.owner,
-          repo: selectedNode!.repo,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to add environment variable');
-
-      // リストを再取得
-      setRefreshTrigger((prev) => prev + 1);
-    } catch (err) {
-      console.error('Failed to add environment variable:', err);
-      throw err;
-    }
   };
 
   return (
@@ -124,13 +74,15 @@ export default function SettingsPage() {
         </div>
 
         {/* Right Panel: Editor */}
-        <div className="flex-1 bg-theme-card p-4">
+        <div className="flex-1 bg-theme-card p-4 overflow-y-auto">
           {selectedNode ? (
-            <EnvVariableEditor
-              selectedNode={selectedNode}
-              onAddClick={() => setShowAddDialog(true)}
-              refreshTrigger={refreshTrigger}
-            />
+            <div className="space-y-6">
+              {/* Claude Token Section (All scopes) */}
+              <ClaudeTokenSection selectedNode={selectedNode} />
+
+              {/* Environment Variables Section */}
+              <EnvVariableEditor selectedNode={selectedNode} />
+            </div>
           ) : (
             <div className="h-full flex items-center justify-center text-theme-muted text-sm">
               Select a node from the left panel
@@ -138,17 +90,6 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
-
-      {/* Add Variable Dialog */}
-      {selectedNode && (
-        <EnvAddDialog
-          isOpen={showAddDialog}
-          onClose={() => setShowAddDialog(false)}
-          selectedNode={selectedNode}
-          existingKeys={existingKeys}
-          onAdd={handleAddVariable}
-        />
-      )}
     </div>
   );
 }

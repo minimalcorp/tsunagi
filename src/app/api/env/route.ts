@@ -68,6 +68,43 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PUT /api/env
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { key, value, scope, owner, repo } = body;
+
+    // Validation
+    if (!key || !value || !scope) {
+      return NextResponse.json(
+        { error: 'Missing required fields: key, value, scope' },
+        { status: 400 }
+      );
+    }
+
+    if (scope === 'owner' && !owner) {
+      return NextResponse.json(
+        { error: 'Missing required field: owner for scope=owner' },
+        { status: 400 }
+      );
+    }
+
+    if (scope === 'repo' && (!owner || !repo)) {
+      return NextResponse.json(
+        { error: 'Missing required fields: owner, repo for scope=repo' },
+        { status: 400 }
+      );
+    }
+
+    // Update the value (setEnv will overwrite if exists)
+    await envRepo.setEnv(key, value, scope, owner, repo);
+    return NextResponse.json({ data: { success: true } });
+  } catch (error) {
+    console.error('PUT /api/env error:', error);
+    return NextResponse.json({ error: 'Failed to update environment variable' }, { status: 500 });
+  }
+}
+
 // DELETE /api/env?key=...&scope=...&owner=...&repo=...
 export async function DELETE(request: NextRequest) {
   try {

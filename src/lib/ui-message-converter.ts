@@ -117,8 +117,10 @@ export class UIMessageConverter {
           break;
 
         case 'result':
-          // SDKResultMessageはClaudeセッションの最終状態を示すだけなので、UI表示不要
-          // ステータス管理はonStatusChangeコールバックで行う
+          const resultMsg = this.convertResultMessage(msg as SDKResultMessage);
+          if (resultMsg) {
+            uiMessages.push(resultMsg);
+          }
           break;
       }
     }
@@ -338,6 +340,47 @@ export class UIMessageConverter {
         model: msg.model,
       },
     };
+  }
+
+  private convertResultMessage(msg: SDKResultMessage): UIMessage | null {
+    const isError = msg.is_error || msg.subtype === 'error';
+    const isSuccess = msg.subtype === 'success';
+
+    if (!isSuccess && !isError) {
+      return null;
+    }
+
+    if (isError) {
+      // エラーの場合
+      const errorMessage = msg.errors?.join('\n') || msg.result || 'Session failed';
+      return {
+        id: uuidv4(),
+        timestamp: msg.created_at || new Date().toISOString(),
+        type: 'error',
+        content: {
+          type: 'error',
+          message: errorMessage,
+        },
+        metadata: {
+          sdkMessageUuids: msg.uuid ? [msg.uuid] : [],
+        },
+      };
+    } else {
+      // 成功の場合
+      return {
+        id: uuidv4(),
+        timestamp: msg.created_at || new Date().toISOString(),
+        type: 'system_event',
+        content: {
+          type: 'system_event',
+          event: 'session_completed',
+          description: msg.result || 'Session completed successfully',
+        },
+        metadata: {
+          sdkMessageUuids: msg.uuid ? [msg.uuid] : [],
+        },
+      };
+    }
   }
 }
 
