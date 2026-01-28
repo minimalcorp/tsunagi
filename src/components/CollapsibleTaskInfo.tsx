@@ -19,11 +19,11 @@ export function CollapsibleTaskInfo({ task, defaultExpanded = false }: Collapsib
         className="flex items-center gap-2 w-full text-left py-2 hover:bg-theme-hover rounded px-2 -mx-2 cursor-pointer"
       >
         {isExpanded ? (
-          <ChevronUp className="w-5 h-5 text-theme-fg" />
+          <ChevronUp className="w-4 h-4 text-theme-fg" />
         ) : (
-          <ChevronDown className="w-5 h-5 text-theme-fg" />
+          <ChevronDown className="w-4 h-4 text-theme-fg" />
         )}
-        <h3 className="text-lg font-semibold text-theme-fg">Task Details</h3>
+        <h3 className="text-base font-medium text-theme-fg">Task Details</h3>
       </button>
 
       {isExpanded && (
