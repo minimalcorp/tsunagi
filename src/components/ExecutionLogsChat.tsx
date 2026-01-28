@@ -13,9 +13,11 @@ import {
   Ban,
   CircleCheck,
 } from 'lucide-react';
-import type { UIMessage } from '@/lib/types';
+import type { UIMessage, Tab } from '@/lib/types';
 import { UIMessageConverter } from '@/lib/ui-message-converter';
 import { useTheme } from '@/contexts/ThemeContext';
+import { ClaudeState } from '@/components/ClaudeState';
+import { getClaudeStatus } from '@/lib/claude-status';
 
 // セッション完了状態を判定するヘルパー関数
 function isSessionCompleted(rawMessages?: unknown[]): boolean {
@@ -39,9 +41,10 @@ function isSessionCompleted(rawMessages?: unknown[]): boolean {
 interface ExecutionLogsChatProps {
   rawMessages?: unknown[]; // SDK messages
   tabId?: string; // タブ切り替え検知用
+  tab: Tab;
 }
 
-export function ExecutionLogsChat({ rawMessages, tabId }: ExecutionLogsChatProps) {
+export function ExecutionLogsChat({ rawMessages, tabId, tab }: ExecutionLogsChatProps) {
   const logsEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -49,6 +52,8 @@ export function ExecutionLogsChat({ rawMessages, tabId }: ExecutionLogsChatProps
 
   // セッション完了状態を判定
   const sessionCompleted = useMemo(() => isSessionCompleted(rawMessages), [rawMessages]);
+
+  const status = getClaudeStatus(tab);
 
   // rawMessagesをUIMessagesに変換
   const uiMessages = useMemo(() => {
@@ -92,6 +97,7 @@ export function ExecutionLogsChat({ rawMessages, tabId }: ExecutionLogsChatProps
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
         <h3 className="text-sm font-semibold text-theme-fg">Logs</h3>
+        <ClaudeState status={status} />
       </div>
 
       <div
