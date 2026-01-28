@@ -261,3 +261,68 @@ export async function listWorktrees(owner: string, repo: string): Promise<Worktr
 
   return worktrees;
 }
+
+// worktreeをrebase
+export async function rebaseWorktree(
+  owner: string,
+  repo: string,
+  branch: string,
+  baseBranch?: string
+): Promise<{ success: boolean; message: string; conflicts?: string[] }> {
+  const bareRepoPath = await ensureBareRepository(owner, repo);
+  const worktreePath = getWorktreePath(owner, repo, branch);
+
+  // worktreeが存在するか確認
+  try {
+    await fs.access(worktreePath);
+  } catch {
+    throw new Error(`Worktree not found at ${worktreePath}`);
+  }
+
+  const git: SimpleGit = simpleGit(worktreePath);
+
+  // uncommitted changesがあるかチェック
+  const status = await git.status();
+  if (!status.isClean()) {
+    throw new Error('Worktree has uncommitted changes. Please commit or stash your changes first.');
+  }
+
+  // リモートの最新状態を取得
+  const bareGit: SimpleGit = simpleGit(bareRepoPath);
+  await bareGit.fetch('origin', { '--prune': null });
+
+  // デフォルトブランチを取得
+  const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
+  const targetRef = `origin/${effectiveBaseBranch}`;
+
+  try {
+    // rebaseを実行
+    await git.rebase([targetRef]);
+
+    return {
+      success: true,
+      message: `Successfully rebased ${branch} onto ${targetRef}`,
+    };
+  } catch {
+    // rebase失敗時の処理
+    try {
+      // conflictファイルを取得
+      const conflictStatus = await git.status();
+      const conflicts = conflictStatus.conflicted;
+
+      // rebaseをabort
+      await git.rebase(['--abort']);
+
+      return {
+        success: false,
+        message: `Rebase failed due to conflicts. Branch has been reset to original state.`,
+        conflicts,
+      };
+    } catch (abortError) {
+      // abortも失敗した場合
+      throw new Error(
+        `Rebase failed and abort also failed: ${abortError instanceof Error ? abortError.message : String(abortError)}`
+      );
+    }
+  }
+}
