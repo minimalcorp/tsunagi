@@ -126,8 +126,14 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
         <button
           onClick={handleRebase}
           disabled={isRebaseDisabled}
-          title="Rebase to main"
-          className="w-auto px-4 py-2 bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          title={
+            task.needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
+          }
+          className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+            task.needsRebase
+              ? 'bg-primary-600 hover:bg-primary-hover text-white border-0'
+              : 'bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme'
+          }`}
         >
           <GitMerge className="w-4 h-4" />
           Rebase
@@ -166,8 +172,16 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
           <button
             onClick={handleRebase}
             disabled={isRebaseDisabled}
-            title="Rebase to main"
-            className="w-auto px-4 py-2 bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            title={
+              task.needsRebase
+                ? 'Base branch has new commits - Rebase recommended'
+                : 'Rebase to main'
+            }
+            className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+              task.needsRebase
+                ? 'bg-primary-600 hover:bg-primary-hover text-white border-0'
+                : 'bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme'
+            }`}
           >
             <GitMerge className="w-4 h-4" />
             Rebase
