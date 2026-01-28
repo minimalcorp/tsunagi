@@ -40,7 +40,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const activeTab = tabs.find((t) => t.tab_id === activeTabId);
 
   // SSE統合
-  const { eventSource, isConnected } = useSSE();
+  const { eventSource, connectionState } = useSSE();
 
   // タブ切り替え時の処理（現在のプロンプトを保存）
   const handleTabChange = useCallback(
@@ -345,7 +345,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // タブのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
   useEffect(() => {
     // SSE接続済みの場合はポーリング不要
-    if (isConnected) return;
+    if (connectionState === 'connected') return;
     if (!activeTabId || !task) return;
 
     const pollTab = async () => {
@@ -385,7 +385,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     return () => {
       clearInterval(intervalId);
     };
-  }, [isConnected, activeTabId, activeTab?.status, task]);
+  }, [connectionState, activeTabId, activeTab?.status, task]);
 
   // タスク更新
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
@@ -612,7 +612,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         </div>
 
         {/* Quick Actions */}
-        <div className="p-4 border-t border-theme bg-theme-card flex-shrink-0">
+        <div className="px-4 py-4 pr-[72px] border-t border-theme bg-theme-card flex-shrink-0">
           <TaskActions task={task} onDelete={handleTaskDelete} />
         </div>
       </div>
