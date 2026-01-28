@@ -57,6 +57,10 @@ npm run type-check
 
 エラーがある場合は修正し、再度実行する。
 
+## Serena (MCP) 使用時の注意
+
+- **Serenaはdockerで動いているため、プロジェクトのactivateは常に `.` を指定**
+
 ## 実装計画
 
 - **実装計画は、ホームディレクトリではなく、必ずプロジェクトディレクトリの `{project root directory}/.claude/plans/procedures.md` で管理**
