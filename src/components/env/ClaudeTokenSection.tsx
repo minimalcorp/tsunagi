@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Pencil, Plus, X, Check, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Plus, X, Check, AlertCircle, Trash2 } from 'lucide-react';
 import { LoadingSpinner } from '../LoadingSpinner';
 import type { SelectedNode } from './EnvTreeNavigation';
 
@@ -242,6 +242,32 @@ export function ClaudeTokenSection({
     setDetectedKey(null);
   };
 
+  const handleDelete = async (key: string) => {
+    if (!confirm(`Are you sure you want to delete this token?`)) {
+      return;
+    }
+
+    try {
+      const deleteParams = new URLSearchParams({
+        key,
+        scope: selectedNode.scope,
+      });
+      if (selectedNode.owner) deleteParams.set('owner', selectedNode.owner);
+      if (selectedNode.repo) deleteParams.set('repo', selectedNode.repo);
+
+      const response = await fetch(`/api/env?${deleteParams}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to delete token');
+
+      await loadTokens();
+    } catch (err) {
+      console.error('Failed to delete token:', err);
+      alert('Failed to delete token');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="border-2 border-primary rounded-lg p-4 bg-theme-card">
@@ -407,6 +433,15 @@ export function ClaudeTokenSection({
                       >
                         <Pencil className="w-4 h-4 text-theme-muted" />
                       </button>
+                      {selectedNode.scope !== 'global' && (
+                        <button
+                          onClick={() => handleDelete(token.key)}
+                          className="p-1 hover:bg-red-50 rounded cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <input
