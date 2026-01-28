@@ -413,6 +413,38 @@ select {
   background-color: rgba(17, 24, 39, 0.9);
 }
 
+/* Connection Status Indicator styles */
+.connection-status-indicator {
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .connection-status-indicator {
+    background-color: #111827 !important;
+    border-color: #1f2937 !important;
+  }
+}
+
+:root[data-theme='dark'] .connection-status-indicator {
+  background-color: #111827 !important;
+  border-color: #1f2937 !important;
+}
+
+.connection-status-tooltip {
+  background-color: #111827;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .connection-status-tooltip {
+    background-color: #374151;
+  }
+}
+
+:root[data-theme='dark'] .connection-status-tooltip {
+  background-color: #374151;
+}
+
 /* ReactMarkdown prose styles for Logs - ensure proper word wrapping and readability */
 .prose {
   /* Paragraph styling */
