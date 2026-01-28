@@ -602,6 +602,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                     <ExecutionLogsChat
                       rawMessages={tabMessages[activeTab.tab_id] || []}
                       tabId={activeTab.tab_id}
+                      tab={activeTab}
                     />
                   )}
                 </div>
