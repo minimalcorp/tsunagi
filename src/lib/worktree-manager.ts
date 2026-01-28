@@ -288,13 +288,17 @@ export async function checkRebaseNeeded(
     const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
     const targetRef = `origin/${effectiveBaseBranch}`;
 
-    // base branchの方が進んでいる場合（現在のブランチがbehind）
-    // HEAD..targetRef: base branchに存在して現在のブランチに無いコミット数
     const git: SimpleGit = simpleGit(worktreePath);
-    const aheadResult = await git.raw(['rev-list', '--count', `HEAD..${targetRef}`]);
-    const aheadCount = parseInt(aheadResult.trim(), 10);
 
-    return aheadCount > 0; // base branchに新しいコミットがある場合はtrue
+    // merge-base（共通祖先）を取得
+    const mergeBaseResult = await git.raw(['merge-base', 'HEAD', targetRef]);
+    const mergeBaseCommit = mergeBaseResult.trim();
+
+    // merge-baseからbase branchが進んでいるコミット数を取得
+    const behindResult = await git.raw(['rev-list', '--count', `${mergeBaseCommit}..${targetRef}`]);
+    const behindCount = parseInt(behindResult.trim(), 10);
+
+    return behindCount > 0; // base branchがmerge-baseから進んでいる場合はtrue
   } catch (error) {
     console.error('Failed to check rebase needed:', error);
     return false; // エラー時はrebase不要として扱う

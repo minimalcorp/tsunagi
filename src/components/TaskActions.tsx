@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Task } from '@/lib/types';
 import { normalizeBranchName } from '@/lib/branch-utils';
-import { Code2, Terminal, Trash2, GitMerge } from 'lucide-react';
+import { Code2, Terminal, Trash2, GitMerge, Loader2 } from 'lucide-react';
 
 interface TaskActionsProps {
   task: Task;
@@ -19,6 +19,37 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
   const worktreePath = getWorktreePath(task);
   const [isExecuting, setIsExecuting] = useState<string | null>(null);
   const [isRebasing, setIsRebasing] = useState(false);
+  const [needsRebase, setNeedsRebase] = useState<boolean | undefined>(undefined);
+  const [isCheckingRebase, setIsCheckingRebase] = useState(false);
+
+  // rebase判定を非同期で取得
+  useEffect(() => {
+    // worktreeが作成済みの場合のみ判定を取得
+    if (task.worktreeStatus !== 'created') {
+      setNeedsRebase(false);
+      return;
+    }
+
+    const checkRebase = async () => {
+      setIsCheckingRebase(true);
+      try {
+        const response = await fetch(`/api/tasks/${task.id}/needs-rebase`);
+        if (response.ok) {
+          const data = await response.json();
+          setNeedsRebase(data.data.needsRebase);
+        } else {
+          setNeedsRebase(false);
+        }
+      } catch (error) {
+        console.error('Failed to check rebase status:', error);
+        setNeedsRebase(false);
+      } finally {
+        setIsCheckingRebase(false);
+      }
+    };
+
+    checkRebase();
+  }, [task.id, task.worktreeStatus]);
 
   const handleCommand = async (commandType: 'vscode' | 'terminal') => {
     setIsExecuting(commandType);
@@ -127,15 +158,19 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
           onClick={handleRebase}
           disabled={isRebaseDisabled}
           title={
-            task.needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
+            needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
           }
           className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
-            task.needsRebase
+            needsRebase
               ? 'bg-primary-600 hover:bg-primary-hover text-white border-0'
               : 'bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme'
           }`}
         >
-          <GitMerge className="w-4 h-4" />
+          {isCheckingRebase ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <GitMerge className="w-4 h-4" />
+          )}
           Rebase
         </button>
       </div>
@@ -173,17 +208,19 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
             onClick={handleRebase}
             disabled={isRebaseDisabled}
             title={
-              task.needsRebase
-                ? 'Base branch has new commits - Rebase recommended'
-                : 'Rebase to main'
+              needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
             }
             className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
-              task.needsRebase
+              needsRebase
                 ? 'bg-primary-600 hover:bg-primary-hover text-white border-0'
                 : 'bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme'
             }`}
           >
-            <GitMerge className="w-4 h-4" />
+            {isCheckingRebase ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <GitMerge className="w-4 h-4" />
+            )}
             Rebase
           </button>
         </div>

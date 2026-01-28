@@ -29,16 +29,9 @@ export async function GET(request: NextRequest, { params }: Params) {
       })
     );
 
-    // worktreeが作成済みの場合、rebaseが必要かチェック
-    let needsRebase = false;
-    if (task.worktreeStatus === 'created') {
-      needsRebase = await worktreeManager.checkRebaseNeeded(task.owner, task.repo, task.branch);
-    }
-
     const taskWithCounts = {
       ...task,
       tabs: tabsWithCounts,
-      needsRebase,
     };
 
     return NextResponse.json({ data: { task: taskWithCounts } });
