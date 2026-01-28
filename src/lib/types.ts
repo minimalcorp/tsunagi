@@ -17,6 +17,7 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   tabs: Tab[]; // タブ管理（Phase 1で追加）
+  needsRebase?: boolean; // base branchが進んでいてrebaseが必要か
 }
 
 // Tab型（タブとメッセージ履歴を分離）

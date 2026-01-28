@@ -262,6 +262,45 @@ export async function listWorktrees(owner: string, repo: string): Promise<Worktr
   return worktrees;
 }
 
+// base branchが進んでいてrebaseが必要かチェック
+export async function checkRebaseNeeded(
+  owner: string,
+  repo: string,
+  branch: string,
+  baseBranch?: string
+): Promise<boolean> {
+  try {
+    const bareRepoPath = await ensureBareRepository(owner, repo);
+    const worktreePath = getWorktreePath(owner, repo, branch);
+
+    // worktreeが存在するか確認
+    try {
+      await fs.access(worktreePath);
+    } catch {
+      return false; // worktreeが存在しない場合はrebase不要
+    }
+
+    // リモートの最新状態を取得
+    const bareGit: SimpleGit = simpleGit(bareRepoPath);
+    await bareGit.fetch('origin', { '--prune': null });
+
+    // デフォルトブランチを取得
+    const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
+    const targetRef = `origin/${effectiveBaseBranch}`;
+
+    // base branchの方が進んでいる場合（現在のブランチがbehind）
+    // HEAD..targetRef: base branchに存在して現在のブランチに無いコミット数
+    const git: SimpleGit = simpleGit(worktreePath);
+    const aheadResult = await git.raw(['rev-list', '--count', `HEAD..${targetRef}`]);
+    const aheadCount = parseInt(aheadResult.trim(), 10);
+
+    return aheadCount > 0; // base branchに新しいコミットがある場合はtrue
+  } catch (error) {
+    console.error('Failed to check rebase needed:', error);
+    return false; // エラー時はrebase不要として扱う
+  }
+}
+
 // worktreeをrebase
 export async function rebaseWorktree(
   owner: string,
