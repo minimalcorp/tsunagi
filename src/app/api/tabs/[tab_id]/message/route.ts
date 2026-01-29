@@ -83,15 +83,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     const newMessage = messages.find((m) => m._sequence === result.sequence);
 
     if (newMessage) {
-      sseManager.broadcast(
-        'tab:message:added',
-        {
-          tab_id,
-          message: newMessage,
-          sequence: result.sequence,
-        },
-        result.sequence.toString() // SSE event id
-      );
+      sseManager.broadcast('tab:message:added', {
+        tab_id,
+        message: newMessage,
+      });
     }
 
     // Execute Claude in background
@@ -113,15 +108,10 @@ export async function POST(request: NextRequest, { params }: Params) {
         const newMessage = messages.find((m) => m._sequence === result.sequence);
 
         if (newMessage) {
-          sseManager.broadcast(
-            'tab:message:added',
-            {
-              tab_id,
-              message: newMessage,
-              sequence: result.sequence,
-            },
-            result.sequence.toString() // SSE event id
-          );
+          sseManager.broadcast('tab:message:added', {
+            tab_id,
+            message: newMessage,
+          });
         }
       },
       onStatusChange: async (status) => {

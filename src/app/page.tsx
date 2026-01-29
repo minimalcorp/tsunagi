@@ -16,6 +16,7 @@ export default function Home() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [globalEnv, setGlobalEnv] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [lastSequence, setLastSequence] = useState<number>(0);
 
   // Dialog states
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
@@ -103,39 +104,87 @@ export default function Home() {
   useEffect(() => {
     if (!eventSource) return;
 
+    // connected イベントでsequenceを初期化
+    const handleConnected = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId || '0', 10);
+      console.log('[SSE] Connected with sequence:', sequence);
+      setLastSequence(sequence);
+    };
+
     // task:created イベント
     const handleTaskCreated = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId, 10);
       const task = JSON.parse(event.data) as Task;
+
+      // ギャップ検知
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected!', {
+          expected: lastSequence + 1,
+          received: sequence,
+        });
+        loadData(); // 全体再同期
+        setLastSequence(sequence);
+        return;
+      }
+
       setTasks((prev) => {
         // 重複チェック
         if (prev.some((t) => t.id === task.id)) return prev;
         return [...prev, task];
       });
+      setLastSequence(sequence);
     };
 
     // task:updated イベント
     const handleTaskUpdated = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId, 10);
       const task = JSON.parse(event.data) as Task;
+
+      // ギャップ検知
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected!', {
+          expected: lastSequence + 1,
+          received: sequence,
+        });
+        loadData();
+        setLastSequence(sequence);
+        return;
+      }
+
       console.log('[SSE] task:updated received:', task.id);
       setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+      setLastSequence(sequence);
     };
 
     // task:deleted イベント
     const handleTaskDeleted = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId, 10);
       const { id } = JSON.parse(event.data) as { id: string };
+
+      // ギャップ検知
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected!');
+        loadData();
+        setLastSequence(sequence);
+        return;
+      }
+
       setTasks((prev) => prev.filter((t) => t.id !== id));
+      setLastSequence(sequence);
     };
 
+    eventSource.addEventListener('connected', handleConnected);
     eventSource.addEventListener('task:created', handleTaskCreated);
     eventSource.addEventListener('task:updated', handleTaskUpdated);
     eventSource.addEventListener('task:deleted', handleTaskDeleted);
 
     return () => {
+      eventSource.removeEventListener('connected', handleConnected);
       eventSource.removeEventListener('task:created', handleTaskCreated);
       eventSource.removeEventListener('task:updated', handleTaskUpdated);
       eventSource.removeEventListener('task:deleted', handleTaskDeleted);
     };
-  }, [eventSource]);
+  }, [eventSource, lastSequence]);
 
   // Handler functions
   const handleTaskMove = async (taskId: string, newStatus: Task['status']) => {
