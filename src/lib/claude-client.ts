@@ -147,10 +147,37 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
 
         case 'result':
           // Handle final result for status change
+          console.log('[Session] Result message received:', {
+            sessionId,
+            subtype: message.subtype,
+          });
+
           if (message.subtype === 'success') {
-            onStatusChange?.('success');
+            console.log('[Session] Calling onStatusChange with success');
+            try {
+              const result = onStatusChange?.('success');
+              // onStatusChange is async, catch any unhandled errors
+              if (result) {
+                Promise.resolve(result).catch((error: unknown) => {
+                  console.error('[Session] onStatusChange(success) failed:', error);
+                });
+              }
+            } catch (error) {
+              console.error('[Session] onStatusChange(success) threw synchronously:', error);
+            }
           } else {
-            onStatusChange?.('error');
+            console.log('[Session] Calling onStatusChange with error');
+            try {
+              const result = onStatusChange?.('error');
+              // onStatusChange is async, catch any unhandled errors
+              if (result) {
+                Promise.resolve(result).catch((error: unknown) => {
+                  console.error('[Session] onStatusChange(error) failed:', error);
+                });
+              }
+            } catch (error) {
+              console.error('[Session] onStatusChange(error) threw synchronously:', error);
+            }
           }
           break;
       }

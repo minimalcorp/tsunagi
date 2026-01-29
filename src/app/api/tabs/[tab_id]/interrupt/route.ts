@@ -37,8 +37,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Interrupt the Claude session
     await interruptSession(tab_id);
 
-    // Note: Tab status remains 'running' as per SDK design
-    // The next message API call will automatically resume the session
+    // Update tab status to idle after interrupt
+    await taskRepo.updateTab(task.id, tab_id, { status: 'idle' });
+
+    // SSE broadcast (tab status changed)
+    const updatedTab = await taskRepo.getTab(task.id, tab_id);
+    if (updatedTab) {
+      sseManager.broadcast('tab:updated', { taskId: task.id, tab: updatedTab });
+    }
 
     const updatedTask = await taskRepo.getTask(task.id);
     if (updatedTask) {

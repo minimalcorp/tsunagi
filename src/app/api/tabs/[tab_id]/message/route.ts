@@ -115,25 +115,48 @@ export async function POST(request: NextRequest, { params }: Params) {
         }
       },
       onStatusChange: async (status) => {
-        // Update tab status
-        await taskRepo.updateTab(task.id, tab_id, {
-          status,
-          ...(status === 'success' || status === 'error'
-            ? { completedAt: new Date().toISOString() }
-            : {}),
-        });
+        console.log('[onStatusChange] START:', { tab_id, status, taskId: task.id });
 
-        await taskRepo.updateTask(task.id, {});
+        try {
+          // Update tab status
+          await taskRepo.updateTab(task.id, tab_id, {
+            status,
+            ...(status === 'success' || status === 'error'
+              ? { completedAt: new Date().toISOString() }
+              : {}),
+          });
 
-        // SSE broadcast (tab status changed)
-        const updatedTab = await taskRepo.getTab(task.id, tab_id);
-        if (updatedTab) {
-          sseManager.broadcast('tab:updated', { taskId: task.id, tab: updatedTab });
-        }
+          await taskRepo.updateTask(task.id, {});
 
-        const updatedTask = await taskRepo.getTask(task.id);
-        if (updatedTask) {
-          sseManager.broadcast('task:updated', updatedTask);
+          // SSE broadcast (tab status changed)
+          const updatedTab = await taskRepo.getTab(task.id, tab_id);
+          if (updatedTab) {
+            sseManager.broadcast('tab:updated', { taskId: task.id, tab: updatedTab });
+          } else {
+            console.error('[onStatusChange] ERROR: updatedTab is null!', {
+              tab_id,
+              taskId: task.id,
+            });
+          }
+
+          const updatedTask = await taskRepo.getTask(task.id);
+          if (updatedTask) {
+            sseManager.broadcast('task:updated', updatedTask);
+          } else {
+            console.error('[onStatusChange] ERROR: updatedTask is null!', { taskId: task.id });
+          }
+
+          console.log('[onStatusChange] SUCCESS:', { tab_id, status });
+        } catch (error) {
+          console.error('[onStatusChange] ERROR:', error);
+          console.error('[onStatusChange] Error details:', {
+            tab_id,
+            taskId: task.id,
+            status,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorStack: error instanceof Error ? error.stack : undefined,
+          });
+          // エラーが発生してもthrowせず、ログに記録するのみ
         }
       },
       onAgentSessionId: async (agentSessionId: string) => {

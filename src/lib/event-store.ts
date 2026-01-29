@@ -49,11 +49,7 @@ class EventStore {
       WHEN (SELECT COUNT(*) FROM events) > ${MAX_EVENTS}
       BEGIN
         DELETE FROM events
-        WHERE sequence < (
-          SELECT sequence FROM events
-          ORDER BY sequence DESC
-          LIMIT 1 OFFSET ${MAX_EVENTS - 1}
-        );
+        WHERE sequence = (SELECT MIN(sequence) FROM events);
       END;
     `);
 
