@@ -7,12 +7,11 @@ export interface Task {
   owner: string;
   repo: string;
   branch: string;
+  repoId: string; // Repository IDへの参照
   worktreeStatus: 'pending' | 'created' | 'error';
-  claudeState: 'idle' | 'running';
   plan?: string;
   effort?: number;
   order?: number;
-  deleted: boolean;
   deletedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -23,13 +22,13 @@ export interface Task {
 // Tab型（タブとメッセージ履歴を分離）
 export interface Tab {
   tab_id: string; // UUID（タブ作成時に生成）
-  sessionNumber: number; // タブ表示用の連番
+  order: number; // タブ表示用の連番
   status: 'idle' | 'running' | 'success' | 'error';
   startedAt: string;
   completedAt?: string;
   updatedAt: string;
   session_id?: string; // Claude Agent SDKのセッションID（初回プロンプト後に設定）
-  userPromptCount?: number; // ユーザーが送信したメッセージ数
+  promptCount?: number; // 送信したプロンプト数
 }
 
 // UserPrompt型（ユーザーが送信したプロンプト）
@@ -41,8 +40,8 @@ export interface UserPrompt {
 
 // SessionData型（sessions.jsonの値型）
 export interface SessionData {
-  rawMessages: unknown[];
-  userPrompts: UserPrompt[];
+  sdkMessages: unknown[];
+  prompts: UserPrompt[];
   nextSequence?: number; // タブごとの連番カウンター（オプショナル、既存データ互換性のため）
 }
 
@@ -65,8 +64,8 @@ export interface SequencedMessage extends Record<string, unknown> {
 }
 
 // getMergedMessagesが返すメッセージ型
-// - SimplifiedUserMessage: userPromptsから変換されたメッセージ
-// - unknown: rawMessagesからのSDKメッセージ（SDKMessage型だが、型定義をimportせずにunknownとする）
+// - SimplifiedUserMessage: promptsから変換されたメッセージ
+// - unknown: sdkMessagesからのSDKメッセージ（SDKMessage型だが、型定義をimportせずにunknownとする）
 export type MergedMessage = SequencedMessage;
 
 // ============================================
@@ -171,7 +170,6 @@ export interface Repository {
   owner: string;
   repo: string;
   cloneUrl: string;
-  authToken?: string;
   createdAt: string;
 }
 

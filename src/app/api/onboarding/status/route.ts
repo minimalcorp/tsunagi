@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import * as envRepo from '@/lib/env-repository';
+import * as envRepo from '@/lib/repositories/environment';
 
 export async function GET() {
   const globalEnv = await envRepo.getEnv('global');

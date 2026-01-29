@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as repoRepo from '@/lib/repo-repository';
+import * as repoRepo from '@/lib/repositories/repository';
 
 type Params = {
   params: Promise<{ owner: string; repo: string }>;

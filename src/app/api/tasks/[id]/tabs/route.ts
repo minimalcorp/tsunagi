@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/task-repository';
+import * as taskRepo from '@/lib/repositories/task';
 import { sseManager } from '@/lib/sse-manager';
 
 type Params = {

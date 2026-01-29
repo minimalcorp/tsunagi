@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getRepos } from '@/lib/repo-repository';
+import { getRepos } from '@/lib/repositories/repository';
 
 export async function GET() {
   try {
