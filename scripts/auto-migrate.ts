@@ -20,25 +20,13 @@ function getStateDir(): string {
 
 async function autoMigrate() {
   try {
+    console.log('DB migration started');
+
     const dbPath = getDatabasePath();
     const stateDir = getStateDir();
 
-    console.log(`🔍 データベースの状態を確認中: ${dbPath}`);
-
     // データベースディレクトリが存在しない場合は作成
     await fs.mkdir(stateDir, { recursive: true });
-
-    // データベースファイルの存在確認
-    const dbExists = await fs
-      .access(dbPath)
-      .then(() => true)
-      .catch(() => false);
-
-    if (!dbExists) {
-      console.log('📦 新規データベースを作成します...');
-    } else {
-      console.log('🔄 既存データベースをマイグレーションします...');
-    }
 
     // 環境変数を設定してprisma migrate deployを実行
     const env = {
@@ -46,14 +34,19 @@ async function autoMigrate() {
       DATABASE_URL: `file:${dbPath}`,
     };
 
-    const { stdout, stderr } = await execAsync('npx prisma migrate deploy', { env });
+    const { stdout } = await execAsync('npx prisma migrate deploy', { env });
 
-    if (stdout) console.log(stdout);
-    if (stderr && !stderr.includes('No pending migrations')) console.error(stderr);
+    // Prismaの出力から重要な行を抽出して表示
+    const lines = stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('Prisma schema loaded'));
 
-    console.log('✅ マイグレーション完了！');
+    if (lines.length > 0) {
+      console.log(lines.join('\n'));
+    }
   } catch (error) {
-    console.error('❌ マイグレーションエラー:', error);
+    console.error('DB migration failed:', error instanceof Error ? error.message : error);
     process.exit(1);
   }
 }
