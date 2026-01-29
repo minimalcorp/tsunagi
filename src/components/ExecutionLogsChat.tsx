@@ -12,6 +12,7 @@ import {
   Loader2,
   Ban,
   CircleCheck,
+  CircleAlert,
 } from 'lucide-react';
 import type { UIMessage, Tab } from '@/lib/types';
 import { UIMessageConverter } from '@/lib/ui-message-converter';
@@ -128,11 +129,64 @@ export function ExecutionLogsChat({ rawMessages, tabId, tab }: ExecutionLogsChat
 
 // グループステータス判定ヘルパー関数
 function getGroupStatus(executions: { status: string }[]) {
-  const hasRunning = executions.some((e) => e.status === 'pending');
+  const hasRunning = executions.some((e) => e.status === 'pending' || e.status === 'running');
   const hasError = executions.some((e) => e.status === 'error');
   const allCompleted = executions.every((e) => e.status === 'success' || e.status === 'error');
 
   return { hasRunning, hasError, allCompleted };
+}
+
+// ステータスに応じたアイコンと色を返すヘルパー関数
+function getToolStatusIcon(
+  status: 'pending' | 'running' | 'success' | 'error',
+  sessionCompleted: boolean
+): { icon: JSX.Element | null; colorClass: string } {
+  switch (status) {
+    case 'running':
+      return {
+        icon: <Loader2 className="w-3 h-3 animate-spin" />,
+        colorClass: 'text-theme-fg',
+      };
+    case 'pending':
+      return sessionCompleted
+        ? { icon: <Ban className="w-3 h-3" />, colorClass: 'text-theme-fg' }
+        : { icon: <Loader2 className="w-3 h-3 animate-spin" />, colorClass: 'text-theme-fg' };
+    case 'success':
+      return {
+        icon: <CircleCheck className="w-3 h-3" />,
+        colorClass: 'text-green-500',
+      };
+    case 'error':
+      return {
+        icon: <CircleAlert className="w-3 h-3" />,
+        colorClass: 'text-red-500',
+      };
+  }
+}
+
+// グループ全体のステータスアイコンと色を返すヘルパー関数
+function getGroupStatusIcon(
+  groupStatus: { hasRunning: boolean; hasError: boolean; allCompleted: boolean },
+  sessionCompleted: boolean
+): { icon: JSX.Element | null; colorClass: string } {
+  if (groupStatus.hasRunning) {
+    return sessionCompleted
+      ? { icon: <Ban className="w-3 h-3" />, colorClass: 'text-theme-fg' }
+      : { icon: <Loader2 className="w-3 h-3 animate-spin" />, colorClass: 'text-theme-fg' };
+  }
+  if (groupStatus.hasError) {
+    return {
+      icon: <CircleAlert className="w-3 h-3" />,
+      colorClass: 'text-red-500',
+    };
+  }
+  if (groupStatus.allCompleted) {
+    return {
+      icon: <CircleCheck className="w-3 h-3" />,
+      colorClass: 'text-green-500',
+    };
+  }
+  return { icon: null, colorClass: '' };
 }
 
 // UIMessage用のコンポーネント
@@ -223,15 +277,11 @@ function UIMessageItem({
             const isExpanded = expandedTools[toolKey] ?? false;
             const hasDetails = Boolean(tool.input) || Boolean(tool.result);
 
-            // Status icon for pending state
-            const statusIcon =
-              tool.status === 'pending' ? (
-                sessionCompleted ? (
-                  <Ban className="w-3 h-3" />
-                ) : (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                )
-              ) : null;
+            // Get status icon and color
+            const { icon: statusIcon, colorClass } = getToolStatusIcon(
+              tool.status,
+              sessionCompleted
+            );
 
             return (
               <div key={index}>
@@ -256,11 +306,7 @@ function UIMessageItem({
                         >
                           {tool.toolName}
                         </span>
-                        {statusIcon && (
-                          <span className={`${isDark ? 'text-purple-300' : 'text-purple-950'}`}>
-                            {statusIcon}
-                          </span>
-                        )}
+                        {statusIcon && <span className={colorClass}>{statusIcon}</span>}
                         {isExpanded ? (
                           <ChevronUp
                             className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
@@ -279,7 +325,7 @@ function UIMessageItem({
                       >
                         <Wrench className="w-3 h-3" />
                         {tool.toolName}
-                        {statusIcon}
+                        {statusIcon && <span className={colorClass}>{statusIcon}</span>}
                       </div>
                     )}
                     {isExpanded && tool.input && (
@@ -322,18 +368,11 @@ function UIMessageItem({
             // グループ全体のステータスを判定
             const groupStatus = getGroupStatus(executions);
 
-            // グループ全体のステータスアイコン
-            const groupStatusIcon = groupStatus.hasRunning ? (
-              sessionCompleted ? (
-                <Ban className="w-3 h-3" />
-              ) : (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              )
-            ) : groupStatus.hasError ? (
-              <XCircle className="w-3 h-3" />
-            ) : groupStatus.allCompleted ? (
-              <CircleCheck className="w-3 h-3" />
-            ) : null;
+            // Get group status icon and color
+            const { icon: groupStatusIcon, colorClass: groupColorClass } = getGroupStatusIcon(
+              groupStatus,
+              sessionCompleted
+            );
 
             return (
               <div key={index}>
@@ -358,9 +397,7 @@ function UIMessageItem({
                         Tool Uses ({executions.length})
                       </span>
                       {groupStatusIcon && (
-                        <span className={`${isDark ? 'text-purple-300' : 'text-purple-950'}`}>
-                          {groupStatusIcon}
-                        </span>
+                        <span className={groupColorClass}>{groupStatusIcon}</span>
                       )}
                       {isGroupExpanded ? (
                         <ChevronUp
@@ -380,15 +417,9 @@ function UIMessageItem({
                           const isToolExpanded = expandedTools[toolKey] ?? false;
                           const hasDetails = Boolean(exec.input) || Boolean(exec.result);
 
-                          // Status icon for pending state
-                          const statusIcon =
-                            exec.status === 'pending' ? (
-                              sessionCompleted ? (
-                                <Ban className="w-3 h-3" />
-                              ) : (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              )
-                            ) : null;
+                          // Get status icon and color
+                          const { icon: execStatusIcon, colorClass: execColorClass } =
+                            getToolStatusIcon(exec.status, sessionCompleted);
 
                           return (
                             <div
@@ -412,12 +443,8 @@ function UIMessageItem({
                                   >
                                     {exec.toolName}
                                   </span>
-                                  {statusIcon && (
-                                    <span
-                                      className={`${isDark ? 'text-purple-300' : 'text-purple-950'}`}
-                                    >
-                                      {statusIcon}
-                                    </span>
+                                  {execStatusIcon && (
+                                    <span className={execColorClass}>{execStatusIcon}</span>
                                   )}
                                   {isToolExpanded ? (
                                     <ChevronUp
@@ -436,7 +463,9 @@ function UIMessageItem({
                                   }`}
                                 >
                                   {exec.toolName}
-                                  {statusIcon}
+                                  {execStatusIcon && (
+                                    <span className={execColorClass}>{execStatusIcon}</span>
+                                  )}
                                 </div>
                               )}
                               {isToolExpanded && exec.input && (
