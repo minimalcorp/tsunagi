@@ -186,12 +186,17 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       const sequence = parseInt(event.lastEventId, 10);
       const { taskId, tab } = JSON.parse(event.data) as { taskId: string; tab: Tab };
 
-      // ギャップ検知
+      // ギャップ検知（更新は適用し、バックグラウンドで再同期）
       if (sequence !== lastSequence + 1 && lastSequence > 0) {
-        console.warn('[SSE] Gap detected on tab:updated');
-        loadData();
-        setLastSequence(sequence);
-        return;
+        console.warn(
+          '[SSE] Gap detected on tab:updated, applying update and resyncing in background',
+          {
+            expected: lastSequence + 1,
+            received: sequence,
+          }
+        );
+        // 非同期で全体再同期
+        setTimeout(() => loadData(), 100);
       }
 
       // このタスクのタブのみ更新
@@ -206,12 +211,16 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       const sequence = parseInt(event.lastEventId, 10);
       const { taskId, tab_id } = JSON.parse(event.data) as { taskId: string; tab_id: string };
 
-      // ギャップ検知
+      // ギャップ検知（更新は適用し、バックグラウンドで再同期）
       if (sequence !== lastSequence + 1 && lastSequence > 0) {
-        console.warn('[SSE] Gap detected on tab:deleted');
-        loadData();
-        setLastSequence(sequence);
-        return;
+        console.warn(
+          '[SSE] Gap detected on tab:deleted, applying update and resyncing in background',
+          {
+            expected: lastSequence + 1,
+            received: sequence,
+          }
+        );
+        setTimeout(() => loadData(), 100);
       }
 
       if (taskId === id) {
@@ -239,12 +248,16 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       const sequence = parseInt(event.lastEventId, 10);
       const { taskId, tab } = JSON.parse(event.data) as { taskId: string; tab: Tab };
 
-      // ギャップ検知
+      // ギャップ検知（更新は適用し、バックグラウンドで再同期）
       if (sequence !== lastSequence + 1 && lastSequence > 0) {
-        console.warn('[SSE] Gap detected on tab:created');
-        loadData();
-        setLastSequence(sequence);
-        return;
+        console.warn(
+          '[SSE] Gap detected on tab:created, applying update and resyncing in background',
+          {
+            expected: lastSequence + 1,
+            received: sequence,
+          }
+        );
+        setTimeout(() => loadData(), 100);
       }
 
       // このタスクのタブのみ追加
@@ -267,15 +280,17 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         message: MergedMessage;
       };
 
-      // ギャップ検知（グローバルsequenceで判定）
+      // ギャップ検知（メッセージは適用し、バックグラウンドで再同期）
       if (sequence !== lastSequence + 1 && lastSequence > 0) {
-        console.warn('[SSE] Gap detected, resyncing tab:', tab_id, {
-          expected: lastSequence + 1,
-          received: sequence,
-        });
-        triggerFullResync(tab_id);
-        setLastSequence(sequence);
-        return;
+        console.warn(
+          '[SSE] Gap detected on message:added, applying message and resyncing tab in background:',
+          tab_id,
+          {
+            expected: lastSequence + 1,
+            received: sequence,
+          }
+        );
+        setTimeout(() => triggerFullResync(tab_id), 100);
       }
 
       setTabMessages((prev) => {
@@ -308,15 +323,16 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         promptCount?: number;
       };
 
-      // ギャップ検知
+      // ギャップ検知（更新は適用し、バックグラウンドで再同期）
       if (sequence !== lastSequence + 1 && lastSequence > 0) {
-        console.warn('[SSE] Gap detected on tab:messages:updated', {
-          expected: lastSequence + 1,
-          received: sequence,
-        });
-        triggerFullResync(tab_id);
-        setLastSequence(sequence);
-        return;
+        console.warn(
+          '[SSE] Gap detected on tab:messages:updated, applying update and resyncing in background',
+          {
+            expected: lastSequence + 1,
+            received: sequence,
+          }
+        );
+        setTimeout(() => triggerFullResync(tab_id), 100);
       }
 
       console.log(`[SSE] Full sync for tab ${tab_id}`, { count: messages.length });
@@ -358,12 +374,16 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       const sequence = parseInt(event.lastEventId, 10);
       const updatedTask = JSON.parse(event.data) as Task;
 
-      // ギャップ検知
+      // ギャップ検知（更新は適用し、バックグラウンドで再同期）
       if (sequence !== lastSequence + 1 && lastSequence > 0) {
-        console.warn('[SSE] Gap detected on task:updated');
-        loadData();
-        setLastSequence(sequence);
-        return;
+        console.warn(
+          '[SSE] Gap detected on task:updated, applying update and resyncing in background',
+          {
+            expected: lastSequence + 1,
+            received: sequence,
+          }
+        );
+        setTimeout(() => loadData(), 100);
       }
 
       // このタスクのみ更新
@@ -382,12 +402,16 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       const sequence = parseInt(event.lastEventId, 10);
       const { taskId } = JSON.parse(event.data) as { taskId: string };
 
-      // ギャップ検知
+      // ギャップ検知（更新は適用し、バックグラウンドで再同期）
       if (sequence !== lastSequence + 1 && lastSequence > 0) {
-        console.warn('[SSE] Gap detected on task:deleted');
-        loadData();
-        setLastSequence(sequence);
-        return;
+        console.warn(
+          '[SSE] Gap detected on task:deleted, applying update and resyncing in background',
+          {
+            expected: lastSequence + 1,
+            received: sequence,
+          }
+        );
+        setTimeout(() => loadData(), 100);
       }
 
       // このタスクが削除された場合、一覧に戻る
