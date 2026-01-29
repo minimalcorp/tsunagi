@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { toggleEnv } from '@/lib/env-repository';
+import { toggleEnv } from '@/lib/repositories/environment';
 
 export async function PATCH(request: Request) {
   try {

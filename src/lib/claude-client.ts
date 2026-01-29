@@ -1,5 +1,5 @@
 import { query, type Query } from '@anthropic-ai/claude-agent-sdk';
-import * as settingsRepo from './claude-settings-repository';
+import * as settingsRepo from './repositories/claude-setting';
 
 export interface ExecuteOptions {
   sessionId: string;

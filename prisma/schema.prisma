@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Repository
+model Repository {
+  id        String   @id @default(uuid())
+  owner     String
+  repo      String
+  cloneUrl  String   @map("clone_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tasks           Task[]
+  environmentVars EnvironmentVariable[]
+  claudeSettings  ClaudeSetting[]
+
+  @@unique([owner, repo])
+  @@map("repositories")
+}
+
+// Task
+model Task {
+  id             String    @id @default(uuid())
+  title          String
+  description    String
+  status         String    // 'backlog' | 'planning' | 'coding' | 'reviewing' | 'done'
+  owner          String
+  repo           String
+  branch         String
+  repoId         String    @map("repo_id")
+  worktreeStatus String    @map("worktree_status") // 'pending' | 'created' | 'error'
+  plan           String?
+  effort         Int?
+  order          Int?
+  deletedAt      DateTime? @map("deleted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  repository Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  tabs       Tab[]
+
+  @@index([owner, repo])
+  @@index([deletedAt])
+  @@map("tasks")
+}
+
+// Tab
+model Tab {
+  tabId        String    @id @map("tab_id")
+  taskId       String    @map("task_id")
+  order        Int       // タブ表示用の連番
+  status       String    // 'idle' | 'running' | 'success' | 'error'
+  sessionId    String?   @map("session_id") // Claude Agent SDKのセッションID
+  promptCount  Int?      @map("prompt_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  startedAt    DateTime  @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  sessionData SessionData?
+
+  @@index([taskId])
+  @@map("tabs")
+}
+
+// SessionData
+model SessionData {
+  tabId       String   @id @map("tab_id")
+  sdkMessages String   @map("sdk_messages") // Claude Agent SDKからのメッセージ（JSON配列）
+  prompts     String   // ユーザー送信プロンプト（JSON配列）
+  nextSequence Int     @default(1) @map("next_sequence")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tab Tab @relation(fields: [tabId], references: [tabId], onDelete: Cascade)
+
+  @@map("session_data")
+}
+
+// EnvironmentVariable
+model EnvironmentVariable {
+  id        String   @id @default(uuid())
+  key       String
+  value     String
+  scope     String   // 'global' | 'owner' | 'repo' - 階層構造の優先順位制御
+  owner     String?
+  repo      String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  repository Repository? @relation(fields: [owner, repo], references: [owner, repo], onDelete: Cascade)
+
+  @@unique([key, scope, owner, repo])
+  @@index([scope, owner, repo])
+  @@map("environment_variables")
+}
+
+// ClaudeSetting
+model ClaudeSetting {
+  id        String   @id @default(uuid())
+  scope     String   // 'global' | 'owner' | 'repo' - 階層構造の優先順位制御
+  owner     String?
+  repo      String?
+  sources   String   // JSON配列をテキストで保存: ['user', 'project', 'local']
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  repository Repository? @relation(fields: [owner, repo], references: [owner, repo], onDelete: Cascade)
+
+  @@unique([scope, owner, repo])
+  @@index([scope, owner, repo])
+  @@map("claude_settings")
+}

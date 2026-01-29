@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as settingsRepo from '@/lib/claude-settings-repository';
+import * as settingsRepo from '@/lib/repositories/claude-setting';
 
 /**
  * GET /api/claude-settings?scope=xxx&owner=xxx&repo=xxx

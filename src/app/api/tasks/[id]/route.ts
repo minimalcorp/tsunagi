@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/task-repository';
-import * as tabRepo from '@/lib/tab-repository';
+import * as taskRepo from '@/lib/repositories/task';
+import * as tabRepo from '@/lib/repositories/tab';
 import * as worktreeManager from '@/lib/worktree-manager';
 import { sseManager } from '@/lib/sse-manager';
 
@@ -18,13 +18,13 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // タブにuserPromptCountを追加
+    // タブにpromptCountを追加
     const tabsWithCounts = await Promise.all(
       task.tabs.map(async (tab) => {
         const sessionData = await tabRepo.getSessionData(tab.tab_id);
         return {
           ...tab,
-          userPromptCount: sessionData?.userPrompts?.length ?? 0,
+          promptCount: sessionData?.prompts?.length ?? 0,
         };
       })
     );

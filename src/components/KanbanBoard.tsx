@@ -25,8 +25,8 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   // タスクソート: 人間タスク（上）→ Claude実行中タスク（下、グレーアウト）、それぞれ order 昇順
   const sortTasks = (a: Task, b: Task) => {
-    const aIsClaudeRunning = a.claudeState === 'running';
-    const bIsClaudeRunning = b.claudeState === 'running';
+    const aIsClaudeRunning = a.tabs?.some((tab) => tab.status === 'running') ?? false;
+    const bIsClaudeRunning = b.tabs?.some((tab) => tab.status === 'running') ?? false;
 
     // Claude実行中タスクは下に配置
     if (aIsClaudeRunning !== bIsClaudeRunning) {

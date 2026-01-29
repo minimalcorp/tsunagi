@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/task-repository';
-import * as tabRepo from '@/lib/tab-repository';
-import * as envRepo from '@/lib/env-repository';
+import * as taskRepo from '@/lib/repositories/task';
+import * as tabRepo from '@/lib/repositories/tab';
+import * as envRepo from '@/lib/repositories/environment';
 import { executeSession } from '@/lib/claude-client';
 import { normalizeBranchName } from '@/lib/branch-utils';
 import * as path from 'path';
@@ -72,9 +72,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Update tab status to running
     await taskRepo.updateTab(task.id, tab_id, { status: 'running' });
 
-    // Update task claudeState to running
-    await taskRepo.updateTask(task.id, { claudeState: 'running' });
-
     // ユーザープロンプトをsessions.jsonに保存
     const result = await tabRepo.appendUserPrompt(tab_id, message);
     if (!result.sessionData) {
@@ -136,10 +133,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             : {}),
         });
 
-        // Update task claudeState
-        await taskRepo.updateTask(task.id, {
-          claudeState: status === 'running' ? 'running' : 'idle',
-        });
+        await taskRepo.updateTask(task.id, {});
 
         // SSE broadcast (tab status changed)
         const updatedTab = await taskRepo.getTab(task.id, tab_id);
@@ -147,7 +141,6 @@ export async function POST(request: NextRequest, { params }: Params) {
           sseManager.broadcast('tab:updated', { taskId: task.id, tab: updatedTab });
         }
 
-        // SSE broadcast (task claudeState changed)
         const updatedTask = await taskRepo.getTask(task.id);
         if (updatedTask) {
           sseManager.broadcast('task:updated', updatedTask);
@@ -178,7 +171,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         status: 'error',
         completedAt: new Date().toISOString(),
       });
-      await taskRepo.updateTask(task.id, { claudeState: 'idle' });
     });
 
     return NextResponse.json({ data: { success: true } });

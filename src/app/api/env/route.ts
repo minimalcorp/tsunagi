@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as envRepo from '@/lib/env-repository';
+import * as envRepo from '@/lib/repositories/environment';
 
 // GET /api/env?scope=global&owner=...&repo=...
 export async function GET(request: NextRequest) {

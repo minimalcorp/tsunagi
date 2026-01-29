@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/task-repository';
+import * as taskRepo from '@/lib/repositories/task';
+import type { Task } from '@/lib/types';
 
 // POST /api/tasks/validate
 export async function POST(request: NextRequest) {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     // ブランチ名重複チェック
     const existingTasks = await taskRepo.getTasks({ includeDeleted: false });
     const duplicateTask = existingTasks.find(
-      (task) => task.owner === owner && task.repo === repo && task.branch === branch
+      (task: Task) => task.owner === owner && task.repo === repo && task.branch === branch
     );
 
     if (duplicateTask) {

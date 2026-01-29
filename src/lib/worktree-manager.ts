@@ -52,8 +52,7 @@ function getWorktreePath(owner: string, repo: string, branch: string): string {
 export async function initBareRepository(
   owner: string,
   repo: string,
-  cloneUrl: string,
-  authToken?: string
+  cloneUrl: string
 ): Promise<string> {
   const bareRepoPath = getBareRepoPath(owner, repo);
 
@@ -70,17 +69,9 @@ export async function initBareRepository(
   // 親ディレクトリを作成
   await fs.mkdir(path.dirname(bareRepoPath), { recursive: true });
 
-  // 認証トークンがある場合はURLに埋め込む
-  let authCloneUrl = cloneUrl;
-  if (authToken && cloneUrl.startsWith('https://')) {
-    const url = new URL(cloneUrl);
-    url.username = authToken;
-    authCloneUrl = url.toString();
-  }
-
   // bare repositoryとしてクローン
   const git = simpleGit();
-  await git.clone(authCloneUrl, bareRepoPath, ['--bare']);
+  await git.clone(cloneUrl, bareRepoPath, ['--bare']);
 
   // 標準的なfetch refspecを設定
   const bareGit = simpleGit(bareRepoPath);

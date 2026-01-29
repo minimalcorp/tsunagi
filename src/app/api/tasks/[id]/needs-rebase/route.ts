@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/task-repository';
+import * as taskRepo from '@/lib/repositories/task';
 import * as worktreeManager from '@/lib/worktree-manager';
 
 type Params = {

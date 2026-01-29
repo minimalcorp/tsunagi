@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as repoRepo from '@/lib/repo-repository';
+import * as repoRepo from '@/lib/repositories/repository';
 
 // GET /api/repos
 export async function GET() {
@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { owner, repo, cloneUrl, authToken } = body;
+    const { owner, repo, cloneUrl } = body;
 
     // Validation
     if (!owner || !repo || !cloneUrl) {
@@ -30,7 +30,6 @@ export async function POST(request: NextRequest) {
       owner,
       repo,
       cloneUrl,
-      authToken,
     });
 
     return NextResponse.json({ data: newRepo }, { status: 201 });

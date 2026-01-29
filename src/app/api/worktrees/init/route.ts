@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as worktreeManager from '@/lib/worktree-manager';
-import * as repoRepo from '@/lib/repo-repository';
+import * as repoRepo from '@/lib/repositories/repository';
 
 // POST /api/worktrees/init
 export async function POST(request: NextRequest) {
@@ -22,12 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // bare repositoryを初期化
-    const bareRepoPath = await worktreeManager.initBareRepository(
-      owner,
-      repo,
-      repository.cloneUrl,
-      repository.authToken
-    );
+    const bareRepoPath = await worktreeManager.initBareRepository(owner, repo, repository.cloneUrl);
 
     return NextResponse.json({ data: { bareRepoPath, success: true } }, { status: 201 });
   } catch (error) {

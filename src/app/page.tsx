@@ -116,7 +116,7 @@ export default function Home() {
     // task:updated イベント
     const handleTaskUpdated = (event: MessageEvent) => {
       const task = JSON.parse(event.data) as Task;
-      console.log('[SSE] task:updated received:', task.id, 'claudeState:', task.claudeState);
+      console.log('[SSE] task:updated received:', task.id);
       setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
     };
 

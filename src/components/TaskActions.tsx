@@ -143,7 +143,8 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
       });
   };
 
-  const isRebaseDisabled = task.worktreeStatus !== 'created' || task.claudeState === 'running';
+  const isClaudeRunning = task.tabs.some((tab) => tab.status === 'running');
+  const isRebaseDisabled = task.worktreeStatus !== 'created' || isClaudeRunning;
 
   return (
     <div>

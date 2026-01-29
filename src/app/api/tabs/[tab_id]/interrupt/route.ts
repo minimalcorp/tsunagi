@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/task-repository';
+import * as taskRepo from '@/lib/repositories/task';
 import { interruptSession } from '@/lib/claude-client';
 import { sseManager } from '@/lib/sse-manager';
 
@@ -40,10 +40,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Note: Tab status remains 'running' as per SDK design
     // The next message API call will automatically resume the session
 
-    // Update task claudeState to idle
-    await taskRepo.updateTask(task.id, { claudeState: 'idle' });
-
-    // SSE broadcast (task claudeState changed)
     const updatedTask = await taskRepo.getTask(task.id);
     if (updatedTask) {
       sseManager.broadcast('task:updated', updatedTask);

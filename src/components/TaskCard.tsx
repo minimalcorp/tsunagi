@@ -12,9 +12,9 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, isDragging, onTaskClick }: TaskCardProps) {
-  const isClaudeRunning = task.claudeState === 'running';
   const tabs = task.tabs || [];
-  const totalUserMessages = tabs.reduce((sum, tab) => sum + (tab.userPromptCount ?? 0), 0);
+  const isClaudeRunning = tabs.some((tab) => tab.status === 'running');
+  const totalUserMessages = tabs.reduce((sum, tab) => sum + (tab.promptCount ?? 0), 0);
 
   return (
     <div

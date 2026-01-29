@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/task-repository';
-import * as tabRepo from '@/lib/tab-repository';
+import * as taskRepo from '@/lib/repositories/task';
+import * as tabRepo from '@/lib/repositories/tab';
+import * as repoRepo from '@/lib/repositories/repository';
 import * as worktreeManager from '@/lib/worktree-manager';
 import type { Task } from '@/lib/types';
 import { sseManager } from '@/lib/sse-manager';
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
       includeDeleted,
     });
 
-    // 各タスクのタブにuserPromptCountを追加
+    // 各タスクのタブにpromptCountを追加
     const tasksWithCounts = await Promise.all(
       tasks.map(async (task) => {
         const tabsWithCounts = await Promise.all(
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
             const sessionData = await tabRepo.getSessionData(tab.tab_id);
             return {
               ...tab,
-              userPromptCount: sessionData?.userPrompts?.length ?? 0,
+              promptCount: sessionData?.prompts?.length ?? 0,
             };
           })
         );
@@ -53,6 +54,57 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { title, description, owner, repo, branch, baseBranch } = body;
 
+    // Validation
+    if (!title || !owner || !repo || !branch) {
+      return NextResponse.json(
+        {
+          errors: [
+            {
+              field: 'global',
+              message: 'Missing required fields: title, owner, repo, branch',
+            },
+          ],
+        },
+        { status: 400 }
+      );
+    }
+
+    // ブランチ名重複チェック
+    const existingTasks = await taskRepo.getTasks({ includeDeleted: false });
+    const duplicateTask = existingTasks.find(
+      (task) => task.owner === owner && task.repo === repo && task.branch === branch
+    );
+
+    if (duplicateTask) {
+      return NextResponse.json(
+        {
+          errors: [
+            {
+              field: 'branch',
+              message: `Branch "${branch}" already exists. Task "${duplicateTask.title}" (ID: ${duplicateTask.id}) is already using this branch.`,
+            },
+          ],
+        },
+        { status: 409 }
+      );
+    }
+
+    // リポジトリIDを取得
+    const repository = await repoRepo.getRepo(owner, repo);
+    if (!repository) {
+      return NextResponse.json(
+        {
+          errors: [
+            {
+              field: 'global',
+              message: 'Repository not found. Please clone the repository first.',
+            },
+          ],
+        },
+        { status: 404 }
+      );
+    }
+
     // タスクを作成
     const newTask = await taskRepo.createTask({
       title,
@@ -61,8 +113,8 @@ export async function POST(request: NextRequest) {
       owner,
       repo,
       branch,
+      repoId: repository.id,
       worktreeStatus: 'pending',
-      claudeState: 'idle',
       plan: body.plan,
       effort: body.effort,
       order: body.order,

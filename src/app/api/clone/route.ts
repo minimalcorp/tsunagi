@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createRepo } from '@/lib/repo-repository';
+import { createRepo } from '@/lib/repositories/repository';
 import { initBareRepository, authenticateGhCli } from '@/lib/worktree-manager';
-import { getEnv } from '@/lib/env-repository';
+import { getEnv } from '@/lib/repositories/environment';
 import * as path from 'path';
 import * as os from 'os';
 
@@ -24,7 +24,7 @@ function parseGitUrl(gitUrl: string): { owner: string; repo: string } | null {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { gitUrl, authToken } = body;
+    const { gitUrl } = body;
 
     if (!gitUrl) {
       return NextResponse.json(
@@ -63,14 +63,13 @@ export async function POST(request: Request) {
     const bareRepoPath = path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, '.bare');
 
     // Bare cloneを実行
-    await initBareRepository(owner, repo, gitUrl, authToken);
+    await initBareRepository(owner, repo, gitUrl);
 
     // Repository登録
     const newRepo = await createRepo({
       owner,
       repo,
       cloneUrl: gitUrl,
-      authToken,
     });
 
     return NextResponse.json({
