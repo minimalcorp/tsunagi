@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Settings, Filter, RefreshCw, FolderDown } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { Combobox } from './ui/Combobox';
 
 interface HeaderProps {
   onCloneClick: () => void;
@@ -87,18 +88,13 @@ export function Header({
 
       {/* Filters - Desktop (>= 1024px) */}
       <div className="hidden lg:flex gap-4 flex-1 justify-center">
-        <select
+        <Combobox
+          options={[{ value: '', label: 'All Repositories' }, ...repoOptions]}
           value={repoFilter}
-          onChange={(e) => handleRepoChange(e.target.value)}
-          className="pl-3 pr-10 py-1.5 border border-theme rounded text-theme-fg bg-theme-card min-w-48"
-        >
-          <option value="">All Repositories</option>
-          {repoOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          onChange={handleRepoChange}
+          placeholder="All Repositories"
+          className="min-w-48"
+        />
 
         <input
           type="text"
@@ -132,18 +128,12 @@ export function Header({
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium mb-1 text-theme-fg">Repository</label>
-                  <select
+                  <Combobox
+                    options={[{ value: '', label: 'All Repositories' }, ...repoOptions]}
                     value={repoFilter}
-                    onChange={(e) => handleRepoChange(e.target.value)}
-                    className="w-full pl-3 pr-10 py-1.5 border border-theme rounded text-theme-fg bg-theme-card"
-                  >
-                    <option value="">All Repositories</option>
-                    {repoOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handleRepoChange}
+                    placeholder="All Repositories"
+                  />
                 </div>
 
                 <div>
