@@ -29,7 +29,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
   const [tabMessages, setTabMessages] = useState<Record<string, MergedMessage[]>>({});
-  const [tabSequences, setTabSequences] = useState<Record<string, number>>({});
+  const [lastSequence, setLastSequence] = useState<number>(0); // グローバルsequence
   const [isResyncing, setIsResyncing] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [isLoading, setIsLoading] = useState(true);
@@ -71,83 +71,76 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // データロード（初回ロード時のみ、またはIDが変わった時）
   const prevIdRef = useRef<string | null>(null);
 
+  const loadData = useCallback(async () => {
+    // IDが変わった場合は再ロード
+    if (prevIdRef.current !== null && prevIdRef.current !== id) {
+      setIsInitialLoad(true);
+    }
+    prevIdRef.current = id;
+
+    if (!isInitialLoad) return;
+
+    setIsLoading(true);
+    try {
+      // タスク取得
+      const taskResponse = await fetch(`/api/tasks/${id}`);
+      if (!taskResponse.ok) throw new Error('Failed to fetch task');
+      const taskData = await taskResponse.json();
+      const loadedTask = taskData.data.task;
+      setTask(loadedTask);
+
+      // タスクからタブを取得（既にpromptCountを含む）
+      let loadedTabs = loadedTask.tabs || [];
+
+      // タブが0個の場合、自動的に1個作成
+      if (loadedTabs.length === 0) {
+        const createResponse = await fetch(`/api/tasks/${id}/tabs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (createResponse.ok) {
+          const createData = await createResponse.json();
+          loadedTabs = [createData.data.tab];
+        }
+      }
+
+      setTabs(loadedTabs);
+
+      // 各タブのメッセージを取得
+      const messagesPromises = loadedTabs.map(async (tab: Tab) => {
+        try {
+          const response = await fetch(`/api/tabs/${tab.tab_id}/messages`);
+          if (response.ok) {
+            const data = await response.json();
+            return { tab_id: tab.tab_id, messages: data.data.messages };
+          }
+        } catch (error) {
+          console.error(`Failed to load messages for tab ${tab.tab_id}:`, error);
+        }
+        return { tab_id: tab.tab_id, messages: [] };
+      });
+
+      const messagesResults = await Promise.all(messagesPromises);
+      const messagesMap: Record<string, MergedMessage[]> = {};
+      messagesResults.forEach((result) => {
+        messagesMap[result.tab_id] = result.messages;
+      });
+      setTabMessages(messagesMap);
+
+      // アクティブタブ設定
+      if (loadedTabs.length > 0) {
+        setActiveTabId(loadedTabs[0].tab_id);
+      }
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    } finally {
+      setIsLoading(false);
+      setIsInitialLoad(false);
+    }
+  }, [id, isInitialLoad]);
+
   useEffect(() => {
-    const loadData = async () => {
-      // IDが変わった場合は再ロード
-      if (prevIdRef.current !== null && prevIdRef.current !== id) {
-        setIsInitialLoad(true);
-      }
-      prevIdRef.current = id;
-
-      if (!isInitialLoad) return;
-
-      setIsLoading(true);
-      try {
-        // タスク取得
-        const taskResponse = await fetch(`/api/tasks/${id}`);
-        if (!taskResponse.ok) throw new Error('Failed to fetch task');
-        const taskData = await taskResponse.json();
-        const loadedTask = taskData.data.task;
-        setTask(loadedTask);
-
-        // タスクからタブを取得（既にpromptCountを含む）
-        let loadedTabs = loadedTask.tabs || [];
-
-        // タブが0個の場合、自動的に1個作成
-        if (loadedTabs.length === 0) {
-          const createResponse = await fetch(`/api/tasks/${id}/tabs`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
-          });
-          if (createResponse.ok) {
-            const createData = await createResponse.json();
-            loadedTabs = [createData.data.tab];
-          }
-        }
-
-        setTabs(loadedTabs);
-
-        // 各タブのメッセージを取得
-        const messagesPromises = loadedTabs.map(async (tab: Tab) => {
-          try {
-            const response = await fetch(`/api/tabs/${tab.tab_id}/messages`);
-            if (response.ok) {
-              const data = await response.json();
-              return { tab_id: tab.tab_id, messages: data.data.messages };
-            }
-          } catch (error) {
-            console.error(`Failed to load messages for tab ${tab.tab_id}:`, error);
-          }
-          return { tab_id: tab.tab_id, messages: [] };
-        });
-
-        const messagesResults = await Promise.all(messagesPromises);
-        const messagesMap: Record<string, MergedMessage[]> = {};
-        const sequencesMap: Record<string, number> = {};
-        messagesResults.forEach((result) => {
-          messagesMap[result.tab_id] = result.messages;
-          // 最終シーケンス番号を初期化
-          const lastMessage = result.messages[result.messages.length - 1];
-          if (lastMessage?._sequence) {
-            sequencesMap[result.tab_id] = lastMessage._sequence;
-          }
-        });
-        setTabMessages(messagesMap);
-        setTabSequences(sequencesMap);
-
-        // アクティブタブ設定
-        if (loadedTabs.length > 0) {
-          setActiveTabId(loadedTabs[0].tab_id);
-        }
-      } catch (error) {
-        console.error('Failed to load data:', error);
-      } finally {
-        setIsLoading(false);
-        setIsInitialLoad(false);
-      }
-    };
-
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -171,12 +164,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
           // メッセージを置き換え
           setTabMessages((prev) => ({ ...prev, [tab_id]: messages }));
-
-          // シーケンスを更新
-          const lastMessage = messages[messages.length - 1];
-          if (lastMessage?._sequence) {
-            setTabSequences((prev) => ({ ...prev, [tab_id]: lastMessage._sequence }));
-          }
         }
       } catch (error) {
         console.error(`[Resync] Failed to resync tab ${tab_id}:`, error);
@@ -197,16 +184,37 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
     // tab:updated イベント
     const handleTabUpdated = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId, 10);
       const { taskId, tab } = JSON.parse(event.data) as { taskId: string; tab: Tab };
+
+      // ギャップ検知
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected on tab:updated');
+        loadData();
+        setLastSequence(sequence);
+        return;
+      }
+
       // このタスクのタブのみ更新
       if (taskId === id) {
         setTabs((prev) => prev.map((t) => (t.tab_id === tab.tab_id ? tab : t)));
       }
+      setLastSequence(sequence);
     };
 
     // tab:deleted イベント
     const handleTabDeleted = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId, 10);
       const { taskId, tab_id } = JSON.parse(event.data) as { taskId: string; tab_id: string };
+
+      // ギャップ検知
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected on tab:deleted');
+        loadData();
+        setLastSequence(sequence);
+        return;
+      }
+
       if (taskId === id) {
         setTabs((prev) => prev.filter((t) => t.tab_id !== tab_id));
         setTabMessages((prev) => {
@@ -224,11 +232,22 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
           setActiveTabId(remaining[0]?.tab_id);
         }
       }
+      setLastSequence(sequence);
     };
 
     // tab:created イベント
     const handleTabCreated = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId, 10);
       const { taskId, tab } = JSON.parse(event.data) as { taskId: string; tab: Tab };
+
+      // ギャップ検知
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected on tab:created');
+        loadData();
+        setLastSequence(sequence);
+        return;
+      }
+
       // このタスクのタブのみ追加
       if (taskId === id) {
         setTabs((prev) => {
@@ -238,34 +257,36 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         });
         setTabMessages((prev) => ({ ...prev, [tab.tab_id]: [] }));
       }
+      setLastSequence(sequence);
     };
 
     // tab:message:added イベント（差分更新）
     const handleTabMessageAdded = (event: MessageEvent) => {
-      const { tab_id, message, sequence } = JSON.parse(event.data) as {
+      const sequence = parseInt(event.lastEventId, 10);
+      const { tab_id, message } = JSON.parse(event.data) as {
         tab_id: string;
         message: MergedMessage;
-        sequence: number;
       };
+
+      // ギャップ検知（グローバルsequenceで判定）
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected, resyncing tab:', tab_id, {
+          expected: lastSequence + 1,
+          received: sequence,
+        });
+        triggerFullResync(tab_id);
+        setLastSequence(sequence);
+        return;
+      }
 
       setTabMessages((prev) => {
         const currentMessages = prev[tab_id] || [];
-        const lastSequence = tabSequences[tab_id] || 0;
-
-        // ギャップ検知
-        if (sequence !== lastSequence + 1) {
-          console.warn(`[SSE] Gap detected for tab ${tab_id}`, {
-            expected: lastSequence + 1,
-            received: sequence,
-          });
-          // 全体再同期をトリガー
-          triggerFullResync(tab_id);
-          return prev; // メッセージを追加せず、再同期を待つ
-        }
 
         // 重複検知
-        if (currentMessages.some((m) => m._sequence === sequence)) {
-          console.log(`[SSE] Duplicate message ignored for tab ${tab_id}`, { sequence });
+        if (currentMessages.some((m) => m._sequence === message._sequence)) {
+          console.log(`[SSE] Duplicate message ignored for tab ${tab_id}`, {
+            sequence: message._sequence,
+          });
           return prev;
         }
 
@@ -276,17 +297,28 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         };
       });
 
-      // シーケンスを更新
-      setTabSequences((prev) => ({ ...prev, [tab_id]: sequence }));
+      setLastSequence(sequence);
     };
 
     // tab:messages:updated イベント（全体同期）
     const handleTabMessagesUpdated = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId, 10);
       const { tab_id, messages, promptCount } = JSON.parse(event.data) as {
         tab_id: string;
         messages: MergedMessage[];
         promptCount?: number;
       };
+
+      // ギャップ検知
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected on tab:messages:updated', {
+          expected: lastSequence + 1,
+          received: sequence,
+        });
+        triggerFullResync(tab_id);
+        setLastSequence(sequence);
+        return;
+      }
 
       console.log(`[SSE] Full sync for tab ${tab_id}`, { count: messages.length });
 
@@ -300,11 +332,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         );
       }
 
-      // シーケンスを更新
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage?._sequence) {
-        setTabSequences((prev) => ({ ...prev, [tab_id]: lastMessage._sequence }));
-      }
+      // グローバルシーケンスを更新
+      setLastSequence(sequence);
 
       // 再同期フラグをクリア
       setIsResyncing((prev) => {
@@ -327,7 +356,17 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
     // task:updated イベント
     const handleTaskUpdated = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId, 10);
       const updatedTask = JSON.parse(event.data) as Task;
+
+      // ギャップ検知
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected on task:updated');
+        loadData();
+        setLastSequence(sequence);
+        return;
+      }
+
       // このタスクのみ更新
       if (updatedTask.id === id) {
         setTask(updatedTask);
@@ -336,17 +375,37 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
           setTabs(updatedTask.tabs);
         }
       }
+      setLastSequence(sequence);
     };
 
     // task:deleted イベント
     const handleTaskDeleted = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId, 10);
       const { taskId } = JSON.parse(event.data) as { taskId: string };
+
+      // ギャップ検知
+      if (sequence !== lastSequence + 1 && lastSequence > 0) {
+        console.warn('[SSE] Gap detected on task:deleted');
+        loadData();
+        setLastSequence(sequence);
+        return;
+      }
+
       // このタスクが削除された場合、一覧に戻る
       if (taskId === id) {
         router.push('/');
       }
+      setLastSequence(sequence);
     };
 
+    // connected イベントでsequenceを初期化
+    const handleConnected = (event: MessageEvent) => {
+      const sequence = parseInt(event.lastEventId || '0', 10);
+      console.log('[SSE] Connected with sequence:', sequence);
+      setLastSequence(sequence);
+    };
+
+    eventSource.addEventListener('connected', handleConnected);
     eventSource.addEventListener('tab:updated', handleTabUpdated);
     eventSource.addEventListener('tab:deleted', handleTabDeleted);
     eventSource.addEventListener('tab:created', handleTabCreated);
@@ -357,6 +416,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     eventSource.addEventListener('task:deleted', handleTaskDeleted);
 
     return () => {
+      eventSource.removeEventListener('connected', handleConnected);
       eventSource.removeEventListener('tab:updated', handleTabUpdated);
       eventSource.removeEventListener('tab:deleted', handleTabDeleted);
       eventSource.removeEventListener('tab:created', handleTabCreated);
@@ -366,7 +426,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       eventSource.removeEventListener('task:updated', handleTaskUpdated);
       eventSource.removeEventListener('task:deleted', handleTaskDeleted);
     };
-  }, [eventSource, id, activeTabId, tabs, tabSequences, triggerFullResync, router]);
+  }, [eventSource, id, activeTabId, tabs, lastSequence, triggerFullResync, router]);
 
   // タブのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
   useEffect(() => {

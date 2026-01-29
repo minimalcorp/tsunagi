@@ -1,32 +1,55 @@
 import { sseManager } from '@/lib/sse-manager';
+import { eventStore } from '@/lib/event-store';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  // EventStoreを初期化（初回のみ）
+  eventStore.init();
+
   const encoder = new TextEncoder();
   const lastEventId = request.headers.get('Last-Event-ID');
+  const lastSequence = lastEventId ? parseInt(lastEventId, 10) : 0;
 
-  console.log('[SSE] Client connecting', { lastEventId });
+  console.log('[SSE] Client connecting', { lastEventId, lastSequence });
 
   const stream = new ReadableStream({
     start(controller) {
       const clientId = crypto.randomUUID();
 
-      // クライアント登録
-      sseManager.addClient({ id: clientId, controller });
+      console.log(`[SSE] New connection: ${clientId}, Last-Event-ID: ${lastEventId}`);
 
-      // 初期接続確認メッセージ
+      // 抜けたイベントを送信
+      if (lastSequence > 0) {
+        const missedEvents = eventStore.getEventsSince(lastSequence);
+
+        if (missedEvents.length > 0) {
+          console.log(`[SSE] Sending ${missedEvents.length} missed events to ${clientId}`);
+
+          missedEvents.forEach((event) => {
+            controller.enqueue(
+              encoder.encode(
+                `id: ${event.sequence}\n` +
+                  `event: ${event.type}\n` +
+                  `data: ${JSON.stringify(event.data)}\n\n`
+              )
+            );
+          });
+        }
+      }
+
+      // 現在のsequenceを通知
+      const currentSequence = eventStore.getCurrentSequence();
       controller.enqueue(
-        encoder.encode(`event: connected\ndata: ${JSON.stringify({ clientId })}\n\n`)
+        encoder.encode(
+          `id: ${currentSequence}\n` +
+            `event: connected\n` +
+            `data: ${JSON.stringify({ sequence: currentSequence })}\n\n`
+        )
       );
 
-      // Last-Event-IDがある場合（再接続）、クライアントに再同期ヒントを送信
-      if (lastEventId) {
-        console.log('[SSE] Reconnection detected, sending resync hint');
-        controller.enqueue(
-          encoder.encode(`event: resync:hint\ndata: ${JSON.stringify({ lastEventId })}\n\n`)
-        );
-      }
+      // クライアントを登録
+      sseManager.addClient({ id: clientId, controller });
 
       // Heartbeat設定（30秒ごと）
       const heartbeat = setInterval(() => {
@@ -40,6 +63,7 @@ export async function GET(request: Request) {
       // クリーンアップ
       request.signal.addEventListener('abort', () => {
         clearInterval(heartbeat);
+        console.log(`[SSE] Client disconnected: ${clientId}`);
         sseManager.removeClient(clientId);
       });
     },

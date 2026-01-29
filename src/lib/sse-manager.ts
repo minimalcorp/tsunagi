@@ -1,3 +1,5 @@
+import { eventStore } from './event-store';
+
 type SSEClient = {
   id: string;
   controller: ReadableStreamDefaultController;
@@ -19,20 +21,17 @@ class SSEManager {
     }
   }
 
-  broadcast(event: string, data: unknown, eventId?: string): void {
-    // SSEメッセージの構築（eventIdがあればidフィールドを追加）
-    let message = `event: ${event}\n`;
-    if (eventId) {
-      message += `id: ${eventId}\n`;
-    }
-    message += `data: ${JSON.stringify(data)}\n\n`;
+  broadcast(eventType: string, data: unknown): void {
+    // EventStoreに記録してグローバルsequenceを取得
+    const sequence = eventStore.record(eventType, data);
+
+    // SSEメッセージの構築
+    const message = `id: ${sequence}\nevent: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
 
     const encoder = new TextEncoder();
     const encoded = encoder.encode(message);
 
-    console.log(`[SSE] Broadcasting ${event} to ${this.clients.size} clients`, {
-      eventId,
-    });
+    console.log(`[SSE] Broadcasting ${eventType} to ${this.clients.size} clients`, { sequence });
 
     for (const client of this.clients) {
       try {
