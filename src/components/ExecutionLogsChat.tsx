@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import {
   ChevronDown,
   ChevronUp,
@@ -18,6 +19,30 @@ import { UIMessageConverter } from '@/lib/ui-message-converter';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
+import { CodeBlock } from '@/components/CodeBlock';
+
+// ReactMarkdown用のカスタムコンポーネント
+const markdownComponents: Components = {
+  code: (props) => {
+    const { className, children } = props;
+    const match = /language-(\w+)/.exec(className || '');
+    const language = match ? match[1] : '';
+    const codeString = String(children).replace(/\n$/, '');
+
+    // inline属性がない場合はコードブロック（複数行）とみなす
+    const isCodeBlock = className && className.startsWith('language-');
+
+    if (isCodeBlock && codeString) {
+      return (
+        <CodeBlock language={language} code={codeString}>
+          {children}
+        </CodeBlock>
+      );
+    }
+
+    return <code {...props}>{children}</code>;
+  },
+};
 
 // セッション完了状態を判定するヘルパー関数
 function isSessionCompleted(rawMessages?: unknown[]): boolean {
@@ -209,7 +234,7 @@ function UIMessageItem({
                 <div className="flex justify-start items-center gap-2">
                   <div className="inline-block text-left rounded-lg p-2 bg-theme-card max-w-full">
                     <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-theme-fg text-xs break-words overflow-wrap-anywhere">
-                      <ReactMarkdown>{block.content}</ReactMarkdown>
+                      <ReactMarkdown components={markdownComponents}>{block.content}</ReactMarkdown>
                     </div>
                   </div>
                 </div>
