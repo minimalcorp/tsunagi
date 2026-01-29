@@ -534,7 +534,7 @@ export class UIMessageConverter {
         content: {
           type: 'system_event',
           event: 'session_completed',
-          description: msg.result || 'Session completed successfully',
+          description: 'Session completed successfully',
         },
         metadata: {
           sdkMessageUuids: msg.uuid ? [msg.uuid] : [],
