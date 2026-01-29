@@ -149,7 +149,7 @@ body {
 
 /* Global smooth transitions for theme changes */
 * {
-  transition-property: color, background-color, border-color, opacity, transform;
+  transition-property: color, background-color, border-color, opacity, transform, box-shadow;
   transition-duration: 200ms;
   transition-timing-function: ease-in-out;
 }
@@ -169,18 +169,31 @@ body {
   }
 }
 
-/* Scrollbar customization - Firefox */
+/* Scrollbar customization */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--muted) var(--background);
+  transition-property:
+    color, background-color, border-color, opacity, transform, box-shadow, scrollbar-color;
 }
 
-/* Base form input styles */
-input,
-textarea,
-select {
-  transition-property: border-color, box-shadow;
-  transition-duration: 200ms;
+/* WebKit scrollbar customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--subtle);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
 }
 
 /* Base button and link styles */
