@@ -140,7 +140,7 @@ function getGroupStatus(executions: { status: string }[]) {
 function getToolStatusIcon(
   status: 'pending' | 'running' | 'success' | 'error',
   sessionCompleted: boolean
-): { icon: JSX.Element | null; colorClass: string } {
+): { icon: React.ReactElement | null; colorClass: string } {
   switch (status) {
     case 'running':
       return {
@@ -168,7 +168,7 @@ function getToolStatusIcon(
 function getGroupStatusIcon(
   groupStatus: { hasRunning: boolean; hasError: boolean; allCompleted: boolean },
   sessionCompleted: boolean
-): { icon: JSX.Element | null; colorClass: string } {
+): { icon: React.ReactElement | null; colorClass: string } {
   if (groupStatus.hasRunning) {
     return sessionCompleted
       ? { icon: <Ban className="w-3 h-3" />, colorClass: 'text-theme-fg' }
