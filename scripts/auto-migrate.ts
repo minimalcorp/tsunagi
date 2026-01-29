@@ -45,6 +45,19 @@ async function autoMigrate() {
     if (lines.length > 0) {
       console.log(lines.join('\n'));
     }
+
+    // Prisma Clientを生成
+    console.log('Generating Prisma Client...');
+    const { stdout: generateOutput } = await execAsync('npx prisma generate', { env });
+
+    const generateLines = generateOutput
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('Prisma schema loaded'));
+
+    if (generateLines.length > 0) {
+      console.log(generateLines.join('\n'));
+    }
   } catch (error) {
     console.error('DB migration failed:', error instanceof Error ? error.message : error);
     process.exit(1);
