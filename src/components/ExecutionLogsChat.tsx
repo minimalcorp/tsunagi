@@ -49,6 +49,7 @@ export function ExecutionLogsChat({ rawMessages, tabId, tab }: ExecutionLogsChat
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const prevTabIdRef = useRef<string | undefined>(tabId);
+  const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
 
   // セッション完了状態を判定
   const sessionCompleted = useMemo(() => isSessionCompleted(rawMessages), [rawMessages]);
@@ -110,7 +111,13 @@ export function ExecutionLogsChat({ rawMessages, tabId, tab }: ExecutionLogsChat
           </p>
         ) : (
           uiMessages.map((msg) => (
-            <UIMessageItem key={msg.id} message={msg} sessionCompleted={sessionCompleted} />
+            <UIMessageItem
+              key={msg.id}
+              message={msg}
+              sessionCompleted={sessionCompleted}
+              expandedTools={expandedTools}
+              setExpandedTools={setExpandedTools}
+            />
           ))
         )}
         <div ref={logsEndRef} />
@@ -132,13 +139,16 @@ function getGroupStatus(executions: { status: string }[]) {
 function UIMessageItem({
   message,
   sessionCompleted,
+  expandedTools,
+  setExpandedTools,
 }: {
   message: UIMessage;
   sessionCompleted: boolean;
+  expandedTools: Record<string, boolean>;
+  setExpandedTools: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }) {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
-  const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
 
   if (message.type === 'user_message') {
     const content = message.content;
@@ -209,7 +219,7 @@ function UIMessageItem({
 
           if (block.type === 'tool_use') {
             const tool = block.info;
-            const toolKey = `${message.id}-${index}`;
+            const toolKey = tool.id; // Use stable tool_use_id instead of message.id
             const isExpanded = expandedTools[toolKey] ?? false;
             const hasDetails = Boolean(tool.input) || Boolean(tool.result);
 
@@ -303,9 +313,11 @@ function UIMessageItem({
           }
 
           if (block.type === 'tool_use_group') {
-            const groupKey = `${message.id}-group-${index}`;
-            const isGroupExpanded = expandedTools[groupKey] ?? false;
             const executions = block.executions;
+            // Use the first tool's ID for stable group key
+            const groupKey =
+              executions.length > 0 ? `group-${executions[0].id}` : `${message.id}-group-${index}`;
+            const isGroupExpanded = expandedTools[groupKey] ?? false;
 
             // グループ全体のステータスを判定
             const groupStatus = getGroupStatus(executions);
@@ -364,7 +376,7 @@ function UIMessageItem({
                     {isGroupExpanded && (
                       <div className="mt-2 space-y-2">
                         {executions.map((exec, execIndex) => {
-                          const toolKey = `${groupKey}-${execIndex}`;
+                          const toolKey = exec.id; // Use stable exec.id instead of group-based key
                           const isToolExpanded = expandedTools[toolKey] ?? false;
                           const hasDetails = Boolean(exec.input) || Boolean(exec.result);
 
