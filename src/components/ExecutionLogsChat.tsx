@@ -16,6 +16,7 @@ import {
   CircleCheck,
   CircleAlert,
   ExternalLink,
+  CircleEllipsis,
 } from 'lucide-react';
 import type { UIMessage, Tab } from '@/lib/types';
 import { UIMessageConverter } from '@/lib/ui-message-converter';
@@ -184,11 +185,14 @@ export function ExecutionLogsChat({ rawMessages, tabId, tab }: ExecutionLogsChat
 
 // グループステータス判定ヘルパー関数
 function getGroupStatus(executions: { status: string }[]) {
+  // hasRunningは従来通りグループ全体をチェック
   const hasRunning = executions.some((e) => e.status === 'pending' || e.status === 'running');
-  const hasError = executions.some((e) => e.status === 'error');
-  const allCompleted = executions.every((e) => e.status === 'success' || e.status === 'error');
 
-  return { hasRunning, hasError, allCompleted };
+  // all error または all success の判定
+  const allError = executions.length > 0 && executions.every((e) => e.status === 'error');
+  const allSuccess = executions.length > 0 && executions.every((e) => e.status === 'success');
+
+  return { hasRunning, allError, allSuccess };
 }
 
 // ステータスに応じたアイコンと色を返すヘルパー関数
@@ -221,27 +225,37 @@ function getToolStatusIcon(
 
 // グループ全体のステータスアイコンと色を返すヘルパー関数
 function getGroupStatusIcon(
-  groupStatus: { hasRunning: boolean; hasError: boolean; allCompleted: boolean },
+  groupStatus: { hasRunning: boolean; allError: boolean; allSuccess: boolean },
   sessionCompleted: boolean
 ): { icon: React.ReactElement | null; colorClass: string } {
+  // hasRunningは従来通り優先
   if (groupStatus.hasRunning) {
     return sessionCompleted
       ? { icon: <Ban className="w-3 h-3" />, colorClass: 'text-theme-fg' }
       : { icon: <Loader2 className="w-3 h-3 animate-spin" />, colorClass: 'text-theme-fg' };
   }
-  if (groupStatus.hasError) {
+
+  // all error → CircleAlert (red)
+  if (groupStatus.allError) {
     return {
       icon: <CircleAlert className="w-3 h-3" />,
       colorClass: 'text-red-500',
     };
   }
-  if (groupStatus.allCompleted) {
+
+  // all success → CircleCheck (green)
+  if (groupStatus.allSuccess) {
     return {
       icon: <CircleCheck className="w-3 h-3" />,
       colorClass: 'text-green-500',
     };
   }
-  return { icon: null, colorClass: '' };
+
+  // anything else (混在状態) → CircleEllipsis (yellow)
+  return {
+    icon: <CircleEllipsis className="w-3 h-3" />,
+    colorClass: 'text-yellow-500',
+  };
 }
 
 // UIMessage用のコンポーネント
