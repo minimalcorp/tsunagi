@@ -154,15 +154,17 @@ body {
   transition-timing-function: ease-in-out;
 }
 
-/* Dark theme: Brighten buttons on hover */
+/* Dark theme: Brighten buttons and links on hover */
 @media (prefers-color-scheme: dark) {
-  button:hover:not(:disabled) {
+  button:hover:not(:disabled),
+  a:hover {
     filter: brightness(1.2);
   }
 }
 
 :root[data-theme='dark'] {
-  button:hover:not(:disabled) {
+  button:hover:not(:disabled),
+  a:hover {
     filter: brightness(1.2);
   }
 }
@@ -181,6 +183,12 @@ select {
   transition-duration: 200ms;
 }
 
+/* Base button and link styles */
+button,
+a {
+  transition: box-shadow 200ms ease-in-out;
+}
+
 /* Hover state - border color only */
 input:hover:not(:focus):not(:disabled),
 textarea:hover:not(:focus):not(:disabled),
@@ -192,6 +200,22 @@ select:hover:not(:focus):not(:disabled) {
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--primary);
+}
+
+/* Override focus ring color for buttons */
+button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--primary);
+}
+
+/* Override focus ring color for links */
+a:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px var(--background),

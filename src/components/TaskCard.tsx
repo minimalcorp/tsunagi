@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
 import type { Task } from '@/lib/types';
 import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
@@ -9,9 +10,10 @@ import { MessageCircle } from 'lucide-react';
 interface TaskCardProps {
   task: Task;
   isDragging: boolean;
+  dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }
 
-export function TaskCard({ task, isDragging }: TaskCardProps) {
+export function TaskCard({ task, isDragging, dragHandleProps }: TaskCardProps) {
   const tabs = task.tabs || [];
   const isClaudeRunning = tabs.some((tab) => tab.status === 'running');
   const totalUserMessages = tabs.reduce((sum, tab) => sum + (tab.promptCount ?? 0), 0);
@@ -27,11 +29,11 @@ export function TaskCard({ task, isDragging }: TaskCardProps) {
 
   return (
     <Link
+      {...dragHandleProps}
       href={`/tasks/${task.id}`}
       onClick={handleClick}
       className={`
         block bg-theme-card border border-theme rounded-lg p-4 cursor-grab active:cursor-grabbing
-        hover:border-primary transition-colors
         ${isDragging ? 'shadow-xl rotate-2' : ''}
         ${isClaudeRunning ? 'opacity-50 bg-theme-hover' : ''}
       `}
