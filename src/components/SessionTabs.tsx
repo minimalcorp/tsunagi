@@ -42,7 +42,7 @@ export function SessionTabs({
   }, [activeTabId, tabs]);
 
   return (
-    <div className="relative flex items-center gap-2 overflow-x-auto border-b border-theme">
+    <div className="relative flex items-center gap-2 overflow-x-auto border-b border-theme py-1">
       {tabs.map((tab, index) => {
         const isActive = activeTabId === tab.tab_id;
         const isRunning = tab.status === 'running';
