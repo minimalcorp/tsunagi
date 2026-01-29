@@ -105,6 +105,8 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
       const data = await response.json();
 
       if (response.ok) {
+        // rebase成功後、needsRebaseをfalseに設定
+        setNeedsRebase(false);
         toast.success(notificationId, 'Successfully rebased branch', task.branch);
       } else if (response.status === 409) {
         // conflict発生
