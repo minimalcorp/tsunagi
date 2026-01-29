@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/task-repository';
+import * as taskRepo from '@/lib/repositories/task';
 import * as worktreeManager from '@/lib/worktree-manager';
 import { sseManager } from '@/lib/sse-manager';
 
@@ -26,7 +26,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     // Claude実行中の場合はエラー
-    if (task.claudeState === 'running') {
+    const isClaudeRunning = task.tabs.some((tab) => tab.status === 'running');
+    if (isClaudeRunning) {
       return NextResponse.json({ error: 'Cannot rebase while Claude is running' }, { status: 400 });
     }
 
