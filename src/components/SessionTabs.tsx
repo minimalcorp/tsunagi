@@ -99,7 +99,7 @@ export function SessionTabs({
 
       {/* Material Design Indicator */}
       <div
-        className="absolute bottom-0 h-0.5 bg-primary transition-all duration-300 ease-in-out"
+        className="absolute bottom-0 h-0.5 bg-primary transition-all"
         style={{
           left: `${indicatorStyle.left}px`,
           width: `${indicatorStyle.width}px`,

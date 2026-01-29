@@ -149,7 +149,8 @@ body {
 
 /* Global smooth transitions for theme changes */
 * {
-  transition-property: color, background-color, border-color, opacity, transform;
+  transition-property:
+    color, background-color, border-color, opacity, transform, box-shadow, scrollbar-color;
   transition-duration: 200ms;
   transition-timing-function: ease-in-out;
 }
@@ -169,24 +170,29 @@ body {
   }
 }
 
-/* Scrollbar customization - Firefox */
+/* Scrollbar customization */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--muted) var(--background);
 }
 
-/* Base form input styles */
-input,
-textarea,
-select {
-  transition-property: border-color, box-shadow;
-  transition-duration: 200ms;
+/* WebKit scrollbar customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-/* Base button and link styles */
-button,
-a {
-  transition: box-shadow 200ms ease-in-out;
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--subtle);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
 }
 
 /* Hover state - border color only */
@@ -293,43 +299,183 @@ select {
 
 /* Theme-aware utility classes */
 .bg-theme-bg {
-  background-color: var(--background);
+  background-color: #f4f3ee;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bg-theme-bg {
+    background-color: #1a1a1a;
+  }
+}
+
+html[data-theme='light'] .bg-theme-bg {
+  background-color: #f4f3ee;
+}
+
+html[data-theme='dark'] .bg-theme-bg {
+  background-color: #1a1a1a;
 }
 
 .bg-theme-card {
-  background-color: var(--card-background);
+  background-color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bg-theme-card {
+    background-color: #2a2a2a;
+  }
+}
+
+html[data-theme='light'] .bg-theme-card {
+  background-color: #ffffff;
+}
+
+html[data-theme='dark'] .bg-theme-card {
+  background-color: #2a2a2a;
 }
 
 .bg-theme-hover {
-  background-color: var(--hover-background);
+  background-color: #eaeaea;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bg-theme-hover {
+    background-color: #333333;
+  }
+}
+
+html[data-theme='light'] .bg-theme-hover {
+  background-color: #eaeaea;
+}
+
+html[data-theme='dark'] .bg-theme-hover {
+  background-color: #333333;
 }
 
 .text-theme-fg {
-  color: var(--foreground);
+  color: #1e1e1e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .text-theme-fg {
+    color: #e5e5e5;
+  }
+}
+
+html[data-theme='light'] .text-theme-fg {
+  color: #1e1e1e;
+}
+
+html[data-theme='dark'] .text-theme-fg {
+  color: #e5e5e5;
 }
 
 .text-theme-muted {
-  color: var(--muted);
+  color: #8c8c8c;
+}
+
+@media (prefers-color-scheme: dark) {
+  .text-theme-muted {
+    color: #a0a0a0;
+  }
+}
+
+html[data-theme='light'] .text-theme-muted {
+  color: #8c8c8c;
+}
+
+html[data-theme='dark'] .text-theme-muted {
+  color: #a0a0a0;
 }
 
 .border-theme {
-  border-color: var(--border);
+  border-color: #d0d0d0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .border-theme {
+    border-color: #404040;
+  }
+}
+
+html[data-theme='light'] .border-theme {
+  border-color: #d0d0d0;
+}
+
+html[data-theme='dark'] .border-theme {
+  border-color: #404040;
 }
 
 .hover\:bg-theme-card:hover {
-  background-color: var(--card-background);
+  background-color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hover\:bg-theme-card:hover {
+    background-color: #2a2a2a;
+  }
+}
+
+html[data-theme='light'] .hover\:bg-theme-card:hover {
+  background-color: #ffffff;
+}
+
+html[data-theme='dark'] .hover\:bg-theme-card:hover {
+  background-color: #2a2a2a;
 }
 
 .hover\:bg-theme-hover:hover {
-  background-color: var(--hover-background);
+  background-color: #eaeaea;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hover\:bg-theme-hover:hover {
+    background-color: #333333;
+  }
+}
+
+html[data-theme='light'] .hover\:bg-theme-hover:hover {
+  background-color: #eaeaea;
+}
+
+html[data-theme='dark'] .hover\:bg-theme-hover:hover {
+  background-color: #333333;
 }
 
 .hover\:text-theme-fg:hover {
-  color: var(--foreground);
+  color: #1e1e1e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hover\:text-theme-fg:hover {
+    color: #e5e5e5;
+  }
+}
+
+html[data-theme='light'] .hover\:text-theme-fg:hover {
+  color: #1e1e1e;
+}
+
+html[data-theme='dark'] .hover\:text-theme-fg:hover {
+  color: #e5e5e5;
 }
 
 .hover\:border-theme-fg:hover {
-  border-color: var(--foreground);
+  border-color: #1e1e1e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hover\:border-theme-fg:hover {
+    border-color: #e5e5e5;
+  }
+}
+
+html[data-theme='light'] .hover\:border-theme-fg:hover {
+  border-color: #1e1e1e;
+}
+
+html[data-theme='dark'] .hover\:border-theme-fg:hover {
+  border-color: #e5e5e5;
 }
 
 /* Primary color utilities */
@@ -445,11 +591,11 @@ select {
 }
 
 .animate-fade-in {
-  animation: fade-in 150ms ease-out forwards;
+  animation: fade-in 200ms ease-out forwards;
 }
 
 .animate-fade-out {
-  animation: fade-out 100ms ease-in forwards;
+  animation: fade-out 200ms ease-in forwards;
 }
 
 /* Combobox positioner - disable all transitions to prevent visible repositioning */
