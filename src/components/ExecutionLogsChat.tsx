@@ -15,6 +15,7 @@ import {
   Ban,
   CircleCheck,
   CircleAlert,
+  ExternalLink,
 } from 'lucide-react';
 import type { UIMessage, Tab } from '@/lib/types';
 import { UIMessageConverter } from '@/lib/ui-message-converter';
@@ -44,6 +45,20 @@ const markdownComponents: Components = {
 
     return <code {...props}>{children}</code>;
   },
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-0.5 text-primary hover:underline break-all"
+    >
+      {children}
+      <ExternalLink
+        className="inline-block flex-shrink-0"
+        style={{ width: '1em', height: '1em' }}
+      />
+    </a>
+  ),
   table: ({ children }) => (
     <div className="overflow-x-auto my-2 w-fit max-w-full">
       <table className="border-collapse border border-theme rounded-lg overflow-hidden text-xs">
