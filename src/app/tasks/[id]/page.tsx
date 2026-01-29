@@ -142,8 +142,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, loadData]);
 
   // 全体再同期関数
   const triggerFullResync = useCallback(
@@ -426,7 +425,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       eventSource.removeEventListener('task:updated', handleTaskUpdated);
       eventSource.removeEventListener('task:deleted', handleTaskDeleted);
     };
-  }, [eventSource, id, activeTabId, tabs, lastSequence, triggerFullResync, router]);
+  }, [eventSource, id, activeTabId, tabs, lastSequence, triggerFullResync, router, loadData]);
 
   // タブのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
   useEffect(() => {
