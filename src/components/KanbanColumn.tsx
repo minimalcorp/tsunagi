@@ -60,17 +60,17 @@ export function KanbanColumn({
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex-1 space-y-2 overflow-y-auto ${snapshot.isDraggingOver ? 'bg-primary-50' : ''}`}
+            className={`flex-1 space-y-2 overflow-y-auto p-1 ${snapshot.isDraggingOver ? 'bg-primary-50' : ''}`}
           >
             {tasks.map((task, index) => (
               <Draggable key={task.id} draggableId={task.id} index={index}>
                 {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                  >
-                    <TaskCard task={task} isDragging={snapshot.isDragging} />
+                  <div ref={provided.innerRef} {...provided.draggableProps}>
+                    <TaskCard
+                      task={task}
+                      isDragging={snapshot.isDragging}
+                      dragHandleProps={provided.dragHandleProps}
+                    />
                   </div>
                 )}
               </Draggable>

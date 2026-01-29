@@ -154,15 +154,17 @@ body {
   transition-timing-function: ease-in-out;
 }
 
-/* Dark theme: Brighten buttons on hover */
+/* Dark theme: Brighten buttons and links on hover */
 @media (prefers-color-scheme: dark) {
-  button:hover:not(:disabled) {
+  button:hover:not(:disabled),
+  a:hover {
     filter: brightness(1.2);
   }
 }
 
 :root[data-theme='dark'] {
-  button:hover:not(:disabled) {
+  button:hover:not(:disabled),
+  a:hover {
     filter: brightness(1.2);
   }
 }
