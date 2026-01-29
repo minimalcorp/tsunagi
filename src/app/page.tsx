@@ -178,10 +178,6 @@ export default function Home() {
     setSearchQuery(filters.search);
   };
 
-  const handleTaskClick = (taskId: string) => {
-    router.push(`/tasks/${taskId}`);
-  };
-
   // 初回ロード時のみローディング表示
   if (isLoading && tasks.length === 0) {
     return (
@@ -210,7 +206,6 @@ export default function Home() {
         <KanbanBoard
           tasks={filteredTasks}
           onTaskMove={handleTaskMove}
-          onTaskClick={handleTaskClick}
           onAddTaskClick={() => setIsAddTaskDialogOpen(true)}
           nextStep={onboardingState.nextStep}
           isAddTaskDialogOpen={isAddTaskDialogOpen}

@@ -7,7 +7,6 @@ import { KanbanColumn } from './KanbanColumn';
 interface KanbanBoardProps {
   tasks: Task[];
   onTaskMove: (taskId: string, newStatus: Task['status']) => void;
-  onTaskClick?: (taskId: string) => void;
   onAddTaskClick?: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isAddTaskDialogOpen?: boolean;
@@ -17,7 +16,6 @@ interface KanbanBoardProps {
 export function KanbanBoard({
   tasks,
   onTaskMove,
-  onTaskClick,
   onAddTaskClick,
   nextStep,
   isAddTaskDialogOpen = false,
@@ -68,31 +66,15 @@ export function KanbanBoard({
           title="Backlog"
           status="backlog"
           tasks={backlogTasks}
-          onTaskClick={onTaskClick}
           onAddTaskClick={onAddTaskClick}
           nextStep={nextStep}
           isAddTaskDialogOpen={isAddTaskDialogOpen}
           hasApiKey={hasApiKey}
         />
-        <KanbanColumn
-          title="Planning"
-          status="planning"
-          tasks={planningTasks}
-          onTaskClick={onTaskClick}
-        />
-        <KanbanColumn
-          title="Coding"
-          status="coding"
-          tasks={codingTasks}
-          onTaskClick={onTaskClick}
-        />
-        <KanbanColumn
-          title="Reviewing"
-          status="reviewing"
-          tasks={reviewingTasks}
-          onTaskClick={onTaskClick}
-        />
-        <KanbanColumn title="Done" status="done" tasks={doneTasks} onTaskClick={onTaskClick} />
+        <KanbanColumn title="Planning" status="planning" tasks={planningTasks} />
+        <KanbanColumn title="Coding" status="coding" tasks={codingTasks} />
+        <KanbanColumn title="Reviewing" status="reviewing" tasks={reviewingTasks} />
+        <KanbanColumn title="Done" status="done" tasks={doneTasks} />
       </div>
     </DragDropContext>
   );
