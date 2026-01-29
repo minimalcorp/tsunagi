@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { Task } from '@/lib/types';
 import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
@@ -8,23 +9,32 @@ import { MessageCircle } from 'lucide-react';
 interface TaskCardProps {
   task: Task;
   isDragging: boolean;
-  onTaskClick?: (taskId: string) => void;
 }
 
-export function TaskCard({ task, isDragging, onTaskClick }: TaskCardProps) {
+export function TaskCard({ task, isDragging }: TaskCardProps) {
   const tabs = task.tabs || [];
   const isClaudeRunning = tabs.some((tab) => tab.status === 'running');
   const totalUserMessages = tabs.reduce((sum, tab) => sum + (tab.promptCount ?? 0), 0);
 
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // ドラッグ中はリンク遷移を防止
+    if (isDragging) {
+      e.preventDefault();
+      return;
+    }
+    // 通常クリック、middle click、Cmd+clickなどは全てブラウザのデフォルト動作に任せる
+  };
+
   return (
-    <div
+    <Link
+      href={`/tasks/${task.id}`}
+      onClick={handleClick}
       className={`
-        bg-theme-card border border-theme rounded-lg p-4 cursor-pointer
-        hover:border-primary
+        block bg-theme-card border border-theme rounded-lg p-4 cursor-grab active:cursor-grabbing
+        hover:border-primary transition-colors
         ${isDragging ? 'shadow-xl rotate-2' : ''}
         ${isClaudeRunning ? 'opacity-50 bg-theme-hover' : ''}
       `}
-      onClick={() => onTaskClick?.(task.id)}
     >
       {/* Order Badge */}
       {task.order !== undefined && (
@@ -77,6 +87,6 @@ export function TaskCard({ task, isDragging, onTaskClick }: TaskCardProps) {
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

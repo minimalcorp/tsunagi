@@ -9,7 +9,6 @@ interface KanbanColumnProps {
   title: string;
   status: 'backlog' | 'planning' | 'coding' | 'reviewing' | 'done';
   tasks: Task[];
-  onTaskClick?: (taskId: string) => void;
   onAddTaskClick?: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isAddTaskDialogOpen?: boolean;
@@ -20,7 +19,6 @@ export function KanbanColumn({
   title,
   status,
   tasks,
-  onTaskClick,
   onAddTaskClick,
   nextStep,
   isAddTaskDialogOpen = false,
@@ -72,11 +70,7 @@ export function KanbanColumn({
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
                   >
-                    <TaskCard
-                      task={task}
-                      isDragging={snapshot.isDragging}
-                      onTaskClick={onTaskClick}
-                    />
+                    <TaskCard task={task} isDragging={snapshot.isDragging} />
                   </div>
                 )}
               </Draggable>
