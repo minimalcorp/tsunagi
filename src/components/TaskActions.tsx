@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import type { Task } from '@/lib/types';
 import { normalizeBranchName } from '@/lib/branch-utils';
 import { Code2, Terminal, Trash2, GitMerge, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
 
 interface TaskActionsProps {
   task: Task;
@@ -17,8 +18,7 @@ function getWorktreePath(task: Task): string {
 
 export function TaskActions({ task, onDelete }: TaskActionsProps) {
   const worktreePath = getWorktreePath(task);
-  const [isExecuting, setIsExecuting] = useState<string | null>(null);
-  const [isRebasing, setIsRebasing] = useState(false);
+  const toast = useToast();
   const [needsRebase, setNeedsRebase] = useState<boolean | undefined>(undefined);
   const [isCheckingRebase, setIsCheckingRebase] = useState(false);
 
@@ -52,7 +52,9 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
   }, [task.id, task.worktreeStatus]);
 
   const handleCommand = async (commandType: 'vscode' | 'terminal') => {
-    setIsExecuting(commandType);
+    const commandLabel = commandType === 'vscode' ? 'VS Code' : 'Terminal';
+    const notificationId = toast.loading(`Opening ${commandLabel}...`, worktreePath);
+
     try {
       const response = await fetch('/api/commands/open', {
         method: 'POST',
@@ -68,13 +70,17 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
       if (!response.ok) {
         throw new Error('Command execution failed');
       }
+
+      toast.success(notificationId, `Successfully opened ${commandLabel}`, worktreePath);
     } catch {
       // フォールバック: クリップボードにコピー
       const command = commandType === 'vscode' ? `code ${worktreePath}` : `cd ${worktreePath}`;
       await navigator.clipboard.writeText(command);
-      alert('Command execution failed. Command copied to clipboard instead.');
-    } finally {
-      setIsExecuting(null);
+      toast.info(
+        'Command copied to clipboard',
+        `Failed to open automatically. Command: ${command}`
+      );
+      toast.dismiss(notificationId);
     }
   };
 
@@ -87,7 +93,8 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
       return;
     }
 
-    setIsRebasing(true);
+    const notificationId = toast.loading('Rebasing branch...', task.branch);
+
     try {
       const response = await fetch(`/api/tasks/${task.id}/rebase`, {
         method: 'POST',
@@ -98,31 +105,45 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
       const data = await response.json();
 
       if (response.ok) {
-        alert(`✓ ${data.data.message}`);
+        toast.success(notificationId, 'Successfully rebased branch', task.branch);
       } else if (response.status === 409) {
         // conflict発生
         const conflictFiles = data.conflicts?.join('\n  - ') || 'unknown files';
-        alert(
-          `✗ Rebase failed due to conflicts:\n\n  - ${conflictFiles}\n\nPlease resolve conflicts manually.`
+        toast.error(
+          notificationId,
+          'Rebase failed due to conflicts',
+          `Conflicts in:\n${conflictFiles}`
         );
       } else {
-        alert(`✗ ${data.error || 'Rebase failed'}`);
+        toast.error(notificationId, 'Rebase failed', data.error || 'Unknown error');
       }
     } catch (error) {
-      alert(`✗ Failed to rebase: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsRebasing(false);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(notificationId, 'Failed to rebase', errorMessage);
     }
   };
 
-  const handleDelete = async () => {
-    if (confirm(`Delete task "${task.title}"?\n\nThis will also delete the worktree and branch.`)) {
-      await onDelete(task.id);
+  const handleDelete = () => {
+    if (
+      !confirm(`Delete task "${task.title}"?\n\nThis will also delete the worktree and branch.`)
+    ) {
+      return;
     }
+
+    const notificationId = toast.loading('Deleting task...', task.title);
+
+    // 非同期で削除処理を実行（awaitしない）
+    onDelete(task.id)
+      .then(() => {
+        toast.success(notificationId, 'Successfully deleted task', task.title);
+      })
+      .catch((error) => {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        toast.error(notificationId, 'Failed to delete task', errorMessage);
+      });
   };
 
-  const isRebaseDisabled =
-    task.worktreeStatus !== 'created' || task.claudeState === 'running' || isRebasing;
+  const isRebaseDisabled = task.worktreeStatus !== 'created' || task.claudeState === 'running';
 
   return (
     <div>
@@ -138,20 +159,18 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
 
         <button
           onClick={() => handleCommand('vscode')}
-          disabled={isExecuting !== null}
-          className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-primary-600 hover:bg-primary-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-primary-600 hover:bg-primary-hover text-white flex items-center justify-center gap-2"
         >
           <Code2 className="w-4 h-4" />
-          {isExecuting === 'vscode' ? 'Opening...' : 'Open VS Code'}
+          Open VS Code
         </button>
 
         <button
           onClick={() => handleCommand('terminal')}
-          disabled={isExecuting !== null}
-          className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme flex items-center justify-center gap-2"
         >
           <Terminal className="w-4 h-4" />
-          {isExecuting === 'terminal' ? 'Opening...' : 'Open Terminal'}
+          Open Terminal
         </button>
 
         <button
@@ -188,20 +207,18 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleCommand('vscode')}
-            disabled={isExecuting !== null}
-            className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-primary-600 hover:bg-primary-hover text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-primary-600 hover:bg-primary-hover text-white flex items-center justify-center gap-2"
           >
             <Code2 className="w-4 h-4" />
-            {isExecuting === 'vscode' ? 'Opening...' : 'Open VS Code'}
+            Open VS Code
           </button>
 
           <button
             onClick={() => handleCommand('terminal')}
-            disabled={isExecuting !== null}
-            className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme flex items-center justify-center gap-2"
           >
             <Terminal className="w-4 h-4" />
-            {isExecuting === 'terminal' ? 'Opening...' : 'Open Terminal'}
+            Open Terminal
           </button>
 
           <button

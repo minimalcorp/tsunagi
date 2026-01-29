@@ -13,6 +13,7 @@ import { ExecutionLogsChat } from '@/components/ExecutionLogsChat';
 import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useSSE } from '@/hooks/useSSE';
+import { useToast } from '@/hooks/useToast';
 
 interface TaskDetailPageProps {
   params: Promise<{
@@ -23,6 +24,7 @@ interface TaskDetailPageProps {
 export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const { id } = use(params);
   const router = useRouter();
+  const toast = useToast();
   const [task, setTask] = useState<Task | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
@@ -32,6 +34,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Prompts管理をstateからrefに変更（再レンダリングを防止）
   const promptsRef = useRef<Record<string, string>>({});
@@ -65,9 +68,19 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     }
   }, [activeTabId]);
 
-  // データロード
+  // データロード（初回ロード時のみ、またはIDが変わった時）
+  const prevIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     const loadData = async () => {
+      // IDが変わった場合は再ロード
+      if (prevIdRef.current !== null && prevIdRef.current !== id) {
+        setIsInitialLoad(true);
+      }
+      prevIdRef.current = id;
+
+      if (!isInitialLoad) return;
+
       setIsLoading(true);
       try {
         // タスク取得
@@ -131,10 +144,12 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         console.error('Failed to load data:', error);
       } finally {
         setIsLoading(false);
+        setIsInitialLoad(false);
       }
     };
 
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // 全体再同期関数
@@ -323,6 +338,15 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       }
     };
 
+    // task:deleted イベント
+    const handleTaskDeleted = (event: MessageEvent) => {
+      const { taskId } = JSON.parse(event.data) as { taskId: string };
+      // このタスクが削除された場合、一覧に戻る
+      if (taskId === id) {
+        router.push('/');
+      }
+    };
+
     eventSource.addEventListener('tab:updated', handleTabUpdated);
     eventSource.addEventListener('tab:deleted', handleTabDeleted);
     eventSource.addEventListener('tab:created', handleTabCreated);
@@ -330,6 +354,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     eventSource.addEventListener('tab:messages:updated', handleTabMessagesUpdated);
     eventSource.addEventListener('resync:hint', handleResyncHint);
     eventSource.addEventListener('task:updated', handleTaskUpdated);
+    eventSource.addEventListener('task:deleted', handleTaskDeleted);
 
     return () => {
       eventSource.removeEventListener('tab:updated', handleTabUpdated);
@@ -339,8 +364,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       eventSource.removeEventListener('tab:messages:updated', handleTabMessagesUpdated);
       eventSource.removeEventListener('resync:hint', handleResyncHint);
       eventSource.removeEventListener('task:updated', handleTaskUpdated);
+      eventSource.removeEventListener('task:deleted', handleTaskDeleted);
     };
-  }, [eventSource, id, activeTabId, tabs, tabSequences, triggerFullResync]);
+  }, [eventSource, id, activeTabId, tabs, tabSequences, triggerFullResync, router]);
 
   // タブのポーリング（running状態の場合のみ、SSE未接続時のフォールバック）
   useEffect(() => {
@@ -389,6 +415,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
   // タスク更新
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+    const notificationId = toast.loading('Updating task...');
+
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
@@ -398,10 +426,14 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       if (!response.ok) throw new Error('Failed to update task');
 
+      toast.success(notificationId, 'Successfully updated task');
+
       // SSE経由でtask:updatedイベントが配信されるため、ここではstateを更新しない
       return { success: true };
     } catch (error) {
       console.error('Failed to update task:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update task';
+      toast.error(notificationId, 'Failed to update task', errorMessage);
       return { success: false, errors: [{ field: 'global', message: 'Failed to update task' }] };
     }
   };
@@ -494,24 +526,31 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
   // タスク削除
   const handleTaskDelete = async (taskId: string) => {
-    try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to delete task');
-
-      // Kanbanに戻る
-      router.push('/');
-    } catch (error) {
+    // 削除API呼び出し（非同期）
+    fetch(`/api/tasks/${taskId}`, {
+      method: 'DELETE',
+    }).catch((error) => {
       console.error('Failed to delete task:', error);
-    }
+    });
+
+    // 即座に一覧に戻る
+    router.push('/');
   };
 
-  if (isLoading || !task) {
+  // 初回ロード時のみローディング表示
+  if (isLoading && !task) {
     return (
       <div className="h-screen flex items-center justify-center bg-theme-bg">
         <LoadingSpinner size="lg" message="Loading task..." />
+      </div>
+    );
+  }
+
+  // taskがnullの場合（エラー時など）
+  if (!task) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-theme-bg">
+        <div className="text-center text-theme-fg">Task not found</div>
       </div>
     );
   }

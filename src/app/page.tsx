@@ -86,20 +86,15 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // 初回ロード時のみデータを取得
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Reload data when returning from Settings
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadData();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    if (isInitialLoad) {
+      loadData();
+      setIsInitialLoad(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // SSE統合
@@ -159,30 +154,6 @@ export default function Home() {
     }
   };
 
-  const handleAddTask = async (formData: {
-    title: string;
-    description: string;
-    owner: string;
-    repo: string;
-    branch: string;
-    baseBranch: string;
-  }) => {
-    const response = await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      // APIエラーレスポンス（正常なレスポンス）
-      return { success: false, errors: data.errors };
-    }
-
-    // SSE経由でtask:createdイベントが配信されるため、ここではstateを更新しない
-    return { success: true };
-  };
-
   const handleCloneRepository = async (cloneData: { gitUrl: string; authToken?: string }) => {
     try {
       const response = await fetch('/api/clone', {
@@ -211,7 +182,8 @@ export default function Home() {
     router.push(`/tasks/${taskId}`);
   };
 
-  if (isLoading) {
+  // 初回ロード時のみローディング表示
+  if (isLoading && tasks.length === 0) {
     return (
       <div className="h-screen flex items-center justify-center bg-theme-bg">
         <div className="text-center">
@@ -271,7 +243,6 @@ export default function Home() {
         mode="create"
         isOpen={isAddTaskDialogOpen}
         onClose={() => setIsAddTaskDialogOpen(false)}
-        onAdd={handleAddTask}
         repositories={repositories}
       />
     </div>

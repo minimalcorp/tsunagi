@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import type { Repository, Task } from '@/lib/types';
 import { LoadingSpinner } from './LoadingSpinner';
+import { useToast } from '@/hooks/useToast';
 
 interface FieldError {
   field: string;
@@ -34,7 +35,6 @@ interface TaskDialogProps {
 
   // Create mode用
   repositories?: Repository[];
-  onAdd?: (data: CreateTaskData) => Promise<{ success: boolean; errors?: FieldError[] }>;
 
   // Edit mode用
   task?: Task;
@@ -49,10 +49,11 @@ export function TaskDialog({
   isOpen,
   onClose,
   repositories = [],
-  onAdd,
   task,
   onUpdate,
 }: TaskDialogProps) {
+  const toast = useToast();
+
   // Create mode用のstate
   const [combinedRepo, setCombinedRepo] = useState('');
   const [branches, setBranches] = useState<string[]>([]);
@@ -158,23 +159,93 @@ export function TaskDialog({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setFieldErrors({});
 
-    try {
-      let result: { success: boolean; errors?: FieldError[] };
+    if (mode === 'create') {
+      // Create mode: validation -> close dialog -> async create with notification
+      setIsLoading(true);
 
-      if (mode === 'create' && onAdd) {
-        result = await onAdd({
+      try {
+        // 1. Validation API (blocking)
+        const validateRes = await fetch('/api/tasks/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: formData.title,
+            owner: formData.owner,
+            repo: formData.repo,
+            branch: formData.branch,
+          }),
+        });
+
+        const validateData = await validateRes.json();
+
+        if (!validateData.valid) {
+          const errorsMap: Record<string, string> = {};
+          validateData.errors.forEach((err: FieldError) => {
+            errorsMap[err.field] = err.message;
+          });
+          setFieldErrors(errorsMap);
+          setIsLoading(false);
+          return;
+        }
+
+        // 2. Close dialog immediately after validation
+        const taskData = {
           title: formData.title,
           description: formData.description,
           owner: formData.owner,
           repo: formData.repo,
           branch: formData.branch,
           baseBranch: formData.baseBranch,
+        };
+
+        onClose();
+        setCombinedRepo('');
+        setFormData({
+          title: '',
+          description: '',
+          owner: '',
+          repo: '',
+          branch: '',
+          baseBranch: '',
+          plan: undefined,
+          status: 'backlog',
+          effort: undefined,
+          order: undefined,
         });
-      } else if (mode === 'edit' && onUpdate && task) {
-        result = await onUpdate(task.id, {
+        setIsLoading(false);
+
+        // 3. Create task async with notification
+        const notificationId = toast.loading('Creating task...', taskData.title);
+
+        try {
+          const response = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(taskData),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to create task');
+          }
+
+          toast.success(notificationId, 'Successfully created task', taskData.title);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          toast.error(notificationId, 'Failed to create task', errorMessage);
+        }
+      } catch (error) {
+        setIsLoading(false);
+        const errorMessage = error instanceof Error ? error.message : 'Validation failed';
+        toast.error(undefined, 'Validation failed', errorMessage);
+      }
+    } else if (mode === 'edit' && onUpdate && task) {
+      // Edit mode: use existing callback pattern
+      setIsLoading(true);
+
+      try {
+        const result = await onUpdate(task.id, {
           title: formData.title,
           description: formData.description,
           plan: formData.plan,
@@ -182,44 +253,25 @@ export function TaskDialog({
           effort: formData.effort,
           order: formData.order,
         });
-      } else {
-        throw new Error('Invalid mode or missing callbacks');
-      }
 
-      if (result.success) {
-        onClose();
-        // Reset form (Create modeのみ)
-        if (mode === 'create') {
-          setCombinedRepo('');
-          setFormData({
-            title: '',
-            description: '',
-            owner: '',
-            repo: '',
-            branch: '',
-            baseBranch: '',
-            plan: undefined,
-            status: 'backlog',
-            effort: undefined,
-            order: undefined,
+        if (result.success) {
+          onClose();
+        } else if (result.errors) {
+          const errorsMap: Record<string, string> = {};
+          result.errors.forEach((err) => {
+            errorsMap[err.field] = err.message;
           });
+          setFieldErrors(errorsMap);
         }
-      } else if (result.errors) {
-        // APIからのエラーレスポンス（正常なレスポンス）
-        const errorsMap: Record<string, string> = {};
-        result.errors.forEach((err) => {
-          errorsMap[err.field] = err.message;
+      } catch (error) {
+        console.error('Failed to update task:', error);
+        setFieldErrors({
+          global:
+            error instanceof Error ? error.message : 'Failed to update task. Please try again.',
         });
-        setFieldErrors(errorsMap);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      // 本当のエラー（ネットワークエラーなど）
-      console.error('Failed to save task:', error);
-      setFieldErrors({
-        global: error instanceof Error ? error.message : 'Failed to save task. Please try again.',
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 

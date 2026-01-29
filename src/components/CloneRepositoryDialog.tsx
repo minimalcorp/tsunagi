@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { LoadingSpinner } from './LoadingSpinner';
+import { useToast } from '@/hooks/useToast';
 
 interface CloneRepositoryDialogProps {
   isOpen: boolean;
@@ -17,20 +17,25 @@ export function CloneRepositoryDialog({
   isOnboarding = false,
 }: CloneRepositoryDialogProps) {
   const [gitUrl, setGitUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const toast = useToast();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+
+    // ダイアログを即座に閉じる
+    onClose();
+    const url = gitUrl;
+    setGitUrl('');
+
+    // 非同期でclone処理を実行し、通知で進捗を表示
+    const notificationId = toast.loading('Cloning repository...', url);
+
     try {
-      await onClone({ gitUrl });
-      onClose();
-      // Reset form
-      setGitUrl('');
+      await onClone({ gitUrl: url });
+      toast.success(notificationId, 'Successfully cloned repository', url);
     } catch (error) {
-      console.error('Failed to clone repository:', error);
-    } finally {
-      setIsLoading(false);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(notificationId, 'Failed to clone repository', errorMessage);
     }
   };
 
@@ -39,18 +44,12 @@ export function CloneRepositoryDialog({
   return (
     <div
       className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
-      onClick={!isOnboarding && !isLoading ? onClose : undefined}
+      onClick={!isOnboarding ? onClose : undefined}
     >
       <div
         className="bg-theme-card rounded-lg p-6 w-full max-w-md relative"
         onClick={(e) => e.stopPropagation()}
       >
-        {isLoading && (
-          <div className="absolute inset-0 bg-theme-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
-            <LoadingSpinner size="lg" message="Cloning repository..." />
-          </div>
-        )}
-
         <h2 className="text-xl font-bold mb-4 text-theme-fg">Clone Repository</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -63,7 +62,6 @@ export function CloneRepositoryDialog({
               value={gitUrl}
               onChange={(e) => setGitUrl(e.target.value)}
               className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
-              disabled={isLoading}
             />
             <p className="text-xs text-theme-muted mt-1">
               HTTPS or SSH形式のGit URLを入力してください
@@ -75,14 +73,12 @@ export function CloneRepositoryDialog({
               type="button"
               onClick={onClose}
               className="px-4 py-2 border border-theme rounded text-theme-fg hover:bg-theme-card active:scale-95 cursor-pointer"
-              disabled={isLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              disabled={isLoading}
+              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer"
             >
               Clone
             </button>
