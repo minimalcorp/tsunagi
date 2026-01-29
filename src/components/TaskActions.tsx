@@ -152,7 +152,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
       <div className="hidden md:flex items-center gap-2">
         <button
           onClick={handleDelete}
-          className="w-auto px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 flex items-center gap-2 cursor-pointer"
+          className="w-auto px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 flex items-center gap-2 cursor-pointer font-medium text-sm"
         >
           <Trash2 className="w-4 h-4" />
           Delete Task
@@ -180,7 +180,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
           title={
             needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
           }
-          className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+          className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium text-sm ${
             needsRebase
               ? 'bg-primary-600 hover:bg-primary-hover text-white border-0'
               : 'bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme'
@@ -199,7 +199,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
       <div className="flex flex-col gap-2 md:hidden">
         <button
           onClick={handleDelete}
-          className="w-full px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 flex items-center justify-center gap-2 cursor-pointer font-medium text-sm"
         >
           <Trash2 className="w-4 h-4" />
           Delete Task
@@ -228,7 +228,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
             title={
               needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
             }
-            className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+            className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium text-sm ${
               needsRebase
                 ? 'bg-primary-600 hover:bg-primary-hover text-white border-0'
                 : 'bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme'
