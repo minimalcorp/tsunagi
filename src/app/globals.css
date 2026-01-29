@@ -149,7 +149,8 @@ body {
 
 /* Global smooth transitions for theme changes */
 * {
-  transition-property: color, background-color, border-color, opacity, transform, box-shadow;
+  transition-property:
+    color, background-color, border-color, opacity, transform, box-shadow, scrollbar-color;
   transition-duration: 200ms;
   transition-timing-function: ease-in-out;
 }
@@ -173,8 +174,6 @@ body {
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--muted) var(--background);
-  transition-property:
-    color, background-color, border-color, opacity, transform, box-shadow, scrollbar-color;
 }
 
 /* WebKit scrollbar customization */
@@ -194,12 +193,6 @@ body {
 
 ::-webkit-scrollbar-track {
   background: var(--background);
-}
-
-/* Base button and link styles */
-button,
-a {
-  transition: box-shadow 200ms ease-in-out;
 }
 
 /* Hover state - border color only */
@@ -306,43 +299,183 @@ select {
 
 /* Theme-aware utility classes */
 .bg-theme-bg {
-  background-color: var(--background);
+  background-color: #f4f3ee;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bg-theme-bg {
+    background-color: #1a1a1a;
+  }
+}
+
+:root[data-theme='dark'] .bg-theme-bg {
+  background-color: #1a1a1a;
+}
+
+:root[data-theme='light'] .bg-theme-bg {
+  background-color: #f4f3ee;
 }
 
 .bg-theme-card {
-  background-color: var(--card-background);
+  background-color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bg-theme-card {
+    background-color: #2a2a2a;
+  }
+}
+
+:root[data-theme='dark'] .bg-theme-card {
+  background-color: #2a2a2a;
+}
+
+:root[data-theme='light'] .bg-theme-card {
+  background-color: #ffffff;
 }
 
 .bg-theme-hover {
-  background-color: var(--hover-background);
+  background-color: #eaeaea;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bg-theme-hover {
+    background-color: #333333;
+  }
+}
+
+:root[data-theme='dark'] .bg-theme-hover {
+  background-color: #333333;
+}
+
+:root[data-theme='light'] .bg-theme-hover {
+  background-color: #eaeaea;
 }
 
 .text-theme-fg {
-  color: var(--foreground);
+  color: #1e1e1e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .text-theme-fg {
+    color: #e5e5e5;
+  }
+}
+
+:root[data-theme='dark'] .text-theme-fg {
+  color: #e5e5e5;
+}
+
+:root[data-theme='light'] .text-theme-fg {
+  color: #1e1e1e;
 }
 
 .text-theme-muted {
-  color: var(--muted);
+  color: #8c8c8c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .text-theme-muted {
+    color: #a0a0a0;
+  }
+}
+
+:root[data-theme='dark'] .text-theme-muted {
+  color: #a0a0a0;
+}
+
+:root[data-theme='light'] .text-theme-muted {
+  color: #8c8c8c;
 }
 
 .border-theme {
-  border-color: var(--border);
+  border-color: #d0d0d0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .border-theme {
+    border-color: #404040;
+  }
+}
+
+:root[data-theme='dark'] .border-theme {
+  border-color: #404040;
+}
+
+:root[data-theme='light'] .border-theme {
+  border-color: #d0d0d0;
 }
 
 .hover\:bg-theme-card:hover {
-  background-color: var(--card-background);
+  background-color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .hover\:bg-theme-card:hover {
+    background-color: #2a2a2a;
+  }
+}
+
+:root[data-theme='dark'] .hover\:bg-theme-card:hover {
+  background-color: #2a2a2a;
+}
+
+:root[data-theme='light'] .hover\:bg-theme-card:hover {
+  background-color: #ffffff;
 }
 
 .hover\:bg-theme-hover:hover {
-  background-color: var(--hover-background);
+  background-color: #eaeaea;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .hover\:bg-theme-hover:hover {
+    background-color: #333333;
+  }
+}
+
+:root[data-theme='dark'] .hover\:bg-theme-hover:hover {
+  background-color: #333333;
+}
+
+:root[data-theme='light'] .hover\:bg-theme-hover:hover {
+  background-color: #eaeaea;
 }
 
 .hover\:text-theme-fg:hover {
-  color: var(--foreground);
+  color: #1e1e1e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .hover\:text-theme-fg:hover {
+    color: #e5e5e5;
+  }
+}
+
+:root[data-theme='dark'] .hover\:text-theme-fg:hover {
+  color: #e5e5e5;
+}
+
+:root[data-theme='light'] .hover\:text-theme-fg:hover {
+  color: #1e1e1e;
 }
 
 .hover\:border-theme-fg:hover {
-  border-color: var(--foreground);
+  border-color: #1e1e1e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .hover\:border-theme-fg:hover {
+    border-color: #e5e5e5;
+  }
+}
+
+:root[data-theme='dark'] .hover\:border-theme-fg:hover {
+  border-color: #e5e5e5;
+}
+
+:root[data-theme='light'] .hover\:border-theme-fg:hover {
+  border-color: #1e1e1e;
 }
 
 /* Primary color utilities */
@@ -458,11 +591,11 @@ select {
 }
 
 .animate-fade-in {
-  animation: fade-in 150ms ease-out forwards;
+  animation: fade-in 200ms ease-out forwards;
 }
 
 .animate-fade-out {
-  animation: fade-out 100ms ease-in forwards;
+  animation: fade-out 200ms ease-in forwards;
 }
 
 /* Combobox positioner - disable all transitions to prevent visible repositioning */
