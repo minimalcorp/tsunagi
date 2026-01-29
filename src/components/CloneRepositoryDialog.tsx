@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useToast } from '@/hooks/useToast';
+import { Dialog } from './ui/Dialog';
 
 interface CloneRepositoryDialogProps {
   isOpen: boolean;
@@ -39,36 +40,36 @@ export function CloneRepositoryDialog({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
-      onClick={!isOnboarding ? onClose : undefined}
+    <Dialog
+      open={isOpen}
+      onOpenChange={(details) => {
+        if (!details.open && !isOnboarding) {
+          onClose();
+        }
+      }}
+      title="Clone Repository"
+      maxWidth="md"
+      showCloseButton={!isOnboarding}
     >
-      <div
-        className="bg-theme-card rounded-lg p-6 w-full max-w-md relative"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold mb-4 text-theme-fg">Clone Repository</h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1 text-theme-fg">Git URL *</label>
+          <input
+            type="text"
+            required
+            placeholder="https://github.com/owner/repo.git"
+            value={gitUrl}
+            onChange={(e) => setGitUrl(e.target.value)}
+            className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+          />
+          <p className="text-xs text-theme-muted mt-1">
+            HTTPS or SSH形式のGit URLを入力してください
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">Git URL *</label>
-            <input
-              type="text"
-              required
-              placeholder="https://github.com/owner/repo.git"
-              value={gitUrl}
-              onChange={(e) => setGitUrl(e.target.value)}
-              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
-            />
-            <p className="text-xs text-theme-muted mt-1">
-              HTTPS or SSH形式のGit URLを入力してください
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2">
+          {!isOnboarding && (
             <button
               type="button"
               onClick={onClose}
@@ -76,15 +77,15 @@ export function CloneRepositoryDialog({
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer"
-            >
-              Clone
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          )}
+          <button
+            type="submit"
+            className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer"
+          >
+            Clone
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

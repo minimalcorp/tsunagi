@@ -5,6 +5,7 @@ import type { Task } from '@/lib/types';
 import { normalizeBranchName } from '@/lib/branch-utils';
 import { Code2, Terminal, Trash2, GitMerge, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
+import { ConfirmDialog } from './ui/Dialog';
 
 interface TaskActionsProps {
   task: Task;
@@ -21,6 +22,8 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
   const toast = useToast();
   const [needsRebase, setNeedsRebase] = useState<boolean | undefined>(undefined);
   const [isCheckingRebase, setIsCheckingRebase] = useState(false);
+  const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // rebase判定を非同期で取得
   useEffect(() => {
@@ -84,15 +87,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
     }
   };
 
-  const handleRebase = async () => {
-    if (
-      !confirm(
-        `Rebase ${task.branch} to origin/main?\n\nThis will fetch the latest changes and rebase your branch.`
-      )
-    ) {
-      return;
-    }
-
+  const executeRebase = async () => {
     const notificationId = toast.loading('Rebasing branch...', task.branch);
 
     try {
@@ -125,13 +120,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
     }
   };
 
-  const handleDelete = () => {
-    if (
-      !confirm(`Delete task "${task.title}"?\n\nThis will also delete the worktree and branch.`)
-    ) {
-      return;
-    }
-
+  const executeDelete = () => {
     const notificationId = toast.loading('Deleting task...', task.title);
 
     // 非同期で削除処理を実行（awaitしない）
@@ -149,65 +138,41 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
   const isRebaseDisabled = task.worktreeStatus !== 'created' || isClaudeRunning;
 
   return (
-    <div>
-      {/* Desktop Layout (md:) - 1 row */}
-      <div className="hidden md:flex items-center gap-2">
-        <button
-          onClick={handleDelete}
-          className="w-auto px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 flex items-center gap-2 cursor-pointer font-medium text-sm"
-        >
-          <Trash2 className="w-4 h-4" />
-          Delete Task
-        </button>
+    <>
+      {/* Confirmation Dialogs */}
+      <ConfirmDialog
+        open={rebaseConfirmOpen}
+        onOpenChange={(details) => setRebaseConfirmOpen(details.open)}
+        title="Rebase Branch"
+        message={`Rebase ${task.branch} to origin/main?\n\nThis will fetch the latest changes and rebase your branch.`}
+        confirmLabel="Rebase"
+        cancelLabel="Cancel"
+        onConfirm={executeRebase}
+        variant="default"
+      />
 
-        <button
-          onClick={() => handleCommand('vscode')}
-          className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-primary-600 hover:bg-primary-hover text-white flex items-center justify-center gap-2"
-        >
-          <Code2 className="w-4 h-4" />
-          Open VS Code
-        </button>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={(details) => setDeleteConfirmOpen(details.open)}
+        title="Delete Task"
+        message={`Delete task "${task.title}"?\n\nThis will also delete the worktree and branch.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={executeDelete}
+        variant="danger"
+      />
 
-        <button
-          onClick={() => handleCommand('terminal')}
-          className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme flex items-center justify-center gap-2"
-        >
-          <Terminal className="w-4 h-4" />
-          Open Terminal
-        </button>
+      <div>
+        {/* Desktop Layout (md:) - 1 row */}
+        <div className="hidden md:flex items-center gap-2">
+          <button
+            onClick={() => setDeleteConfirmOpen(true)}
+            className="w-auto px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 flex items-center gap-2 cursor-pointer font-medium text-sm"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Task
+          </button>
 
-        <button
-          onClick={handleRebase}
-          disabled={isRebaseDisabled}
-          title={
-            needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
-          }
-          className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium text-sm ${
-            needsRebase
-              ? 'bg-primary-600 hover:bg-primary-hover text-white border-0'
-              : 'bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme'
-          }`}
-        >
-          {isCheckingRebase ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <GitMerge className="w-4 h-4" />
-          )}
-          Rebase
-        </button>
-      </div>
-
-      {/* Mobile Layout (< md:) - 2 rows */}
-      <div className="flex flex-col gap-2 md:hidden">
-        <button
-          onClick={handleDelete}
-          className="w-full px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 flex items-center justify-center gap-2 cursor-pointer font-medium text-sm"
-        >
-          <Trash2 className="w-4 h-4" />
-          Delete Task
-        </button>
-
-        <div className="flex items-center gap-2">
           <button
             onClick={() => handleCommand('vscode')}
             className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-primary-600 hover:bg-primary-hover text-white flex items-center justify-center gap-2"
@@ -225,7 +190,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
           </button>
 
           <button
-            onClick={handleRebase}
+            onClick={() => setRebaseConfirmOpen(true)}
             disabled={isRebaseDisabled}
             title={
               needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
@@ -244,7 +209,56 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
             Rebase
           </button>
         </div>
+
+        {/* Mobile Layout (< md:) - 2 rows */}
+        <div className="flex flex-col gap-2 md:hidden">
+          <button
+            onClick={() => setDeleteConfirmOpen(true)}
+            className="w-full px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 flex items-center justify-center gap-2 cursor-pointer font-medium text-sm"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Task
+          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleCommand('vscode')}
+              className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-primary-600 hover:bg-primary-hover text-white flex items-center justify-center gap-2"
+            >
+              <Code2 className="w-4 h-4" />
+              Open VS Code
+            </button>
+
+            <button
+              onClick={() => handleCommand('terminal')}
+              className="flex-1 px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme flex items-center justify-center gap-2"
+            >
+              <Terminal className="w-4 h-4" />
+              Open Terminal
+            </button>
+
+            <button
+              onClick={() => setRebaseConfirmOpen(true)}
+              disabled={isRebaseDisabled}
+              title={
+                needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
+              }
+              className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium text-sm ${
+                needsRebase
+                  ? 'bg-primary-600 hover:bg-primary-hover text-white border-0'
+                  : 'bg-theme-card hover:bg-theme-hover text-theme-fg border border-theme'
+              }`}
+            >
+              {isCheckingRebase ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <GitMerge className="w-4 h-4" />
+              )}
+              Rebase
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
