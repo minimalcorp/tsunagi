@@ -1,4 +1,4 @@
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { PrismaClient } from '../../generated/prisma/client';
 import { getDatabasePath } from './data-path';
 
@@ -6,9 +6,8 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// Prisma v7: SQLiteアダプターの設定（ランタイムで動的にパス解決）
 const dbPath = getDatabasePath();
-const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
+const adapter = new PrismaLibSql({ url: `file:${dbPath}` });
 
 export const prisma =
   globalForPrisma.prisma ??

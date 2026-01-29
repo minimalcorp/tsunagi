@@ -1,4 +1,4 @@
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { PrismaClient } from '../generated/prisma/client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -103,8 +103,7 @@ async function main() {
   console.log(`📦 データベースパス: ${DB_PATH}`);
   console.log(`📁 JSONファイルディレクトリ: ${STATE_DIR}`);
 
-  // Prisma v7: アダプターを使ってクライアントを初期化
-  const adapter = new PrismaBetterSqlite3({ url: `file:${DB_PATH}` });
+  const adapter = new PrismaLibSql({ url: `file:${DB_PATH}` });
   const prisma = new PrismaClient({ adapter });
 
   try {
