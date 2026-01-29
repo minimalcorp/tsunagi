@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   ChevronDown,
   ChevronUp,
@@ -43,6 +44,20 @@ const markdownComponents: Components = {
 
     return <code {...props}>{children}</code>;
   },
+  table: ({ children }) => (
+    <div className="overflow-x-auto my-2 w-fit max-w-full">
+      <table className="border-collapse border border-theme rounded-lg overflow-hidden text-xs">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }) => <thead className="bg-theme-hover">{children}</thead>,
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: ({ children }) => <tr>{children}</tr>,
+  th: ({ children }) => (
+    <th className="border border-theme px-3 py-2 text-left font-semibold">{children}</th>
+  ),
+  td: ({ children }) => <td className="border border-theme px-3 py-2">{children}</td>,
 };
 
 // セッション完了状態を判定するヘルパー関数
@@ -288,7 +303,9 @@ function UIMessageItem({
                 <div className="flex justify-start items-center gap-2">
                   <div className="inline-block text-left rounded-lg p-2 bg-theme-card max-w-full">
                     <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-theme-fg text-xs break-words overflow-wrap-anywhere">
-                      <ReactMarkdown components={markdownComponents}>{block.content}</ReactMarkdown>
+                      <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
+                        {block.content}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 </div>
