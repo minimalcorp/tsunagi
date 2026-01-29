@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import type { Repository } from '@/lib/types';
 import { LoadingSpinner } from './LoadingSpinner';
+import { useToast } from '@/hooks/useToast';
 
 interface FieldError {
   field: string;
@@ -12,18 +13,10 @@ interface FieldError {
 interface AddTaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (data: {
-    title: string;
-    description: string;
-    owner: string;
-    repo: string;
-    branch: string;
-    baseBranch: string;
-  }) => Promise<{ success: boolean; errors?: FieldError[] }>;
   repositories: Repository[];
 }
 
-export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskDialogProps) {
+export function AddTaskDialog({ isOpen, onClose, repositories }: AddTaskDialogProps) {
   const [combinedRepo, setCombinedRepo] = useState('');
   const [formData, setFormData] = useState({
     title: '',
@@ -33,12 +26,13 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
     branch: '',
     baseBranch: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const [branches, setBranches] = useState<string[]>([]);
   const [defaultBranch, setDefaultBranch] = useState('');
   const [isFetchingBranches, setIsFetchingBranches] = useState(false);
   const [branchError, setBranchError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const toast = useToast();
 
   const repoOptions = useMemo(() => {
     return repositories.map((repo) => ({
@@ -103,40 +97,69 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsValidating(true);
     setFieldErrors({});
 
     try {
-      const result = await onAdd(formData);
+      // 1. バリデーションAPIを呼び出し（同期的に待つ）
+      const validateRes = await fetch('/api/tasks/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const validateData = await validateRes.json();
 
-      if (result.success) {
-        onClose();
-        // Reset form
-        setCombinedRepo('');
-        setFormData({
-          title: '',
-          description: '',
-          owner: '',
-          repo: '',
-          branch: '',
-          baseBranch: '',
-        });
-      } else if (result.errors) {
-        // APIからのエラーレスポンス（正常なレスポンス）
+      if (!validateData.valid) {
+        // バリデーションエラー: ダイアログ内でエラー表示
         const errorsMap: Record<string, string> = {};
-        result.errors.forEach((err) => {
+        validateData.errors.forEach((err: FieldError) => {
           errorsMap[err.field] = err.message;
         });
         setFieldErrors(errorsMap);
+        setIsValidating(false);
+        return;
+      }
+
+      // 2. バリデーションOK: ダイアログを即座に閉じて、非同期でタスク作成
+      const taskData = { ...formData };
+
+      // ダイアログを即座に閉じる
+      onClose();
+      setCombinedRepo('');
+      setFormData({
+        title: '',
+        description: '',
+        owner: '',
+        repo: '',
+        branch: '',
+        baseBranch: '',
+      });
+      setIsValidating(false);
+
+      // 通知を表示してタスク作成開始
+      const notificationId = toast.loading('Creating task...', taskData.title);
+
+      // タスク作成APIを直接呼び出し（onAddを経由しない）
+      try {
+        const response = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(taskData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create task');
+        }
+
+        toast.success(notificationId, 'Successfully created task', taskData.title);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        toast.error(notificationId, 'Failed to create task', errorMessage);
       }
     } catch (error) {
-      // 本当のエラー（ネットワークエラーなど）
-      console.error('Failed to create task:', error);
-      setFieldErrors({
-        global: error instanceof Error ? error.message : 'Failed to create task. Please try again.',
-      });
-    } finally {
-      setIsLoading(false);
+      setIsValidating(false);
+      const errorMessage = error instanceof Error ? error.message : 'Validation failed';
+      toast.error(undefined, 'Validation failed', errorMessage);
     }
   };
 
@@ -151,9 +174,9 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
         className="bg-theme-card rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative"
         onClick={(e) => e.stopPropagation()}
       >
-        {isLoading && (
+        {isValidating && (
           <div className="absolute inset-0 bg-theme-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
-            <LoadingSpinner size="lg" message="Creating task..." />
+            <LoadingSpinner size="lg" message="Validating..." />
           </div>
         )}
 
@@ -173,7 +196,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
               value={combinedRepo}
               onChange={(e) => handleRepositoryChange(e.target.value)}
               className="w-full pl-3 pr-10 py-2 border border-theme rounded text-theme-fg bg-theme-card"
-              disabled={isLoading}
+              disabled={isValidating}
             >
               <option value="">Select repository</option>
               {repoOptions.map((option) => (
@@ -193,7 +216,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
-              disabled={isLoading}
+              disabled={isValidating}
             />
           </div>
 
@@ -204,7 +227,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full px-3 py-2 border border-theme rounded h-24 text-theme-fg bg-theme-card"
-              disabled={isLoading}
+              disabled={isValidating}
             />
           </div>
 
@@ -221,7 +244,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
                 value={formData.baseBranch}
                 onChange={(e) => setFormData({ ...formData, baseBranch: e.target.value })}
                 className="w-full h-10 pl-3 pr-10 border border-theme rounded text-theme-fg bg-theme-card"
-                disabled={isLoading}
+                disabled={isValidating}
               >
                 {branches.map((branch) => (
                   <option key={branch} value={branch}>
@@ -254,7 +277,7 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
                 fieldErrors.branch ? 'border-red-500 input-error' : 'border-theme'
               }`}
               placeholder="feature/new-feature"
-              disabled={isLoading}
+              disabled={isValidating}
             />
             {fieldErrors.branch && (
               <p className="text-xs text-red-500 mt-1">{fieldErrors.branch}</p>
@@ -271,14 +294,14 @@ export function AddTaskDialog({ isOpen, onClose, onAdd, repositories }: AddTaskD
               type="button"
               onClick={onClose}
               className="px-4 py-2 border border-theme rounded text-theme-fg hover:bg-theme-card active:scale-95 cursor-pointer"
-              disabled={isLoading}
+              disabled={isValidating}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              disabled={isLoading || isFetchingBranches}
+              disabled={isValidating || isFetchingBranches}
             >
               Create
             </button>
