@@ -192,6 +192,17 @@ Body: { "requirement": "...", "design": "...", "procedure": "..." }`;
   const handleRequestImplementation = async () => {
     if (!onSendPrompt || !activeTabId) return;
 
+    // まずタスクステータスをcodingに変更
+    try {
+      await fetch(`/api/tasks/${task.id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'coding' }),
+      });
+    } catch (error) {
+      console.error('Failed to update task status:', error);
+    }
+
     const prompt = `requirement, designを参考にし、procedureの手順に従って実装を開始してください。
 
 実装後、以下を必ず実行してください：
