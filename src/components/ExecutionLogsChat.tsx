@@ -111,6 +111,7 @@ const ExecutionLogsChatComponent = forwardRef<ExecutionLogsChatHandle, Execution
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [isAtBottom, setIsAtBottom] = useState(true);
     const prevTabIdRef = useRef<string | undefined>(tabId);
+    const prevScrollHeightRef = useRef<number>(0);
     const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
 
     // セッション完了状態を判定
@@ -149,6 +150,12 @@ const ExecutionLogsChatComponent = forwardRef<ExecutionLogsChatHandle, Execution
 
     // スクロール制御
     useEffect(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      const currentScrollHeight = container.scrollHeight;
+      const heightDiff = currentScrollHeight - prevScrollHeightRef.current;
+
       const tabChanged = prevTabIdRef.current !== tabId;
       prevTabIdRef.current = tabId;
 
@@ -159,8 +166,12 @@ const ExecutionLogsChatComponent = forwardRef<ExecutionLogsChatHandle, Execution
       } else if (isAtBottom) {
         // 最下部にいる状態で新規メッセージ: 即座にスクロール
         logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+      } else if (heightDiff > 0) {
+        // 最下部以外で高さ増加: スクロール位置を調整して表示位置を維持
+        container.scrollTop += heightDiff;
       }
-      // 最下部以外にいる場合: スクロールしない
+
+      prevScrollHeightRef.current = currentScrollHeight;
     }, [uiMessages, tabId, isAtBottom]);
 
     return (
