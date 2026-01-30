@@ -27,7 +27,7 @@ export function KanbanColumn({
   const showAddButton = status === 'backlog' && onAddTaskClick;
 
   return (
-    <div className="min-w-64 flex flex-col bg-theme-hover rounded-lg p-4 h-full">
+    <div className="flex-1 flex flex-col bg-theme-hover rounded-lg p-4 h-full min-w-64">
       {/* ヘッダー */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h2 className="text-lg font-semibold text-theme-fg">{title}</h2>
