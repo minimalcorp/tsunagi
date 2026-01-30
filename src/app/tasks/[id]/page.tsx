@@ -585,9 +585,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         editorRef.current.clearPrompt();
       }
       promptsRef.current[tab_id] = '';
-
-      // プロンプト送信後にLogsエリアを最下部までスクロール
-      logsRef.current?.scrollToBottom();
     } catch (error) {
       console.error('Failed to execute:', error);
       throw error;
