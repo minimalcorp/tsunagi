@@ -184,12 +184,15 @@ description: ${task.description}
         ? `現在、タスクはreviewing状態です。
 レビューやテストで見つかった問題を修正してください。
 
-修正内容をユーザーに確認してから、以下を実行：
+修正フロー：
 1. 修正内容の確認・ヒアリング
-2. 問題の修正
-3. Prettier, ESLint, TypeScript型チェック
-4. 動作確認
-5. 修正をコミット・プッシュ
+2. 必要に応じてrequirement, design, procedureを更新（PUT /api/tasks/${task.id}/plans）
+3. タスクステータスをcodingに変更（PUT /api/tasks/${task.id}/status）
+4. 問題の修正
+5. Prettier, ESLint, TypeScript型チェック
+6. 動作確認
+7. 修正をコミット・プッシュ
+8. タスクをreviewingステータスに戻す（PUT /api/tasks/${task.id}/status）
 
 修正が完了したら、その旨を報告してください。`
         : `タスクをcodingステータスに更新してください。
