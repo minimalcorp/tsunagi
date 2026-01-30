@@ -179,7 +179,23 @@ description: ${task.description}
   const handleRequestImplementation = async () => {
     if (!onSendPrompt || !activeTabId) return;
 
-    const prompt = `タスクをcodingステータスに更新してください。
+    const prompt =
+      task.status === 'reviewing'
+        ? `現在、タスクはreviewing状態です。
+レビューやテストで見つかった問題を修正してください。
+
+修正フロー：
+1. 修正内容の確認・ヒアリング
+2. 必要に応じてrequirement, design, procedureを更新（PUT /api/tasks/${task.id}/plans）
+3. タスクステータスをcodingに変更（PUT /api/tasks/${task.id}/status）
+4. 問題の修正
+5. Prettier, ESLint, TypeScript型チェック
+6. 動作確認
+7. 修正をコミット・プッシュ
+8. タスクをreviewingステータスに戻す（PUT /api/tasks/${task.id}/status）
+
+修正が完了したら、その旨を報告してください。`
+        : `タスクをcodingステータスに更新してください。
 
 その後、requirement, designを参考にし、procedureに従って実装を開始してください。
 

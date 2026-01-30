@@ -91,7 +91,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     // Prepare system prompt for new sessions
-    const systemPrompt = !tab.session_id ? getTaskWorkflowPrompt(task.id, task.status) : undefined;
+    // Get base URL from request headers
+    const host = request.headers.get('host') || 'localhost:3000';
+    const protocol = request.headers.get('x-forwarded-proto') || 'http';
+    const baseUrl = `${protocol}://${host}`;
+
+    const systemPrompt = !tab.session_id
+      ? getTaskWorkflowPrompt(task.id, task.status, baseUrl)
+      : undefined;
 
     // Execute Claude in background
     executeSession({
