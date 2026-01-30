@@ -20,6 +20,8 @@ import { MarkdownViewerDialog } from './MarkdownViewerDialog';
 interface TaskActionsProps {
   task: Task;
   onDelete: (taskId: string) => Promise<void>;
+  onSendPrompt?: (tabId: string, prompt: string) => Promise<void>;
+  activeTabId?: string;
 }
 
 function getWorktreePath(task: Task): string {
@@ -27,7 +29,7 @@ function getWorktreePath(task: Task): string {
   return `~/.tsunagi/workspaces/${task.owner}/${task.repo}/${normalizedBranch}`;
 }
 
-export function TaskActions({ task, onDelete }: TaskActionsProps) {
+export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskActionsProps) {
   const worktreePath = getWorktreePath(task);
   const toast = useToast();
   const [needsRebase, setNeedsRebase] = useState<boolean | undefined>(undefined);
@@ -157,6 +159,63 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
     setMarkdownViewerOpen(true);
   };
 
+  const handleRequestPlanning = async () => {
+    if (!onSendPrompt || !activeTabId) return;
+
+    const prompt = `タスクのタイトル「${task.title}」、説明「${task.description}」を参考に、プロジェクトの内容を調査し、このタスクのrequirement, design, procedureを作成してください。
+
+作成後、以下のAPIを呼び出してDBに保存してください：
+PUT /api/tasks/${task.id}/plans
+Body: { "requirement": "...", "design": "...", "procedure": "..." }
+
+また、タスクステータスをplanningに変更してください：
+PUT /api/tasks/${task.id}/status
+Body: { "status": "planning" }`;
+
+    await onSendPrompt(activeTabId, prompt);
+  };
+
+  const handleRequestImplementation = async () => {
+    if (!onSendPrompt || !activeTabId) return;
+
+    const prompt = `requirement, designを参考にし、procedureの手順に従って実装を開始してください。
+
+実装後、以下を必ず実行してください：
+1. Prettier: コードフォーマット
+2. ESLint: コード品質チェック
+3. TypeScript: 型チェック（tsc --noEmit）
+4. 動作確認（可能なら）
+
+全てのチェックが成功したら、Pull Requestを作成してください。
+作成できなければ、Pull Requestを作成するためのリンクを示してください。
+
+Pull Request作成後、以下のAPIを呼び出してタスクを'reviewing'ステータスに遷移してください：
+PUT /api/tasks/${task.id}/status
+Body: { "status": "reviewing", "pullRequestUrl": "..." }`;
+
+    await onSendPrompt(activeTabId, prompt);
+  };
+
+  const handleCompleteTask = async () => {
+    const notificationId = toast.loading('Completing task...', task.title);
+
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to complete task');
+      }
+
+      toast.success(notificationId, 'Successfully completed task', task.title);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(notificationId, 'Failed to complete task', errorMessage);
+    }
+  };
+
   return (
     <>
       {/* Confirmation Dialogs */}
@@ -196,6 +255,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
           {/* Backlog: 計画を依頼 */}
           {task.status === 'backlog' && (
             <button
+              onClick={handleRequestPlanning}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-hover flex items-center gap-2 font-medium text-sm"
               title="Request planning from Claude"
             >
@@ -229,6 +289,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
                 Procedure
               </button>
               <button
+                onClick={handleRequestImplementation}
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-hover flex items-center gap-2 font-medium text-sm"
                 title="Request implementation from Claude"
               >
@@ -263,6 +324,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
                 Procedure
               </button>
               <button
+                onClick={handleRequestImplementation}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
                 title="Request fix implementation from Claude"
               >
@@ -270,6 +332,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
                 Request Implementation (Fix)
               </button>
               <button
+                onClick={handleCompleteTask}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 font-medium text-sm"
                 title="Complete task and merge PR"
               >

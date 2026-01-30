@@ -740,7 +740,12 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
         {/* Quick Actions */}
         <div className="px-4 py-4 pr-[72px] border-t border-theme bg-theme-card flex-shrink-0">
-          <TaskActions task={task} onDelete={handleTaskDelete} />
+          <TaskActions
+            task={task}
+            onDelete={handleTaskDelete}
+            onSendPrompt={handleExecute}
+            activeTabId={activeTabId}
+          />
         </div>
       </div>
 
