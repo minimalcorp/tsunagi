@@ -162,15 +162,29 @@ export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskA
   const handleRequestPlanning = async () => {
     if (!onSendPrompt || !activeTabId) return;
 
-    const prompt = `タスクのタイトル「${task.title}」、説明「${task.description}」を参考に、プロジェクトの内容を調査し、このタスクのrequirement, design, procedureを作成してください。
+    // まずタスクステータスをplanningに変更
+    try {
+      await fetch(`/api/tasks/${task.id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'planning' }),
+      });
+    } catch (error) {
+      console.error('Failed to update task status:', error);
+    }
+
+    const prompt = `title: ${task.title}
+description: ${task.description}
+---
+上記のタスクの情報と、プロジェクトの内容を参考にして、requirement, design, procedureを作成してください。それぞれの資料は、以下のように役割が分かれているので、この順序で作成をお願いします。
+
+1. requirement: titleやdescriptionに書かれているユーザーの要望をそのまままとめた資料
+2. design: ユーザーの要求を実現するための設計資料
+3. procedure: designをどのような手順で実現していくか、作業の順序をチェックリスト化した資料
 
 作成後、以下のAPIを呼び出してDBに保存してください：
 PUT /api/tasks/${task.id}/plans
-Body: { "requirement": "...", "design": "...", "procedure": "..." }
-
-また、タスクステータスをplanningに変更してください：
-PUT /api/tasks/${task.id}/status
-Body: { "status": "planning" }`;
+Body: { "requirement": "...", "design": "...", "procedure": "..." }`;
 
     await onSendPrompt(activeTabId, prompt);
   };
