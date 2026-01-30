@@ -64,15 +64,11 @@ export function Combobox({
   // Normalize value to array
   const normalizedValue = Array.isArray(value) ? value : [value];
 
-  // Get selected labels for display
-  const selectedLabels = normalizedValue
-    .map((val) => {
-      const option = options.find((opt) => opt.value === val);
-      return option?.label;
-    })
-    .filter(Boolean);
-
-  const displayValue = selectedLabels.join(', ');
+  // Calculate input value from selected values
+  const calculatedInputValue = normalizedValue
+    .map((v) => options.find((opt) => opt.value === v)?.label)
+    .filter(Boolean)
+    .join(', ');
 
   // Group items by group property
   const groupedItems = collection.items.reduce(
@@ -93,6 +89,7 @@ export function Combobox({
     <ArkCombobox.Root
       collection={collection}
       value={normalizedValue}
+      inputValue={calculatedInputValue}
       onValueChange={handleValueChange}
       onInputValueChange={handleInputValueChange}
       positioning={{ sameWidth: true }}
@@ -108,7 +105,7 @@ export function Combobox({
       <ArkCombobox.Control className={`relative ${className}`}>
         <ArkCombobox.Input
           className={`w-full pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} py-2 border border-theme rounded text-theme-fg bg-theme-card disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap`}
-          placeholder={displayValue || placeholder}
+          placeholder={placeholder}
         />
         {showClearButton && onClear && (
           <button
