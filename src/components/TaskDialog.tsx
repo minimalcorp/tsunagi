@@ -104,6 +104,13 @@ export function TaskDialog({
     }));
   }, [repositories]);
 
+  const branchOptions = useMemo(() => {
+    return branches.map((branch) => ({
+      value: branch,
+      label: branch === defaultBranch ? `${branch} (default)` : branch,
+    }));
+  }, [branches, defaultBranch]);
+
   const handleRepositoryChange = (value: string | string[]) => {
     const selectedValue = Array.isArray(value) ? value[0] || '' : value;
     setCombinedRepo(selectedValue);
@@ -434,20 +441,16 @@ export function TaskDialog({
                 <span className="text-xs">Loading branches...</span>
               </div>
             ) : branches.length > 0 ? (
-              <select
-                required
+              <Combobox
+                options={branchOptions}
                 value={formData.baseBranch}
-                onChange={(e) => setFormData({ ...formData, baseBranch: e.target.value })}
-                className="w-full h-10 pl-3 pr-10 border border-theme rounded text-theme-fg bg-theme-card"
+                onChange={(value) => {
+                  const selectedValue = Array.isArray(value) ? value[0] || '' : value;
+                  setFormData({ ...formData, baseBranch: selectedValue });
+                }}
+                placeholder="Select base branch"
                 disabled={isLoading}
-              >
-                {branches.map((branch) => (
-                  <option key={branch} value={branch}>
-                    {branch}
-                    {branch === defaultBranch ? ' (default)' : ''}
-                  </option>
-                ))}
-              </select>
+              />
             ) : (
               <div className="w-full h-10 px-3 border border-theme rounded text-sm text-theme-muted bg-theme-card flex items-center">
                 {branchError || 'Select repository first'}
