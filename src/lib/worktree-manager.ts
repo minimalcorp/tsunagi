@@ -140,7 +140,7 @@ export async function createWorktree(
   repo: string,
   branch: string,
   baseBranch?: string
-): Promise<string> {
+): Promise<{ worktreePath: string; baseBranchCommit: string }> {
   const bareRepoPath = await ensureBareRepository(owner, repo);
   const worktreePath = getWorktreePath(owner, repo, branch);
 
@@ -163,6 +163,11 @@ export async function createWorktree(
     (b) => b === `remotes/origin/${branch}` || b === `origin/${branch}`
   );
 
+  // baseBranchの現在のコミットハッシュを取得
+  const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
+  const baseBranchCommitResult = await git.raw(['rev-parse', `origin/${effectiveBaseBranch}`]);
+  const baseBranchCommit = baseBranchCommitResult.trim();
+
   if (localBranchExists) {
     // Local branchが存在する場合は直接チェックアウト
     await git.raw(['worktree', 'add', worktreePath, branch]);
@@ -171,11 +176,10 @@ export async function createWorktree(
     await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${branch}`]);
   } else {
     // 新規ブランチを作成（常にorigin/baseBranchから）
-    const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
     await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${effectiveBaseBranch}`]);
   }
 
-  return worktreePath;
+  return { worktreePath, baseBranchCommit };
 }
 
 // worktreeを削除
@@ -258,7 +262,8 @@ export async function checkRebaseNeeded(
   owner: string,
   repo: string,
   branch: string,
-  baseBranch?: string
+  baseBranch?: string,
+  baseBranchCommit?: string
 ): Promise<boolean> {
   try {
     const bareRepoPath = await ensureBareRepository(owner, repo);
@@ -279,6 +284,16 @@ export async function checkRebaseNeeded(
     const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
     const targetRef = `origin/${effectiveBaseBranch}`;
 
+    // baseBranchCommitが指定されている場合は、それと現在のbaseBranchを比較
+    if (baseBranchCommit) {
+      const currentBaseBranchCommitResult = await bareGit.raw(['rev-parse', targetRef]);
+      const currentBaseBranchCommit = currentBaseBranchCommitResult.trim();
+
+      // worktree作成時のコミットと現在のコミットが異なる場合はrebase必要
+      return baseBranchCommit !== currentBaseBranchCommit;
+    }
+
+    // baseBranchCommitが指定されていない場合は従来のアルゴリズム（merge-base比較）
     const git: SimpleGit = simpleGit(worktreePath);
 
     // merge-base（共通祖先）を取得
@@ -302,7 +317,7 @@ export async function rebaseWorktree(
   repo: string,
   branch: string,
   baseBranch?: string
-): Promise<{ success: boolean; message: string; conflicts?: string[] }> {
+): Promise<{ success: boolean; message: string; baseBranchCommit?: string; conflicts?: string[] }> {
   const bareRepoPath = await ensureBareRepository(owner, repo);
   const worktreePath = getWorktreePath(owner, repo, branch);
 
@@ -329,6 +344,10 @@ export async function rebaseWorktree(
   const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
   const targetRef = `origin/${effectiveBaseBranch}`;
 
+  // rebase後の新しいbaseBranchCommitを取得
+  const baseBranchCommitResult = await bareGit.raw(['rev-parse', targetRef]);
+  const baseBranchCommit = baseBranchCommitResult.trim();
+
   try {
     // rebaseを実行
     await git.rebase([targetRef]);
@@ -336,6 +355,7 @@ export async function rebaseWorktree(
     return {
       success: true,
       message: `Successfully rebased ${branch} onto ${targetRef}`,
+      baseBranchCommit,
     };
   } catch {
     // rebase失敗時の処理
