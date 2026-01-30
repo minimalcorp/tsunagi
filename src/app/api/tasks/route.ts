@@ -113,9 +113,9 @@ export async function POST(request: NextRequest) {
       owner,
       repo,
       branch,
+      baseBranch: baseBranch || 'main',
       repoId: repository.id,
       worktreeStatus: 'pending',
-      plan: body.plan,
       effort: body.effort,
       order: body.order,
     });

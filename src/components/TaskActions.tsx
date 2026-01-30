@@ -3,9 +3,19 @@
 import { useState, useEffect } from 'react';
 import type { Task } from '@/lib/types';
 import { normalizeBranchName } from '@/lib/branch-utils';
-import { Code2, Terminal, Trash2, GitMerge, Loader2 } from 'lucide-react';
+import {
+  Code2,
+  Terminal,
+  Trash2,
+  GitMerge,
+  Loader2,
+  FileText,
+  Play,
+  CheckCircle,
+} from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmDialog } from './ui/Dialog';
+import { MarkdownViewerDialog } from './MarkdownViewerDialog';
 
 interface TaskActionsProps {
   task: Task;
@@ -24,6 +34,8 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
   const [isCheckingRebase, setIsCheckingRebase] = useState(false);
   const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [markdownViewerOpen, setMarkdownViewerOpen] = useState(false);
+  const [markdownViewerContent, setMarkdownViewerContent] = useState({ title: '', content: '' });
 
   // rebase判定を非同期で取得
   useEffect(() => {
@@ -137,6 +149,14 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
   const isClaudeRunning = task.tabs.some((tab) => tab.status === 'running');
   const isRebaseDisabled = task.worktreeStatus !== 'created' || isClaudeRunning;
 
+  const handleViewMarkdown = (title: string, content: string | undefined) => {
+    setMarkdownViewerContent({
+      title,
+      content: content || 'No content available',
+    });
+    setMarkdownViewerOpen(true);
+  };
+
   return (
     <>
       {/* Confirmation Dialogs */}
@@ -162,7 +182,105 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
         variant="danger"
       />
 
+      {/* Markdown Viewer Dialog */}
+      <MarkdownViewerDialog
+        open={markdownViewerOpen}
+        onOpenChange={(details) => setMarkdownViewerOpen(details.open)}
+        title={markdownViewerContent.title}
+        content={markdownViewerContent.content}
+      />
+
       <div>
+        {/* Workflow Action Buttons (Status-based) */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {/* Backlog: 計画を依頼 */}
+          {task.status === 'backlog' && (
+            <button
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-hover flex items-center gap-2 font-medium text-sm"
+              title="Request planning from Claude"
+            >
+              <FileText className="w-4 h-4" />
+              Request Planning
+            </button>
+          )}
+
+          {/* Planning: Requirement/Design/Procedure表示、実装を依頼 */}
+          {task.status === 'planning' && (
+            <>
+              <button
+                onClick={() => handleViewMarkdown('Requirement', task.requirement)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Requirement
+              </button>
+              <button
+                onClick={() => handleViewMarkdown('Design', task.design)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Design
+              </button>
+              <button
+                onClick={() => handleViewMarkdown('Procedure', task.procedure)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Procedure
+              </button>
+              <button
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-hover flex items-center gap-2 font-medium text-sm"
+                title="Request implementation from Claude"
+              >
+                <Play className="w-4 h-4" />
+                Request Implementation
+              </button>
+            </>
+          )}
+
+          {/* Reviewing: Requirement/Design/Procedure表示、実装を依頼、タスクを完了 */}
+          {task.status === 'reviewing' && (
+            <>
+              <button
+                onClick={() => handleViewMarkdown('Requirement', task.requirement)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Requirement
+              </button>
+              <button
+                onClick={() => handleViewMarkdown('Design', task.design)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Design
+              </button>
+              <button
+                onClick={() => handleViewMarkdown('Procedure', task.procedure)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Procedure
+              </button>
+              <button
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+                title="Request fix implementation from Claude"
+              >
+                <Play className="w-4 h-4" />
+                Request Implementation (Fix)
+              </button>
+              <button
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 font-medium text-sm"
+                title="Complete task and merge PR"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Complete Task
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Existing Actions (VS Code, Terminal, Rebase, Delete) */}
         {/* Desktop Layout (md:) - 1 row */}
         <div className="hidden md:flex items-center gap-2">
           <button

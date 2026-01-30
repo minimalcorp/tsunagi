@@ -32,9 +32,21 @@ model Task {
   owner          String
   repo           String
   branch         String
+  baseBranch     String    @map("base_branch") // rebase/merge判定用のベースブランチ
   repoId         String    @map("repo_id")
   worktreeStatus String    @map("worktree_status") // 'pending' | 'created' | 'error'
-  plan           String?
+
+  // 計画ドキュメント（planning時に作成）
+  requirement    String?   // Markdown形式、要求仕様
+  design         String?   // Markdown形式、IF定義・設計
+  procedure      String?   // Markdown形式、実装手順チェックリスト
+
+  // Pull Request情報
+  pullRequestUrl String?   @map("pull_request_url")
+
+  // 完了日時
+  completedAt    DateTime? @map("completed_at")
+
   effort         Int?
   order          Int?
   deletedAt      DateTime? @map("deleted_at")
@@ -45,6 +57,7 @@ model Task {
   tabs       Tab[]
 
   @@index([owner, repo])
+  @@index([status])
   @@index([deletedAt])
   @@map("tasks")
 }

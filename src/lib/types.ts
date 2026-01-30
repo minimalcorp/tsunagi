@@ -7,9 +7,21 @@ export interface Task {
   owner: string;
   repo: string;
   branch: string;
+  baseBranch: string; // rebase/merge判定用のベースブランチ
   repoId: string; // Repository IDへの参照
   worktreeStatus: 'pending' | 'created' | 'error';
-  plan?: string;
+
+  // 計画ドキュメント（planning時に作成）
+  requirement?: string; // Markdown形式、要求仕様
+  design?: string; // Markdown形式、IF定義・設計
+  procedure?: string; // Markdown形式、実装手順チェックリスト
+
+  // Pull Request情報
+  pullRequestUrl?: string;
+
+  // 完了日時
+  completedAt?: string; // done時に設定
+
   effort?: number;
   order?: number;
   deletedAt?: string;

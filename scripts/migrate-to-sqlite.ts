@@ -153,9 +153,9 @@ async function main() {
           owner: task.owner,
           repo: task.repo,
           branch: task.branch,
+          baseBranch: 'main', // デフォルト値
           repoId,
           worktreeStatus: task.worktreeStatus,
-          plan: task.plan,
           effort: task.effort,
           order: task.order,
           deletedAt: task.deletedAt ? new Date(task.deletedAt) : null,
