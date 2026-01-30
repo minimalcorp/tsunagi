@@ -15,7 +15,7 @@ interface ToastProps extends ToastRootProps {
 const getIcon = (type?: ToastType) => {
   switch (type) {
     case 'loading':
-      return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
+      return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
     case 'success':
       return <CheckCircle className="h-5 w-5 text-green-500" />;
     case 'error':
