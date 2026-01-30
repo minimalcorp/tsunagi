@@ -103,20 +103,16 @@ export function Combobox({
       allowCustomValue={allowCustomValue}
       openOnClick={true}
       inputBehavior="autohighlight"
+      selectionBehavior="preserve"
       multiple={multiple}
       lazyMount
       unmountOnExit
     >
       <ArkCombobox.Control className={`relative ${className}`}>
         <ArkCombobox.Input
-          className={`w-full pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} py-2 border border-theme rounded text-theme-fg bg-theme-card disabled:opacity-50 disabled:cursor-not-allowed`}
-          placeholder={isAllSelected ? placeholder : ''}
+          className={`w-full pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} py-2 border border-theme rounded text-theme-fg bg-theme-card disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap`}
+          placeholder={isAllSelected ? placeholder : displayValue}
         />
-        {multiple && displayValue && !isAllSelected && (
-          <div className="absolute left-3 top-0 bottom-0 right-16 flex items-center pointer-events-none">
-            <div className="text-theme-fg truncate">{displayValue}</div>
-          </div>
-        )}
         {showClearButton && onClear && (
           <button
             type="button"
