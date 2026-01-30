@@ -149,9 +149,13 @@ export async function updateTask(
   const updatedTask = await prisma.task.update({
     where: { id },
     data: {
-      ...(updates.status && { status: updates.status }),
-      ...(updates.title && { title: updates.title }),
-      ...(updates.branch && { branch: updates.branch }),
+      ...(updates.status !== undefined && { status: updates.status }),
+      ...(updates.title !== undefined && { title: updates.title }),
+      ...(updates.description !== undefined && { description: updates.description }),
+      ...(updates.branch !== undefined && { branch: updates.branch }),
+      ...(updates.plan !== undefined && { plan: updates.plan }),
+      ...(updates.effort !== undefined && { effort: updates.effort }),
+      ...(updates.order !== undefined && { order: updates.order }),
     },
     include: {
       tabs: {
