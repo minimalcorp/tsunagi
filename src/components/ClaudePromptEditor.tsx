@@ -70,9 +70,15 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
       }
     }, [onInterrupt, tab.tab_id]);
 
-    // 常に最新のハンドラーを参照するためのref
+    const status = getClaudeStatus(tab);
+    const isRunning = status === 'running';
+    const canExecute = !isExecuting && !isRunning;
+
+    // 常に最新のハンドラーと状態を参照するためのref
     const handleExecuteRef = useRef(handleExecute);
     const handleInterruptRef = useRef(handleInterrupt);
+    const isRunningRef = useRef(isRunning);
+    const canExecuteRef = useRef(canExecute);
 
     useEffect(() => {
       handleExecuteRef.current = handleExecute;
@@ -82,9 +88,13 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
       handleInterruptRef.current = handleInterrupt;
     }, [handleInterrupt]);
 
-    const status = getClaudeStatus(tab);
-    const isRunning = status === 'running';
-    const canExecute = !isExecuting && !isRunning;
+    useEffect(() => {
+      isRunningRef.current = isRunning;
+    }, [isRunning]);
+
+    useEffect(() => {
+      canExecuteRef.current = canExecute;
+    }, [canExecute]);
 
     return (
       <div className="flex flex-col h-full min-h-0">
@@ -126,14 +136,29 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
               const monaco = await import('monaco-editor');
 
               // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で Send
+              // Claude stateがidleの時のみ実行可能
               editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-                handleExecuteRef.current();
+                if (canExecuteRef.current) {
+                  handleExecuteRef.current();
+                }
               });
 
               // Esc で Interrupt
-              editor.addCommand(monaco.KeyCode.Escape, () => {
-                handleInterruptRef.current();
-              });
+              // 条件1: エディタのウィジェットが表示されていない場合のみ
+              //   - findWidgetVisible: 検索ウィジェット
+              //   - suggestWidgetVisible: サジェスト（入力補完）
+              //   - parameterHintsVisible: パラメータヒント
+              //   - renameInputVisible: リネーム入力
+              // 条件2: Claude stateがrunningの時のみ
+              editor.addCommand(
+                monaco.KeyCode.Escape,
+                () => {
+                  if (isRunningRef.current) {
+                    handleInterruptRef.current();
+                  }
+                },
+                'editorTextFocus && !findWidgetVisible && !suggestWidgetVisible && !parameterHintsVisible && !renameInputVisible'
+              );
             }}
             options={{
               minimap: { enabled: false },
