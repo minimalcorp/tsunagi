@@ -4,6 +4,7 @@ import { Combobox as ArkCombobox, useListCollection } from '@ark-ui/react/combob
 import { useFilter } from '@ark-ui/react/locale';
 import { Portal } from '@ark-ui/react/portal';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 
 interface ComboboxOption {
   value: string;
@@ -43,32 +44,62 @@ export function Combobox({
     filter: contains,
   });
 
+  // Manage input value with state
+  const [inputValue, setInputValue] = useState('');
+  const isSelectingRef = useRef(false);
+
   const handleValueChange = (details: { value: string[] }) => {
+    isSelectingRef.current = true;
+
     if (multiple) {
       onChange(details.value);
+      // 複数選択時：選択したlabelsをカンマ区切りで表示
+      const labels = details.value
+        .map((v) => options.find((opt) => opt.value === v)?.label)
+        .filter(Boolean)
+        .join(', ');
+      setInputValue(labels);
     } else {
       const newValue = details.value[0];
       if (newValue !== undefined) {
         onChange(newValue);
+        // 単一選択時：選択したlabelを表示（入力値をクリア）
+        const label = options.find((opt) => opt.value === newValue)?.label || '';
+        setInputValue(label);
       }
     }
+
+    // Reset flag to allow input value updates
+    setTimeout(() => {
+      isSelectingRef.current = false;
+    }, 0);
   };
 
   const handleInputValueChange = (details: { inputValue: string }) => {
+    if (!isSelectingRef.current) {
+      setInputValue(details.inputValue);
+    }
     filter(details.inputValue);
     if (allowCustomValue && !multiple) {
       onChange(details.inputValue);
     }
   };
 
+  // Sync input value when value prop changes externally (e.g., form reset)
+  useEffect(() => {
+    if (!isSelectingRef.current) {
+      const normalizedValue = Array.isArray(value) ? value : [value];
+      const labels = normalizedValue
+        .map((v) => options.find((opt) => opt.value === v)?.label)
+        .filter(Boolean)
+        .join(', ');
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInputValue(labels);
+    }
+  }, [value, options]);
+
   // Normalize value to array
   const normalizedValue = Array.isArray(value) ? value : [value];
-
-  // Calculate input value from selected values
-  const calculatedInputValue = normalizedValue
-    .map((v) => options.find((opt) => opt.value === v)?.label)
-    .filter(Boolean)
-    .join(', ');
 
   // Group items by group property
   const groupedItems = collection.items.reduce(
@@ -89,7 +120,7 @@ export function Combobox({
     <ArkCombobox.Root
       collection={collection}
       value={normalizedValue}
-      inputValue={calculatedInputValue}
+      inputValue={inputValue}
       onValueChange={handleValueChange}
       onInputValueChange={handleInputValueChange}
       positioning={{ sameWidth: true }}
