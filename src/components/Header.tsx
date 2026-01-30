@@ -11,7 +11,12 @@ interface HeaderProps {
   onReload: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   repositories: Array<{ owner: string; repo: string }>;
-  onFilterChange: (filters: { owner: string; repo: string; search: string }) => void;
+  onFilterChange: (filters: {
+    owner: string;
+    repo: string;
+    search: string;
+    selectedRepos?: string[];
+  }) => void;
   isCloneDialogOpen?: boolean;
 }
 
@@ -24,7 +29,7 @@ export function Header({
   onFilterChange,
   isCloneDialogOpen = false,
 }: HeaderProps) {
-  const [repoFilter, setRepoFilter] = useState<string>(''); // "owner/repo" format
+  const [repoFilter, setRepoFilter] = useState<string[]>(['all']); // Array of "owner/repo" format or ['all']
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -46,29 +51,75 @@ export function Header({
     };
   }, [isFilterOpen]);
 
-  // Create combined owner/repo list
+  // Create combined owner/repo list with grouping
   const repoOptions = repositories.map((repository) => ({
     value: `${repository.owner}/${repository.repo}`,
-    label: `${repository.owner}/${repository.repo}`,
+    label: repository.repo,
+    group: repository.owner,
   }));
 
-  const handleRepoChange = (value: string) => {
-    setRepoFilter(value);
-    if (value) {
-      const [owner, repo] = value.split('/');
-      onFilterChange({ owner, repo, search: searchQuery });
+  const handleRepoChange = (value: string | string[]) => {
+    let values = Array.isArray(value) ? value : [value];
+    const prevValues = repoFilter;
+
+    // State transition logic
+    const prevHasAll = prevValues.includes('all');
+    const newHasAll = values.includes('all');
+
+    if (prevHasAll && !newHasAll) {
+      // Case: 'all' was selected, now other options are selected
+      // Remove 'all' from selection (already done by Ark UI)
+      // Keep the newly selected non-'all' items
+    } else if (!prevHasAll && newHasAll) {
+      // Case: non-'all' items were selected, now 'all' is selected
+      // Keep only 'all'
+      values = ['all'];
+    } else if (prevHasAll && newHasAll && values.length > 1) {
+      // Case: 'all' was selected, user clicked another option
+      // This means user wants to switch from 'all' to specific items
+      // Remove 'all', keep only the newly selected items
+      values = values.filter((v) => v !== 'all');
+    } else if (!prevHasAll && !newHasAll && values.length === 0) {
+      // Case: no selection remains after deselecting
+      // Auto-select 'all'
+      values = ['all'];
+    }
+
+    setRepoFilter(values);
+
+    // If 'all' is selected, show all repositories
+    if (values.includes('all')) {
+      onFilterChange({ owner: '', repo: '', search: searchQuery, selectedRepos: ['all'] });
     } else {
-      onFilterChange({ owner: '', repo: '', search: searchQuery });
+      // For multiple selections, pass selected repos
+      const repoList = values.map((v) => v.split('/')).filter((parts) => parts.length === 2);
+      if (repoList.length > 0) {
+        const [owner, repo] = repoList[0];
+        onFilterChange({ owner, repo, search: searchQuery, selectedRepos: values });
+      }
     }
   };
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
-    const [owner = '', repo = ''] = repoFilter ? repoFilter.split('/') : ['', ''];
-    onFilterChange({ owner, repo, search: value });
+
+    if (repoFilter.includes('all') || repoFilter.length === 0) {
+      onFilterChange({ owner: '', repo: '', search: value });
+    } else {
+      const repoList = repoFilter.map((v) => v.split('/')).filter((parts) => parts.length === 2);
+      if (repoList.length > 0) {
+        const [owner, repo] = repoList[0];
+        onFilterChange({ owner, repo, search: value, selectedRepos: repoFilter });
+      }
+    }
   };
 
   // ボタンハイライト用のスタイル関数
+  const handleClearRepoFilter = () => {
+    setRepoFilter(['all']);
+    onFilterChange({ owner: '', repo: '', search: searchQuery, selectedRepos: ['all'] });
+  };
+
   const getButtonStyle = (step: string) => {
     const isHighlighted = nextStep === step;
     const baseStyle =
@@ -89,11 +140,14 @@ export function Header({
       {/* Filters - Desktop (>= 1024px) */}
       <div className="hidden lg:flex gap-4 flex-1 justify-center">
         <Combobox
-          options={[{ value: '', label: 'All Repositories' }, ...repoOptions]}
+          options={[{ value: 'all', label: 'All Repositories' }, ...repoOptions]}
           value={repoFilter}
           onChange={handleRepoChange}
           placeholder="All Repositories"
           className="min-w-48"
+          multiple={true}
+          onClear={handleClearRepoFilter}
+          showClearButton={!repoFilter.includes('all')}
         />
 
         <input

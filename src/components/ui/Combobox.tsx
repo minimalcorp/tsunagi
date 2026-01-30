@@ -1,23 +1,27 @@
 'use client';
 
-import { Combobox as ArkCombobox, createListCollection } from '@ark-ui/react/combobox';
+import { Combobox as ArkCombobox, useListCollection } from '@ark-ui/react/combobox';
+import { useFilter } from '@ark-ui/react/locale';
 import { Portal } from '@ark-ui/react/portal';
-import { Check, ChevronsUpDown } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Check, ChevronsUpDown, X } from 'lucide-react';
 
 interface ComboboxOption {
   value: string;
   label: string;
+  group?: string;
 }
 
 interface ComboboxProps {
   options: ComboboxOption[];
-  value: string;
-  onChange: (value: string) => void;
+  value: string | string[];
+  onChange: (value: string | string[]) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
   allowCustomValue?: boolean;
+  multiple?: boolean;
+  onClear?: () => void;
+  showClearButton?: boolean;
 }
 
 export function Combobox({
@@ -28,64 +32,104 @@ export function Combobox({
   disabled = false,
   className = '',
   allowCustomValue = false,
+  multiple = false,
+  onClear,
+  showClearButton = false,
 }: ComboboxProps) {
-  const [inputValue, setInputValue] = useState('');
+  const { contains } = useFilter({ sensitivity: 'base' });
 
-  const filteredOptions = useMemo(() => {
-    if (!inputValue) return options;
-
-    return options.filter(
-      (opt) =>
-        opt.label.toLowerCase().includes(inputValue.toLowerCase()) ||
-        opt.value.toLowerCase().includes(inputValue.toLowerCase())
-    );
-  }, [options, inputValue]);
-
-  const collection = useMemo(
-    () => createListCollection({ items: filteredOptions }),
-    [filteredOptions]
-  );
-
-  const items = useMemo(
-    () =>
-      filteredOptions.map((opt) => ({
-        label: opt.label,
-        value: opt.value,
-      })),
-    [filteredOptions]
-  );
+  const { collection, filter } = useListCollection({
+    initialItems: options,
+    filter: contains,
+  });
 
   const handleValueChange = (details: { value: string[] }) => {
-    const newValue = details.value[0] || '';
-    onChange(newValue);
-    setInputValue(''); // 選択後に入力値をクリア
+    if (multiple) {
+      onChange(details.value);
+    } else {
+      const newValue = details.value[0];
+      if (newValue !== undefined) {
+        onChange(newValue);
+      }
+    }
   };
 
   const handleInputValueChange = (details: { inputValue: string }) => {
-    setInputValue(details.inputValue);
-    if (allowCustomValue) {
+    filter(details.inputValue);
+    if (allowCustomValue && !multiple) {
       onChange(details.inputValue);
     }
   };
 
+  // Normalize value to array
+  const normalizedValue = Array.isArray(value) ? value : [value];
+
+  // Get selected labels for display
+  const selectedLabels = normalizedValue
+    .map((val) => {
+      const option = options.find((opt) => opt.value === val);
+      return option?.label;
+    })
+    .filter(Boolean);
+
+  const displayValue = selectedLabels.join(', ');
+
+  // Check if 'all' is selected
+  const isAllSelected = normalizedValue.includes('all');
+
+  // Group items by group property
+  const groupedItems = collection.items.reduce(
+    (acc, item) => {
+      const group = item.group || 'Other';
+      if (!acc[group]) {
+        acc[group] = [];
+      }
+      acc[group].push(item);
+      return acc;
+    },
+    {} as Record<string, typeof collection.items>
+  );
+
+  const hasGroups = Object.keys(groupedItems).length > 1 || !groupedItems['Other'];
+
   return (
     <ArkCombobox.Root
       collection={collection}
-      value={value ? [value] : []}
+      value={normalizedValue}
       onValueChange={handleValueChange}
       onInputValueChange={handleInputValueChange}
-      inputValue={inputValue}
       positioning={{ sameWidth: true }}
       disabled={disabled}
       allowCustomValue={allowCustomValue}
+      openOnClick={true}
+      inputBehavior="autohighlight"
+      multiple={multiple}
       lazyMount
       unmountOnExit
     >
       <ArkCombobox.Control className={`relative ${className}`}>
         <ArkCombobox.Input
-          className="w-full pl-3 pr-10 py-2 border border-theme rounded text-theme-fg bg-theme-card disabled:opacity-50 disabled:cursor-not-allowed"
-          placeholder={placeholder}
+          className={`w-full pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} py-2 border border-theme rounded text-theme-fg bg-theme-card disabled:opacity-50 disabled:cursor-not-allowed`}
+          placeholder={isAllSelected ? placeholder : ''}
         />
+        {multiple && displayValue && !isAllSelected && (
+          <div className="absolute left-3 top-0 bottom-0 right-16 flex items-center pointer-events-none">
+            <div className="text-theme-fg truncate">{displayValue}</div>
+          </div>
+        )}
+        {showClearButton && onClear && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            className="absolute right-8 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-fg transition-colors cursor-pointer"
+            aria-label="Clear selection"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
         <ArkCombobox.Trigger className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-muted">
           <ChevronsUpDown className="w-4 h-4" />
         </ArkCombobox.Trigger>
@@ -94,21 +138,45 @@ export function Combobox({
       <Portal>
         <ArkCombobox.Positioner>
           <ArkCombobox.Content className="bg-theme-card border border-theme rounded shadow-lg mt-1 max-h-60 overflow-auto z-50 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out">
-            {items.length > 0 ? (
-              <ArkCombobox.ItemGroup>
-                {items.map((item) => (
-                  <ArkCombobox.Item
-                    key={item.value}
-                    item={item}
-                    className="px-3 py-2 cursor-pointer hover:bg-theme-hover text-theme-fg flex items-center justify-between data-[highlighted]:bg-theme-hover"
-                  >
-                    <ArkCombobox.ItemText>{item.label}</ArkCombobox.ItemText>
-                    <ArkCombobox.ItemIndicator>
-                      <Check className="w-4 h-4 text-primary" />
-                    </ArkCombobox.ItemIndicator>
-                  </ArkCombobox.Item>
-                ))}
-              </ArkCombobox.ItemGroup>
+            {collection.items.length > 0 ? (
+              hasGroups ? (
+                <>
+                  {Object.entries(groupedItems).map(([groupName, groupItems]) => (
+                    <ArkCombobox.ItemGroup key={groupName}>
+                      <ArkCombobox.ItemGroupLabel className="px-3 py-1.5 text-xs font-semibold text-theme-muted uppercase">
+                        {groupName}
+                      </ArkCombobox.ItemGroupLabel>
+                      {groupItems.map((item) => (
+                        <ArkCombobox.Item
+                          key={item.value}
+                          item={item}
+                          className="px-3 py-2 cursor-pointer hover:bg-theme-hover text-theme-fg flex items-center justify-between"
+                        >
+                          <ArkCombobox.ItemText>{item.label}</ArkCombobox.ItemText>
+                          <ArkCombobox.ItemIndicator>
+                            <Check className="w-4 h-4 text-primary" />
+                          </ArkCombobox.ItemIndicator>
+                        </ArkCombobox.Item>
+                      ))}
+                    </ArkCombobox.ItemGroup>
+                  ))}
+                </>
+              ) : (
+                <ArkCombobox.ItemGroup>
+                  {collection.items.map((item) => (
+                    <ArkCombobox.Item
+                      key={item.value}
+                      item={item}
+                      className="px-3 py-2 cursor-pointer hover:bg-theme-hover text-theme-fg flex items-center justify-between"
+                    >
+                      <ArkCombobox.ItemText>{item.label}</ArkCombobox.ItemText>
+                      <ArkCombobox.ItemIndicator>
+                        <Check className="w-4 h-4 text-primary" />
+                      </ArkCombobox.ItemIndicator>
+                    </ArkCombobox.Item>
+                  ))}
+                </ArkCombobox.ItemGroup>
+              )
             ) : (
               <div className="px-3 py-2 text-theme-muted text-sm">No options found</div>
             )}

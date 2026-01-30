@@ -104,11 +104,12 @@ export function TaskDialog({
     }));
   }, [repositories]);
 
-  const handleRepositoryChange = (value: string) => {
-    setCombinedRepo(value);
+  const handleRepositoryChange = (value: string | string[]) => {
+    const selectedValue = Array.isArray(value) ? value[0] || '' : value;
+    setCombinedRepo(selectedValue);
 
-    if (value) {
-      const [owner, repo] = value.split('/');
+    if (selectedValue) {
+      const [owner, repo] = selectedValue.split('/');
       setFormData((prev) => ({
         ...prev,
         owner,

@@ -23,9 +23,8 @@ export default function Home() {
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
 
   // Filter states
-  const [ownerFilter, setOwnerFilter] = useState('');
-  const [repoFilter, setRepoFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
 
   // 初回ユーザーフローの状態を検出
   const onboardingState = useMemo(() => {
@@ -55,13 +54,16 @@ export default function Home() {
   // Filter tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
-      if (ownerFilter && task.owner !== ownerFilter) return false;
-      if (repoFilter && task.repo !== repoFilter) return false;
+      // If selectedRepos has values and doesn't include 'all', filter by selected repos
+      if (selectedRepos.length > 0 && !selectedRepos.includes('all')) {
+        const taskRepo = `${task.owner}/${task.repo}`;
+        if (!selectedRepos.includes(taskRepo)) return false;
+      }
       if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase()))
         return false;
       return true;
     });
-  }, [tasks, ownerFilter, repoFilter, searchQuery]);
+  }, [tasks, selectedRepos, searchQuery]);
 
   // 初回データロード
   const loadData = async () => {
@@ -221,10 +223,14 @@ export default function Home() {
     }
   };
 
-  const handleFilterChange = (filters: { owner: string; repo: string; search: string }) => {
-    setOwnerFilter(filters.owner);
-    setRepoFilter(filters.repo);
+  const handleFilterChange = (filters: {
+    owner: string;
+    repo: string;
+    search: string;
+    selectedRepos?: string[];
+  }) => {
     setSearchQuery(filters.search);
+    setSelectedRepos(filters.selectedRepos || []);
   };
 
   // 初回ロード時のみローディング表示
