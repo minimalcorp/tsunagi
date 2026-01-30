@@ -74,9 +74,6 @@ export function Combobox({
 
   const displayValue = selectedLabels.join(', ');
 
-  // Check if 'all' is selected
-  const isAllSelected = normalizedValue.includes('all');
-
   // Group items by group property
   const groupedItems = collection.items.reduce(
     (acc, item) => {
@@ -111,7 +108,7 @@ export function Combobox({
       <ArkCombobox.Control className={`relative ${className}`}>
         <ArkCombobox.Input
           className={`w-full pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} py-2 border border-theme rounded text-theme-fg bg-theme-card disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap`}
-          placeholder={isAllSelected ? placeholder : displayValue}
+          placeholder={displayValue || placeholder}
         />
         {showClearButton && onClear && (
           <button
