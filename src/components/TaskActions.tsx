@@ -162,29 +162,16 @@ export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskA
   const handleRequestPlanning = async () => {
     if (!onSendPrompt || !activeTabId) return;
 
-    // まずタスクステータスをplanningに変更
-    try {
-      await fetch(`/api/tasks/${task.id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'planning' }),
-      });
-    } catch (error) {
-      console.error('Failed to update task status:', error);
-    }
+    const prompt = `タスクをplanningステータスに更新してください。
 
-    const prompt = `title: ${task.title}
+その後、以下の情報からrequirement, design, procedureを作成してください：
+title: ${task.title}
 description: ${task.description}
----
-上記のタスクの情報と、プロジェクトの内容を参考にして、requirement, design, procedureを作成してください。それぞれの資料は、以下のように役割が分かれているので、この順序で作成をお願いします。
 
-1. requirement: titleやdescriptionに書かれているユーザーの要望をそのまままとめた資料
-2. design: ユーザーの要求を実現するための設計資料
-3. procedure: designをどのような手順で実現していくか、作業の順序をチェックリスト化した資料
-
-作成後、以下のAPIを呼び出してDBに保存してください：
-PUT /api/tasks/${task.id}/plans
-Body: { "requirement": "...", "design": "...", "procedure": "..." }`;
+それぞれの資料の役割：
+1. requirement: ユーザーの要望をまとめた資料
+2. design: 要求実現のための設計資料
+3. procedure: 実装手順のチェックリスト`;
 
     await onSendPrompt(activeTabId, prompt);
   };
@@ -192,31 +179,16 @@ Body: { "requirement": "...", "design": "...", "procedure": "..." }`;
   const handleRequestImplementation = async () => {
     if (!onSendPrompt || !activeTabId) return;
 
-    // まずタスクステータスをcodingに変更
-    try {
-      await fetch(`/api/tasks/${task.id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'coding' }),
-      });
-    } catch (error) {
-      console.error('Failed to update task status:', error);
-    }
+    const prompt = `タスクをcodingステータスに更新してください。
 
-    const prompt = `requirement, designを参考にし、procedureの手順に従って実装を開始してください。
+その後、requirement, designを参考にし、procedureに従って実装を開始してください。
 
-実装後、以下を必ず実行してください：
-1. Prettier: コードフォーマット
-2. ESLint: コード品質チェック
-3. TypeScript: 型チェック（tsc --noEmit）
-4. 動作確認（可能なら）
+実装後、以下を実行：
+1. Prettier, ESLint, TypeScript型チェック
+2. 動作確認（可能なら）
+3. Pull Request作成
 
-全てのチェックが成功したら、Pull Requestを作成してください。
-作成できなければ、Pull Requestを作成するためのリンクを示してください。
-
-Pull Request作成後、以下のAPIを呼び出してタスクを'reviewing'ステータスに遷移してください：
-PUT /api/tasks/${task.id}/status
-Body: { "status": "reviewing", "pullRequestUrl": "..." }`;
+PR作成後、タスクをreviewingステータスに更新してください。`;
 
     await onSendPrompt(activeTabId, prompt);
   };

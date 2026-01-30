@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { sseManager } from '@/lib/sse-manager';
+import { getTaskWorkflowPrompt } from '@/lib/system-prompts';
 
 type Params = {
   params: Promise<{ tab_id: string }>;
@@ -89,6 +90,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       });
     }
 
+    // Prepare system prompt for new sessions
+    const systemPrompt = !tab.session_id ? getTaskWorkflowPrompt(task.id, task.status) : undefined;
+
     // Execute Claude in background
     executeSession({
       sessionId: tab_id,
@@ -98,6 +102,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       agentSessionId: tab.session_id,
       owner: task.owner,
       repo: task.repo,
+      systemPrompt,
       onRawMessage: async (rawMessage: unknown) => {
         // Raw messageをsessions.jsonに追加
         const result = await tabRepo.appendMessage(tab_id, rawMessage);
