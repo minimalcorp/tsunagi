@@ -338,7 +338,7 @@ PR作成後、タスクをreviewingステータスに更新してください。
               </button>
               <button
                 onClick={handleRequestImplementation}
-                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-hover flex items-center gap-2 font-medium text-sm"
                 title="Request fix implementation from Claude"
               >
                 <Play className="w-4 h-4" />
@@ -346,7 +346,7 @@ PR作成後、タスクをreviewingステータスに更新してください。
               </button>
               <button
                 onClick={handleCompleteTask}
-                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-hover flex items-center gap-2 font-medium text-sm"
                 title="Complete task and merge PR"
               >
                 <CheckCircle className="w-4 h-4" />
