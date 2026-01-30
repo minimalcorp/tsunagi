@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, forwardRef, useImperativeHandle } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -101,87 +101,104 @@ interface ExecutionLogsChatProps {
   tab: Tab;
 }
 
-export function ExecutionLogsChat({ rawMessages, tabId, tab }: ExecutionLogsChatProps) {
-  const logsEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const prevTabIdRef = useRef<string | undefined>(tabId);
-  const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
-
-  // セッション完了状態を判定
-  const sessionCompleted = useMemo(() => isSessionCompleted(rawMessages), [rawMessages]);
-
-  const status = getClaudeStatus(tab);
-
-  // rawMessagesをUIMessagesに変換
-  const uiMessages = useMemo(() => {
-    if (!rawMessages || rawMessages.length === 0) return [];
-    const converter = new UIMessageConverter();
-    return converter.convert(rawMessages);
-  }, [rawMessages]);
-
-  // スクロール位置の監視
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      const isBottom = scrollHeight - scrollTop - clientHeight < 10; // 10px以内を最下部とみなす
-      setIsAtBottom(isBottom);
-    };
-
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // スクロール制御
-  useEffect(() => {
-    const tabChanged = prevTabIdRef.current !== tabId;
-    prevTabIdRef.current = tabId;
-
-    if (tabChanged) {
-      // タブ切り替え時: 即座にスクロール
-      logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
-      // Note: setIsAtBottomはスクロールイベントで自動的に更新される
-    } else if (isAtBottom) {
-      // 最下部にいる状態で新規メッセージ: 即座にスクロール
-      logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
-    }
-    // 最下部以外にいる場合: スクロールしない
-  }, [uiMessages, tabId, isAtBottom]);
-
-  return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
-        <h3 className="text-sm font-semibold text-theme-fg">Logs</h3>
-        <ClaudeState status={status} />
-      </div>
-
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-theme rounded p-4 space-y-3 bg-theme-hover"
-      >
-        {uiMessages.length === 0 ? (
-          <p className="text-theme-muted text-sm text-center mt-8">
-            No logs yet. Execute a prompt to start.
-          </p>
-        ) : (
-          uiMessages.map((msg) => (
-            <UIMessageItem
-              key={msg.id}
-              message={msg}
-              sessionCompleted={sessionCompleted}
-              expandedTools={expandedTools}
-              setExpandedTools={setExpandedTools}
-            />
-          ))
-        )}
-        <div ref={logsEndRef} />
-      </div>
-    </div>
-  );
+export interface ExecutionLogsChatHandle {
+  scrollToBottom: () => void;
 }
+
+const ExecutionLogsChatComponent = forwardRef<ExecutionLogsChatHandle, ExecutionLogsChatProps>(
+  ({ rawMessages, tabId, tab }, ref) => {
+    const logsEndRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [isAtBottom, setIsAtBottom] = useState(true);
+    const prevTabIdRef = useRef<string | undefined>(tabId);
+    const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
+
+    // セッション完了状態を判定
+    const sessionCompleted = useMemo(() => isSessionCompleted(rawMessages), [rawMessages]);
+
+    const status = getClaudeStatus(tab);
+
+    // 親コンポーネントに公開するメソッド
+    useImperativeHandle(ref, () => ({
+      scrollToBottom: () => {
+        logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+      },
+    }));
+
+    // rawMessagesをUIMessagesに変換
+    const uiMessages = useMemo(() => {
+      if (!rawMessages || rawMessages.length === 0) return [];
+      const converter = new UIMessageConverter();
+      return converter.convert(rawMessages);
+    }, [rawMessages]);
+
+    // スクロール位置の監視
+    useEffect(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      const handleScroll = () => {
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const isBottom = scrollHeight - scrollTop - clientHeight < 10; // 10px以内を最下部とみなす
+        setIsAtBottom(isBottom);
+      };
+
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // スクロール制御
+    useEffect(() => {
+      const tabChanged = prevTabIdRef.current !== tabId;
+      prevTabIdRef.current = tabId;
+
+      if (tabChanged) {
+        // タブ切り替え時: 即座にスクロール
+        logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+        // Note: setIsAtBottomはスクロールイベントで自動的に更新される
+      } else if (isAtBottom) {
+        // 最下部にいる状態で新規メッセージ: 即座にスクロール
+        logsEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+      }
+      // 最下部以外にいる場合: スクロールしない
+    }, [uiMessages, tabId, isAtBottom]);
+
+    return (
+      <div className="flex flex-col h-full min-h-0">
+        <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
+          <h3 className="text-sm font-semibold text-theme-fg">Logs</h3>
+          <ClaudeState status={status} />
+        </div>
+
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-theme rounded p-4 space-y-3 bg-theme-hover"
+        >
+          {uiMessages.length === 0 ? (
+            <p className="text-theme-muted text-sm text-center mt-8">
+              No logs yet. Execute a prompt to start.
+            </p>
+          ) : (
+            uiMessages.map((msg) => (
+              <UIMessageItem
+                key={msg.id}
+                message={msg}
+                sessionCompleted={sessionCompleted}
+                expandedTools={expandedTools}
+                setExpandedTools={setExpandedTools}
+              />
+            ))
+          )}
+          <div ref={logsEndRef} />
+        </div>
+      </div>
+    );
+  }
+);
+
+ExecutionLogsChatComponent.displayName = 'ExecutionLogsChat';
+
+export const ExecutionLogsChat = ExecutionLogsChatComponent;
 
 // グループステータス判定ヘルパー関数
 function getGroupStatus(executions: { status: string }[]) {

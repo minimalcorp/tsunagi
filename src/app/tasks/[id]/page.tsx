@@ -9,7 +9,7 @@ import { CollapsibleTaskInfo } from '@/components/CollapsibleTaskInfo';
 import { SessionTabs } from '@/components/SessionTabs';
 import { ViewLayoutToggle, type ViewMode } from '@/components/ViewLayoutToggle';
 import { ClaudePromptEditor, type ClaudePromptEditorHandle } from '@/components/ClaudePromptEditor';
-import { ExecutionLogsChat } from '@/components/ExecutionLogsChat';
+import { ExecutionLogsChat, type ExecutionLogsChatHandle } from '@/components/ExecutionLogsChat';
 import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useSSE } from '@/hooks/useSSE';
@@ -39,6 +39,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // Prompts管理をstateからrefに変更（再レンダリングを防止）
   const promptsRef = useRef<Record<string, string>>({});
   const editorRef = useRef<ClaudePromptEditorHandle | null>(null);
+  const logsRef = useRef<ExecutionLogsChatHandle | null>(null);
 
   const activeTab = tabs.find((t) => t.tab_id === activeTabId);
 
@@ -583,6 +584,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         editorRef.current.clearPrompt();
       }
       promptsRef.current[tab_id] = '';
+
+      // プロンプト送信後にLogsエリアを最下部までスクロール
+      logsRef.current?.scrollToBottom();
     } catch (error) {
       console.error('Failed to execute:', error);
       throw error;
@@ -722,6 +726,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
                   {(viewMode === 'split' || viewMode === 'logs') && (
                     <ExecutionLogsChat
+                      ref={logsRef}
                       rawMessages={tabMessages[activeTab.tab_id] || []}
                       tabId={activeTab.tab_id}
                       tab={activeTab}
