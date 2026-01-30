@@ -113,9 +113,9 @@ export async function POST(request: NextRequest) {
       owner,
       repo,
       branch,
+      baseBranch: baseBranch || 'main',
       repoId: repository.id,
       worktreeStatus: 'pending',
-      plan: body.plan,
       effort: body.effort,
       order: body.order,
     });
@@ -124,8 +124,16 @@ export async function POST(request: NextRequest) {
     try {
       // 最新のremote情報を取得
       await worktreeManager.fetchRemote(owner, repo);
-      await worktreeManager.createWorktree(owner, repo, branch, baseBranch);
-      await taskRepo.updateTask(newTask.id, { worktreeStatus: 'created' });
+      const { baseBranchCommit } = await worktreeManager.createWorktree(
+        owner,
+        repo,
+        branch,
+        baseBranch
+      );
+      await taskRepo.updateTask(newTask.id, {
+        worktreeStatus: 'created',
+        baseBranchCommit,
+      });
     } catch (error) {
       console.error('Failed to create worktree:', error);
       await taskRepo.updateTask(newTask.id, { worktreeStatus: 'error' });

@@ -24,7 +24,6 @@ interface CreateTaskData {
 interface UpdateTaskData {
   title: string;
   description: string;
-  plan?: string;
   status: Task['status'];
   effort?: number;
   order?: number;
@@ -71,7 +70,6 @@ export function TaskDialog({
     repo: '',
     branch: '',
     baseBranch: '',
-    plan: undefined,
     status: 'backlog',
     effort: undefined,
     order: undefined,
@@ -89,7 +87,6 @@ export function TaskDialog({
         repo: task.repo,
         branch: task.branch,
         baseBranch: '',
-        plan: task.plan,
         status: task.status,
         effort: task.effort,
         order: task.order,
@@ -219,7 +216,6 @@ export function TaskDialog({
           repo: '',
           branch: '',
           baseBranch: '',
-          plan: undefined,
           status: 'backlog',
           effort: undefined,
           order: undefined,
@@ -258,7 +254,6 @@ export function TaskDialog({
         const result = await onUpdate(task.id, {
           title: formData.title,
           description: formData.description,
-          plan: formData.plan,
           status: formData.status!,
           effort: formData.effort,
           order: formData.order,
@@ -355,21 +350,6 @@ export function TaskDialog({
             disabled={isLoading}
           />
         </div>
-
-        {/* Edit mode: Plan */}
-        {!isCreateMode && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">Plan</label>
-            <textarea
-              maxLength={5000}
-              value={formData.plan ?? ''}
-              onChange={(e) => setFormData({ ...formData, plan: e.target.value || undefined })}
-              className="w-full px-3 py-2 border border-theme rounded h-32 text-theme-fg bg-theme-card"
-              placeholder="実行計画を記述してください..."
-              disabled={isLoading}
-            />
-          </div>
-        )}
 
         {/* Edit mode: Status */}
         {!isCreateMode && (

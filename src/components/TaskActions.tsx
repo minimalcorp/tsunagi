@@ -3,13 +3,25 @@
 import { useState, useEffect } from 'react';
 import type { Task } from '@/lib/types';
 import { normalizeBranchName } from '@/lib/branch-utils';
-import { Code2, Terminal, Trash2, GitMerge, Loader2 } from 'lucide-react';
+import {
+  Code2,
+  Terminal,
+  Trash2,
+  GitMerge,
+  Loader2,
+  FileText,
+  Play,
+  CheckCircle,
+} from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmDialog } from './ui/Dialog';
+import { MarkdownViewerDialog } from './MarkdownViewerDialog';
 
 interface TaskActionsProps {
   task: Task;
   onDelete: (taskId: string) => Promise<void>;
+  onSendPrompt?: (tabId: string, prompt: string) => Promise<void>;
+  activeTabId?: string;
 }
 
 function getWorktreePath(task: Task): string {
@@ -17,13 +29,15 @@ function getWorktreePath(task: Task): string {
   return `~/.tsunagi/workspaces/${task.owner}/${task.repo}/${normalizedBranch}`;
 }
 
-export function TaskActions({ task, onDelete }: TaskActionsProps) {
+export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskActionsProps) {
   const worktreePath = getWorktreePath(task);
   const toast = useToast();
   const [needsRebase, setNeedsRebase] = useState<boolean | undefined>(undefined);
   const [isCheckingRebase, setIsCheckingRebase] = useState(false);
   const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [markdownViewerOpen, setMarkdownViewerOpen] = useState(false);
+  const [markdownViewerContent, setMarkdownViewerContent] = useState({ title: '', content: '' });
 
   // rebase判定を非同期で取得
   useEffect(() => {
@@ -137,6 +151,68 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
   const isClaudeRunning = task.tabs.some((tab) => tab.status === 'running');
   const isRebaseDisabled = task.worktreeStatus !== 'created' || isClaudeRunning;
 
+  const handleViewMarkdown = (title: string, content: string | undefined) => {
+    setMarkdownViewerContent({
+      title,
+      content: content || 'No content available',
+    });
+    setMarkdownViewerOpen(true);
+  };
+
+  const handleRequestPlanning = async () => {
+    if (!onSendPrompt || !activeTabId) return;
+
+    const prompt = `タスクをplanningステータスに更新してください。
+
+その後、以下の情報からrequirement, design, procedureを作成してください：
+title: ${task.title}
+description: ${task.description}
+
+それぞれの資料の役割：
+1. requirement: ユーザーの要望をまとめた資料
+2. design: 要求実現のための設計資料
+3. procedure: 実装手順のチェックリスト`;
+
+    await onSendPrompt(activeTabId, prompt);
+  };
+
+  const handleRequestImplementation = async () => {
+    if (!onSendPrompt || !activeTabId) return;
+
+    const prompt = `タスクをcodingステータスに更新してください。
+
+その後、requirement, designを参考にし、procedureに従って実装を開始してください。
+
+実装後、以下を実行：
+1. Prettier, ESLint, TypeScript型チェック
+2. 動作確認（可能なら）
+3. Pull Request作成
+
+PR作成後、タスクをreviewingステータスに更新してください。`;
+
+    await onSendPrompt(activeTabId, prompt);
+  };
+
+  const handleCompleteTask = async () => {
+    const notificationId = toast.loading('Completing task...', task.title);
+
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to complete task');
+      }
+
+      toast.success(notificationId, 'Successfully completed task', task.title);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(notificationId, 'Failed to complete task', errorMessage);
+    }
+  };
+
   return (
     <>
       {/* Confirmation Dialogs */}
@@ -162,7 +238,109 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
         variant="danger"
       />
 
+      {/* Markdown Viewer Dialog */}
+      <MarkdownViewerDialog
+        open={markdownViewerOpen}
+        onOpenChange={(details) => setMarkdownViewerOpen(details.open)}
+        title={markdownViewerContent.title}
+        content={markdownViewerContent.content}
+      />
+
       <div>
+        {/* Workflow Action Buttons (Status-based) */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {/* Backlog: 計画を依頼 */}
+          {task.status === 'backlog' && (
+            <button
+              onClick={handleRequestPlanning}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-hover flex items-center gap-2 font-medium text-sm"
+              title="Request planning from Claude"
+            >
+              <FileText className="w-4 h-4" />
+              Request Planning
+            </button>
+          )}
+
+          {/* Planning: Requirement/Design/Procedure表示、実装を依頼 */}
+          {task.status === 'planning' && (
+            <>
+              <button
+                onClick={() => handleViewMarkdown('Requirement', task.requirement)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Requirement
+              </button>
+              <button
+                onClick={() => handleViewMarkdown('Design', task.design)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Design
+              </button>
+              <button
+                onClick={() => handleViewMarkdown('Procedure', task.procedure)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Procedure
+              </button>
+              <button
+                onClick={handleRequestImplementation}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-hover flex items-center gap-2 font-medium text-sm"
+                title="Request implementation from Claude"
+              >
+                <Play className="w-4 h-4" />
+                Request Implementation
+              </button>
+            </>
+          )}
+
+          {/* Reviewing: Requirement/Design/Procedure表示、実装を依頼、タスクを完了 */}
+          {task.status === 'reviewing' && (
+            <>
+              <button
+                onClick={() => handleViewMarkdown('Requirement', task.requirement)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Requirement
+              </button>
+              <button
+                onClick={() => handleViewMarkdown('Design', task.design)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Design
+              </button>
+              <button
+                onClick={() => handleViewMarkdown('Procedure', task.procedure)}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                Procedure
+              </button>
+              <button
+                onClick={handleRequestImplementation}
+                className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
+                title="Request fix implementation from Claude"
+              >
+                <Play className="w-4 h-4" />
+                Request Implementation (Fix)
+              </button>
+              <button
+                onClick={handleCompleteTask}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 font-medium text-sm"
+                title="Complete task and merge PR"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Complete Task
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Existing Actions (VS Code, Terminal, Rebase, Delete) */}
         {/* Desktop Layout (md:) - 1 row */}
         <div className="hidden md:flex items-center gap-2">
           <button

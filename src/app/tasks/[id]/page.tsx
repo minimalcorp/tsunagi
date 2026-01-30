@@ -8,8 +8,9 @@ import { TaskDialog } from '@/components/TaskDialog';
 import { CollapsibleTaskInfo } from '@/components/CollapsibleTaskInfo';
 import { SessionTabs } from '@/components/SessionTabs';
 import { ViewLayoutToggle, type ViewMode } from '@/components/ViewLayoutToggle';
+import { DocumentViewToggle, type DocumentViewMode } from '@/components/DocumentViewToggle';
 import { ClaudePromptEditor, type ClaudePromptEditorHandle } from '@/components/ClaudePromptEditor';
-import { ExecutionLogsChat, type ExecutionLogsChatHandle } from '@/components/ExecutionLogsChat';
+import { DocumentViewer } from '@/components/DocumentViewer';
 import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useSSE } from '@/hooks/useSSE';
@@ -32,6 +33,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [lastSequence, setLastSequence] = useState<number>(0); // グローバルsequence
   const [isResyncing, setIsResyncing] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('split');
+  const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>('logs');
   const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -39,7 +41,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // Prompts管理をstateからrefに変更（再レンダリングを防止）
   const promptsRef = useRef<Record<string, string>>({});
   const editorRef = useRef<ClaudePromptEditorHandle | null>(null);
-  const logsRef = useRef<ExecutionLogsChatHandle | null>(null);
 
   const activeTab = tabs.find((t) => t.tab_id === activeTabId);
 
@@ -584,9 +585,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         editorRef.current.clearPrompt();
       }
       promptsRef.current[tab_id] = '';
-
-      // プロンプト送信後にLogsエリアを最下部までスクロール
-      logsRef.current?.scrollToBottom();
     } catch (error) {
       console.error('Failed to execute:', error);
       throw error;
@@ -704,7 +702,11 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             <>
               {/* View Toggle */}
               <div className="px-4 pt-2">
-                <ViewLayoutToggle mode={viewMode} onChange={setViewMode} />
+                <div className="flex items-center gap-2">
+                  <ViewLayoutToggle mode={viewMode} onChange={setViewMode} />
+                  <div className="h-6 w-px bg-theme" />
+                  <DocumentViewToggle mode={documentViewMode} onChange={setDocumentViewMode} />
+                </div>
               </div>
 
               {/* Editor + Logs (Split or Single) */}
@@ -725,8 +727,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                   )}
 
                   {(viewMode === 'split' || viewMode === 'logs') && (
-                    <ExecutionLogsChat
-                      ref={logsRef}
+                    <DocumentViewer
+                      mode={documentViewMode}
+                      task={task}
                       rawMessages={tabMessages[activeTab.tab_id] || []}
                       tabId={activeTab.tab_id}
                       tab={activeTab}
@@ -740,7 +743,12 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
         {/* Quick Actions */}
         <div className="px-4 py-4 pr-[72px] border-t border-theme bg-theme-card flex-shrink-0">
-          <TaskActions task={task} onDelete={handleTaskDelete} />
+          <TaskActions
+            task={task}
+            onDelete={handleTaskDelete}
+            onSendPrompt={handleExecute}
+            activeTabId={activeTabId}
+          />
         </div>
       </div>
 

@@ -32,9 +32,15 @@ export async function getTasks(filter?: {
     owner: task.owner,
     repo: task.repo,
     branch: task.branch,
+    baseBranch: task.baseBranch,
+    baseBranchCommit: task.baseBranchCommit ?? undefined,
     repoId: task.repoId,
     worktreeStatus: task.worktreeStatus as Task['worktreeStatus'],
-    plan: task.plan ?? undefined,
+    requirement: task.requirement ?? undefined,
+    design: task.design ?? undefined,
+    procedure: task.procedure ?? undefined,
+    pullRequestUrl: task.pullRequestUrl ?? undefined,
+    completedAt: task.completedAt?.toISOString(),
     effort: task.effort ?? undefined,
     order: task.order ?? undefined,
     deletedAt: task.deletedAt?.toISOString(),
@@ -74,9 +80,15 @@ export async function getTask(id: string): Promise<Task | null> {
     owner: task.owner,
     repo: task.repo,
     branch: task.branch,
+    baseBranch: task.baseBranch,
+    baseBranchCommit: task.baseBranchCommit ?? undefined,
     repoId: task.repoId,
     worktreeStatus: task.worktreeStatus as Task['worktreeStatus'],
-    plan: task.plan ?? undefined,
+    requirement: task.requirement ?? undefined,
+    design: task.design ?? undefined,
+    procedure: task.procedure ?? undefined,
+    pullRequestUrl: task.pullRequestUrl ?? undefined,
+    completedAt: task.completedAt?.toISOString(),
     effort: task.effort ?? undefined,
     order: task.order ?? undefined,
     deletedAt: task.deletedAt?.toISOString(),
@@ -107,9 +119,15 @@ export async function createTask(
       owner: task.owner,
       repo: task.repo,
       branch: task.branch,
+      baseBranch: task.baseBranch,
+      baseBranchCommit: task.baseBranchCommit,
       repoId: task.repoId,
       worktreeStatus: task.worktreeStatus,
-      plan: task.plan,
+      requirement: task.requirement,
+      design: task.design,
+      procedure: task.procedure,
+      pullRequestUrl: task.pullRequestUrl,
+      completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
       effort: task.effort,
       order: task.order,
     },
@@ -126,9 +144,14 @@ export async function createTask(
     owner: newTask.owner,
     repo: newTask.repo,
     branch: newTask.branch,
+    baseBranch: newTask.baseBranch,
     repoId: newTask.repoId,
     worktreeStatus: newTask.worktreeStatus as Task['worktreeStatus'],
-    plan: newTask.plan ?? undefined,
+    requirement: newTask.requirement ?? undefined,
+    design: newTask.design ?? undefined,
+    procedure: newTask.procedure ?? undefined,
+    pullRequestUrl: newTask.pullRequestUrl ?? undefined,
+    completedAt: newTask.completedAt?.toISOString(),
     effort: newTask.effort ?? undefined,
     order: newTask.order ?? undefined,
     deletedAt: newTask.deletedAt?.toISOString(),
@@ -153,7 +176,17 @@ export async function updateTask(
       ...(updates.title !== undefined && { title: updates.title }),
       ...(updates.description !== undefined && { description: updates.description }),
       ...(updates.branch !== undefined && { branch: updates.branch }),
-      ...(updates.plan !== undefined && { plan: updates.plan }),
+      ...(updates.baseBranch !== undefined && { baseBranch: updates.baseBranch }),
+      ...(updates.baseBranchCommit !== undefined && {
+        baseBranchCommit: updates.baseBranchCommit,
+      }),
+      ...(updates.requirement !== undefined && { requirement: updates.requirement }),
+      ...(updates.design !== undefined && { design: updates.design }),
+      ...(updates.procedure !== undefined && { procedure: updates.procedure }),
+      ...(updates.pullRequestUrl !== undefined && { pullRequestUrl: updates.pullRequestUrl }),
+      ...(updates.completedAt !== undefined && {
+        completedAt: updates.completedAt ? new Date(updates.completedAt) : null,
+      }),
       ...(updates.effort !== undefined && { effort: updates.effort }),
       ...(updates.order !== undefined && { order: updates.order }),
     },
@@ -172,9 +205,14 @@ export async function updateTask(
     owner: updatedTask.owner,
     repo: updatedTask.repo,
     branch: updatedTask.branch,
+    baseBranch: updatedTask.baseBranch,
     repoId: updatedTask.repoId,
     worktreeStatus: updatedTask.worktreeStatus as Task['worktreeStatus'],
-    plan: updatedTask.plan ?? undefined,
+    requirement: updatedTask.requirement ?? undefined,
+    design: updatedTask.design ?? undefined,
+    procedure: updatedTask.procedure ?? undefined,
+    pullRequestUrl: updatedTask.pullRequestUrl ?? undefined,
+    completedAt: updatedTask.completedAt?.toISOString(),
     effort: updatedTask.effort ?? undefined,
     order: updatedTask.order ?? undefined,
     deletedAt: updatedTask.deletedAt?.toISOString(),
@@ -324,4 +362,70 @@ export async function deleteTab(taskId: string, tab_id: string): Promise<boolean
   } catch {
     return false;
   }
+}
+
+// ============================================
+// Claude Tool関数（タスクワークフロー用）
+// ============================================
+
+/**
+ * タスクの計画ドキュメント（requirement, design, procedure）を更新
+ * Claudeがplanning時に使用
+ */
+export async function updateTaskPlans(
+  taskId: string,
+  plans: {
+    requirement: string;
+    design: string;
+    procedure: string;
+  }
+): Promise<Task | null> {
+  return updateTask(taskId, {
+    requirement: plans.requirement,
+    design: plans.design,
+    procedure: plans.procedure,
+  });
+}
+
+/**
+ * タスクステータスを遷移させる
+ * Claudeが実装完了時にreviewing へ自動遷移する際に使用
+ */
+export async function transitionTaskStatus(
+  taskId: string,
+  newStatus: Task['status'],
+  data?: { pullRequestUrl?: string }
+): Promise<Task | null> {
+  return updateTask(taskId, {
+    status: newStatus,
+    ...(data?.pullRequestUrl && { pullRequestUrl: data.pullRequestUrl }),
+  });
+}
+
+/**
+ * タスクを完了する
+ * Pull Requestをマージし、タスクをdoneステータスに遷移
+ */
+export async function completeTask(taskId: string): Promise<Task | null> {
+  const task = await getTask(taskId);
+
+  if (!task) {
+    throw new Error(`Task not found: ${taskId}`);
+  }
+
+  // TODO: PRマージ処理を実装（gh CLIを使用）
+  // if (task.pullRequestUrl) {
+  //   const prNumber = extractPRNumber(task.pullRequestUrl);
+  //   try {
+  //     await execCommand(`gh pr merge ${prNumber} --merge`);
+  //   } catch (error) {
+  //     console.warn('PR merge failed or already merged:', error);
+  //   }
+  // }
+
+  // タスクをdoneに遷移
+  return updateTask(taskId, {
+    status: 'done',
+    completedAt: new Date().toISOString(),
+  });
 }

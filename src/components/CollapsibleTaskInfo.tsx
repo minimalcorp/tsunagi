@@ -58,12 +58,6 @@ export function CollapsibleTaskInfo({ task, defaultExpanded = false }: Collapsib
               {task.order !== undefined ? task.order : 'Not set'}
             </span>
           </div>
-          <div className="col-span-2">
-            <span className="font-medium text-theme-fg">Plan:</span>
-            <pre className="mt-1 whitespace-pre-wrap text-sm text-theme-muted">
-              {task.plan || 'No plan yet'}
-            </pre>
-          </div>
         </div>
       )}
     </div>

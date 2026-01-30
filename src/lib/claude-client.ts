@@ -12,6 +12,7 @@ export interface ExecuteOptions {
   onAgentSessionId?: (agentSessionId: string) => void;
   owner?: string; // タスクのowner
   repo?: string; // タスクのrepo
+  systemPrompt?: string; // System prompt (applied once at session start)
 }
 
 /**
@@ -34,6 +35,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
     onAgentSessionId,
     owner,
     repo,
+    systemPrompt,
   } = options;
 
   try {
@@ -118,9 +120,12 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       });
     }
 
+    // Prepend system prompt if this is a new session (not resuming)
+    const finalPrompt = !agentSessionId && systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+
     // Execute query
     const queryResult = query({
-      prompt,
+      prompt: finalPrompt,
       options: queryOptions,
     });
 
