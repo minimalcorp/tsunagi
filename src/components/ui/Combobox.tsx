@@ -3,7 +3,7 @@
 import { Combobox as ArkCombobox, createListCollection } from '@ark-ui/react/combobox';
 import { Portal } from '@ark-ui/react/portal';
 import { Check, ChevronsUpDown } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 interface ComboboxOption {
   value: string;
@@ -29,28 +29,40 @@ export function Combobox({
   className = '',
   allowCustomValue = false,
 }: ComboboxProps) {
-  const collection = useMemo(() => createListCollection({ items: options }), [options]);
+  const [inputValue, setInputValue] = useState('');
+
+  const filteredOptions = useMemo(() => {
+    if (!inputValue) return options;
+
+    return options.filter(
+      (opt) =>
+        opt.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+        opt.value.toLowerCase().includes(inputValue.toLowerCase())
+    );
+  }, [options, inputValue]);
+
+  const collection = useMemo(
+    () => createListCollection({ items: filteredOptions }),
+    [filteredOptions]
+  );
 
   const items = useMemo(
     () =>
-      options.map((opt) => ({
+      filteredOptions.map((opt) => ({
         label: opt.label,
         value: opt.value,
       })),
-    [options]
+    [filteredOptions]
   );
-
-  const selectedLabel = useMemo(() => {
-    const option = options.find((opt) => opt.value === value);
-    return option ? option.label : value || placeholder;
-  }, [options, value, placeholder]);
 
   const handleValueChange = (details: { value: string[] }) => {
     const newValue = details.value[0] || '';
     onChange(newValue);
+    setInputValue(''); // 選択後に入力値をクリア
   };
 
   const handleInputValueChange = (details: { inputValue: string }) => {
+    setInputValue(details.inputValue);
     if (allowCustomValue) {
       onChange(details.inputValue);
     }
@@ -62,6 +74,7 @@ export function Combobox({
       value={value ? [value] : []}
       onValueChange={handleValueChange}
       onInputValueChange={handleInputValueChange}
+      inputValue={inputValue}
       positioning={{ sameWidth: true }}
       disabled={disabled}
       allowCustomValue={allowCustomValue}
