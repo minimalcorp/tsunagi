@@ -352,6 +352,25 @@ html[data-theme='dark'] .bg-theme-hover {
   background-color: #333333;
 }
 
+/* Combobox highlighted item - use data attribute selector directly */
+[data-scope='combobox'][data-part='item'][data-highlighted] {
+  background-color: #d5d5d5; /* Light theme: hoverより少し暗い */
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-scope='combobox'][data-part='item'][data-highlighted] {
+    background-color: #3d3d3d; /* Dark theme: hoverより少し明るい */
+  }
+}
+
+html[data-theme='light'] [data-scope='combobox'][data-part='item'][data-highlighted] {
+  background-color: #d5d5d5;
+}
+
+html[data-theme='dark'] [data-scope='combobox'][data-part='item'][data-highlighted] {
+  background-color: #3d3d3d;
+}
+
 .text-theme-fg {
   color: #1e1e1e;
 }

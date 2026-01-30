@@ -64,10 +64,10 @@ export async function updateSessionData(
 // セッションデータ削除
 export async function deleteSessionData(tab_id: string): Promise<boolean> {
   try {
-    await prisma.sessionData.delete({
+    const result = await prisma.sessionData.deleteMany({
       where: { tabId: tab_id },
     });
-    return true;
+    return result.count > 0;
   } catch {
     return false;
   }
