@@ -45,9 +45,6 @@ model Task {
   // Pull Request情報
   pullRequestUrl String?   @map("pull_request_url")
 
-  // 完了日時
-  completedAt    DateTime? @map("completed_at")
-
   effort         Int?
   order          Int?
   deletedAt      DateTime? @map("deleted_at")

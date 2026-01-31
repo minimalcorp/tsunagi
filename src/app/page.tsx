@@ -109,7 +109,7 @@ export default function Home() {
   const { eventSource } = useSSE();
 
   // バッチ削除
-  const { isDeleting, deletedCount, totalCount, isCompleted, startBatchDelete, reset } =
+  const { isDeleting, deletedCount, errorCount, totalCount, isCompleted, startBatchDelete, reset } =
     useBatchDelete();
 
   useEffect(() => {
@@ -201,36 +201,50 @@ export default function Home() {
   useEffect(() => {
     if (!isDeleting && !isCompleted) return;
 
-    if (isDeleting) {
-      // 進捗更新
-      toaster.update('batch-delete-progress', {
-        type: 'loading',
-        title: 'Deleting tasks...',
-        description: `${deletedCount} / ${totalCount}`,
-        duration: Infinity,
-      });
-    }
+    // マイクロタスクでtoaster操作を実行（Reactのレンダリング外で実行）
+    queueMicrotask(() => {
+      if (isDeleting) {
+        // 進捗更新
+        const description =
+          errorCount > 0
+            ? `${deletedCount} / ${totalCount} (${errorCount} failed)`
+            : `${deletedCount} / ${totalCount}`;
 
-    if (isCompleted) {
-      // 完了通知
-      toaster.dismiss('batch-delete-progress');
-      toaster.create({
-        type: 'success',
-        title: (
-          <div className="flex items-center gap-2">
-            <CircleCheck className="w-5 h-5" />
-            <span>Deleted {totalCount} tasks</span>
-          </div>
-        ),
-        duration: 3000,
-      });
+        toaster.update('batch-delete-progress', {
+          type: 'loading',
+          title: 'Deleting tasks...',
+          description,
+          duration: Infinity,
+        });
+      }
 
-      // リセット
-      setTimeout(() => {
-        reset();
-      }, 3000);
-    }
-  }, [isDeleting, isCompleted, deletedCount, totalCount, reset]);
+      if (isCompleted) {
+        // 完了通知
+        toaster.dismiss('batch-delete-progress');
+
+        const successMessage =
+          errorCount > 0
+            ? `Deleted ${deletedCount} tasks (${errorCount} failed)`
+            : `Deleted ${deletedCount} tasks`;
+
+        toaster.create({
+          type: errorCount > 0 ? 'warning' : 'success',
+          title: (
+            <div className="flex items-center gap-2">
+              <CircleCheck className="w-5 h-5" />
+              <span>{successMessage}</span>
+            </div>
+          ),
+          duration: 5000,
+        });
+
+        // リセット
+        setTimeout(() => {
+          reset();
+        }, 5000);
+      }
+    });
+  }, [isDeleting, isCompleted, deletedCount, errorCount, totalCount, reset]);
 
   // Handler functions
   const handleTaskMove = async (taskId: string, newStatus: Task['status']) => {
@@ -281,7 +295,8 @@ export default function Home() {
     try {
       const result = await startBatchDelete(daysAgo);
 
-      if (result.totalCount === 0) {
+      // 削除対象が0件の場合は通知のみ表示して終了
+      if (!result || result.totalCount === 0) {
         toaster.create({
           type: 'info',
           title: 'No tasks to delete',
@@ -340,6 +355,7 @@ export default function Home() {
           onTaskMove={handleTaskMove}
           onAddTaskClick={() => setIsAddTaskDialogOpen(true)}
           onBatchDeleteClick={() => setIsBatchDeleteDialogOpen(true)}
+          isBatchDeleting={isDeleting}
           nextStep={onboardingState.nextStep}
           isAddTaskDialogOpen={isAddTaskDialogOpen}
           hasApiKey={

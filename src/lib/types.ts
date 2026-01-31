@@ -20,9 +20,6 @@ export interface Task {
   // Pull Request情報
   pullRequestUrl?: string;
 
-  // 完了日時
-  completedAt?: string; // done時に設定
-
   effort?: number;
   order?: number;
   deletedAt?: string;

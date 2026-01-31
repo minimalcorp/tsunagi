@@ -15,17 +15,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid daysAgo parameter' }, { status: 400 });
     }
 
-    // 削除対象タスクの抽出（completedAt < now - daysAgo days かつ status = done）
+    // 削除対象タスクの抽出（updatedAt < now - daysAgo days かつ status = done）
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
 
-    const allTasks = await taskRepo.getTasks({ includeDeleted: false });
-    const targetTasks = allTasks.filter((task) => {
-      if (task.status !== 'done' || !task.completedAt) {
-        return false;
-      }
-      const completedDate = new Date(task.completedAt);
-      return completedDate < cutoffDate;
+    const targetTasks = await taskRepo.getTasks({
+      includeDeleted: false,
+      status: 'done',
+      updatedBefore: cutoffDate,
     });
 
     const targetTaskIds = targetTasks.map((task) => task.id);
@@ -43,10 +40,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // バックグラウンドで削除処理を実行
+    // バックグラウンドで削除処理を実行（最大8件の並行実行）
     // （Next.jsの制約上、ここで直接実行するが、本来はワーカーやキューを使うべき）
     setImmediate(async () => {
-      for (const task of targetTasks) {
+      const MAX_CONCURRENT = 8;
+      let index = 0;
+      const executing: Promise<void>[] = [];
+
+      const deleteTask = async (task: (typeof targetTasks)[0]) => {
         try {
           // DBから削除
           const success = await taskRepo.deleteTask(task.id);
@@ -65,9 +66,36 @@ export async function POST(request: NextRequest) {
         } catch (error) {
           console.error(`Failed to delete task ${task.id}:`, error);
           // エラーが発生してもbatchIdを含めてbroadcast（失敗として通知）
-          sseManager.broadcast('task:delete:error', { id: task.id, batchId, error: String(error) });
+          sseManager.broadcast('task:delete:error', {
+            id: task.id,
+            batchId,
+            error: String(error),
+          });
+        }
+      };
+
+      while (index < targetTasks.length) {
+        // 並行実行数が上限に達していない場合、新しいタスクを開始
+        while (index < targetTasks.length && executing.length < MAX_CONCURRENT) {
+          const task = targetTasks[index];
+          index++;
+
+          const promise = deleteTask(task).then(() => {
+            // 完了したら実行中リストから削除
+            executing.splice(executing.indexOf(promise), 1);
+          });
+
+          executing.push(promise);
+        }
+
+        // 少なくとも1つのタスクが完了するまで待機
+        if (executing.length > 0) {
+          await Promise.race(executing);
         }
       }
+
+      // 残りの実行中タスクを全て完了するまで待機
+      await Promise.all(executing);
     });
 
     return response;
