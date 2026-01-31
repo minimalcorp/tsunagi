@@ -40,7 +40,7 @@ export function BatchDeleteDialog({
             min="1"
             value={daysAgo}
             onChange={(e) => setDaysAgo(Number(e.target.value))}
-            className="w-16 px-2 py-1 mx-1 border border-theme-border rounded bg-theme-bg text-theme-fg text-center"
+            className="w-16 px-2 py-1 mx-1 border border-theme rounded bg-theme-card text-theme-fg text-center"
           />{' '}
           days ago?
         </p>

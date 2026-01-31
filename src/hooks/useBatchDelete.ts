@@ -5,6 +5,7 @@ interface BatchDeleteState {
   batchId: string | null;
   totalCount: number;
   deletedCount: number;
+  errorCount: number;
   isDeleting: boolean;
   isCompleted: boolean;
 }
@@ -15,6 +16,7 @@ export function useBatchDelete() {
     batchId: null,
     totalCount: 0,
     deletedCount: 0,
+    errorCount: 0,
     isDeleting: false,
     isCompleted: false,
   });
@@ -35,10 +37,16 @@ export function useBatchDelete() {
       const result = await response.json();
       const { batchId, totalCount } = result.data;
 
+      // 削除対象が0件の場合は状態を更新しない
+      if (totalCount === 0) {
+        return { batchId, totalCount };
+      }
+
       setState({
         batchId,
         totalCount,
         deletedCount: 0,
+        errorCount: 0,
         isDeleting: true,
         isCompleted: false,
       });
@@ -50,7 +58,7 @@ export function useBatchDelete() {
     }
   }, []);
 
-  // 削除完了イベントを購読
+  // 削除完了イベントと削除エラーイベントを購読
   useEffect(() => {
     if (!eventSource || !state.batchId) return;
 
@@ -62,7 +70,8 @@ export function useBatchDelete() {
         if (data.batchId === state.batchId) {
           setState((prev) => {
             const newDeletedCount = prev.deletedCount + 1;
-            const isCompleted = newDeletedCount >= prev.totalCount;
+            const processedCount = newDeletedCount + prev.errorCount;
+            const isCompleted = processedCount >= prev.totalCount;
 
             return {
               ...prev,
@@ -77,10 +86,36 @@ export function useBatchDelete() {
       }
     };
 
+    const handleTaskDeleteError = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        // このbatchIdに属するイベントのみカウント
+        if (data.batchId === state.batchId) {
+          setState((prev) => {
+            const newErrorCount = prev.errorCount + 1;
+            const processedCount = prev.deletedCount + newErrorCount;
+            const isCompleted = processedCount >= prev.totalCount;
+
+            return {
+              ...prev,
+              errorCount: newErrorCount,
+              isCompleted,
+              isDeleting: !isCompleted,
+            };
+          });
+        }
+      } catch (error) {
+        console.error('Failed to parse task:delete:error event:', error);
+      }
+    };
+
     eventSource.addEventListener('task:deleted', handleTaskDeleted);
+    eventSource.addEventListener('task:delete:error', handleTaskDeleteError);
 
     return () => {
       eventSource.removeEventListener('task:deleted', handleTaskDeleted);
+      eventSource.removeEventListener('task:delete:error', handleTaskDeleteError);
     };
   }, [eventSource, state.batchId]);
 
@@ -90,6 +125,7 @@ export function useBatchDelete() {
       batchId: null,
       totalCount: 0,
       deletedCount: 0,
+      errorCount: 0,
       isDeleting: false,
       isCompleted: false,
     });

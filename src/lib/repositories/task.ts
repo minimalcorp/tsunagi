@@ -8,6 +8,7 @@ export async function getTasks(filter?: {
   status?: Task['status'];
   owner?: string;
   repo?: string;
+  updatedBefore?: Date;
 }): Promise<Task[]> {
   const tasks = await prisma.task.findMany({
     where: {
@@ -15,6 +16,7 @@ export async function getTasks(filter?: {
       ...(filter?.status && { status: filter.status }),
       ...(filter?.owner && { owner: filter.owner }),
       ...(filter?.repo && { repo: filter.repo }),
+      ...(filter?.updatedBefore && { updatedAt: { lt: filter.updatedBefore } }),
     },
     include: {
       tabs: {
@@ -40,7 +42,6 @@ export async function getTasks(filter?: {
     design: task.design ?? undefined,
     procedure: task.procedure ?? undefined,
     pullRequestUrl: task.pullRequestUrl ?? undefined,
-    completedAt: task.completedAt?.toISOString(),
     effort: task.effort ?? undefined,
     order: task.order ?? undefined,
     deletedAt: task.deletedAt?.toISOString(),
@@ -88,7 +89,6 @@ export async function getTask(id: string): Promise<Task | null> {
     design: task.design ?? undefined,
     procedure: task.procedure ?? undefined,
     pullRequestUrl: task.pullRequestUrl ?? undefined,
-    completedAt: task.completedAt?.toISOString(),
     effort: task.effort ?? undefined,
     order: task.order ?? undefined,
     deletedAt: task.deletedAt?.toISOString(),
@@ -127,7 +127,6 @@ export async function createTask(
       design: task.design,
       procedure: task.procedure,
       pullRequestUrl: task.pullRequestUrl,
-      completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
       effort: task.effort,
       order: task.order,
     },
@@ -151,7 +150,6 @@ export async function createTask(
     design: newTask.design ?? undefined,
     procedure: newTask.procedure ?? undefined,
     pullRequestUrl: newTask.pullRequestUrl ?? undefined,
-    completedAt: newTask.completedAt?.toISOString(),
     effort: newTask.effort ?? undefined,
     order: newTask.order ?? undefined,
     deletedAt: newTask.deletedAt?.toISOString(),
@@ -184,9 +182,6 @@ export async function updateTask(
       ...(updates.design !== undefined && { design: updates.design }),
       ...(updates.procedure !== undefined && { procedure: updates.procedure }),
       ...(updates.pullRequestUrl !== undefined && { pullRequestUrl: updates.pullRequestUrl }),
-      ...(updates.completedAt !== undefined && {
-        completedAt: updates.completedAt ? new Date(updates.completedAt) : null,
-      }),
       ...(updates.effort !== undefined && { effort: updates.effort }),
       ...(updates.order !== undefined && { order: updates.order }),
     },
@@ -212,7 +207,6 @@ export async function updateTask(
     design: updatedTask.design ?? undefined,
     procedure: updatedTask.procedure ?? undefined,
     pullRequestUrl: updatedTask.pullRequestUrl ?? undefined,
-    completedAt: updatedTask.completedAt?.toISOString(),
     effort: updatedTask.effort ?? undefined,
     order: updatedTask.order ?? undefined,
     deletedAt: updatedTask.deletedAt?.toISOString(),
@@ -426,6 +420,5 @@ export async function completeTask(taskId: string): Promise<Task | null> {
   // タスクをdoneに遷移
   return updateTask(taskId, {
     status: 'done',
-    completedAt: new Date().toISOString(),
   });
 }

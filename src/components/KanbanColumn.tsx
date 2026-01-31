@@ -11,6 +11,7 @@ interface KanbanColumnProps {
   tasks: Task[];
   onAddTaskClick?: () => void;
   onBatchDeleteClick?: () => void;
+  isBatchDeleting?: boolean;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isAddTaskDialogOpen?: boolean;
   hasApiKey?: boolean;
@@ -22,6 +23,7 @@ export function KanbanColumn({
   tasks,
   onAddTaskClick,
   onBatchDeleteClick,
+  isBatchDeleting = false,
   nextStep,
   isAddTaskDialogOpen = false,
   hasApiKey = false,
@@ -56,9 +58,9 @@ export function KanbanColumn({
           {showBatchDeleteButton && (
             <button
               onClick={onBatchDeleteClick}
-              className="px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600 active:scale-95 transition-transform cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 rounded-lg bg-red-700 text-white hover:bg-red-600 active:scale-95 transition-transform cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               title="Delete Old Tasks"
-              disabled={tasks.length === 0}
+              disabled={tasks.length === 0 || isBatchDeleting}
             >
               <Trash className="w-4 h-4" />
             </button>
