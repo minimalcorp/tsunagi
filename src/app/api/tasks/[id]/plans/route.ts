@@ -17,7 +17,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // 現在のタスクを取得
-    const currentTask = await taskRepo.findTaskById(id);
+    const currentTask = await taskRepo.getTask(id);
     if (!currentTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
