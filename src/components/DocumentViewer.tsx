@@ -3,6 +3,7 @@ import type { Task, Tab } from '@/lib/types';
 import type { DocumentViewMode } from './DocumentViewToggle';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { markdownComponents } from '@/components/MarkdownComponents';
 
 interface DocumentViewerProps {
   mode: DocumentViewMode;
@@ -27,10 +28,12 @@ export function DocumentViewer({ mode, task, rawMessages, tabId, tab }: Document
         <h3 className="text-sm font-semibold text-theme-fg">{documentTitle}</h3>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-theme rounded p-4 bg-theme-hover">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-theme rounded p-4 bg-[#1e1e1e]">
         {documentContent ? (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{documentContent}</ReactMarkdown>
+          <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-theme-fg text-sm break-words overflow-wrap-anywhere">
+            <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
+              {documentContent}
+            </ReactMarkdown>
           </div>
         ) : (
           <div className="text-theme-muted text-sm text-center mt-8">No {mode} yet</div>
