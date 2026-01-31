@@ -8,6 +8,7 @@ interface KanbanBoardProps {
   tasks: Task[];
   onTaskMove: (taskId: string, newStatus: Task['status']) => void;
   onAddTaskClick?: () => void;
+  onBatchDeleteClick?: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isAddTaskDialogOpen?: boolean;
   hasApiKey?: boolean;
@@ -17,6 +18,7 @@ export function KanbanBoard({
   tasks,
   onTaskMove,
   onAddTaskClick,
+  onBatchDeleteClick,
   nextStep,
   isAddTaskDialogOpen = false,
   hasApiKey = false,
@@ -74,7 +76,12 @@ export function KanbanBoard({
         <KanbanColumn title="Planning" status="planning" tasks={planningTasks} />
         <KanbanColumn title="Coding" status="coding" tasks={codingTasks} />
         <KanbanColumn title="Reviewing" status="reviewing" tasks={reviewingTasks} />
-        <KanbanColumn title="Done" status="done" tasks={doneTasks} />
+        <KanbanColumn
+          title="Done"
+          status="done"
+          tasks={doneTasks}
+          onBatchDeleteClick={onBatchDeleteClick}
+        />
       </div>
     </DragDropContext>
   );
