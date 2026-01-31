@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
+import { sseManager } from '@/lib/sse-manager';
 
 // PUT /api/tasks/:id/plans - Update task planning documents
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -8,22 +9,29 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const body = await request.json();
     const { requirement, design, procedure } = body;
 
-    if (!requirement || !design || !procedure) {
+    // 少なくとも1つのフィールドが必要
+    if (!requirement && !design && !procedure) {
       return NextResponse.json(
-        { error: 'Missing required fields: requirement, design, procedure' },
+        { error: 'At least one field (requirement, design, or procedure) is required' },
         { status: 400 }
       );
     }
 
-    const updatedTask = await taskRepo.updateTaskPlans(id, {
-      requirement,
-      design,
-      procedure,
-    });
-
-    if (!updatedTask) {
+    // 現在のタスクを取得
+    const currentTask = await taskRepo.getTask(id);
+    if (!currentTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
+
+    // 提供されたフィールドのみを更新、提供されていないフィールドは既存の値を保持
+    const updatedTask = await taskRepo.updateTaskPlans(id, {
+      requirement: requirement !== undefined ? requirement : currentTask.requirement,
+      design: design !== undefined ? design : currentTask.design,
+      procedure: procedure !== undefined ? procedure : currentTask.procedure,
+    });
+
+    // SSE broadcast to update UI immediately
+    sseManager.broadcast('task:updated', updatedTask);
 
     return NextResponse.json({ data: { task: updatedTask } });
   } catch (error) {
