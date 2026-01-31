@@ -38,7 +38,7 @@ export function PlanEditorDialog({
   const [editedContent, setEditedContent] = useState(content);
   const [isSaving, setIsSaving] = useState(false);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const handleSaveRef = useRef<() => Promise<void>>();
+  const handleSaveRef = useRef<(() => Promise<void>) | undefined>(undefined);
   const { effectiveTheme } = useTheme();
 
   // Reset content when dialog opens or content changes
