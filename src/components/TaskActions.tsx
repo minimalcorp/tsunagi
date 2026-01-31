@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmDialog } from './ui/Dialog';
-import { MarkdownViewerDialog } from './MarkdownViewerDialog';
+import { PlanEditorDialog } from './PlanEditorDialog';
 
 interface TaskActionsProps {
   task: Task;
@@ -36,8 +36,10 @@ export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskA
   const [isCheckingRebase, setIsCheckingRebase] = useState(false);
   const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [markdownViewerOpen, setMarkdownViewerOpen] = useState(false);
-  const [markdownViewerContent, setMarkdownViewerContent] = useState({ title: '', content: '' });
+  const [planEditorOpen, setPlanEditorOpen] = useState(false);
+  const [currentPlanType, setCurrentPlanType] = useState<'requirement' | 'design' | 'procedure'>(
+    'requirement'
+  );
 
   // rebase判定を非同期で取得
   useEffect(() => {
@@ -151,12 +153,31 @@ export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskA
   const isClaudeRunning = task.tabs.some((tab) => tab.status === 'running');
   const isRebaseDisabled = task.worktreeStatus !== 'created' || isClaudeRunning;
 
-  const handleViewMarkdown = (title: string, content: string | undefined) => {
-    setMarkdownViewerContent({
-      title,
-      content: content || 'No content available',
-    });
-    setMarkdownViewerOpen(true);
+  const handleEditPlan = (planType: 'requirement' | 'design' | 'procedure') => {
+    setCurrentPlanType(planType);
+    setPlanEditorOpen(true);
+  };
+
+  const handleSavePlan = async (content: string) => {
+    const notificationId = toast.loading(`Updating ${currentPlanType}...`);
+
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/plans`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [currentPlanType]: content }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update ${currentPlanType}`);
+      }
+
+      toast.success(notificationId, `Successfully updated ${currentPlanType}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(notificationId, `Failed to update ${currentPlanType}`, errorMessage);
+      throw error;
+    }
   };
 
   const handleRequestPlanning = async () => {
@@ -254,12 +275,13 @@ PR作成後、タスクをreviewingステータスに更新してください。
         variant="danger"
       />
 
-      {/* Markdown Viewer Dialog */}
-      <MarkdownViewerDialog
-        open={markdownViewerOpen}
-        onOpenChange={(details) => setMarkdownViewerOpen(details.open)}
-        title={markdownViewerContent.title}
-        content={markdownViewerContent.content}
+      {/* Plan Editor Dialog */}
+      <PlanEditorDialog
+        open={planEditorOpen}
+        onOpenChange={(details) => setPlanEditorOpen(details.open)}
+        planType={currentPlanType}
+        content={task[currentPlanType] || ''}
+        onSave={handleSavePlan}
       />
 
       <div>
@@ -281,25 +303,25 @@ PR作成後、タスクをreviewingステータスに更新してください。
           {task.status === 'planning' && (
             <>
               <button
-                onClick={() => handleViewMarkdown('Requirement', task.requirement)}
+                onClick={() => handleEditPlan('requirement')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
                 <FileText className="w-4 h-4" />
-                Requirement
+                Edit Requirement
               </button>
               <button
-                onClick={() => handleViewMarkdown('Design', task.design)}
+                onClick={() => handleEditPlan('design')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
                 <FileText className="w-4 h-4" />
-                Design
+                Edit Design
               </button>
               <button
-                onClick={() => handleViewMarkdown('Procedure', task.procedure)}
+                onClick={() => handleEditPlan('procedure')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
                 <FileText className="w-4 h-4" />
-                Procedure
+                Edit Procedure
               </button>
               <button
                 onClick={handleRequestImplementation}
@@ -316,25 +338,25 @@ PR作成後、タスクをreviewingステータスに更新してください。
           {task.status === 'reviewing' && (
             <>
               <button
-                onClick={() => handleViewMarkdown('Requirement', task.requirement)}
+                onClick={() => handleEditPlan('requirement')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
                 <FileText className="w-4 h-4" />
-                Requirement
+                Edit Requirement
               </button>
               <button
-                onClick={() => handleViewMarkdown('Design', task.design)}
+                onClick={() => handleEditPlan('design')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
                 <FileText className="w-4 h-4" />
-                Design
+                Edit Design
               </button>
               <button
-                onClick={() => handleViewMarkdown('Procedure', task.procedure)}
+                onClick={() => handleEditPlan('procedure')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
                 <FileText className="w-4 h-4" />
-                Procedure
+                Edit Procedure
               </button>
               <button
                 onClick={handleRequestImplementation}
