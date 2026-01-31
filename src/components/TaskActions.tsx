@@ -233,6 +233,40 @@ PR作成後、タスクをreviewingステータスに更新してください。
     await onSendPrompt(activeTabId, prompt);
   };
 
+  const handleRequestFix = async () => {
+    if (!onSendPrompt || !activeTabId) return;
+
+    const notificationId = toast.loading('Requesting fix...', task.title);
+
+    try {
+      // 1. タスクステータスをplanningに戻す
+      const response = await fetch(`/api/tasks/${task.id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'planning' }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task status');
+      }
+
+      toast.success(notificationId, 'Task status updated to planning', task.title);
+
+      // 2. ヒアリングメッセージを送信
+      const prompt = `現在の実装で期待通りに動作していない点を教えてください。
+
+問題点を確認した後、必要に応じてrequirement, design, procedureを更新し（PUT /api/tasks/${task.id}/plans）、
+再実装を行います。
+
+どのような問題が発生していますか？`;
+
+      await onSendPrompt(activeTabId, prompt);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(notificationId, 'Failed to request fix', errorMessage);
+    }
+  };
+
   const handleCompleteTask = async () => {
     const notificationId = toast.loading('Completing task...', task.title);
 
@@ -364,10 +398,10 @@ PR作成後、タスクをreviewingステータスに更新してください。
                 Edit Procedure
               </button>
               <button
-                onClick={handleRequestImplementation}
+                onClick={handleRequestFix}
                 disabled={isClaudeRunning}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-hover flex items-center gap-2 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Request fix implementation from Claude"
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 flex items-center gap-2 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Request fix - Return to planning and discuss issues"
               >
                 <Play className="w-4 h-4" />
                 Request Implementation (Fix)
