@@ -28,7 +28,7 @@ export function DocumentViewer({ mode, task, rawMessages, tabId, tab }: Document
         <h3 className="text-sm font-semibold text-theme-fg">{documentTitle}</h3>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-theme rounded p-4 bg-theme-hover">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-theme rounded p-4 bg-theme-card">
         {documentContent ? (
           <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-theme-fg text-sm break-words overflow-wrap-anywhere">
             <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
