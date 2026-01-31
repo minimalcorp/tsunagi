@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Dialog as ArkDialog } from '@ark-ui/react/dialog';
 import { Editor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
@@ -49,7 +49,7 @@ export function PlanEditorDialog({
     }
   }, [content, open]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (isSaving) return; // 保存中は再実行しない
     setIsSaving(true);
     try {
@@ -61,7 +61,7 @@ export function PlanEditorDialog({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [isSaving, editedContent, onSave, onOpenChange]);
 
   // handleSaveの最新版をrefに保持
   useEffect(() => {

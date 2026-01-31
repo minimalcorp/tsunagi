@@ -12,6 +12,9 @@ import {
   FileText,
   Play,
   CheckCircle,
+  Megaphone,
+  Palette,
+  ListTodo,
 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmDialog } from './ui/Dialog';
@@ -306,21 +309,21 @@ PR作成後、タスクをreviewingステータスに更新してください。
                 onClick={() => handleEditPlan('requirement')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
-                <FileText className="w-4 h-4" />
+                <Megaphone className="w-4 h-4" />
                 Edit Requirement
               </button>
               <button
                 onClick={() => handleEditPlan('design')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
-                <FileText className="w-4 h-4" />
+                <Palette className="w-4 h-4" />
                 Edit Design
               </button>
               <button
                 onClick={() => handleEditPlan('procedure')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
-                <FileText className="w-4 h-4" />
+                <ListTodo className="w-4 h-4" />
                 Edit Procedure
               </button>
               <button
@@ -341,21 +344,21 @@ PR作成後、タスクをreviewingステータスに更新してください。
                 onClick={() => handleEditPlan('requirement')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
-                <FileText className="w-4 h-4" />
+                <Megaphone className="w-4 h-4" />
                 Edit Requirement
               </button>
               <button
                 onClick={() => handleEditPlan('design')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
-                <FileText className="w-4 h-4" />
+                <Palette className="w-4 h-4" />
                 Edit Design
               </button>
               <button
                 onClick={() => handleEditPlan('procedure')}
                 className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme flex items-center gap-2 font-medium text-sm"
               >
-                <FileText className="w-4 h-4" />
+                <ListTodo className="w-4 h-4" />
                 Edit Procedure
               </button>
               <button
