@@ -29,11 +29,11 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     /* Dark Mode */
-    --background: #0a0a0a;
+    --background: #1a1a1a;
     --foreground: #e5e5e5;
-    --card-background: #171717;
-    --hover-background: #1f1f1f;
-    --border: #2a2a2a;
+    --card-background: #2a2a2a;
+    --hover-background: #333333;
+    --border: #404040;
     --muted: #a0a0a0;
     --subtle: #b0b0b0;
 
@@ -56,11 +56,11 @@
 /* Dark mode via manual selection */
 :root[data-theme='dark'] {
   /* Dark Mode */
-  --background: #0a0a0a;
+  --background: #1a1a1a;
   --foreground: #e5e5e5;
-  --card-background: #171717;
-  --hover-background: #1f1f1f;
-  --border: #2a2a2a;
+  --card-background: #2a2a2a;
+  --hover-background: #333333;
+  --border: #404040;
   --muted: #a0a0a0;
   --subtle: #b0b0b0;
 
@@ -304,7 +304,7 @@ select {
 
 @media (prefers-color-scheme: dark) {
   .bg-theme-bg {
-    background-color: #0a0a0a;
+    background-color: #1a1a1a;
   }
 }
 
@@ -313,7 +313,7 @@ html[data-theme='light'] .bg-theme-bg {
 }
 
 html[data-theme='dark'] .bg-theme-bg {
-  background-color: #0a0a0a;
+  background-color: #1a1a1a;
 }
 
 .bg-theme-card {
@@ -322,7 +322,7 @@ html[data-theme='dark'] .bg-theme-bg {
 
 @media (prefers-color-scheme: dark) {
   .bg-theme-card {
-    background-color: #171717;
+    background-color: #2a2a2a;
   }
 }
 
@@ -331,7 +331,7 @@ html[data-theme='light'] .bg-theme-card {
 }
 
 html[data-theme='dark'] .bg-theme-card {
-  background-color: #171717;
+  background-color: #2a2a2a;
 }
 
 .bg-theme-hover {
@@ -340,7 +340,7 @@ html[data-theme='dark'] .bg-theme-card {
 
 @media (prefers-color-scheme: dark) {
   .bg-theme-hover {
-    background-color: #1f1f1f;
+    background-color: #333333;
   }
 }
 
@@ -349,7 +349,7 @@ html[data-theme='light'] .bg-theme-hover {
 }
 
 html[data-theme='dark'] .bg-theme-hover {
-  background-color: #1f1f1f;
+  background-color: #333333;
 }
 
 /* Combobox highlighted item - use data attribute selector directly */
@@ -359,7 +359,7 @@ html[data-theme='dark'] .bg-theme-hover {
 
 @media (prefers-color-scheme: dark) {
   [data-scope='combobox'][data-part='item'][data-highlighted] {
-    background-color: #2a2a2a; /* Dark theme: hoverより少し明るい */
+    background-color: #3d3d3d; /* Dark theme: hoverより少し明るい */
   }
 }
 
@@ -368,7 +368,7 @@ html[data-theme='light'] [data-scope='combobox'][data-part='item'][data-highligh
 }
 
 html[data-theme='dark'] [data-scope='combobox'][data-part='item'][data-highlighted] {
-  background-color: #2a2a2a;
+  background-color: #3d3d3d;
 }
 
 .text-theme-fg {
@@ -413,7 +413,7 @@ html[data-theme='dark'] .text-theme-muted {
 
 @media (prefers-color-scheme: dark) {
   .border-theme {
-    border-color: #2a2a2a;
+    border-color: #404040;
   }
 }
 
@@ -422,7 +422,7 @@ html[data-theme='light'] .border-theme {
 }
 
 html[data-theme='dark'] .border-theme {
-  border-color: #2a2a2a;
+  border-color: #404040;
 }
 
 .hover\:bg-theme-card:hover {
@@ -431,7 +431,7 @@ html[data-theme='dark'] .border-theme {
 
 @media (prefers-color-scheme: dark) {
   .hover\:bg-theme-card:hover {
-    background-color: #171717;
+    background-color: #2a2a2a;
   }
 }
 
@@ -440,7 +440,7 @@ html[data-theme='light'] .hover\:bg-theme-card:hover {
 }
 
 html[data-theme='dark'] .hover\:bg-theme-card:hover {
-  background-color: #171717;
+  background-color: #2a2a2a;
 }
 
 .hover\:bg-theme-hover:hover {
@@ -449,7 +449,7 @@ html[data-theme='dark'] .hover\:bg-theme-card:hover {
 
 @media (prefers-color-scheme: dark) {
   .hover\:bg-theme-hover:hover {
-    background-color: #1f1f1f;
+    background-color: #333333;
   }
 }
 
@@ -458,7 +458,7 @@ html[data-theme='light'] .hover\:bg-theme-hover:hover {
 }
 
 html[data-theme='dark'] .hover\:bg-theme-hover:hover {
-  background-color: #1f1f1f;
+  background-color: #333333;
 }
 
 .hover\:text-theme-fg:hover {
