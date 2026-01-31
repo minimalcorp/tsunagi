@@ -2,13 +2,17 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { CircleCheck } from 'lucide-react';
 import type { Task, Repository } from '@/lib/types';
 import { Header } from '@/components/Header';
 import { KanbanBoard } from '@/components/KanbanBoard';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
 import { TaskDialog } from '@/components/TaskDialog';
 import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
+import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { useSSE } from '@/hooks/useSSE';
+import { useBatchDelete } from '@/hooks/useBatchDelete';
+import { toaster } from '@/lib/toaster';
 
 export default function Home() {
   const router = useRouter();
@@ -21,6 +25,7 @@ export default function Home() {
   // Dialog states
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
+  const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,6 +107,10 @@ export default function Home() {
 
   // SSE統合
   const { eventSource } = useSSE();
+
+  // バッチ削除
+  const { isDeleting, deletedCount, totalCount, isCompleted, startBatchDelete, reset } =
+    useBatchDelete();
 
   useEffect(() => {
     if (!eventSource) return;
@@ -188,6 +197,41 @@ export default function Home() {
     };
   }, [eventSource, lastSequence]);
 
+  // バッチ削除の進捗更新とToast通知
+  useEffect(() => {
+    if (!isDeleting && !isCompleted) return;
+
+    if (isDeleting) {
+      // 進捗更新
+      toaster.update('batch-delete-progress', {
+        type: 'loading',
+        title: 'Deleting tasks...',
+        description: `${deletedCount} / ${totalCount}`,
+        duration: Infinity,
+      });
+    }
+
+    if (isCompleted) {
+      // 完了通知
+      toaster.dismiss('batch-delete-progress');
+      toaster.create({
+        type: 'success',
+        title: (
+          <div className="flex items-center gap-2">
+            <CircleCheck className="w-5 h-5" />
+            <span>Deleted {totalCount} tasks</span>
+          </div>
+        ),
+        duration: 3000,
+      });
+
+      // リセット
+      setTimeout(() => {
+        reset();
+      }, 3000);
+    }
+  }, [isDeleting, isCompleted, deletedCount, totalCount, reset]);
+
   // Handler functions
   const handleTaskMove = async (taskId: string, newStatus: Task['status']) => {
     try {
@@ -233,6 +277,39 @@ export default function Home() {
     setSelectedRepos(filters.selectedRepos || []);
   };
 
+  const handleBatchDelete = async (daysAgo: number) => {
+    try {
+      const result = await startBatchDelete(daysAgo);
+
+      if (result.totalCount === 0) {
+        toaster.create({
+          type: 'info',
+          title: 'No tasks to delete',
+          description: `No tasks completed more than ${daysAgo} days ago`,
+          duration: 3000,
+        });
+        return;
+      }
+
+      // 削除開始通知
+      toaster.create({
+        id: 'batch-delete-progress',
+        type: 'loading',
+        title: 'Deleting tasks...',
+        description: `0 / ${result.totalCount}`,
+        duration: Infinity,
+      });
+    } catch (error) {
+      console.error('Failed to start batch delete:', error);
+      toaster.create({
+        type: 'error',
+        title: 'Failed to delete tasks',
+        description: String(error),
+        duration: 5000,
+      });
+    }
+  };
+
   // 初回ロード時のみローディング表示
   if (isLoading && tasks.length === 0) {
     return (
@@ -262,6 +339,7 @@ export default function Home() {
           tasks={filteredTasks}
           onTaskMove={handleTaskMove}
           onAddTaskClick={() => setIsAddTaskDialogOpen(true)}
+          onBatchDeleteClick={() => setIsBatchDeleteDialogOpen(true)}
           nextStep={onboardingState.nextStep}
           isAddTaskDialogOpen={isAddTaskDialogOpen}
           hasApiKey={
@@ -294,6 +372,12 @@ export default function Home() {
         isOpen={isAddTaskDialogOpen}
         onClose={() => setIsAddTaskDialogOpen(false)}
         repositories={repositories}
+      />
+
+      <BatchDeleteDialog
+        isOpen={isBatchDeleteDialogOpen}
+        onClose={() => setIsBatchDeleteDialogOpen(false)}
+        onConfirm={handleBatchDelete}
       />
     </div>
   );

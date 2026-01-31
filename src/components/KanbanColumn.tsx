@@ -1,7 +1,7 @@
 'use client';
 
 import { Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus } from 'lucide-react';
+import { Plus, Trash } from 'lucide-react';
 import type { Task } from '@/lib/types';
 import { TaskCard } from './TaskCard';
 
@@ -10,6 +10,7 @@ interface KanbanColumnProps {
   status: 'backlog' | 'planning' | 'coding' | 'reviewing' | 'done';
   tasks: Task[];
   onAddTaskClick?: () => void;
+  onBatchDeleteClick?: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isAddTaskDialogOpen?: boolean;
   hasApiKey?: boolean;
@@ -20,11 +21,13 @@ export function KanbanColumn({
   status,
   tasks,
   onAddTaskClick,
+  onBatchDeleteClick,
   nextStep,
   isAddTaskDialogOpen = false,
   hasApiKey = false,
 }: KanbanColumnProps) {
   const showAddButton = status === 'backlog' && onAddTaskClick;
+  const showBatchDeleteButton = status === 'done' && onBatchDeleteClick;
 
   return (
     <div className="flex-1 flex flex-col bg-theme-hover rounded-lg p-4 h-full min-w-64">
@@ -49,6 +52,16 @@ export function KanbanColumn({
                 </div>
               )}
             </div>
+          )}
+          {showBatchDeleteButton && (
+            <button
+              onClick={onBatchDeleteClick}
+              className="px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600 active:scale-95 transition-transform cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Delete Old Tasks"
+              disabled={tasks.length === 0}
+            >
+              <Trash className="w-4 h-4" />
+            </button>
           )}
           <span className="text-sm text-theme-muted">{tasks.length}</span>
         </div>
