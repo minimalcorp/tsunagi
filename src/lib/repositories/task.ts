@@ -178,6 +178,7 @@ export async function updateTask(
       ...(updates.baseBranchCommit !== undefined && {
         baseBranchCommit: updates.baseBranchCommit,
       }),
+      ...(updates.worktreeStatus !== undefined && { worktreeStatus: updates.worktreeStatus }),
       ...(updates.requirement !== undefined && { requirement: updates.requirement }),
       ...(updates.design !== undefined && { design: updates.design }),
       ...(updates.procedure !== undefined && { procedure: updates.procedure }),
