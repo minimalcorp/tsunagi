@@ -55,9 +55,6 @@ class SSEConnectionManager {
     const es = new EventSource('/api/events');
     this.eventSource = es;
 
-    // EventSourceが作成された時点でスナップショットを更新
-    this.updateCachedSnapshot();
-
     // 初期接続時刻を設定
     this.lastMessageAt = Date.now();
 
@@ -170,13 +167,13 @@ class SSEConnectionManager {
 
 const manager = SSEConnectionManager.getInstance();
 
+// subscribe関数を安定させるために外に出す
+const subscribe = (callback: () => void) => manager.subscribe(callback);
+const getSnapshot = () => manager.getSnapshot();
+
 export function useSSE() {
   // useSyncExternalStoreを使ってシングルトンの状態を購読
-  const snapshot = useSyncExternalStore(
-    (callback) => manager.subscribe(callback),
-    () => manager.getSnapshot(),
-    () => manager.getSnapshot()
-  );
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   return snapshot;
 }
