@@ -38,7 +38,6 @@ export function PlanEditorDialog({
   const [editedContent, setEditedContent] = useState(content);
   const [isSaving, setIsSaving] = useState(false);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const handleSaveRef = useRef<(() => Promise<void>) | undefined>(undefined);
   const { effectiveTheme } = useTheme();
 
   // Reset content when dialog opens or content changes
@@ -63,7 +62,9 @@ export function PlanEditorDialog({
     }
   }, [isSaving, editedContent, onSave, onOpenChange]);
 
-  // handleSaveの最新版をrefに保持
+  // 常に最新のハンドラーを参照するためのref
+  const handleSaveRef = useRef(handleSave);
+
   useEffect(() => {
     handleSaveRef.current = handleSave;
   }, [handleSave]);
@@ -129,7 +130,7 @@ export function PlanEditorDialog({
                     <Editor
                       height="100%"
                       defaultLanguage="markdown"
-                      value={editedContent}
+                      defaultValue={content}
                       onChange={handleEditorChange}
                       onMount={async (editor) => {
                         editorRef.current = editor;
@@ -138,11 +139,13 @@ export function PlanEditorDialog({
                         const monaco = await import('monaco-editor');
 
                         // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で保存
-                        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-                          if (handleSaveRef.current) {
+                        editor.addCommand(
+                          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+                          () => {
                             handleSaveRef.current();
-                          }
-                        });
+                          },
+                          'editorTextFocus'
+                        );
                       }}
                       options={{
                         minimap: { enabled: false },
