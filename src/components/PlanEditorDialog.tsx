@@ -130,7 +130,7 @@ export function PlanEditorDialog({
                     <Editor
                       height="100%"
                       defaultLanguage="markdown"
-                      value={editedContent}
+                      defaultValue={content}
                       onChange={handleEditorChange}
                       onMount={async (editor) => {
                         editorRef.current = editor;
