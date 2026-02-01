@@ -13,6 +13,10 @@ class SSEConnectionManager {
   private refCount: number = 0;
   private checkInterval: NodeJS.Timeout | null = null;
   private listeners: Set<() => void> = new Set();
+  private cachedSnapshot: { eventSource: EventSource | null; connectionState: ConnectionState } = {
+    eventSource: null,
+    connectionState: 'disconnected',
+  };
 
   private constructor() {}
 
@@ -100,12 +104,14 @@ class SSEConnectionManager {
     this.eventSource.close();
     this.eventSource = null;
     this.connectionState = 'disconnected';
+    this.updateCachedSnapshot();
     this.notifyListeners();
   }
 
   private updateConnectionState(): void {
     if (!this.eventSource) {
       this.connectionState = 'disconnected';
+      this.updateCachedSnapshot();
       this.notifyListeners();
       return;
     }
@@ -130,8 +136,16 @@ class SSEConnectionManager {
 
     if (this.connectionState !== newState) {
       this.connectionState = newState;
+      this.updateCachedSnapshot();
       this.notifyListeners();
     }
+  }
+
+  private updateCachedSnapshot(): void {
+    this.cachedSnapshot = {
+      eventSource: this.eventSource,
+      connectionState: this.connectionState,
+    };
   }
 
   private notifyListeners(): void {
@@ -139,10 +153,7 @@ class SSEConnectionManager {
   }
 
   getSnapshot(): { eventSource: EventSource | null; connectionState: ConnectionState } {
-    return {
-      eventSource: this.eventSource,
-      connectionState: this.connectionState,
-    };
+    return this.cachedSnapshot;
   }
 }
 
