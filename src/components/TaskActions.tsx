@@ -37,7 +37,6 @@ export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskA
   const toast = useToast();
   const [needsRebase, setNeedsRebase] = useState<boolean | undefined>(undefined);
   const [isCheckingRebase, setIsCheckingRebase] = useState(false);
-  const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [planEditorOpen, setPlanEditorOpen] = useState(false);
   const [currentPlanType, setCurrentPlanType] = useState<'requirement' | 'design' | 'procedure'>(
@@ -113,6 +112,7 @@ export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskA
     }
 
     const prompt = `${task.baseBranch}にgit rebaseしてください。
+commitされていない変更がある場合、中止してユーザーに判断を促してください。
 conflictした場合は、conflictした理由を調査し、適切に修正した上でcontinueし、rebaseを完了してください。
 対応する同名のupstream branchがある場合は、pushまで行ってください。`;
 
@@ -272,17 +272,6 @@ PR作成後、タスクをreviewingステータスに更新してください。
     <>
       {/* Confirmation Dialogs */}
       <ConfirmDialog
-        open={rebaseConfirmOpen}
-        onOpenChange={(details) => setRebaseConfirmOpen(details.open)}
-        title="Request Rebase"
-        message={`Send a rebase prompt to Claude for ${task.branch}?\n\nClaude will rebase your branch to ${task.baseBranch} and resolve any conflicts.`}
-        confirmLabel="Send Prompt"
-        cancelLabel="Cancel"
-        onConfirm={executeRebase}
-        variant="default"
-      />
-
-      <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={(details) => setDeleteConfirmOpen(details.open)}
         title="Delete Task"
@@ -428,7 +417,7 @@ PR作成後、タスクをreviewingステータスに更新してください。
           </button>
 
           <button
-            onClick={() => setRebaseConfirmOpen(true)}
+            onClick={executeRebase}
             disabled={isRebaseDisabled}
             title={
               needsRebase
@@ -478,7 +467,7 @@ PR作成後、タスクをreviewingステータスに更新してください。
             </button>
 
             <button
-              onClick={() => setRebaseConfirmOpen(true)}
+              onClick={executeRebase}
               disabled={isRebaseDisabled}
               title={
                 needsRebase
