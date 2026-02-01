@@ -37,7 +37,6 @@ export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskA
   const toast = useToast();
   const [needsRebase, setNeedsRebase] = useState<boolean | undefined>(undefined);
   const [isCheckingRebase, setIsCheckingRebase] = useState(false);
-  const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [planEditorOpen, setPlanEditorOpen] = useState(false);
   const [currentPlanType, setCurrentPlanType] = useState<'requirement' | 'design' | 'procedure'>(
@@ -107,36 +106,17 @@ export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskA
   };
 
   const executeRebase = async () => {
-    const notificationId = toast.loading('Rebasing branch...', task.branch);
-
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/rebase`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // rebase成功後、needsRebaseをfalseに設定
-        setNeedsRebase(false);
-        toast.success(notificationId, 'Successfully rebased branch', task.branch);
-      } else if (response.status === 409) {
-        // conflict発生
-        const conflictFiles = data.conflicts?.join('\n  - ') || 'unknown files';
-        toast.error(
-          notificationId,
-          'Rebase failed due to conflicts',
-          `Conflicts in:\n${conflictFiles}`
-        );
-      } else {
-        toast.error(notificationId, 'Rebase failed', data.error || 'Unknown error');
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(notificationId, 'Failed to rebase', errorMessage);
+    if (!onSendPrompt || !activeTabId) {
+      toast.error('Cannot send rebase prompt', 'No active tab available');
+      return;
     }
+
+    const prompt = `${task.baseBranch}にgit rebaseしてください。
+commitされていない変更がある場合、中止してユーザーに判断を促してください。
+conflictした場合は、conflictした理由を調査し、適切に修正した上でcontinueし、rebaseを完了してください。
+対応する同名のupstream branchがある場合は、pushまで行ってください。`;
+
+    await onSendPrompt(activeTabId, prompt);
   };
 
   const executeDelete = () => {
@@ -154,7 +134,8 @@ export function TaskActions({ task, onDelete, onSendPrompt, activeTabId }: TaskA
   };
 
   const isClaudeRunning = task.tabs.some((tab) => tab.status === 'running');
-  const isRebaseDisabled = task.worktreeStatus !== 'created' || isClaudeRunning;
+  const isRebaseDisabled =
+    task.worktreeStatus !== 'created' || isClaudeRunning || !needsRebase || !activeTabId;
 
   const handleEditPlan = (planType: 'requirement' | 'design' | 'procedure') => {
     setCurrentPlanType(planType);
@@ -290,17 +271,6 @@ PR作成後、タスクをreviewingステータスに更新してください。
   return (
     <>
       {/* Confirmation Dialogs */}
-      <ConfirmDialog
-        open={rebaseConfirmOpen}
-        onOpenChange={(details) => setRebaseConfirmOpen(details.open)}
-        title="Rebase Branch"
-        message={`Rebase ${task.branch} to origin/main?\n\nThis will fetch the latest changes and rebase your branch.`}
-        confirmLabel="Rebase"
-        cancelLabel="Cancel"
-        onConfirm={executeRebase}
-        variant="default"
-      />
-
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={(details) => setDeleteConfirmOpen(details.open)}
@@ -447,10 +417,12 @@ PR作成後、タスクをreviewingステータスに更新してください。
           </button>
 
           <button
-            onClick={() => setRebaseConfirmOpen(true)}
+            onClick={executeRebase}
             disabled={isRebaseDisabled}
             title={
-              needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
+              needsRebase
+                ? 'Base branch has new commits - Send rebase prompt to Claude'
+                : 'No rebase needed'
             }
             className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium text-sm ${
               needsRebase
@@ -495,10 +467,12 @@ PR作成後、タスクをreviewingステータスに更新してください。
             </button>
 
             <button
-              onClick={() => setRebaseConfirmOpen(true)}
+              onClick={executeRebase}
               disabled={isRebaseDisabled}
               title={
-                needsRebase ? 'Base branch has new commits - Rebase recommended' : 'Rebase to main'
+                needsRebase
+                  ? 'Base branch has new commits - Send rebase prompt to Claude'
+                  : 'No rebase needed'
               }
               className={`w-auto px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium text-sm ${
                 needsRebase
