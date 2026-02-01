@@ -31,9 +31,10 @@ class SSEConnectionManager {
     this.listeners.add(callback);
     this.refCount++;
 
-    // 初回のsubscribe時にEventSourceを作成
+    // 初回のsubscribe時にEventSourceを作成（非同期で実行）
     if (this.refCount === 1) {
-      this.connect();
+      // subscribe中に状態変更を通知しないよう、非同期で接続
+      setTimeout(() => this.connect(), 0);
     }
 
     return () => {
@@ -53,6 +54,9 @@ class SSEConnectionManager {
     console.log('[SSE] Creating singleton EventSource connection');
     const es = new EventSource('/api/events');
     this.eventSource = es;
+
+    // EventSourceが作成された時点でスナップショットを更新
+    this.updateCachedSnapshot();
 
     // 初期接続時刻を設定
     this.lastMessageAt = Date.now();
@@ -90,7 +94,8 @@ class SSEConnectionManager {
       this.updateConnectionState();
     }, 5000);
 
-    this.updateConnectionState();
+    // 初回の状態更新は非同期で実行（subscribe中の通知を避ける）
+    setTimeout(() => this.updateConnectionState(), 0);
   }
 
   private disconnect(): void {
@@ -142,10 +147,16 @@ class SSEConnectionManager {
   }
 
   private updateCachedSnapshot(): void {
-    this.cachedSnapshot = {
-      eventSource: this.eventSource,
-      connectionState: this.connectionState,
-    };
+    // 状態が実際に変わった場合のみ新しいオブジェクトを作成
+    if (
+      this.cachedSnapshot.eventSource !== this.eventSource ||
+      this.cachedSnapshot.connectionState !== this.connectionState
+    ) {
+      this.cachedSnapshot = {
+        eventSource: this.eventSource,
+        connectionState: this.connectionState,
+      };
+    }
   }
 
   private notifyListeners(): void {
