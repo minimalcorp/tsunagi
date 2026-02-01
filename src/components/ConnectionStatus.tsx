@@ -4,7 +4,7 @@ import { CheckCircle, RefreshCw, Unplug } from 'lucide-react';
 import { useSSE } from '@/hooks/useSSE';
 
 export function ConnectionStatus() {
-  const { connectionState } = useSSE();
+  const { connectionState, reconnect } = useSSE();
 
   // アイコンとスタイルの設定
   const getStatusConfig = () => {
@@ -35,10 +35,21 @@ export function ConnectionStatus() {
 
   const { Icon, color, label, spin } = getStatusConfig();
 
+  const handleClick = () => {
+    if (connectionState === 'disconnected') {
+      reconnect();
+    }
+  };
+
+  const isClickable = connectionState === 'disconnected';
+
   return (
     <div className="fixed bottom-4 right-4 z-50">
       <div
-        className="connection-status-indicator group relative flex items-center justify-center w-10 h-10 rounded-lg shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
+        onClick={handleClick}
+        className={`connection-status-indicator group relative flex items-center justify-center w-10 h-10 rounded-lg shadow-lg transition-shadow ${
+          isClickable ? 'cursor-pointer hover:shadow-xl' : 'cursor-default'
+        }`}
         title={label}
       >
         <Icon className={`w-5 h-5 ${color} ${spin ? 'animate-spin' : ''}`} aria-hidden="true" />

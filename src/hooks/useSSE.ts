@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, useCallback } from 'react';
 
 export type ConnectionState = 'connected' | 'connecting' | 'disconnected';
 
@@ -70,6 +70,11 @@ class SSEConnectionManager {
       updateLastMessage();
     });
 
+    // heartbeat イベント
+    es.addEventListener('heartbeat', () => {
+      updateLastMessage();
+    });
+
     // すべてのイベントで最終受信時刻を更新
     es.addEventListener('message', updateLastMessage);
     es.addEventListener('task:created', updateLastMessage);
@@ -108,6 +113,28 @@ class SSEConnectionManager {
     this.connectionState = 'disconnected';
     this.updateCachedSnapshot();
     this.notifyListeners();
+  }
+
+  public reconnect(): void {
+    console.log('[SSE] Manual reconnection requested');
+
+    // 1. 既存接続をクリーンアップ
+    if (this.eventSource) {
+      if (this.checkInterval) {
+        clearInterval(this.checkInterval);
+        this.checkInterval = null;
+      }
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+
+    // 2. 状態をconnectingに
+    this.connectionState = 'connecting';
+    this.updateCachedSnapshot();
+    this.notifyListeners();
+
+    // 3. 再接続（非同期）
+    setTimeout(() => this.connect(), 0);
   }
 
   private updateConnectionState(): void {
@@ -175,5 +202,10 @@ export function useSSE() {
   // useSyncExternalStoreを使ってシングルトンの状態を購読
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
-  return snapshot;
+  // reconnect関数を公開
+  const reconnect = useCallback(() => {
+    manager.reconnect();
+  }, []);
+
+  return { ...snapshot, reconnect };
 }
