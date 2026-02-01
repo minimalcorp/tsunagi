@@ -1,48 +1,62 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useSyncExternalStore } from 'react';
 
 export type ConnectionState = 'connected' | 'connecting' | 'disconnected';
 
 const STALE_TIMEOUT = 60000; // 60秒
 
-export function useSSE() {
-  const [eventSource, setEventSource] = useState<EventSource | null>(null);
-  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
-  const [lastMessageAt, setLastMessageAt] = useState<number>(0);
+// シングルトンのSSE接続管理
+class SSEConnectionManager {
+  private static instance: SSEConnectionManager;
+  private eventSource: EventSource | null = null;
+  private connectionState: ConnectionState = 'disconnected';
+  private lastMessageAt: number = 0;
+  private refCount: number = 0;
+  private checkInterval: NodeJS.Timeout | null = null;
+  private listeners: Set<() => void> = new Set();
 
-  // 接続状態を更新する関数
-  const updateConnectionState = useCallback((es: EventSource | null, lastMsg: number) => {
-    if (!es) {
-      setConnectionState('disconnected');
-      return;
+  private constructor() {}
+
+  static getInstance(): SSEConnectionManager {
+    if (!SSEConnectionManager.instance) {
+      SSEConnectionManager.instance = new SSEConnectionManager();
+    }
+    return SSEConnectionManager.instance;
+  }
+
+  subscribe(callback: () => void): () => void {
+    this.listeners.add(callback);
+    this.refCount++;
+
+    // 初回のsubscribe時にEventSourceを作成
+    if (this.refCount === 1) {
+      this.connect();
     }
 
-    const now = Date.now();
-    const isStale = now - lastMsg > STALE_TIMEOUT;
+    return () => {
+      this.listeners.delete(callback);
+      this.refCount--;
 
-    switch (es.readyState) {
-      case EventSource.CONNECTING:
-        setConnectionState('connecting');
-        break;
-      case EventSource.OPEN:
-        setConnectionState(isStale ? 'disconnected' : 'connected');
-        break;
-      case EventSource.CLOSED:
-        setConnectionState('disconnected');
-        break;
-    }
-  }, []);
+      // すべてのsubscriberが削除されたら接続を切断
+      if (this.refCount === 0) {
+        this.disconnect();
+      }
+    };
+  }
 
-  useEffect(() => {
+  private connect(): void {
+    if (this.eventSource) return;
+
+    console.log('[SSE] Creating singleton EventSource connection');
     const es = new EventSource('/api/events');
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setEventSource(es);
+    this.eventSource = es;
 
     // 初期接続時刻を設定
-    setLastMessageAt(Date.now());
+    this.lastMessageAt = Date.now();
 
     // メッセージ受信時刻を更新するハンドラー
     const updateLastMessage = () => {
-      setLastMessageAt(Date.now());
+      this.lastMessageAt = Date.now();
+      this.updateConnectionState();
     };
 
     // connected イベント
@@ -63,27 +77,84 @@ export function useSSE() {
     // エラーハンドリング
     es.onerror = () => {
       console.log('[SSE] Error occurred');
+      this.updateConnectionState();
       // ブラウザが自動的に再接続を試みる
     };
 
     // 定期的に接続状態をチェック（5秒ごと）
-    const checkInterval = setInterval(() => {
-      updateConnectionState(es, Date.now());
+    this.checkInterval = setInterval(() => {
+      this.updateConnectionState();
     }, 5000);
 
-    // クリーンアップ
-    return () => {
-      console.log('[SSE] Closing connection');
-      clearInterval(checkInterval);
-      es.close();
+    this.updateConnectionState();
+  }
+
+  private disconnect(): void {
+    if (!this.eventSource) return;
+
+    console.log('[SSE] Closing singleton connection');
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
+    this.eventSource.close();
+    this.eventSource = null;
+    this.connectionState = 'disconnected';
+    this.notifyListeners();
+  }
+
+  private updateConnectionState(): void {
+    if (!this.eventSource) {
+      this.connectionState = 'disconnected';
+      this.notifyListeners();
+      return;
+    }
+
+    const now = Date.now();
+    const isStale = now - this.lastMessageAt > STALE_TIMEOUT;
+
+    let newState: ConnectionState;
+    switch (this.eventSource.readyState) {
+      case EventSource.CONNECTING:
+        newState = 'connecting';
+        break;
+      case EventSource.OPEN:
+        newState = isStale ? 'disconnected' : 'connected';
+        break;
+      case EventSource.CLOSED:
+        newState = 'disconnected';
+        break;
+      default:
+        newState = 'disconnected';
+    }
+
+    if (this.connectionState !== newState) {
+      this.connectionState = newState;
+      this.notifyListeners();
+    }
+  }
+
+  private notifyListeners(): void {
+    this.listeners.forEach((callback) => callback());
+  }
+
+  getSnapshot(): { eventSource: EventSource | null; connectionState: ConnectionState } {
+    return {
+      eventSource: this.eventSource,
+      connectionState: this.connectionState,
     };
-  }, [updateConnectionState]);
+  }
+}
 
-  // lastMessageAtが更新されたら接続状態を再評価
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    updateConnectionState(eventSource, lastMessageAt);
-  }, [eventSource, lastMessageAt, updateConnectionState]);
+const manager = SSEConnectionManager.getInstance();
 
-  return { eventSource, connectionState };
+export function useSSE() {
+  // useSyncExternalStoreを使ってシングルトンの状態を購読
+  const snapshot = useSyncExternalStore(
+    (callback) => manager.subscribe(callback),
+    () => manager.getSnapshot(),
+    () => manager.getSnapshot()
+  );
+
+  return snapshot;
 }
