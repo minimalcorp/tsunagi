@@ -137,11 +137,15 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
 
               // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で Send
               // Claude stateがidleの時のみ実行可能
-              editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-                if (canExecuteRef.current) {
-                  handleExecuteRef.current();
-                }
-              });
+              editor.addCommand(
+                monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+                () => {
+                  if (canExecuteRef.current) {
+                    handleExecuteRef.current();
+                  }
+                },
+                'editorTextFocus'
+              );
 
               // Esc で Interrupt
               // 条件1: エディタのウィジェットが表示されていない場合のみ

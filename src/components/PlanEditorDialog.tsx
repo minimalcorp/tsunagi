@@ -138,11 +138,15 @@ export function PlanEditorDialog({
                         const monaco = await import('monaco-editor');
 
                         // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で保存
-                        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-                          if (handleSaveRef.current) {
-                            handleSaveRef.current();
-                          }
-                        });
+                        editor.addCommand(
+                          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+                          () => {
+                            if (handleSaveRef.current) {
+                              handleSaveRef.current();
+                            }
+                          },
+                          'editorTextFocus'
+                        );
                       }}
                       options={{
                         minimap: { enabled: false },
