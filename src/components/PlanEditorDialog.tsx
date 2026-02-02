@@ -69,6 +69,19 @@ export function PlanEditorDialog({
     handleSaveRef.current = handleSave;
   }, [handleSave]);
 
+  // カスタムイベントリスナーの登録（Monaco Editorのキーバインディング用）
+  useEffect(() => {
+    const handleSaveEvent = () => {
+      handleSaveRef.current();
+    };
+
+    window.addEventListener('monaco:planEditorSave', handleSaveEvent);
+
+    return () => {
+      window.removeEventListener('monaco:planEditorSave', handleSaveEvent);
+    };
+  }, []);
+
   const handleCancel = () => {
     onOpenChange({ open: false });
   };
@@ -135,17 +148,10 @@ export function PlanEditorDialog({
                       onMount={async (editor) => {
                         editorRef.current = editor;
 
-                        // monaco-editorの型をインポート
-                        const monaco = await import('monaco-editor');
+                        // Context Keyを設定（このエディタがPlan Editorであることを示す）
+                        editor.createContextKey('isPlanEditor', true);
 
-                        // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で保存
-                        editor.addCommand(
-                          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-                          () => {
-                            handleSaveRef.current();
-                          },
-                          'editorTextFocus'
-                        );
+                        // コマンド登録は不要（ClaudePromptEditorで既に登録済み）
                       }}
                       options={{
                         minimap: { enabled: false },

@@ -149,8 +149,10 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
               // monaco-editorの型をインポート
               const monaco = await import('monaco-editor');
 
-              // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で Send
-              // Claude stateがidleの時のみ実行可能
+              // Context Keyを設定（このエディタがPrompt Editorであることを示す）
+              editor.createContextKey('isPromptEditor', true);
+
+              // Prompt Editor用: Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で Send
               editor.addCommand(
                 monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
                 () => {
@@ -158,16 +160,10 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
                     handleExecuteRef.current();
                   }
                 },
-                'editorTextFocus'
+                'editorTextFocus && isPromptEditor'
               );
 
-              // Esc で Interrupt
-              // 条件1: エディタのウィジェットが表示されていない場合のみ
-              //   - findWidgetVisible: 検索ウィジェット
-              //   - suggestWidgetVisible: サジェスト（入力補完）
-              //   - parameterHintsVisible: パラメータヒント
-              //   - renameInputVisible: リネーム入力
-              // 条件2: Claude stateがrunningの時のみ
+              // Prompt Editor用: Esc で Interrupt
               editor.addCommand(
                 monaco.KeyCode.Escape,
                 () => {
@@ -175,7 +171,16 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
                     handleInterruptRef.current();
                   }
                 },
-                'editorTextFocus && !findWidgetVisible && !suggestWidgetVisible && !parameterHintsVisible && !renameInputVisible'
+                'editorTextFocus && isPromptEditor && !findWidgetVisible && !suggestWidgetVisible && !parameterHintsVisible && !renameInputVisible'
+              );
+
+              // Plan Editor用: Cmd+Enter でカスタムイベント発火（グローバル登録）
+              editor.addCommand(
+                monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+                () => {
+                  window.dispatchEvent(new CustomEvent('monaco:planEditorSave'));
+                },
+                'editorTextFocus && isPlanEditor'
               );
             }}
             options={{
