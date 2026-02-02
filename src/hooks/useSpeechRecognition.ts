@@ -72,6 +72,9 @@ export const useSpeechRecognition = ({
 }: UseSpeechRecognitionProps): UseSpeechRecognitionReturn => {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const isStartingRef = useRef(false);
+  const interimPositionRef = useRef<{ line: number; column: number } | null>(null);
+  const lastInterimLengthRef = useRef(0);
 
   // ブラウザのSpeechRecognitionサポート判定（初期化時のみ）
   const SpeechRecognitionAPI =
@@ -83,7 +86,6 @@ export const useSpeechRecognition = ({
 
   // SpeechRecognition初期化
   useEffect(() => {
-
     if (SpeechRecognitionAPI) {
       const recognition = new SpeechRecognitionAPI();
       recognition.continuous = true;
@@ -99,15 +101,15 @@ export const useSpeechRecognition = ({
         const result = event.results[event.results.length - 1];
         const transcript = result[0].transcript;
 
-        // 確定した結果のみエディタに挿入
         if (result.isFinal) {
-          const position = editor.getPosition();
-          if (position) {
+          // 最終結果: 中間結果をクリアして確定テキストを挿入
+          if (interimPositionRef.current) {
+            // 中間結果があれば削除して確定結果を挿入
             const range = {
-              startLineNumber: position.lineNumber,
-              startColumn: position.column,
-              endLineNumber: position.lineNumber,
-              endColumn: position.column,
+              startLineNumber: interimPositionRef.current.line,
+              startColumn: interimPositionRef.current.column,
+              endLineNumber: interimPositionRef.current.line,
+              endColumn: interimPositionRef.current.column + lastInterimLengthRef.current,
             };
 
             editor.executeEdits('speech-recognition', [
@@ -117,22 +119,83 @@ export const useSpeechRecognition = ({
               },
             ]);
 
-            // カーソルを挿入したテキストの末尾に移動
-            const newColumn = position.column + transcript.length;
+            // カーソル位置を更新
             editor.setPosition({
-              lineNumber: position.lineNumber,
-              column: newColumn,
+              lineNumber: interimPositionRef.current.line,
+              column: interimPositionRef.current.column + transcript.length,
             });
 
-            // フォーカスを維持
-            editor.focus();
+            // リセット
+            interimPositionRef.current = null;
+            lastInterimLengthRef.current = 0;
+          } else {
+            // 中間結果がない場合（最初の確定結果）
+            const position = editor.getPosition();
+            if (position) {
+              const range = {
+                startLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endLineNumber: position.lineNumber,
+                endColumn: position.column,
+              };
+
+              editor.executeEdits('speech-recognition', [
+                {
+                  range,
+                  text: transcript,
+                },
+              ]);
+
+              editor.setPosition({
+                lineNumber: position.lineNumber,
+                column: position.column + transcript.length,
+              });
+            }
+          }
+        } else {
+          // 中間結果: 一時的に表示
+          if (!interimPositionRef.current) {
+            // 初回: 現在のカーソル位置を保存
+            const pos = editor.getPosition();
+            if (pos) {
+              interimPositionRef.current = { line: pos.lineNumber, column: pos.column };
+            }
+          }
+
+          if (interimPositionRef.current) {
+            // 前回の中間結果を削除して新しい中間結果を挿入
+            const range = {
+              startLineNumber: interimPositionRef.current.line,
+              startColumn: interimPositionRef.current.column,
+              endLineNumber: interimPositionRef.current.line,
+              endColumn: interimPositionRef.current.column + lastInterimLengthRef.current,
+            };
+
+            editor.executeEdits('speech-recognition', [
+              {
+                range,
+                text: transcript,
+              },
+            ]);
+
+            lastInterimLengthRef.current = transcript.length;
+
+            // カーソル位置を中間テキストの末尾に移動
+            editor.setPosition({
+              lineNumber: interimPositionRef.current.line,
+              column: interimPositionRef.current.column + transcript.length,
+            });
           }
         }
+
+        // フォーカスを維持
+        editor.focus();
       };
 
       // エラーハンドラー
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
+        isStartingRef.current = false;
         if (event.error === 'no-speech' || event.error === 'aborted') {
           // ユーザーが話していない、または中断された場合は自動的に停止
           setIsListening(false);
@@ -146,6 +209,10 @@ export const useSpeechRecognition = ({
       // 認識終了ハンドラー
       recognition.onend = () => {
         setIsListening(false);
+        isStartingRef.current = false;
+        // 中間結果のクリーンアップ
+        interimPositionRef.current = null;
+        lastInterimLengthRef.current = 0;
       };
 
       recognitionRef.current = recognition;
@@ -160,13 +227,36 @@ export const useSpeechRecognition = ({
 
   const startListening = useCallback(() => {
     const recognition = recognitionRef.current;
-    if (!recognition || isListening) return;
+    if (!recognition || isListening || isStartingRef.current) return;
 
     try {
+      isStartingRef.current = true;
       recognition.start();
       setIsListening(true);
     } catch (error) {
       console.error('Failed to start speech recognition:', error);
+      isStartingRef.current = false;
+
+      // already started エラーの場合、一度停止してから再開
+      if (error instanceof Error && error.message.includes('already started')) {
+        try {
+          recognition.stop();
+          setTimeout(() => {
+            if (recognitionRef.current && !isListening) {
+              try {
+                isStartingRef.current = true;
+                recognitionRef.current.start();
+                setIsListening(true);
+              } catch (retryError) {
+                console.error('Failed to restart speech recognition:', retryError);
+                isStartingRef.current = false;
+              }
+            }
+          }, 100);
+        } catch (stopError) {
+          console.error('Failed to stop speech recognition:', stopError);
+        }
+      }
     }
   }, [isListening]);
 
@@ -176,9 +266,11 @@ export const useSpeechRecognition = ({
 
     try {
       recognition.stop();
-      setIsListening(false);
+      // onend で setIsListening(false) が呼ばれるのを待つ
     } catch (error) {
       console.error('Failed to stop speech recognition:', error);
+      setIsListening(false);
+      isStartingRef.current = false;
     }
   }, [isListening]);
 
