@@ -14,7 +14,8 @@ import type { editor } from 'monaco-editor';
 import type { Tab } from '@/lib/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getClaudeStatus } from '@/lib/claude-status';
-import { Send, Square } from 'lucide-react';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { Send, Square, Mic } from 'lucide-react';
 
 interface ClaudePromptEditorProps {
   tab: Tab;
@@ -33,6 +34,9 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
     const [isExecuting, setIsExecuting] = useState(false);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const { effectiveTheme } = useTheme();
+    const { isListening, isSupported, startListening, stopListening } = useSpeechRecognition({
+      editorRef,
+    });
 
     // 親コンポーネントに公開するメソッド
     useImperativeHandle(ref, () => ({
@@ -101,6 +105,16 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
         <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
           <h3 className="text-sm font-semibold text-theme-fg">Prompt</h3>
           <div className="flex items-center gap-2">
+            {isSupported && (
+              <button
+                onClick={isListening ? stopListening : startListening}
+                className="p-2 text-primary hover:text-primary-light rounded hover:bg-theme-hover cursor-pointer"
+                title={isListening ? 'Stop voice input' : 'Start voice input'}
+              >
+                {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            )}
+
             {!isRunning && (
               <button
                 onClick={handleExecute}
@@ -135,8 +149,10 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
               // monaco-editorの型をインポート
               const monaco = await import('monaco-editor');
 
-              // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で Send
-              // Claude stateがidleの時のみ実行可能
+              // Context Keyを設定（このエディタがPrompt Editorであることを示す）
+              editor.createContextKey('isPromptEditor', true);
+
+              // Prompt Editor用: Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) で Send
               editor.addCommand(
                 monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
                 () => {
@@ -144,16 +160,10 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
                     handleExecuteRef.current();
                   }
                 },
-                'editorTextFocus'
+                'editorTextFocus && isPromptEditor'
               );
 
-              // Esc で Interrupt
-              // 条件1: エディタのウィジェットが表示されていない場合のみ
-              //   - findWidgetVisible: 検索ウィジェット
-              //   - suggestWidgetVisible: サジェスト（入力補完）
-              //   - parameterHintsVisible: パラメータヒント
-              //   - renameInputVisible: リネーム入力
-              // 条件2: Claude stateがrunningの時のみ
+              // Prompt Editor用: Esc で Interrupt
               editor.addCommand(
                 monaco.KeyCode.Escape,
                 () => {
@@ -161,7 +171,16 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
                     handleInterruptRef.current();
                   }
                 },
-                'editorTextFocus && !findWidgetVisible && !suggestWidgetVisible && !parameterHintsVisible && !renameInputVisible'
+                'editorTextFocus && isPromptEditor && !findWidgetVisible && !suggestWidgetVisible && !parameterHintsVisible && !renameInputVisible'
+              );
+
+              // Plan Editor用: Cmd+Enter でカスタムイベント発火（グローバル登録）
+              editor.addCommand(
+                monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+                () => {
+                  window.dispatchEvent(new CustomEvent('monaco:planEditorSave'));
+                },
+                'editorTextFocus && isPlanEditor'
               );
             }}
             options={{
