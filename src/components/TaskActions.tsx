@@ -234,14 +234,13 @@ PR作成後、タスクをreviewingステータスに更新してください。
       toast.success(notificationId, 'Task status updated to planning', task.title);
 
       // 2. Claudeへの作業指示を送信
-      const prompt = `タスクをplanningステータスに更新しました。
+      const prompt = `タスクをplanningステータスに更新してください。
 
-以下に動作確認で発見したバグの内容を記載しています。
+以下に動作確認で発見したバグの内容を記載していきます。
 バグを深く調査し、design, procedureを更新してください。
 必要に応じてrequirementも更新してください。
 
-調査・更新が完了したら、その旨を報告し、ユーザーからの指示を待ってください。
-ユーザーから実装開始の指示があれば、修正を実装してください。`;
+調査・更新が完了したら、その旨を報告し、ユーザーからの指示を待ってください。`;
 
       await onSendPrompt(activeTabId, prompt);
     } catch (error) {
