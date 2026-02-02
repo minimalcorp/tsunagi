@@ -14,7 +14,8 @@ import type { editor } from 'monaco-editor';
 import type { Tab } from '@/lib/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getClaudeStatus } from '@/lib/claude-status';
-import { Send, Square } from 'lucide-react';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { Send, Square, Mic } from 'lucide-react';
 
 interface ClaudePromptEditorProps {
   tab: Tab;
@@ -33,6 +34,9 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
     const [isExecuting, setIsExecuting] = useState(false);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const { effectiveTheme } = useTheme();
+    const { isListening, isSupported, startListening, stopListening } = useSpeechRecognition({
+      editorRef,
+    });
 
     // 親コンポーネントに公開するメソッド
     useImperativeHandle(ref, () => ({
@@ -101,6 +105,16 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
         <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
           <h3 className="text-sm font-semibold text-theme-fg">Prompt</h3>
           <div className="flex items-center gap-2">
+            {isSupported && (
+              <button
+                onClick={isListening ? stopListening : startListening}
+                className="p-2 text-primary hover:text-primary-light rounded hover:bg-theme-hover cursor-pointer"
+                title={isListening ? 'Stop voice input' : 'Start voice input'}
+              >
+                {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            )}
+
             {!isRunning && (
               <button
                 onClick={handleExecute}
