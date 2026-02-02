@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
+import { messageQueueManager } from '@/lib/message-queue';
 import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
@@ -31,6 +32,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { id: taskId, tab_id } = await params;
+
+    // セッションを終了（クリーンアップ）
+    await messageQueueManager.endSession(tab_id);
 
     const success = await taskRepo.deleteTab(taskId, tab_id);
     if (!success) {

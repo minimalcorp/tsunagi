@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
-import { interruptSession } from '@/lib/claude-client';
+import { messageQueueManager } from '@/lib/message-queue';
 import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     // Interrupt the Claude session
-    await interruptSession(tab_id);
+    await messageQueueManager.interruptSession(tab_id);
 
     // Update tab status to idle after interrupt
     await taskRepo.updateTab(task.id, tab_id, { status: 'idle' });
