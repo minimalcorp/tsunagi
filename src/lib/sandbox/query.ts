@@ -22,10 +22,12 @@ export async function sandboxedQuery(
         permissionMode: 'bypassPermissions',
         hooks: {
           PreToolUse: [
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             { matcher: 'Bash', hooks: [bashSandboxHook as any] },
             {
               matcher: 'Edit',
               hooks: [
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 async (input: any, _toolUseId: string): Promise<any> =>
                   fileAccessHook(input, _toolUseId, { sandboxConfig }),
               ],
@@ -33,6 +35,7 @@ export async function sandboxedQuery(
             {
               matcher: 'Write',
               hooks: [
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 async (input: any, _toolUseId: string): Promise<any> =>
                   fileAccessHook(input, _toolUseId, { sandboxConfig }),
               ],
