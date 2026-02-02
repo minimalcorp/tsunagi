@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.17",
+    "@anthropic-ai/sandbox-runtime": "^0.0.34",
     "@ark-ui/react": "^5.30.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@libsql/client": "0.8.1",
