@@ -47,20 +47,33 @@ class MessageQueueManager {
       timestamp: Date.now(),
     };
 
+    console.log('[MessageQueueManager] Enqueueing message:', {
+      tabId,
+      messageId: queuedMsg.id,
+      hasQueue: this.queues.has(tabId),
+    });
+
     // キューを取得または作成
     let queue = this.queues.get(tabId);
     if (!queue) {
       queue = { messages: [] };
       this.queues.set(tabId, queue);
+      console.log('[MessageQueueManager] Created new queue:', { tabId });
     }
 
     // メッセージをキューに追加
     queue.messages.push(queuedMsg);
+    console.log('[MessageQueueManager] Message added to queue:', {
+      tabId,
+      queueLength: queue.messages.length,
+      hasResolver: !!queue.resolver,
+    });
 
     // 待機中のresolverがあれば即座に通知
     if (queue.resolver) {
       const resolver = queue.resolver;
       queue.resolver = undefined;
+      console.log('[MessageQueueManager] Notifying waiting resolver:', { tabId });
       resolver(queuedMsg);
     }
   }
@@ -71,12 +84,17 @@ class MessageQueueManager {
   private async *createMessageGenerator(
     tabId: string
   ): AsyncGenerator<SDKUserMessage, void, unknown> {
+    console.log('[MessageQueueManager] Generator started:', { tabId });
     while (true) {
       const queue = this.queues.get(tabId);
 
       if (queue && queue.messages.length > 0) {
         // キューにメッセージがある場合
         const message = queue.messages.shift()!;
+        console.log('[MessageQueueManager] Yielding message from queue:', {
+          tabId,
+          messageId: message.id,
+        });
         yield {
           type: 'user' as const,
           message: {
@@ -88,21 +106,28 @@ class MessageQueueManager {
         };
       } else {
         // キューが空の場合はPromiseで待機
+        console.log('[MessageQueueManager] Queue empty, waiting for message:', { tabId });
         const message = await new Promise<QueuedMessage | null>((resolve) => {
           const queue = this.queues.get(tabId);
           if (queue) {
             queue.resolver = resolve;
           } else {
             // キューが削除されている場合は終了
+            console.log('[MessageQueueManager] Queue deleted, ending generator:', { tabId });
             resolve(null);
           }
         });
 
         if (message === null) {
           // 終了シグナル
+          console.log('[MessageQueueManager] Received null, ending generator:', { tabId });
           break;
         }
 
+        console.log('[MessageQueueManager] Yielding message after wait:', {
+          tabId,
+          messageId: message.id,
+        });
         yield {
           type: 'user' as const,
           message: {
@@ -114,6 +139,7 @@ class MessageQueueManager {
         };
       }
     }
+    console.log('[MessageQueueManager] Generator ended:', { tabId });
   }
 
   /**

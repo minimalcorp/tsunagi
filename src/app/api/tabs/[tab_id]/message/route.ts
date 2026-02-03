@@ -90,6 +90,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       });
     }
 
+    // メッセージをキューに追加（先にエンキュー）
+    await messageQueueManager.enqueueMessage(tab_id, message);
+
     // セッションが未開始の場合のみstartSessionを呼ぶ
     const isSessionRunning = messageQueueManager.isSessionRunning(tab_id);
 
@@ -137,7 +140,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       };
 
       // セッション開始
-      await messageQueueManager.startSession(tab_id, queryOptions, {
+      messageQueueManager.startSession(tab_id, queryOptions, {
         onRawMessage: async (rawMessage: unknown) => {
           // Raw messageをsessions.jsonに追加
           const result = await tabRepo.appendMessage(tab_id, rawMessage);
@@ -220,9 +223,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         },
       });
     }
-
-    // メッセージをキューに追加（セッション実行中でも即座にエンキュー）
-    await messageQueueManager.enqueueMessage(tab_id, message);
 
     return NextResponse.json({ data: { success: true } });
   } catch (error) {
