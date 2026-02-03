@@ -36,6 +36,8 @@ class MessageQueueManager {
   private queues = new Map<string, TabMessageQueue>();
   private sessionIds = new Map<string, string>();
   private sessions = new Map<string, SessionInfo>();
+  private idleTimers = new Map<string, NodeJS.Timeout>();
+  private readonly IDLE_TIMEOUT = 30 * 60 * 1000; // 30分
 
   /**
    * メッセージをキューに追加
@@ -76,6 +78,28 @@ class MessageQueueManager {
       console.log('[MessageQueueManager] Notifying waiting resolver:', { tabId });
       resolver(queuedMsg);
     }
+
+    // アイドルタイマーをリセット
+    this.resetIdleTimer(tabId);
+  }
+
+  /**
+   * アイドルタイマーをリセット
+   */
+  private resetIdleTimer(tabId: string) {
+    // 既存タイマーをクリア
+    const existingTimer = this.idleTimers.get(tabId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    // 30分後にセッション終了
+    const timer = setTimeout(() => {
+      console.log('[MessageQueueManager] Idle timeout, ending session:', { tabId });
+      this.endSession(tabId);
+    }, this.IDLE_TIMEOUT);
+
+    this.idleTimers.set(tabId, timer);
   }
 
   /**
@@ -236,6 +260,9 @@ class MessageQueueManager {
       queryObject: queryResult,
     });
 
+    // アイドルタイマーを開始
+    this.resetIdleTimer(tabId);
+
     // 非同期で実行（awaitしない）
     queryPromise.catch((error) => {
       console.error('[MessageQueueManager] Session error:', { tabId, error });
@@ -246,6 +273,13 @@ class MessageQueueManager {
    * セッションを終了
    */
   async endSession(tabId: string): Promise<void> {
+    // アイドルタイマーをクリア
+    const timer = this.idleTimers.get(tabId);
+    if (timer) {
+      clearTimeout(timer);
+      this.idleTimers.delete(tabId);
+    }
+
     const queue = this.queues.get(tabId);
     if (queue?.resolver) {
       // 終了シグナルを送る
