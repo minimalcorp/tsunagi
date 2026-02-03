@@ -21,6 +21,11 @@ export async function POST(request: NextRequest, { params }: Params) {
     const body = await request.json();
     const { message } = body;
 
+    console.log('[POST /api/tabs/[tab_id]/message] Received message:', {
+      tab_id,
+      messageLength: message?.length,
+    });
+
     if (!message) {
       return NextResponse.json({ error: 'Missing required field: message' }, { status: 400 });
     }

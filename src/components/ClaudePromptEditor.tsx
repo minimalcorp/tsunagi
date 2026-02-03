@@ -72,7 +72,8 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
 
     const status = getClaudeStatus(tab);
     const isRunning = status === 'running';
-    const canExecute = !isExecuting && !isRunning;
+    // Streaming Input Modeでは処理中でも送信可能（キューイング）
+    const canExecute = !isExecuting;
 
     // 常に最新のハンドラーと状態を参照するためのref
     const handleExecuteRef = useRef(handleExecute);
@@ -101,16 +102,14 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
         <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
           <h3 className="text-sm font-semibold text-theme-fg">Prompt</h3>
           <div className="flex items-center gap-2">
-            {!isRunning && (
-              <button
-                onClick={handleExecute}
-                disabled={!canExecute}
-                className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 cursor-pointer flex items-center gap-1"
-              >
-                <Send className="w-3 h-3" />
-                Send
-              </button>
-            )}
+            <button
+              onClick={handleExecute}
+              disabled={isExecuting}
+              className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 cursor-pointer flex items-center gap-1"
+            >
+              <Send className="w-3 h-3" />
+              Send
+            </button>
 
             {isRunning && (
               <button
