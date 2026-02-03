@@ -100,10 +100,32 @@ export async function POST(request: NextRequest, { params }: Params) {
         repo: task.repo,
       });
 
+      // Merge custom env with system environment to ensure node and other binaries are accessible
+      const systemEnv = Object.fromEntries(
+        Object.entries(process.env).filter(([, v]) => v !== undefined)
+      ) as Record<string, string>;
+
+      const defaultPath =
+        '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/workspace/node_modules/.bin:/home/node/.local/bin';
+
+      const systemPath = systemEnv.PATH || defaultPath;
+
+      const mergedEnv = {
+        ...systemEnv,
+        ...env,
+      };
+
+      const cleanedEnv = Object.fromEntries(
+        Object.entries(mergedEnv).filter(([, v]) => v !== undefined)
+      ) as Record<string, string>;
+
       // Build query options
       const queryOptions = {
         cwd: workingDirectory,
-        env,
+        env: {
+          ...cleanedEnv,
+          PATH: env?.PATH ? `${systemPath}:${env.PATH}` : systemPath,
+        },
         resumeSessionId: tab.session_id, // 既存のsession_idがあればresume
         permissionMode:
           process.env.CLAUDE_BYPASS_PERMISSIONS !== 'false'
