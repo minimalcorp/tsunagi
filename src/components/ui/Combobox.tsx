@@ -4,7 +4,7 @@ import { Combobox as ArkCombobox, useListCollection } from '@ark-ui/react/combob
 import { useFilter } from '@ark-ui/react/locale';
 import { Portal } from '@ark-ui/react/portal';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 interface ComboboxOption {
   value: string;
@@ -46,21 +46,43 @@ export function Combobox({
 
   // Manage input value with state
   const [inputValue, setInputValue] = useState('');
-  const isSelectingRef = useRef(false);
 
   const handleValueChange = (details: { value: string[] }) => {
-    isSelectingRef.current = true;
-
+    // onChange を呼び出すだけで、表示の更新は useEffect に任せる
+    // これにより、親コンポーネントで値が正規化された後に正しい表示が適用される
     if (multiple) {
       onChange(details.value);
-      // 複数選択時：選択したlabelsをカンマ区切りで表示
+    } else {
+      const newValue = details.value[0];
+      if (newValue !== undefined) {
+        onChange(newValue);
+      }
+    }
+  };
+
+  const handleInputValueChange = (details: { inputValue: string }) => {
+    // ユーザーが入力している時は、入力値を更新してフィルタリング
+    setInputValue(details.inputValue);
+    filter(details.inputValue);
+    if (allowCustomValue && !multiple) {
+      onChange(details.inputValue);
+    }
+  };
+
+  // Sync input value when value prop changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const normalizedValue = Array.isArray(value) ? value : [value];
+
+    // 複数選択モードの場合、親から渡された値を元に表示を更新
+    if (multiple) {
       // "all"のみの場合は"All Repositories"のみ表示
-      if (details.value.length === 1 && details.value[0] === 'all') {
+      if (normalizedValue.length === 1 && normalizedValue[0] === 'all') {
         const allOption = options.find((opt) => opt.value === 'all');
         setInputValue(allOption?.label || '');
       } else {
         // "all"を除外して、選択されたrepository名のみ表示
-        const labels = details.value
+        const labels = normalizedValue
           .filter((v) => v !== 'all')
           .map((v) => options.find((opt) => opt.value === v)?.label)
           .filter(Boolean)
@@ -68,62 +90,12 @@ export function Combobox({
         setInputValue(labels);
       }
     } else {
-      const newValue = details.value[0];
-      if (newValue !== undefined) {
-        onChange(newValue);
-        // 単一選択時：選択したlabelを表示（入力値をクリア）
-        const label = options.find((opt) => opt.value === newValue)?.label || '';
-        setInputValue(label);
-      }
-    }
-
-    // Reset flag to allow input value updates
-    setTimeout(() => {
-      isSelectingRef.current = false;
-    }, 0);
-  };
-
-  const handleInputValueChange = (details: { inputValue: string }) => {
-    if (!isSelectingRef.current) {
-      setInputValue(details.inputValue);
-    }
-    filter(details.inputValue);
-    if (allowCustomValue && !multiple) {
-      onChange(details.inputValue);
-    }
-  };
-
-  // Sync input value when value prop changes externally (e.g., form reset)
-  useEffect(() => {
-    if (!isSelectingRef.current) {
-      const normalizedValue = Array.isArray(value) ? value : [value];
-
-      // 複数選択モードの場合、handleValueChangeと同じロジックを適用
-      if (multiple) {
-        // "all"のみの場合は"All Repositories"のみ表示
-        if (normalizedValue.length === 1 && normalizedValue[0] === 'all') {
-          const allOption = options.find((opt) => opt.value === 'all');
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setInputValue(allOption?.label || '');
-        } else {
-          // "all"を除外して、選択されたrepository名のみ表示
-          const labels = normalizedValue
-            .filter((v) => v !== 'all')
-            .map((v) => options.find((opt) => opt.value === v)?.label)
-            .filter(Boolean)
-            .join(', ');
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setInputValue(labels);
-        }
-      } else {
-        // 単一選択モード
-        const labels = normalizedValue
-          .map((v) => options.find((opt) => opt.value === v)?.label)
-          .filter(Boolean)
-          .join(', ');
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setInputValue(labels);
-      }
+      // 単一選択モード
+      const labels = normalizedValue
+        .map((v) => options.find((opt) => opt.value === v)?.label)
+        .filter(Boolean)
+        .join(', ');
+      setInputValue(labels);
     }
   }, [value, options, multiple]);
 
