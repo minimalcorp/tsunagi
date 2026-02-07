@@ -97,14 +97,35 @@ export function Combobox({
   useEffect(() => {
     if (!isSelectingRef.current) {
       const normalizedValue = Array.isArray(value) ? value : [value];
-      const labels = normalizedValue
-        .map((v) => options.find((opt) => opt.value === v)?.label)
-        .filter(Boolean)
-        .join(', ');
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setInputValue(labels);
+
+      // 複数選択モードの場合、handleValueChangeと同じロジックを適用
+      if (multiple) {
+        // "all"のみの場合は"All Repositories"のみ表示
+        if (normalizedValue.length === 1 && normalizedValue[0] === 'all') {
+          const allOption = options.find((opt) => opt.value === 'all');
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setInputValue(allOption?.label || '');
+        } else {
+          // "all"を除外して、選択されたrepository名のみ表示
+          const labels = normalizedValue
+            .filter((v) => v !== 'all')
+            .map((v) => options.find((opt) => opt.value === v)?.label)
+            .filter(Boolean)
+            .join(', ');
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setInputValue(labels);
+        }
+      } else {
+        // 単一選択モード
+        const labels = normalizedValue
+          .map((v) => options.find((opt) => opt.value === v)?.label)
+          .filter(Boolean)
+          .join(', ');
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setInputValue(labels);
+      }
     }
-  }, [value, options]);
+  }, [value, options, multiple]);
 
   // Normalize value to array
   const normalizedValue = Array.isArray(value) ? value : [value];
