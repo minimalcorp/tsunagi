@@ -5,6 +5,34 @@ import { Settings, Filter, RefreshCw, FolderDown } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { Combobox } from './ui/Combobox';
 
+const STORAGE_KEY = 'tsunagi-repository-filter';
+
+interface FilterState {
+  repositories: string[];
+  search: string;
+}
+
+// localStorageから読み込み
+const loadFilterState = (): FilterState | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+};
+
+// localStorageに保存
+const saveFilterState = (state: FilterState) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // エラーは無視（localStorageが使用できない環境対応）
+  }
+};
+
 interface HeaderProps {
   onCloneClick: () => void;
   onSettingsClick: () => void;
@@ -29,8 +57,14 @@ export function Header({
   onFilterChange,
   isCloneDialogOpen = false,
 }: HeaderProps) {
-  const [repoFilter, setRepoFilter] = useState<string[]>(['all']); // Array of "owner/repo" format or ['all']
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [repoFilter, setRepoFilter] = useState<string[]>(() => {
+    const saved = loadFilterState();
+    return saved?.repositories || ['all'];
+  }); // Array of "owner/repo" format or ['all']
+  const [searchQuery, setSearchQuery] = useState<string>(() => {
+    const saved = loadFilterState();
+    return saved?.search || '';
+  });
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -50,6 +84,26 @@ export function Header({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isFilterOpen]);
+
+  // 初回マウント時にlocalStorageから読み込んだフィルター状態を適用
+  useEffect(() => {
+    const saved = loadFilterState();
+    if (saved) {
+      // フィルター変更を親コンポーネントに通知
+      if (saved.repositories.includes('all')) {
+        onFilterChange({ owner: '', repo: '', search: saved.search, selectedRepos: ['all'] });
+      } else {
+        const repoList = saved.repositories
+          .map((v) => v.split('/'))
+          .filter((parts) => parts.length === 2);
+        if (repoList.length > 0) {
+          const [owner, repo] = repoList[0];
+          onFilterChange({ owner, repo, search: saved.search, selectedRepos: saved.repositories });
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Create combined owner/repo list with grouping
   const repoOptions = repositories.map((repository) => ({
@@ -87,6 +141,9 @@ export function Header({
 
     setRepoFilter(values);
 
+    // localStorageに保存
+    saveFilterState({ repositories: values, search: searchQuery });
+
     // If 'all' is selected, show all repositories
     if (values.includes('all')) {
       onFilterChange({ owner: '', repo: '', search: searchQuery, selectedRepos: ['all'] });
@@ -103,6 +160,9 @@ export function Header({
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
 
+    // localStorageに保存
+    saveFilterState({ repositories: repoFilter, search: value });
+
     if (repoFilter.includes('all') || repoFilter.length === 0) {
       onFilterChange({ owner: '', repo: '', search: value });
     } else {
@@ -117,6 +177,8 @@ export function Header({
   // ボタンハイライト用のスタイル関数
   const handleClearRepoFilter = () => {
     setRepoFilter(['all']);
+    // localStorageに保存
+    saveFilterState({ repositories: ['all'], search: searchQuery });
     onFilterChange({ owner: '', repo: '', search: searchQuery, selectedRepos: ['all'] });
   };
 

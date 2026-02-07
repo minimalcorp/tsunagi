@@ -275,6 +275,9 @@ export default function Home() {
 
       const data = await response.json();
       setRepositories((prev) => [...prev, data.data.repository]);
+
+      // repository一覧を再取得して、TaskDialogなどに最新の状態を反映
+      await loadData();
     } catch (error) {
       console.error('Failed to clone repository:', error);
       throw error;
