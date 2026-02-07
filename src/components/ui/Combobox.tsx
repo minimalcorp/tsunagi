@@ -54,11 +54,19 @@ export function Combobox({
     if (multiple) {
       onChange(details.value);
       // 複数選択時：選択したlabelsをカンマ区切りで表示
-      const labels = details.value
-        .map((v) => options.find((opt) => opt.value === v)?.label)
-        .filter(Boolean)
-        .join(', ');
-      setInputValue(labels);
+      // "all"のみの場合は"All Repositories"のみ表示
+      if (details.value.length === 1 && details.value[0] === 'all') {
+        const allOption = options.find((opt) => opt.value === 'all');
+        setInputValue(allOption?.label || '');
+      } else {
+        // "all"を除外して、選択されたrepository名のみ表示
+        const labels = details.value
+          .filter((v) => v !== 'all')
+          .map((v) => options.find((opt) => opt.value === v)?.label)
+          .filter(Boolean)
+          .join(', ');
+        setInputValue(labels);
+      }
     } else {
       const newValue = details.value[0];
       if (newValue !== undefined) {
