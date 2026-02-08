@@ -13,6 +13,7 @@ import { ClaudePromptEditor, type ClaudePromptEditorHandle } from '@/components/
 import { DocumentViewer } from '@/components/DocumentViewer';
 import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { ModelSelector } from '@/components/ModelSelector';
 import { useSSE } from '@/hooks/useSSE';
 import { useToast } from '@/hooks/useToast';
 
@@ -700,12 +701,19 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
           {activeTab && (
             <>
-              {/* View Toggle */}
+              {/* View Toggle & Model Selector */}
               <div className="px-4 pt-2">
-                <div className="flex items-center gap-2">
-                  <ViewLayoutToggle mode={viewMode} onChange={setViewMode} />
-                  <div className="h-6 w-px bg-theme" />
-                  <DocumentViewToggle mode={documentViewMode} onChange={setDocumentViewMode} />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ViewLayoutToggle mode={viewMode} onChange={setViewMode} />
+                    <div className="h-6 w-px bg-theme" />
+                    <DocumentViewToggle mode={documentViewMode} onChange={setDocumentViewMode} />
+                  </div>
+                  <ModelSelector
+                    taskId={id}
+                    tabId={activeTab.tab_id}
+                    currentModel={activeTab.model}
+                  />
                 </div>
               </div>
 

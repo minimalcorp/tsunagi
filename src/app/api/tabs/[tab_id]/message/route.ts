@@ -9,6 +9,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { sseManager } from '@/lib/sse-manager';
 import { getTaskWorkflowPrompt } from '@/lib/system-prompts';
+import { resolveModel } from '@/lib/model-resolver';
 
 type Params = {
   params: Promise<{ tab_id: string }>;
@@ -100,6 +101,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       ? getTaskWorkflowPrompt(task.id, task.status, baseUrl)
       : undefined;
 
+    // Resolve model for this task
+    const model = await resolveModel(task.status, task.owner, task.repo, tab.model);
+
     // Execute Claude in background
     executeSession({
       sessionId: tab_id,
@@ -110,6 +114,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       owner: task.owner,
       repo: task.repo,
       systemPrompt,
+      model,
       onRawMessage: async (rawMessage: unknown) => {
         // Raw messageをsessions.jsonに追加
         const result = await tabRepo.appendMessage(tab_id, rawMessage);

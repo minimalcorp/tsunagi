@@ -7,6 +7,8 @@ import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNa
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
 import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
 import { ClaudeSettingsEditor } from '@/components/settings/ClaudeSettingsEditor';
+import { ModelManagementSection } from '@/components/settings/ModelManagementSection';
+import { ModelSettingsEditor } from '@/components/settings/ModelSettingsEditor';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -109,6 +111,20 @@ export default function SettingsPage() {
 
               {/* Claude Settings Sources Section (Global scope only) */}
               {selectedNode.scope === 'global' && <ClaudeSettingsEditor scope="global" />}
+
+              {/* Model Management Section (Global scope only) */}
+              {selectedNode.scope === 'global' && <ModelManagementSection />}
+
+              {/* Model Settings Section (All scopes) */}
+              <ModelSettingsEditor
+                scope={selectedNode.scope}
+                owner={
+                  selectedNode.scope === 'owner' || selectedNode.scope === 'repo'
+                    ? selectedNode.owner
+                    : undefined
+                }
+                repo={selectedNode.scope === 'repo' ? selectedNode.repo : undefined}
+              />
 
               {/* Environment Variables Section */}
               <EnvVariableEditor selectedNode={selectedNode} />

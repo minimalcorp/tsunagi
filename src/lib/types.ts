@@ -39,6 +39,7 @@ export interface Tab {
   updatedAt: string;
   session_id?: string; // Claude Agent SDKのセッションID（初回プロンプト後に設定）
   promptCount?: number; // 送信したプロンプト数
+  model?: string; // 明示的に選択されたモデル
 }
 
 // UserPrompt型（ユーザーが送信したプロンプト）
@@ -214,4 +215,40 @@ export interface ResolvedSettings {
 export interface ApiResponse<T> {
   data: T;
   error?: string;
+}
+
+// AvailableModel型
+export interface AvailableModel {
+  id: string;
+  modelId: string; // "claude-3-5-sonnet-20241022"
+  displayName: string; // "Sonnet 3.5"
+  description?: string;
+  category: 'premium' | 'standard' | 'fast';
+  enabled: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ModelSetting型
+export interface ModelSetting {
+  id: string;
+  scope: 'global' | 'owner' | 'repo';
+  owner?: string;
+  repo?: string;
+  backlogModel: string;
+  planningModel: string;
+  codingModel: string;
+  reviewingModel: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ResolvedModelSettings型
+export interface ResolvedModelSettings {
+  backlogModel: string;
+  planningModel: string;
+  codingModel: string;
+  reviewingModel: string;
 }

@@ -18,6 +18,7 @@ model Repository {
   tasks           Task[]
   environmentVars EnvironmentVariable[]
   claudeSettings  ClaudeSetting[]
+  modelSettings   ModelSetting[]
 
   @@unique([owner, repo])
   @@map("repositories")
@@ -68,6 +69,7 @@ model Tab {
   status       String    // 'idle' | 'running' | 'success' | 'error'
   sessionId    String?   @map("session_id") // Claude Agent SDKのセッションID
   promptCount  Int?      @map("prompt_count")
+  model        String?   // 明示的に選択されたモデル
   createdAt    DateTime  @default(now()) @map("created_at")
   startedAt    DateTime  @map("started_at")
   completedAt  DateTime? @map("completed_at")
@@ -129,4 +131,41 @@ model ClaudeSetting {
   @@unique([scope, owner, repo])
   @@index([scope, owner, repo])
   @@map("claude_settings")
+}
+
+// AvailableModel
+model AvailableModel {
+  id          String   @id @default(uuid())
+  modelId     String   @unique @map("model_id")  // "claude-3-5-sonnet-20241022"
+  displayName String   @map("display_name")       // "Sonnet 3.5"
+  description String?
+  category    String   // 'premium' | 'standard' | 'fast'
+  enabled     Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([enabled, sortOrder])
+  @@map("available_models")
+}
+
+// ModelSetting
+model ModelSetting {
+  id             String   @id @default(uuid())
+  scope          String   // 'global' | 'owner' | 'repo'
+  owner          String?
+  repo           String?
+  backlogModel   String   @default("claude-3-5-sonnet-20241022") @map("backlog_model")
+  planningModel  String   @default("claude-3-5-sonnet-20241022") @map("planning_model")
+  codingModel    String   @default("claude-3-5-sonnet-20241022") @map("coding_model")
+  reviewingModel String   @default("claude-3-opus-20240229") @map("reviewing_model")
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  repository Repository? @relation(fields: [owner, repo], references: [owner, repo], onDelete: Cascade)
+
+  @@unique([scope, owner, repo])
+  @@index([scope, owner, repo])
+  @@map("model_settings")
 }

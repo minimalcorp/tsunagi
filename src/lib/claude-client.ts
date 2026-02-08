@@ -13,6 +13,7 @@ export interface ExecuteOptions {
   owner?: string; // タスクのowner
   repo?: string; // タスクのrepo
   systemPrompt?: string; // System prompt (applied once at session start)
+  model?: string; // Claude model to use (e.g., "claude-3-5-sonnet-20241022")
 }
 
 /**
@@ -36,6 +37,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
     owner,
     repo,
     systemPrompt,
+    model,
   } = options;
 
   try {
@@ -61,6 +63,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       allowDangerouslySkipPermissions?: boolean;
       bypassPermissions?: boolean;
       settingSources?: Array<'user' | 'project' | 'local'>;
+      model?: string;
     } = {
       cwd: workingDirectory,
       permissionMode:
@@ -70,6 +73,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
       allowDangerouslySkipPermissions: process.env.CLAUDE_BYPASS_PERMISSIONS !== 'false',
       bypassPermissions: process.env.CLAUDE_BYPASS_PERMISSIONS !== 'false',
       settingSources, // 追加（undefinedの場合はisolationモード）
+      model, // モデル指定
     };
 
     // Merge custom env with system environment to ensure node and other binaries are accessible
@@ -117,6 +121,7 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
         bypassPermissions: queryOptions.bypassPermissions,
         hasResume: !!queryOptions.resume,
         settingSources: queryOptions.settingSources,
+        model: queryOptions.model,
       });
     }
 
