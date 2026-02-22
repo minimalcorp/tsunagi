@@ -9,17 +9,19 @@ export async function getAvailableModels(enabledOnly = true): Promise<AvailableM
     orderBy: { sortOrder: 'asc' },
   });
 
-  return models.map((m): AvailableModel => ({
-    id: m.id,
-    modelId: m.modelId,
-    displayName: m.displayName,
-    description: m.description || undefined,
-    category: m.category as 'premium' | 'standard' | 'fast',
-    enabled: m.enabled,
-    sortOrder: m.sortOrder,
-    createdAt: m.createdAt.toISOString(),
-    updatedAt: m.updatedAt.toISOString(),
-  }));
+  return models.map(
+    (m): AvailableModel => ({
+      id: m.id,
+      modelId: m.modelId,
+      displayName: m.displayName,
+      description: m.description || undefined,
+      category: m.category as 'premium' | 'standard' | 'fast',
+      enabled: m.enabled,
+      sortOrder: m.sortOrder,
+      createdAt: m.createdAt.toISOString(),
+      updatedAt: m.updatedAt.toISOString(),
+    })
+  );
 }
 
 export async function getAvailableModel(id: string): Promise<AvailableModel | null> {

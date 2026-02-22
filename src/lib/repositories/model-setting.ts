@@ -26,19 +26,21 @@ export async function getModelSettings(params?: GetModelSettingsParams): Promise
 
   const settings = await db.modelSetting.findMany({ where });
 
-  return settings.map((s): ModelSetting => ({
-    id: s.id,
-    scope: s.scope as 'global' | 'owner' | 'repo',
-    owner: s.owner || undefined,
-    repo: s.repo || undefined,
-    backlogModel: s.backlogModel,
-    planningModel: s.planningModel,
-    codingModel: s.codingModel,
-    reviewingModel: s.reviewingModel,
-    enabled: s.enabled,
-    createdAt: s.createdAt.toISOString(),
-    updatedAt: s.updatedAt.toISOString(),
-  }));
+  return settings.map(
+    (s): ModelSetting => ({
+      id: s.id,
+      scope: s.scope as 'global' | 'owner' | 'repo',
+      owner: s.owner || undefined,
+      repo: s.repo || undefined,
+      backlogModel: s.backlogModel,
+      planningModel: s.planningModel,
+      codingModel: s.codingModel,
+      reviewingModel: s.reviewingModel,
+      enabled: s.enabled,
+      createdAt: s.createdAt.toISOString(),
+      updatedAt: s.updatedAt.toISOString(),
+    })
+  );
 }
 
 export async function getModelSetting(
