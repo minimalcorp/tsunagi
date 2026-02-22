@@ -126,7 +126,10 @@ export async function executeSession(options: ExecuteOptions): Promise<void> {
     // Execute query
     const queryResult = query({
       prompt: finalPrompt,
-      options: queryOptions,
+      options: {
+        ...queryOptions,
+        model: 'claude-sonnet-4-6',
+      },
     });
 
     // Store the query object for interrupt support
