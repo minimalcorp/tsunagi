@@ -289,9 +289,24 @@ export const useSpeechRecognition = ({
 
     // 認識終了ハンドラー
     recognition.onend = () => {
-      setIsListening(false);
       isStartingRef.current = false;
-      // Mapをクリア
+
+      // isListening が true のままなら、ユーザーが意図的に停止していない
+      // → continuous モードで no-speech 等により自動終了した場合は再起動する
+      if (isListeningRef.current) {
+        try {
+          recognition.start();
+        } catch {
+          // 再起動に失敗した場合は停止扱いにする
+          setIsListening(false);
+          finalResultsMapRef.current.clear();
+          interimResultsMapRef.current.clear();
+        }
+        return;
+      }
+
+      // stopListening によって意図的に止めた場合
+      setIsListening(false);
       finalResultsMapRef.current.clear();
       interimResultsMapRef.current.clear();
     };
@@ -357,12 +372,14 @@ export const useSpeechRecognition = ({
     const recognition = recognitionRef.current;
     if (!recognition || !isListeningRef.current) return;
 
+    // onend での再起動を抑制するために先にフラグを下げる
+    isListeningRef.current = false;
+    setIsListening(false);
+
     try {
       recognition.stop();
-      // onend で setIsListening(false) が呼ばれるのを待つ
     } catch (error) {
       console.error('Failed to stop speech recognition:', error);
-      setIsListening(false);
       isStartingRef.current = false;
     }
   }, []);
