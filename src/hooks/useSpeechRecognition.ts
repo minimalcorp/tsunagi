@@ -129,12 +129,14 @@ export const useSpeechRecognition = ({
   useEffect(() => {
     if (SpeechRecognitionAPI) {
       const recognition = new SpeechRecognitionAPI();
+      console.log('[SR] new recognition instance:', recognition);
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'ja-JP';
 
       // 認識結果のハンドラー
       recognition.onresult = (event: SpeechRecognitionEvent) => {
+        console.log('[SR] onresult instance:', recognition, 'recognitionRef:', recognitionRef.current);
         const editor = editorRef.current;
         if (!editor) return;
 
@@ -142,6 +144,7 @@ export const useSpeechRecognition = ({
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           const transcript = result[0].transcript;
+          console.log(`[SR] result[${i}] isFinal:${result.isFinal} transcript:"${transcript}"`);
 
           if (result.isFinal) {
             // 最終結果の処理
@@ -292,6 +295,7 @@ export const useSpeechRecognition = ({
     }
 
     return () => {
+      console.log('[SR] cleanup instance:', recognition);
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
