@@ -142,6 +142,7 @@ export const useSpeechRecognition = ({
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           const transcript = result[0].transcript;
+          console.log(`[SR] i=${i} isFinal=${result.isFinal} transcript="${transcript}" interimMap=${JSON.stringify([...interimResultsMapRef.current.entries()])} finalMap=${JSON.stringify([...finalResultsMapRef.current.entries()])}`);
 
           if (result.isFinal) {
             // 最終結果の処理
