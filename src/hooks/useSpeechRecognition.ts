@@ -339,6 +339,7 @@ export const useSpeechRecognition = ({
       recognition.abort();
       recognitionRef.current = null;
       // 状態もリセット（onend が呼ばれないためここでリセット）
+      isListeningRef.current = false;
       setIsListening(false);
       isStartingRef.current = false;
       finalResultsMap.clear();
