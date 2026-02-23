@@ -85,13 +85,17 @@ export const useSpeechRecognition = ({
   const interimResultsMapRef = useRef<Map<number, ResultPosition>>(new Map());
 
   // ブラウザのSpeechRecognitionサポート判定（マウント時のみ評価）
-  const SpeechRecognitionAPIRef = useRef<SpeechRecognitionConstructor | undefined>(
+  // SSR 時は undefined、クライアント時は API コンストラクタを初期値として保持
+  const SpeechRecognitionAPIRef = useRef(
     typeof window !== 'undefined'
-      ? window.SpeechRecognition || window.webkitSpeechRecognition
+      ? (window.SpeechRecognition ?? window.webkitSpeechRecognition)
       : undefined
   );
 
-  const isSupported = !!SpeechRecognitionAPIRef.current;
+  // isSupported は初期値を固定し、レンダー中に ref.current を読まない
+  const [isSupported] = useState(
+    typeof window !== 'undefined' && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
+  );
 
   // isListeningをrefでも管理（useEffect内のクロージャで参照するため）
   useEffect(() => {
@@ -141,6 +145,8 @@ export const useSpeechRecognition = ({
 
     // 認識結果のハンドラー
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      // 古いインスタンスのイベントは無視
+      if (recognitionRef.current !== recognition) return;
       const editor = editorRef.current;
       if (!editor) return;
 
@@ -273,6 +279,8 @@ export const useSpeechRecognition = ({
 
     // エラーハンドラー
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      // 古いインスタンスのイベントは無視
+      if (recognitionRef.current !== recognition) return;
       console.error('Speech recognition error:', event.error);
       isStartingRef.current = false;
       if (event.error === 'no-speech' || event.error === 'aborted') {
@@ -287,6 +295,8 @@ export const useSpeechRecognition = ({
 
     // 認識終了ハンドラー
     recognition.onend = () => {
+      // 古いインスタンスのイベントは無視
+      if (recognitionRef.current !== recognition) return;
       setIsListening(false);
       isStartingRef.current = false;
       // Mapをクリア
@@ -297,10 +307,13 @@ export const useSpeechRecognition = ({
     recognitionRef.current = recognition;
 
     return () => {
-      recognition.stop();
+      // リスニング中の場合のみ停止（未起動の recognition に stop() を呼ぶと onend が発火し状態が壊れるため）
+      if (isListeningRef.current) {
+        recognition.stop();
+      }
+      recognitionRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [editorRef]);
 
   const startListening = useCallback(() => {
     const recognition = recognitionRef.current;
