@@ -140,6 +140,11 @@ export const useSpeechRecognition = ({
         : { line: 1, column: 1 };
     };
 
+    // 認識開始ハンドラー（デバッグ用）
+    (recognition as SpeechRecognition & { onstart: (() => void) | null }).onstart = () => {
+      console.log('[SR] onstart fired - recognition is active');
+    };
+
     // 認識結果のハンドラー
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       console.log('[SR] onresult fired, resultIndex:', event.resultIndex, 'results.length:', event.results.length);
@@ -292,17 +297,22 @@ export const useSpeechRecognition = ({
       console.log('[SR] onend fired, isListeningRef:', isListeningRef.current);
       isStartingRef.current = false;
 
-      // isListening が true のままなら、ユーザーが意図的に停止していない
-      // → continuous モードで no-speech 等により自動終了した場合は再起動する
       if (isListeningRef.current) {
-        try {
-          recognition.start();
-        } catch {
-          // 再起動に失敗した場合は停止扱いにする
-          setIsListening(false);
-          finalResultsMapRef.current.clear();
-          interimResultsMapRef.current.clear();
-        }
+        // ユーザーが意図的に停止していない場合、少し待って再起動
+        // 即時再起動するとブラウザが no-speech ループに入るため遅延させる
+        setTimeout(() => {
+          if (isListeningRef.current && recognitionRef.current) {
+            console.log('[SR] restarting recognition...');
+            try {
+              recognitionRef.current.start();
+            } catch {
+              isListeningRef.current = false;
+              setIsListening(false);
+              finalResultsMapRef.current.clear();
+              interimResultsMapRef.current.clear();
+            }
+          }
+        }, 300);
         return;
       }
 
