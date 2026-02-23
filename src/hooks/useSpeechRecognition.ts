@@ -97,17 +97,14 @@ export const useSpeechRecognition = ({
     typeof window !== 'undefined' && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
   );
 
-  // isListeningをrefでも管理（useEffect内のクロージャで参照するため）
-  useEffect(() => {
-    isListeningRef.current = isListening;
-  }, [isListening]);
-
   // SpeechRecognition初期化（マウント時のみ）
   useEffect(() => {
     const SpeechRecognitionAPI = SpeechRecognitionAPIRef.current;
+    console.log('[SR] useEffect run, SpeechRecognitionAPI:', !!SpeechRecognitionAPI);
     if (!SpeechRecognitionAPI) return;
 
     const recognition = new SpeechRecognitionAPI();
+    console.log('[SR] recognition instance created:', recognition);
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'ja-JP';
@@ -145,7 +142,9 @@ export const useSpeechRecognition = ({
 
     // 認識結果のハンドラー
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      console.log('[SR] onresult fired, resultIndex:', event.resultIndex, 'results.length:', event.results.length);
       const editor = editorRef.current;
+      console.log('[SR] editor:', !!editor);
       if (!editor) return;
 
       // resultIndexからループして処理
@@ -277,6 +276,7 @@ export const useSpeechRecognition = ({
 
     // エラーハンドラー
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.log('[SR] onerror:', event.error);
       if (event.error === 'no-speech') {
         // continuous モードでは一時的に音声が検出されなかっただけ。セッション継続
         return;
@@ -289,6 +289,7 @@ export const useSpeechRecognition = ({
 
     // 認識終了ハンドラー
     recognition.onend = () => {
+      console.log('[SR] onend fired, isListeningRef:', isListeningRef.current);
       isStartingRef.current = false;
 
       // isListening が true のままなら、ユーザーが意図的に停止していない
@@ -312,12 +313,14 @@ export const useSpeechRecognition = ({
     };
 
     recognitionRef.current = recognition;
+    console.log('[SR] recognitionRef set, instance id:', recognition);
 
     // クリーンアップ時に ref.current を直接参照しないよう変数にコピー
     const finalResultsMap = finalResultsMapRef.current;
     const interimResultsMap = interimResultsMapRef.current;
 
     return () => {
+      console.log('[SR] cleanup called');
       // ハンドラーを先に無効化してから abort することで、
       // abort 後に発火する可能性のある onend/onerror の副作用を防ぐ
       recognition.onresult = null;
@@ -335,15 +338,19 @@ export const useSpeechRecognition = ({
 
   const startListening = useCallback(() => {
     const recognition = recognitionRef.current;
+    console.log('[SR] startListening called, recognition:', !!recognition, 'isListening:', isListeningRef.current, 'isStarting:', isStartingRef.current);
     if (!recognition || isListeningRef.current || isStartingRef.current) return;
 
     try {
       isStartingRef.current = true;
+      isListeningRef.current = true; // setIsListening より先に同期的にフラグを立てる
       recognition.start();
       setIsListening(true);
+      console.log('[SR] recognition.start() called');
     } catch (error) {
       console.error('Failed to start speech recognition:', error);
       isStartingRef.current = false;
+      isListeningRef.current = false;
 
       // already started エラーの場合、一度停止してから再開
       if (error instanceof Error && error.message.includes('already started')) {
