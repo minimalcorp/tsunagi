@@ -277,16 +277,14 @@ export const useSpeechRecognition = ({
 
     // エラーハンドラー
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === 'no-speech') {
+        // continuous モードでは一時的に音声が検出されなかっただけ。セッション継続
+        return;
+      }
       console.error('Speech recognition error:', event.error);
       isStartingRef.current = false;
-      if (event.error === 'no-speech' || event.error === 'aborted') {
-        // ユーザーが話していない、または中断された場合は自動的に停止
-        setIsListening(false);
-      } else if (event.error === 'not-allowed') {
-        // マイクの許可が拒否された
-        console.error('Microphone permission denied');
-        setIsListening(false);
-      }
+      // not-allowed: マイク許可拒否、audio-capture: マイクなし など致命的なエラーは停止
+      setIsListening(false);
     };
 
     // 認識終了ハンドラー
