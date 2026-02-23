@@ -145,8 +145,6 @@ export const useSpeechRecognition = ({
 
     // 認識結果のハンドラー
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      // 古いインスタンスのイベントは無視
-      if (recognitionRef.current !== recognition) return;
       const editor = editorRef.current;
       if (!editor) return;
 
@@ -279,8 +277,6 @@ export const useSpeechRecognition = ({
 
     // エラーハンドラー
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      // 古いインスタンスのイベントは無視
-      if (recognitionRef.current !== recognition) return;
       console.error('Speech recognition error:', event.error);
       isStartingRef.current = false;
       if (event.error === 'no-speech' || event.error === 'aborted') {
@@ -295,8 +291,6 @@ export const useSpeechRecognition = ({
 
     // 認識終了ハンドラー
     recognition.onend = () => {
-      // 古いインスタンスのイベントは無視
-      if (recognitionRef.current !== recognition) return;
       setIsListening(false);
       isStartingRef.current = false;
       // Mapをクリア
@@ -306,12 +300,23 @@ export const useSpeechRecognition = ({
 
     recognitionRef.current = recognition;
 
+    // クリーンアップ時に ref.current を直接参照しないよう変数にコピー
+    const finalResultsMap = finalResultsMapRef.current;
+    const interimResultsMap = interimResultsMapRef.current;
+
     return () => {
-      // リスニング中の場合のみ停止（未起動の recognition に stop() を呼ぶと onend が発火し状態が壊れるため）
-      if (isListeningRef.current) {
-        recognition.stop();
-      }
+      // ハンドラーを先に無効化してから abort することで、
+      // abort 後に発火する可能性のある onend/onerror の副作用を防ぐ
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.abort();
       recognitionRef.current = null;
+      // 状態もリセット（onend が呼ばれないためここでリセット）
+      setIsListening(false);
+      isStartingRef.current = false;
+      finalResultsMap.clear();
+      interimResultsMap.clear();
     };
   }, [editorRef]);
 
