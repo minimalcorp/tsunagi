@@ -292,15 +292,8 @@ export const useSpeechRecognition = ({
     }
 
     return () => {
-      const r = recognitionRef.current;
-      if (r) {
-        // ハンドラーを無効化してから abort することで、
-        // このインスタンスの結果が editor に書き込まれるのを防ぐ
-        r.onresult = null;
-        r.onend = null;
-        r.onerror = null;
-        r.abort();
-        recognitionRef.current = null;
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
       }
     };
   }, [editorRef, SpeechRecognitionAPI, calculateInsertPosition]);
