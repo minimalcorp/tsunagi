@@ -78,39 +78,22 @@ export const useSpeechRecognition = ({
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isStartingRef = useRef(false);
-  const isListeningRef = useRef(false);
 
   // 各resultインデックスに対応する位置を管理
   const finalResultsMapRef = useRef<Map<number, ResultPosition>>(new Map());
   const interimResultsMapRef = useRef<Map<number, ResultPosition>>(new Map());
 
-  // ブラウザのSpeechRecognitionサポート判定（マウント時のみ評価）
-  // SSR 時は undefined、クライアント時は API コンストラクタを初期値として保持
-  const SpeechRecognitionAPIRef = useRef(
+  // ブラウザのSpeechRecognitionサポート判定（初期化時のみ）
+  const SpeechRecognitionAPI =
     typeof window !== 'undefined'
-      ? (window.SpeechRecognition ?? window.webkitSpeechRecognition)
-      : undefined
-  );
+      ? window.SpeechRecognition || window.webkitSpeechRecognition
+      : undefined;
 
-  // isSupported は初期値を固定し、レンダー中に ref.current を読まない
-  const [isSupported] = useState(
-    typeof window !== 'undefined' && !!(window.SpeechRecognition ?? window.webkitSpeechRecognition)
-  );
+  const isSupported = !!SpeechRecognitionAPI;
 
-  // SpeechRecognition初期化（マウント時のみ）
-  useEffect(() => {
-    const SpeechRecognitionAPI = SpeechRecognitionAPIRef.current;
-    console.log('[SR] useEffect run, SpeechRecognitionAPI:', !!SpeechRecognitionAPI);
-    if (!SpeechRecognitionAPI) return;
-
-    const recognition = new SpeechRecognitionAPI();
-    console.log('[SR] recognition instance created:', recognition);
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'ja-JP';
-
-    // 挿入位置を計算するヘルパー（useEffect内にインライン化）
-    const calculateInsertPosition = (resultIndex: number): { line: number; column: number } => {
+  // 挿入位置を計算するヘルパー
+  const calculateInsertPosition = useCallback(
+    (resultIndex: number): { line: number; column: number } => {
       const editor = editorRef.current;
       if (!editor) return { line: 1, column: 1 };
 
@@ -138,237 +121,208 @@ export const useSpeechRecognition = ({
       return position
         ? { line: position.lineNumber, column: position.column }
         : { line: 1, column: 1 };
-    };
+    },
+    [editorRef]
+  );
 
-    // 認識開始ハンドラー（デバッグ用）
-    (recognition as SpeechRecognition & { onstart: (() => void) | null }).onstart = () => {
-      console.log('[SR] onstart fired - recognition is active');
-    };
+  // SpeechRecognition初期化
+  useEffect(() => {
+    if (SpeechRecognitionAPI) {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'ja-JP';
 
-    // 認識結果のハンドラー
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      console.log('[SR] onresult fired, resultIndex:', event.resultIndex, 'results.length:', event.results.length);
-      const editor = editorRef.current;
-      console.log('[SR] editor:', !!editor);
-      if (!editor) return;
+      // 認識結果のハンドラー
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const editor = editorRef.current;
+        if (!editor) return;
 
-      // resultIndexからループして処理
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcript = result[0].transcript;
+        // resultIndexからループして処理
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          const transcript = result[0].transcript;
 
-        if (result.isFinal) {
-          // 最終結果の処理
-          const interimData = interimResultsMapRef.current.get(i);
+          if (result.isFinal) {
+            // 最終結果の処理
+            const interimData = interimResultsMapRef.current.get(i);
 
-          if (interimData) {
-            // 中間結果を最終結果に置き換え
-            const range = {
-              startLineNumber: interimData.position.line,
-              startColumn: interimData.position.column,
-              endLineNumber: interimData.position.line,
-              endColumn: interimData.position.column + interimData.length,
-            };
+            if (interimData) {
+              // 中間結果を最終結果に置き換え
+              const range = {
+                startLineNumber: interimData.position.line,
+                startColumn: interimData.position.column,
+                endLineNumber: interimData.position.line,
+                endColumn: interimData.position.column + interimData.length,
+              };
 
-            editor.executeEdits('speech-recognition', [
-              {
-                range,
-                text: transcript,
-              },
-            ]);
+              editor.executeEdits('speech-recognition', [
+                {
+                  range,
+                  text: transcript,
+                },
+              ]);
 
-            // finalResultsMapに登録
-            finalResultsMapRef.current.set(i, {
-              position: interimData.position,
-              length: transcript.length,
-            });
+              // finalResultsMapに登録
+              finalResultsMapRef.current.set(i, {
+                position: interimData.position,
+                length: transcript.length,
+              });
 
-            // interimResultsMapから削除
-            interimResultsMapRef.current.delete(i);
+              // interimResultsMapから削除
+              interimResultsMapRef.current.delete(i);
+            } else {
+              // 中間結果がない場合（最初から最終結果）
+              const insertPosition = calculateInsertPosition(i);
+
+              const range = {
+                startLineNumber: insertPosition.line,
+                startColumn: insertPosition.column,
+                endLineNumber: insertPosition.line,
+                endColumn: insertPosition.column,
+              };
+
+              editor.executeEdits('speech-recognition', [
+                {
+                  range,
+                  text: transcript,
+                },
+              ]);
+
+              finalResultsMapRef.current.set(i, {
+                position: insertPosition,
+                length: transcript.length,
+              });
+            }
+
+            // カーソルを最終結果の末尾に移動
+            const finalData = finalResultsMapRef.current.get(i);
+            if (finalData) {
+              editor.setPosition({
+                lineNumber: finalData.position.line,
+                column: finalData.position.column + finalData.length,
+              });
+            }
           } else {
-            // 中間結果がない場合（最初から最終結果）
-            const insertPosition = calculateInsertPosition(i);
+            // 中間結果の処理
+            const existingInterim = interimResultsMapRef.current.get(i);
 
-            const range = {
-              startLineNumber: insertPosition.line,
-              startColumn: insertPosition.column,
-              endLineNumber: insertPosition.line,
-              endColumn: insertPosition.column,
-            };
+            if (existingInterim) {
+              // 既存の中間結果を上書き
+              const range = {
+                startLineNumber: existingInterim.position.line,
+                startColumn: existingInterim.position.column,
+                endLineNumber: existingInterim.position.line,
+                endColumn: existingInterim.position.column + existingInterim.length,
+              };
 
-            editor.executeEdits('speech-recognition', [
-              {
-                range,
-                text: transcript,
-              },
-            ]);
+              editor.executeEdits('speech-recognition', [
+                {
+                  range,
+                  text: transcript,
+                },
+              ]);
 
-            finalResultsMapRef.current.set(i, {
-              position: insertPosition,
-              length: transcript.length,
-            });
-          }
+              interimResultsMapRef.current.set(i, {
+                position: existingInterim.position,
+                length: transcript.length,
+              });
+            } else {
+              // 新しい中間結果
+              const insertPosition = calculateInsertPosition(i);
 
-          // カーソルを最終結果の末尾に移動
-          const finalData = finalResultsMapRef.current.get(i);
-          if (finalData) {
-            editor.setPosition({
-              lineNumber: finalData.position.line,
-              column: finalData.position.column + finalData.length,
-            });
-          }
-        } else {
-          // 中間結果の処理
-          const existingInterim = interimResultsMapRef.current.get(i);
+              const range = {
+                startLineNumber: insertPosition.line,
+                startColumn: insertPosition.column,
+                endLineNumber: insertPosition.line,
+                endColumn: insertPosition.column,
+              };
 
-          if (existingInterim) {
-            // 既存の中間結果を上書き
-            const range = {
-              startLineNumber: existingInterim.position.line,
-              startColumn: existingInterim.position.column,
-              endLineNumber: existingInterim.position.line,
-              endColumn: existingInterim.position.column + existingInterim.length,
-            };
+              editor.executeEdits('speech-recognition', [
+                {
+                  range,
+                  text: transcript,
+                },
+              ]);
 
-            editor.executeEdits('speech-recognition', [
-              {
-                range,
-                text: transcript,
-              },
-            ]);
+              interimResultsMapRef.current.set(i, {
+                position: insertPosition,
+                length: transcript.length,
+              });
+            }
 
-            interimResultsMapRef.current.set(i, {
-              position: existingInterim.position,
-              length: transcript.length,
-            });
-          } else {
-            // 新しい中間結果
-            const insertPosition = calculateInsertPosition(i);
-
-            const range = {
-              startLineNumber: insertPosition.line,
-              startColumn: insertPosition.column,
-              endLineNumber: insertPosition.line,
-              endColumn: insertPosition.column,
-            };
-
-            editor.executeEdits('speech-recognition', [
-              {
-                range,
-                text: transcript,
-              },
-            ]);
-
-            interimResultsMapRef.current.set(i, {
-              position: insertPosition,
-              length: transcript.length,
-            });
-          }
-
-          // カーソルを中間結果の末尾に移動
-          const interimData = interimResultsMapRef.current.get(i);
-          if (interimData) {
-            editor.setPosition({
-              lineNumber: interimData.position.line,
-              column: interimData.position.column + interimData.length,
-            });
-          }
-        }
-      }
-
-      editor.focus();
-    };
-
-    // エラーハンドラー
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.log('[SR] onerror:', event.error);
-      if (event.error === 'no-speech') {
-        // continuous モードでは一時的に音声が検出されなかっただけ。セッション継続
-        return;
-      }
-      console.error('Speech recognition error:', event.error);
-      isStartingRef.current = false;
-      // not-allowed: マイク許可拒否、audio-capture: マイクなし など致命的なエラーは停止
-      setIsListening(false);
-    };
-
-    // 認識終了ハンドラー
-    recognition.onend = () => {
-      console.log('[SR] onend fired, isListeningRef:', isListeningRef.current);
-      isStartingRef.current = false;
-
-      if (isListeningRef.current) {
-        // ユーザーが意図的に停止していない場合、少し待って再起動
-        // 即時再起動するとブラウザが no-speech ループに入るため遅延させる
-        setTimeout(() => {
-          if (isListeningRef.current && recognitionRef.current) {
-            console.log('[SR] restarting recognition...');
-            try {
-              recognitionRef.current.start();
-            } catch {
-              isListeningRef.current = false;
-              setIsListening(false);
-              finalResultsMapRef.current.clear();
-              interimResultsMapRef.current.clear();
+            // カーソルを中間結果の末尾に移動
+            const interimData = interimResultsMapRef.current.get(i);
+            if (interimData) {
+              editor.setPosition({
+                lineNumber: interimData.position.line,
+                column: interimData.position.column + interimData.length,
+              });
             }
           }
-        }, 300);
-        return;
-      }
+        }
 
-      // stopListening によって意図的に止めた場合
-      setIsListening(false);
-      finalResultsMapRef.current.clear();
-      interimResultsMapRef.current.clear();
-    };
+        editor.focus();
+      };
 
-    recognitionRef.current = recognition;
-    console.log('[SR] recognitionRef set, instance id:', recognition);
+      // エラーハンドラー
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        isStartingRef.current = false;
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          // ユーザーが話していない、または中断された場合は自動的に停止
+          setIsListening(false);
+        } else if (event.error === 'not-allowed') {
+          // マイクの許可が拒否された
+          console.error('Microphone permission denied');
+          setIsListening(false);
+        }
+      };
 
-    // クリーンアップ時に ref.current を直接参照しないよう変数にコピー
-    const finalResultsMap = finalResultsMapRef.current;
-    const interimResultsMap = interimResultsMapRef.current;
+      // 認識終了ハンドラー
+      recognition.onend = () => {
+        setIsListening(false);
+        isStartingRef.current = false;
+        // Mapをクリア
+        finalResultsMapRef.current.clear();
+        interimResultsMapRef.current.clear();
+      };
+
+      recognitionRef.current = recognition;
+    }
 
     return () => {
-      console.log('[SR] cleanup called');
-      // ハンドラーを先に無効化してから abort することで、
-      // abort 後に発火する可能性のある onend/onerror の副作用を防ぐ
-      recognition.onresult = null;
-      recognition.onerror = null;
-      recognition.onend = null;
-      recognition.abort();
-      recognitionRef.current = null;
-      // 状態もリセット（onend が呼ばれないためここでリセット）
-      isListeningRef.current = false;
-      setIsListening(false);
-      isStartingRef.current = false;
-      finalResultsMap.clear();
-      interimResultsMap.clear();
+      const r = recognitionRef.current;
+      if (r) {
+        // ハンドラーを無効化してから abort することで、
+        // このインスタンスの結果が editor に書き込まれるのを防ぐ
+        r.onresult = null;
+        r.onend = null;
+        r.onerror = null;
+        r.abort();
+        recognitionRef.current = null;
+      }
     };
-  }, [editorRef]);
+  }, [editorRef, SpeechRecognitionAPI, calculateInsertPosition]);
 
   const startListening = useCallback(() => {
     const recognition = recognitionRef.current;
-    console.log('[SR] startListening called, recognition:', !!recognition, 'isListening:', isListeningRef.current, 'isStarting:', isStartingRef.current);
-    if (!recognition || isListeningRef.current || isStartingRef.current) return;
+    if (!recognition || isListening || isStartingRef.current) return;
 
     try {
       isStartingRef.current = true;
-      isListeningRef.current = true; // setIsListening より先に同期的にフラグを立てる
       recognition.start();
       setIsListening(true);
-      console.log('[SR] recognition.start() called');
     } catch (error) {
       console.error('Failed to start speech recognition:', error);
       isStartingRef.current = false;
-      isListeningRef.current = false;
 
       // already started エラーの場合、一度停止してから再開
       if (error instanceof Error && error.message.includes('already started')) {
         try {
           recognition.stop();
           setTimeout(() => {
-            if (recognitionRef.current && !isListeningRef.current) {
+            if (recognitionRef.current && !isListening) {
               try {
                 isStartingRef.current = true;
                 recognitionRef.current.start();
@@ -384,23 +338,21 @@ export const useSpeechRecognition = ({
         }
       }
     }
-  }, []);
+  }, [isListening]);
 
   const stopListening = useCallback(() => {
     const recognition = recognitionRef.current;
-    if (!recognition || !isListeningRef.current) return;
-
-    // onend での再起動を抑制するために先にフラグを下げる
-    isListeningRef.current = false;
-    setIsListening(false);
+    if (!recognition || !isListening) return;
 
     try {
       recognition.stop();
+      // onend で setIsListening(false) が呼ばれるのを待つ
     } catch (error) {
       console.error('Failed to stop speech recognition:', error);
+      setIsListening(false);
       isStartingRef.current = false;
     }
-  }, []);
+  }, [isListening]);
 
   return {
     isListening,
