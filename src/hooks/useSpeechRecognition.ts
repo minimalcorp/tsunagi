@@ -295,7 +295,7 @@ export const useSpeechRecognition = ({
     }
 
     return () => {
-      console.log('[SR] cleanup instance:', recognition);
+      console.log('[SR] cleanup, recognitionRef:', recognitionRef.current);
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
