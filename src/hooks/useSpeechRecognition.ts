@@ -67,6 +67,13 @@ interface UseSpeechRecognitionReturn {
   stopListening: () => void;
 }
 
+// 前回と今回のテキストの共通プレフィックス長を返す
+const commonPrefixLength = (a: string, b: string): number => {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return i;
+};
+
 export const useSpeechRecognition = ({
   editorRef,
 }: UseSpeechRecognitionProps): UseSpeechRecognitionReturn => {
@@ -74,11 +81,10 @@ export const useSpeechRecognition = ({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isStartingRef = useRef(false);
 
-  // 現在 editor に書き込まれている interim テキストとその開始位置
-  // startListening 時にカーソル位置で初期化し、onresult で更新する
+  // 現在 editor に書き込まれている interim テキストとその開始オフセット
+  // line/column ではなくモデルの文字オフセットで管理することで変換の誤差を排除する
   const interimTextRef = useRef('');
-  const interimStartLineRef = useRef(1);
-  const interimStartColumnRef = useRef(1);
+  const interimStartOffsetRef = useRef(0);
 
   // ブラウザのSpeechRecognitionサポート判定（初期化時のみ）
   const SpeechRecognitionAPI =
@@ -98,49 +104,68 @@ export const useSpeechRecognition = ({
     recognition.lang = 'ja-JP';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const editor = editorRef.current;
-      if (!editor) return;
+      const editorInstance = editorRef.current;
+      if (!editorInstance) return;
+
+      const model = editorInstance.getModel();
+      if (!model) return;
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
-        const transcript = result[0].transcript;
-        const interimText = interimTextRef.current;
-        const startLine = interimStartLineRef.current;
-        const startColumn = interimStartColumnRef.current;
+        // Web Speech API は transcript の先頭に半角スペースを付けることがあるため除去する
+        const transcript = result[0].transcript.trimStart();
+        const prevInterimText = interimTextRef.current;
 
-        // 現在の interim 範囲を transcript で置換（interim/final 共通）
-        editor.executeEdits('speech-recognition', [
+        // フレーズ先頭（prevInterimText が空）のとき、isFinal 後にユーザーがカーソルを
+        // 移動していた場合に追従する。エディタの実際のカーソル位置を開始位置として採用する。
+        if (prevInterimText === '') {
+          const cursorPos = editorInstance.getPosition();
+          if (cursorPos) {
+            interimStartOffsetRef.current = model.getOffsetAt(cursorPos);
+          }
+        }
+
+        const startOffset = interimStartOffsetRef.current;
+
+        // 前回との共通プレフィックスを求め、差分部分だけを editor に適用する
+        // これによりカーソルは常に変更箇所の末尾（前進方向）に留まる
+        const prefixLen = commonPrefixLength(prevInterimText, transcript);
+        const deleteFrom = startOffset + prefixLen;
+        // prevInterimText が '' の場合は deleteTo == deleteFrom になり挿入のみになる
+        const deleteTo = startOffset + prevInterimText.length;
+        const insertText = transcript.slice(prefixLen);
+
+        const deleteFromPos = model.getPositionAt(deleteFrom);
+        const deleteToPos = model.getPositionAt(deleteTo);
+
+        editorInstance.executeEdits('speech-recognition', [
           {
             range: {
-              startLineNumber: startLine,
-              startColumn: startColumn,
-              endLineNumber: startLine,
-              endColumn: startColumn + interimText.length,
+              startLineNumber: deleteFromPos.lineNumber,
+              startColumn: deleteFromPos.column,
+              endLineNumber: deleteToPos.lineNumber,
+              endColumn: deleteToPos.column,
             },
-            text: transcript,
+            text: insertText,
+            forceMoveMarkers: true,
           },
         ]);
 
+        // executeEdits 後のモデルから末尾位置を計算してカーソルを設定する
+        const newEndOffset = startOffset + transcript.length;
+        const newEndPos = model.getPositionAt(newEndOffset);
+        editorInstance.setPosition(newEndPos);
+
         if (result.isFinal) {
-          // executeEdits 後の実際のカーソル位置を次のフレーズ開始位置とする
-          // （計算値ではなく Monaco が管理する実際の位置を使うことでズレを防ぐ）
-          const pos = editor.getPosition();
-          interimStartLineRef.current = pos?.lineNumber ?? startLine;
-          interimStartColumnRef.current = pos?.column ?? startColumn + transcript.length;
+          // 次フレーズの開始オフセット = 確定テキストの末尾
+          interimStartOffsetRef.current = newEndOffset;
           interimTextRef.current = '';
         } else {
-          // interim テキストを更新
           interimTextRef.current = transcript;
-
-          // カーソルを末尾に移動
-          editor.setPosition({
-            lineNumber: startLine,
-            column: startColumn + transcript.length,
-          });
         }
       }
 
-      editor.focus();
+      editorInstance.focus();
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -169,10 +194,14 @@ export const useSpeechRecognition = ({
     const editor = editorRef.current;
     if (!recognition || isListening || isStartingRef.current) return;
 
-    // 音声入力開始時のカーソル位置を記録
+    // 音声入力開始時のカーソル位置をオフセットとして記録
+    const model = editor?.getModel();
     const position = editor?.getPosition();
-    interimStartLineRef.current = position?.lineNumber ?? 1;
-    interimStartColumnRef.current = position?.column ?? 1;
+    if (model && position) {
+      interimStartOffsetRef.current = model.getOffsetAt(position);
+    } else {
+      interimStartOffsetRef.current = 0;
+    }
     interimTextRef.current = '';
 
     try {
