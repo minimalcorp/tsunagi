@@ -122,19 +122,22 @@ export const useSpeechRecognition = ({
         ]);
 
         if (result.isFinal) {
-          // 次のフレーズ開始位置をこの final の末尾に進めて interim をリセット
-          interimStartColumnRef.current = startColumn + transcript.length;
+          // executeEdits 後の実際のカーソル位置を次のフレーズ開始位置とする
+          // （計算値ではなく Monaco が管理する実際の位置を使うことでズレを防ぐ）
+          const pos = editor.getPosition();
+          interimStartLineRef.current = pos?.lineNumber ?? startLine;
+          interimStartColumnRef.current = pos?.column ?? startColumn + transcript.length;
           interimTextRef.current = '';
         } else {
           // interim テキストを更新
           interimTextRef.current = transcript;
-        }
 
-        // カーソルを末尾に移動
-        editor.setPosition({
-          lineNumber: interimStartLineRef.current,
-          column: interimStartColumnRef.current + interimTextRef.current.length,
-        });
+          // カーソルを末尾に移動
+          editor.setPosition({
+            lineNumber: startLine,
+            column: startColumn + transcript.length,
+          });
+        }
       }
 
       editor.focus();
