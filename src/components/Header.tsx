@@ -12,22 +12,22 @@ interface FilterState {
   search: string;
 }
 
-// localStorageから読み込み
+// sessionStorageから読み込み
 const loadFilterState = (): FilterState | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = sessionStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : null;
   } catch {
     return null;
   }
 };
 
-// localStorageに保存
+// sessionStorageに保存
 const saveFilterState = (state: FilterState) => {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
     // エラーは無視（localStorageが使用できない環境対応）
   }
