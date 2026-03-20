@@ -1,6 +1,13 @@
 'use client';
 
-import { TerminalView } from '@/components/TerminalView';
+import dynamic from 'next/dynamic';
+
+const TerminalView = dynamic(
+  () => import('@/components/TerminalView').then((m) => m.TerminalView),
+  {
+    ssr: false,
+  }
+);
 
 export default function TerminalTestPage() {
   return (
