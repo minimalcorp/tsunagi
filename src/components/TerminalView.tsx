@@ -66,15 +66,21 @@ export function TerminalView({ cwd, env, className = '' }: TerminalViewProps) {
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(containerRef.current);
-    fitAddon.fit();
 
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    // リサイズオブザーバー
-    const observer = new ResizeObserver(() => {
+    // open() 直後はレンダラーが未初期化のため、1フレーム待ってから fit()
+    requestAnimationFrame(() => {
       fitAddon.fit();
-      sendResize();
+    });
+
+    // リサイズオブザーバー：dimensions が有効になってから fit() を呼ぶ
+    const observer = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        fitAddon.fit();
+        sendResize();
+      });
     });
     observer.observe(containerRef.current);
 
