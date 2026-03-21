@@ -29,6 +29,7 @@
     "@prisma/adapter-libsql": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "@xyflow/react": "^12.10.0",
     "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",
@@ -44,8 +45,7 @@
     "simple-git": "^3.30.0",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
-    "uuid": "^13.0.0",
-    "xterm": "^5.3.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
