@@ -174,7 +174,7 @@ export function TaskDialog({
 
       try {
         // 1. Validation API (blocking)
-        const validateRes = await fetch('/api/tasks/validate', {
+        const validateRes = await fetch('http://localhost:2792/tasks/validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -226,7 +226,7 @@ export function TaskDialog({
         const notificationId = toast.loading('Creating task...', taskData.title);
 
         try {
-          const response = await fetch('/api/tasks', {
+          const response = await fetch('http://localhost:2792/tasks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(taskData),

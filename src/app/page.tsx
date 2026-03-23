@@ -12,6 +12,7 @@ import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { useTerminalTodos } from '@/hooks/useTerminalTodos';
+import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { toaster } from '@/lib/toaster';
 
 export default function Home() {
@@ -114,6 +115,11 @@ export default function Home() {
 
   // KanbanカードのProgress Bar用Todos
   const tabTodosMap = useTerminalTodos(runningTabIds);
+
+  // task:created イベントを受信してKanbanボードを即時更新
+  useTaskEvents((newTask) => {
+    setTasks((prev) => [...prev, newTask]);
+  });
 
   // バッチ削除
   const { isDeleting, deletedCount, errorCount, totalCount, isCompleted, startBatchDelete, reset } =
