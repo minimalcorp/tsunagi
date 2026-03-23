@@ -24,6 +24,7 @@
     "@fastify/cors": "^11.2.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@libsql/client": "0.8.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@monaco-editor/react": "^4.7.0",
     "@prisma/adapter-libsql": "^7.3.0",
     "@prisma/client": "^7.3.0",
