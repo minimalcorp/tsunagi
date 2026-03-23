@@ -10,7 +10,7 @@ interface TerminalPanelProps {
   tabs: Tab[];
   activeTabId?: string;
   onTabChange: (tabId: string) => void;
-  onTabCreate: () => void;
+  onTabCreate: () => Promise<string | undefined>;
   onTabDelete: (tabId: string) => void;
   /** Todoリスト更新時のコールバック（KanbanカードのProgress Bar用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
@@ -62,7 +62,15 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     );
 
     const handleTabCreate = useCallback(async () => {
-      await onTabCreate();
+      const newTabId = await onTabCreate();
+      // 新規タブを即座にマウント済みとしてマーク（onTabChangeを経由しないため手動追加）
+      if (newTabId) {
+        setMountedTabIds((prev) => {
+          const next = new Set(prev);
+          next.add(newTabId);
+          return next;
+        });
+      }
     }, [onTabCreate]);
 
     const handleTabDelete = useCallback(
@@ -128,6 +136,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   tabId={tab.tab_id}
                   cwd={task.worktreePath}
                   worktreePath={task.worktreePath}
+                  command={`claude --resume ${tab.tab_id} 2>/dev/null || claude --session-id ${tab.tab_id}`}
                   className="h-full"
                   onTodosUpdated={onTodosUpdated}
                 />

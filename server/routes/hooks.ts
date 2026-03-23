@@ -74,13 +74,12 @@ export async function hooksRoutes(fastify: FastifyInstance) {
 
       switch (eventName) {
         case 'SessionStart':
-          // running状態に更新
-          await updateTabStatus(sessionId, 'running');
-          io.to(room).emit('status-changed', { sessionId, status: 'running' });
+          // claudeが起動しただけ（まだプロンプト処理していない）→ idleのまま通知のみ
+          io.to(room).emit('status-changed', { sessionId, status: 'idle' });
           break;
 
         case 'UserPromptSubmit':
-          // running状態に更新（冪等）
+          // プロンプト送信開始 → running状態に更新
           await updateTabStatus(sessionId, 'running');
           io.to(room).emit('status-changed', { sessionId, status: 'running' });
           break;

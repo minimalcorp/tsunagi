@@ -182,7 +182,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         body: JSON.stringify({ cwd, env, worktreePath, sessionId, command }),
       });
 
-      if (!res.ok) throw new Error(`Failed to create session: ${res.status}`);
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => '');
+        throw new Error(`Failed to create session: ${res.status} ${errorText}`);
+      }
 
       const body = (await res.json()) as { sessionId: string; reused: boolean };
       sessionIdRef.current = body.sessionId;

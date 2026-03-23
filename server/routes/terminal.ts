@@ -65,17 +65,17 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       let initialResizeHandled = !isReused;
       const pendingOutput: string[] = [];
 
-      // PTY出力 → クライアントへ送信
+      // PTY出力 → このsocketのみに送信（io.to(room)だと同一PTYに複数socket接続時に重複するため）
       const dataHandler = ptyProcess.onData((data: string) => {
         if (!initialResizeHandled) {
           pendingOutput.push(data);
           return;
         }
-        io.to(room).emit('output', { data });
+        socket.emit('output', { data });
       });
       dataHandlerDispose = () => dataHandler.dispose();
 
-      // PTYプロセス終了 → クライアントへ通知 + セッション削除
+      // PTYプロセス終了 → room全体に通知（全接続クライアントに終了を伝える）+ セッション削除
       const exitHandler = ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
         io.to(room).emit('exit', { exitCode });
         ptyManager.deleteSession(sessionId);
@@ -95,7 +95,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
             if (pendingOutput.length > 0) {
               const flushed = pendingOutput.join('');
               pendingOutput.length = 0;
-              io.to(room).emit('output', { data: flushed });
+              socket.emit('output', { data: flushed });
             }
           }
         }
