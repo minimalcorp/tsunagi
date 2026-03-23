@@ -1,5 +1,6 @@
 import simpleGit, { SimpleGit } from 'simple-git';
 import * as fs from 'fs/promises';
+import * as fssync from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
@@ -179,12 +180,56 @@ export async function createWorktree(
     await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${effectiveBaseBranch}`]);
   }
 
+  // .claude/settings.local.json にhooks設定を生成
+  try {
+    const claudeDir = path.join(worktreePath, '.claude');
+    const settingsPath = path.join(claudeDir, 'settings.local.json');
+    if (!fssync.existsSync(claudeDir)) {
+      fssync.mkdirSync(claudeDir, { recursive: true });
+    }
+    let existing: Record<string, unknown> = {};
+    if (fssync.existsSync(settingsPath)) {
+      try {
+        existing = JSON.parse(fssync.readFileSync(settingsPath, 'utf-8')) as Record<
+          string,
+          unknown
+        >;
+      } catch {
+        /* パースエラーは無視 */
+      }
+    }
+    const hookCommand =
+      "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-";
+    const hook = [{ hooks: [{ type: 'command', command: hookCommand }] }];
+    const updated = {
+      ...existing,
+      hooks: {
+        SessionStart: hook, SessionEnd: hook, UserPromptSubmit: hook,
+        PreToolUse: hook, PostToolUse: hook, PostToolUseFailure: hook,
+        PermissionRequest: hook, Notification: hook,
+        Stop: hook, StopFailure: hook,
+        SubagentStart: hook, SubagentStop: hook,
+        TeammateIdle: hook, TaskCompleted: hook,
+        InstructionsLoaded: hook, ConfigChange: hook,
+        WorktreeCreate: hook, WorktreeRemove: hook,
+        PreCompact: hook, PostCompact: hook,
+        Elicitation: hook, ElicitationResult: hook,
+      },
+    };
+    fssync.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf-8');
+  } catch {
+    // settings.local.json生成失敗は無視
+  }
+
   // worktreeにローカルスコープでMCPサーバーを登録
   // claude CLIが存在しない環境でもエラーにしない
   try {
-    await execAsync('claude mcp add --transport sse --scope local tsunagi http://localhost:2792/mcp', {
-      cwd: worktreePath,
-    });
+    await execAsync(
+      'claude mcp add --transport sse --scope local tsunagi http://localhost:2792/mcp',
+      {
+        cwd: worktreePath,
+      }
+    );
   } catch {
     // claude CLI未インストール時は無視
   }

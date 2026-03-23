@@ -20,6 +20,9 @@ interface ClaudeHookBody {
   tool_use_id?: string;
   tool_input?: Record<string, unknown>;
   tool_response?: Record<string, unknown>;
+  // StopFailure
+  error?: string;
+  error_details?: string;
 }
 
 // 受信したhookイベントをメモリに保持（確認用）
@@ -84,12 +87,13 @@ export async function hooksRoutes(fastify: FastifyInstance) {
           io.to(room).emit('status-changed', { sessionId, status: 'running' });
           break;
 
-        case 'PreToolUse':
-          // ログ記録のみ
+        case 'PermissionRequest':
+          // ツール実行許可待ち → waiting状態に更新
+          io.to(room).emit('status-changed', { sessionId, status: 'waiting' });
           break;
 
         case 'PostToolUse':
-          // TodoWriteツールの場合はtodosを更新
+          // ツール実行完了（PermissionRequest後のAllow含む）→ runningに戻す
           if (body.tool_name === 'TodoWrite' && body.tool_input) {
             const todos = body.tool_input.todos as Array<{
               content: string;
@@ -100,22 +104,27 @@ export async function hooksRoutes(fastify: FastifyInstance) {
               io.to(room).emit('todos-updated', { sessionId, todos });
             }
           }
+          io.to(room).emit('status-changed', { sessionId, status: 'running' });
+          break;
+
+        case 'PreToolUse':
+          // ログ記録のみ
           break;
 
         case 'Stop':
-          // idle状態に更新
+          // 正常完了 → success状態に更新
           await updateTabStatus(sessionId, 'idle');
-          io.to(room).emit('status-changed', { sessionId, status: 'idle' });
+          io.to(room).emit('status-changed', { sessionId, status: 'success' });
           break;
 
         case 'StopFailure':
-          // error状態に更新
+          // APIエラーでターン終了 → failure状態に更新
           await updateTabStatus(sessionId, 'error');
-          io.to(room).emit('status-changed', { sessionId, status: 'error' });
+          io.to(room).emit('status-changed', { sessionId, status: 'failure' });
           break;
 
         default:
-          fastify.log.debug({ eventName }, 'Unknown hook event');
+          fastify.log.debug({ eventName }, 'Unhandled hook event');
       }
     }
 

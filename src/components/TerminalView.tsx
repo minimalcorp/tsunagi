@@ -11,7 +11,7 @@ import { Loader2, Copy, Play, Check } from 'lucide-react';
 const FASTIFY_API_BASE = 'http://localhost:2792';
 
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
-export type ClaudeStatus = 'idle' | 'running' | 'success' | 'error';
+export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
 
 export interface Todo {
   content: string;

@@ -3,7 +3,6 @@ import type { Server as SocketIOServer } from 'socket.io';
 import * as os from 'os';
 import * as path from 'path';
 import { ptyManager } from '../pty-manager.js';
-import { generateSettingsLocalJson } from '../claude-settings.js';
 import { prisma } from '../../src/lib/db.js';
 
 interface FastifyWithIO extends FastifyInstance {
@@ -138,16 +137,6 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      // worktreePathが指定されていればsettings.local.jsonを生成
-      if (worktreePath) {
-        try {
-          generateSettingsLocalJson(worktreePath);
-          fastify.log.info({ worktreePath }, 'Generated .claude/settings.local.json');
-        } catch (err) {
-          fastify.log.warn({ err, worktreePath }, 'Failed to generate settings.local.json');
-        }
-      }
-
       // DBからglobal環境変数を取得（有効なもののみ）
       const globalEnv: Record<string, string> = {};
       try {

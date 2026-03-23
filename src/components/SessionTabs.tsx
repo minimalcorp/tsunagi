@@ -2,7 +2,18 @@
 
 import { useRef, useEffect, useState } from 'react';
 import type { Tab } from '@/lib/types';
-import { X, Loader2, CirclePause, Bot, Terminal, AlertCircle, WifiOff } from 'lucide-react';
+import {
+  X,
+  Loader2,
+  CirclePause,
+  Bot,
+  Terminal,
+  AlertCircle,
+  WifiOff,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+} from 'lucide-react';
 import type { TabStatusEntry } from '@/components/TerminalPanel';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 
@@ -66,15 +77,30 @@ function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
           <span>running</span>
         </div>
       );
+    case 'waiting':
+      return (
+        <div className="flex items-center gap-1 text-xs text-yellow-500">
+          <MessageSquare className="w-3 h-3" />
+          <span>waiting</span>
+        </div>
+      );
+    case 'success':
+      return (
+        <div className="flex items-center gap-1 text-xs text-green-500">
+          <CheckCircle2 className="w-3 h-3" />
+          <span>success</span>
+        </div>
+      );
+    case 'failure':
     case 'error':
       return (
         <div className="flex items-center gap-1 text-xs text-red-500">
-          <AlertCircle className="w-3 h-3" />
-          <span>error</span>
+          <XCircle className="w-3 h-3" />
+          <span>{entry.claude === 'failure' ? 'failure' : 'error'}</span>
         </div>
       );
     default:
-      // claude: idle / success
+      // claude: idle
       return (
         <div className="flex items-center gap-1 text-xs text-theme-muted">
           <CirclePause className="w-3 h-3" />
@@ -141,7 +167,9 @@ export function SessionTabs({
         {tabs.map((tab, index) => {
           const isActive = activeTabId === tab.tab_id;
           const entry = tabStatusMap?.get(tab.tab_id);
-          const isRunning = entry?.claude === 'running' && entry?.terminal === 'connected';
+          const isRunning =
+            (entry?.claude === 'running' || entry?.claude === 'waiting') &&
+            entry?.terminal === 'connected';
 
           return (
             <div

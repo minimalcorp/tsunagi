@@ -4,13 +4,32 @@ import * as path from 'path';
 const HOOK_COMMAND =
   "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-";
 
+const hook = [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }];
+
+// 全イベントを個別に列挙（ワイルドカード未対応のため）
 const HOOKS_CONFIG = {
-  SessionStart: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
-  UserPromptSubmit: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
-  PreToolUse: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
-  PostToolUse: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
-  Stop: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
-  StopFailure: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
+  SessionStart: hook,
+  SessionEnd: hook,
+  UserPromptSubmit: hook,
+  PreToolUse: hook,
+  PostToolUse: hook,
+  PostToolUseFailure: hook,
+  PermissionRequest: hook,
+  Notification: hook,
+  Stop: hook,
+  StopFailure: hook,
+  SubagentStart: hook,
+  SubagentStop: hook,
+  TeammateIdle: hook,
+  TaskCompleted: hook,
+  InstructionsLoaded: hook,
+  ConfigChange: hook,
+  WorktreeCreate: hook,
+  WorktreeRemove: hook,
+  PreCompact: hook,
+  PostCompact: hook,
+  Elicitation: hook,
+  ElicitationResult: hook,
 };
 
 /**
