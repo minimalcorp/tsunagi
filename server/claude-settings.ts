@@ -6,9 +6,8 @@ const HOOK_COMMAND =
 
 const HOOKS_CONFIG = {
   SessionStart: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
-  // プロンプト送信タイミング（running状態の開始検知）
   UserPromptSubmit: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
-  // matcher なし = 全ツールを受信して実際の tool_name を確認する
+  PreToolUse: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
   PostToolUse: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
   Stop: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
   StopFailure: [{ hooks: [{ type: 'command', command: HOOK_COMMAND }] }],
