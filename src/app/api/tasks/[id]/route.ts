@@ -28,9 +28,12 @@ export async function GET(request: NextRequest, { params }: Params) {
       })
     );
 
+    const worktreePath = worktreeManager.getWorktreePath(task.owner, task.repo, task.branch);
+
     const taskWithCounts = {
       ...task,
       tabs: tabsWithCounts,
+      worktreePath,
     };
 
     return NextResponse.json({ data: { task: taskWithCounts } });

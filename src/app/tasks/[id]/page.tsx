@@ -3,17 +3,13 @@
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Edit } from 'lucide-react';
-import type { Task, Tab, MergedMessage } from '@/lib/types';
+import type { Task, Tab } from '@/lib/types';
 import { TaskDialog } from '@/components/TaskDialog';
 import { CollapsibleTaskInfo } from '@/components/CollapsibleTaskInfo';
-import { SessionTabs } from '@/components/SessionTabs';
-import { ViewLayoutToggle, type ViewMode } from '@/components/ViewLayoutToggle';
-import { DocumentViewToggle, type DocumentViewMode } from '@/components/DocumentViewToggle';
-import { ClaudePromptEditor, type ClaudePromptEditorHandle } from '@/components/ClaudePromptEditor';
-import { DocumentViewer } from '@/components/DocumentViewer';
 import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
+import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
 
 interface TaskDetailPageProps {
   params: Promise<{
@@ -28,41 +24,11 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [task, setTask] = useState<Task | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
-  const [tabMessages, setTabMessages] = useState<Record<string, MergedMessage[]>>({});
-  const [viewMode, setViewMode] = useState<ViewMode>('split');
-  const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>('logs');
   const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Prompts管理をstateからrefに変更（再レンダリングを防止）
-  const promptsRef = useRef<Record<string, string>>({});
-  const editorRef = useRef<ClaudePromptEditorHandle | null>(null);
-
-  const activeTab = tabs.find((t) => t.tab_id === activeTabId);
-
-  // タブ切り替え時の処理（現在のプロンプトを保存）
-  const handleTabChange = useCallback(
-    (newTabId: string) => {
-      // 現在のタブのプロンプトを保存
-      if (activeTabId && editorRef.current) {
-        const currentPrompt = editorRef.current.getCurrentPrompt();
-        promptsRef.current[activeTabId] = currentPrompt;
-      }
-
-      // タブIDを切り替え
-      setActiveTabId(newTabId);
-    },
-    [activeTabId]
-  );
-
-  // タブ切り替え後にエディタの値を復元
-  useEffect(() => {
-    if (activeTabId && editorRef.current) {
-      const savedPrompt = promptsRef.current[activeTabId] || '';
-      editorRef.current.setPrompt(savedPrompt);
-    }
-  }, [activeTabId]);
+  const terminalPanelRef = useRef<TerminalPanelHandle | null>(null);
 
   // データロード（初回ロード時のみ、またはIDが変わった時）
   const prevIdRef = useRef<string | null>(null);
@@ -103,27 +69,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       setTabs(loadedTabs);
 
-      // 各タブのメッセージを取得
-      const messagesPromises = loadedTabs.map(async (tab: Tab) => {
-        try {
-          const response = await fetch(`/api/tabs/${tab.tab_id}/messages`);
-          if (response.ok) {
-            const data = await response.json();
-            return { tab_id: tab.tab_id, messages: data.data.messages };
-          }
-        } catch (error) {
-          console.error(`Failed to load messages for tab ${tab.tab_id}:`, error);
-        }
-        return { tab_id: tab.tab_id, messages: [] };
-      });
-
-      const messagesResults = await Promise.all(messagesPromises);
-      const messagesMap: Record<string, MergedMessage[]> = {};
-      messagesResults.forEach((result) => {
-        messagesMap[result.tab_id] = result.messages;
-      });
-      setTabMessages(messagesMap);
-
       // アクティブタブ設定
       if (loadedTabs.length > 0) {
         setActiveTabId(loadedTabs[0].tab_id);
@@ -139,49 +84,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   useEffect(() => {
     loadData();
   }, [id, loadData]);
-
-  // タブのポーリング（running状態の場合のみ）
-  useEffect(() => {
-    if (!activeTabId || !task) return;
-
-    const pollTab = async () => {
-      try {
-        // タスクを再取得してタブ情報を更新
-        const taskResponse = await fetch(`/api/tasks/${task.id}`);
-        if (taskResponse.ok) {
-          const taskData = await taskResponse.json();
-          const updatedTask = taskData.data.task;
-          setTask(updatedTask);
-          if (updatedTask.tabs) {
-            setTabs(updatedTask.tabs);
-          }
-        }
-
-        // メッセージも更新
-        const messagesResponse = await fetch(`/api/tabs/${activeTabId}/messages`);
-        if (messagesResponse.ok) {
-          const messagesData = await messagesResponse.json();
-          setTabMessages((prev) => ({
-            ...prev,
-            [activeTabId]: messagesData.data.messages,
-          }));
-        }
-      } catch (error) {
-        console.error('Failed to poll tab:', error);
-      }
-    };
-
-    // タブがrunning状態の場合のみポーリング
-    const isRunning = activeTab?.status === 'running';
-    if (!isRunning) return;
-
-    // 1秒ごとにポーリング
-    const intervalId = setInterval(pollTab, 1000);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [activeTabId, activeTab?.status, task]);
 
   // タスク更新
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
@@ -225,7 +127,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         if (prev.some((t) => t.tab_id === newTab.tab_id)) return prev;
         return [...prev, newTab];
       });
-      setTabMessages((prev) => ({ ...prev, [newTab.tab_id]: [] }));
       setActiveTabId(newTab.tab_id);
     } catch (error) {
       console.error('Failed to create tab:', error);
@@ -241,15 +142,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       if (!response.ok) throw new Error('Failed to delete tab');
 
-      // promptsRefからも削除
-      delete promptsRef.current[tab_id];
-
       setTabs((prev) => prev.filter((t) => t.tab_id !== tab_id));
-      setTabMessages((prev) => {
-        const newMessages = { ...prev };
-        delete newMessages[tab_id];
-        return newMessages;
-      });
 
       // アクティブタブが削除された場合、次のタブを選択
       if (activeTabId === tab_id) {
@@ -261,42 +154,12 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     }
   };
 
-  // Claude実行
-  const handleExecute = useCallback(async (tab_id: string, prompt: string) => {
-    try {
-      const response = await fetch(`/api/tabs/${tab_id}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt }),
-      });
-
-      if (!response.ok) throw new Error('Failed to execute');
-
-      // 実行成功後にエディタとRefの両方をクリア
-      if (editorRef.current) {
-        editorRef.current.clearPrompt();
-      }
-      promptsRef.current[tab_id] = '';
-    } catch (error) {
-      console.error('Failed to execute:', error);
-      throw error;
-    }
-  }, []);
-
-  // Claude中断
-  const handleInterrupt = useCallback(async (tab_id: string) => {
-    try {
-      const response = await fetch(`/api/tabs/${tab_id}/interrupt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-
-      if (!response.ok) throw new Error('Failed to interrupt');
-    } catch (error) {
-      console.error('Failed to interrupt:', error);
-      throw error;
-    }
+  // TerminalPanel経由でPTYにプロンプトを送信（TaskActions用）
+  const handleSendPrompt = useCallback(async (tab_id: string, prompt: string) => {
+    const panel = terminalPanelRef.current;
+    if (!panel) throw new Error('Terminal panel not ready');
+    // プロンプトをPTYに直接書き込む（改行付き）
+    panel.sendInput(tab_id, prompt + '\n');
   }, []);
 
   // タスク削除
@@ -364,71 +227,17 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
           <CollapsibleTaskInfo task={task} defaultExpanded={false} />
         </div>
 
-        {/* Tab Navigation & Content */}
+        {/* TerminalPanel */}
         <div className="bg-theme-card flex flex-col flex-1 min-h-0">
-          <div className="px-4 pt-4">
-            {tabs.length > 0 ? (
-              <SessionTabs
-                tabs={tabs}
-                activeTabId={activeTabId}
-                onTabChange={handleTabChange}
-                onTabCreate={handleTabCreate}
-                onTabDelete={handleTabDelete}
-              />
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-theme-muted mb-4">No tabs yet</p>
-                <button
-                  onClick={handleTabCreate}
-                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 cursor-pointer"
-                >
-                  + Create First Tab
-                </button>
-              </div>
-            )}
-          </div>
-
-          {activeTab && (
-            <>
-              {/* View Toggle */}
-              <div className="px-4 pt-2">
-                <div className="flex items-center gap-2">
-                  <ViewLayoutToggle mode={viewMode} onChange={setViewMode} />
-                  <div className="h-6 w-px bg-theme" />
-                  <DocumentViewToggle mode={documentViewMode} onChange={setDocumentViewMode} />
-                </div>
-              </div>
-
-              {/* Editor + Logs (Split or Single) */}
-              <div className="pt-2 px-4 pb-4 flex-1 min-h-0">
-                <div
-                  className={`
-                  h-full
-                  ${viewMode === 'split' ? 'grid grid-cols-2 gap-4' : ''}
-                `}
-                >
-                  {(viewMode === 'split' || viewMode === 'editor') && (
-                    <ClaudePromptEditor
-                      ref={editorRef}
-                      tab={activeTab}
-                      onExecute={handleExecute}
-                      onInterrupt={handleInterrupt}
-                    />
-                  )}
-
-                  {(viewMode === 'split' || viewMode === 'logs') && (
-                    <DocumentViewer
-                      mode={documentViewMode}
-                      task={task}
-                      rawMessages={tabMessages[activeTab.tab_id] || []}
-                      tabId={activeTab.tab_id}
-                      tab={activeTab}
-                    />
-                  )}
-                </div>
-              </div>
-            </>
-          )}
+          <TerminalPanel
+            ref={terminalPanelRef}
+            task={task}
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onTabChange={setActiveTabId}
+            onTabCreate={handleTabCreate}
+            onTabDelete={handleTabDelete}
+          />
         </div>
 
         {/* Quick Actions */}
@@ -436,7 +245,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
           <TaskActions
             task={task}
             onDelete={handleTaskDelete}
-            onSendPrompt={handleExecute}
+            onSendPrompt={handleSendPrompt}
             activeTabId={activeTabId}
           />
         </div>

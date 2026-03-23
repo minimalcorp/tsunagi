@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -38,15 +38,16 @@ interface TerminalViewProps {
 type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
 type ClaudeStatus = 'idle' | 'running' | 'success' | 'error';
 
-export function TerminalView({
-  tabId,
-  cwd,
-  env,
-  worktreePath,
-  command,
-  className = '',
-  onTodosUpdated,
-}: TerminalViewProps) {
+/** TerminalViewの外部からアクセス可能なハンドル */
+export interface TerminalViewHandle {
+  /** PTYにテキストを書き込む（末尾改行は自動付加しない） */
+  sendInput: (data: string) => void;
+}
+
+export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
+  { tabId, cwd, env, worktreePath, command, className = '', onTodosUpdated },
+  ref
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -146,6 +147,17 @@ export function TerminalView({
     if (!socket || !socket.connected || !term || !sid) return;
     socket.emit('resize', { sessionId: sid, cols: term.cols, rows: term.rows });
   }
+
+  // 外部からPTYに書き込むためのハンドル
+  useImperativeHandle(ref, () => ({
+    sendInput: (data: string) => {
+      const socket = socketRef.current;
+      const sid = sessionIdRef.current;
+      if (socket?.connected && sid) {
+        socket.emit('input', { sessionId: sid, data });
+      }
+    },
+  }));
 
   /**
    * xterm.js の表示バッファをクリアする。
@@ -441,7 +453,7 @@ export function TerminalView({
       </div>
     </div>
   );
-}
+});
 
 function StatusBadge({ status }: { status: TerminalStatus }) {
   const config: Record<TerminalStatus, { label: string; color: string }> = {

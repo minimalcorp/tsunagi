@@ -43,7 +43,7 @@ export async function authenticateGhCli(githubPat: string): Promise<void> {
 }
 
 // worktreeのパスを取得
-function getWorktreePath(owner: string, repo: string, branch: string): string {
+export function getWorktreePath(owner: string, repo: string, branch: string): string {
   const normalizedBranch = normalizeBranchName(branch);
   return path.join(WORKSPACES_ROOT, owner, repo, normalizedBranch);
 }
