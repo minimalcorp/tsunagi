@@ -56,6 +56,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const unmountedRef = useRef(false);
   // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
   const suppressResizeRef = useRef(false);
+  // IME composition中（日本語変換中）はPTYへの入力を抑制する
+  const isComposingRef = useRef(false);
   const [status, setStatus] = useState<TerminalStatus>('idle');
   const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>('idle');
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -109,6 +111,20 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
+    // IME composition中はPTYへの入力を抑制する
+    // xterm.js の内部 textarea に compositionstart/end を登録する
+    const textarea = containerRef.current.querySelector('textarea');
+    const onCompositionStart = () => {
+      isComposingRef.current = true;
+    };
+    const onCompositionEnd = () => {
+      isComposingRef.current = false;
+    };
+    if (textarea) {
+      textarea.addEventListener('compositionstart', onCompositionStart);
+      textarea.addEventListener('compositionend', onCompositionEnd);
+    }
+
     const observer = new ResizeObserver(() => {
       fitAddon.fit();
       // reused接続中はリングバッファ受信前にsendResizeしない（suppressResizeRefで制御）
@@ -124,6 +140,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     return () => {
       unmountedRef.current = true;
       observer.disconnect();
+      if (textarea) {
+        textarea.removeEventListener('compositionstart', onCompositionStart);
+        textarea.removeEventListener('compositionend', onCompositionEnd);
+      }
       term.dispose();
       termRef.current = null;
       fitAddonRef.current = null;
@@ -275,6 +295,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     });
 
     term.onData((data) => {
+      // IME composition中（日本語変換中）はPTYに送信しない
+      if (isComposingRef.current) return;
       if (socket.connected && sessionIdRef.current) {
         socket.emit('input', { sessionId: sessionIdRef.current, data });
       }
