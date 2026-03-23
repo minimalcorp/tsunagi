@@ -39,6 +39,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Update tab status to idle after interrupt
     await taskRepo.updateTab(task.id, tab_id, { status: 'idle' });
 
+    // Socket.IO経由でclaudeStatusをidleに通知（Fastify側でemit）
+    try {
+      await fetch('http://localhost:2792/internal/emit-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: tab_id, status: 'idle' }),
+      });
+    } catch {
+      /* Socket.IO通知失敗は無視 */
+    }
+
     return NextResponse.json({ data: { success: true } });
   } catch (error) {
     console.error('POST /api/tabs/[tab_id]/interrupt error:', error);

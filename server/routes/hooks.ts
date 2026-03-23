@@ -23,6 +23,8 @@ interface ClaudeHookBody {
   // StopFailure
   error?: string;
   error_details?: string;
+  // SessionEnd
+  reason?: string;
 }
 
 // 受信したhookイベントをメモリに保持（確認用）
@@ -123,6 +125,14 @@ export async function hooksRoutes(fastify: FastifyInstance) {
           io.to(room).emit('status-changed', { sessionId, status: 'failure' });
           break;
 
+        case 'SessionEnd':
+          // セッション終了（Escキー中断・Ctrl+C・/exit等）→ idle状態に更新
+          // reason: "prompt_input_exit" = ユーザー中断、"other" = プロセスkill等
+          fastify.log.info({ sessionId, reason: body.reason }, 'SessionEnd received');
+          await updateTabStatus(sessionId, 'idle');
+          io.to(room).emit('status-changed', { sessionId, status: 'idle' });
+          break;
+
         default:
           fastify.log.debug({ eventName }, 'Unhandled hook event');
       }
@@ -135,4 +145,18 @@ export async function hooksRoutes(fastify: FastifyInstance) {
   fastify.get('/hooks/events', async () => {
     return { events: hookEvents };
   });
+
+  // POST /internal/emit-status - Socket.IO status-changed を発火（Next.jsから呼び出し用）
+  fastify.post<{ Body: { sessionId: string; status: string } }>(
+    '/internal/emit-status',
+    async (request, reply) => {
+      const { sessionId, status } = request.body;
+      if (!sessionId || !status) {
+        return reply.status(400).send({ error: 'sessionId and status are required' });
+      }
+      const room = `tab:${sessionId}`;
+      io.to(room).emit('status-changed', { sessionId, status });
+      return reply.status(200).send({ ok: true });
+    }
+  );
 }
