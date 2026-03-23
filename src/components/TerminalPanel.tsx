@@ -195,7 +195,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   worktreePath={task.worktreePath}
                   command={
                     tabModeMap.get(tab.tab_id) !== 'terminal'
-                      ? `claude --resume ${tab.tab_id} 2>/dev/null || claude --session-id ${tab.tab_id}`
+                      ? `claude --dangerously-skip-permissions --resume ${tab.tab_id} 2>/dev/null || claude --dangerously-skip-permissions --session-id ${tab.tab_id}`
                       : undefined
                   }
                   className="h-full"

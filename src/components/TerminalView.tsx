@@ -334,7 +334,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     const socket = socketRef.current;
     const sid = sessionIdRef.current;
     if (!socket || !socket.connected || !sid) return;
-    const claudeCmd = `claude --resume ${sid} 2>/dev/null || claude --session-id ${sid}\n`;
+    const claudeCmd = `claude --dangerously-skip-permissions --resume ${sid} 2>/dev/null || claude --dangerously-skip-permissions --session-id ${sid}\n`;
     socket.emit('input', { sessionId: sid, data: claudeCmd });
   }
 
