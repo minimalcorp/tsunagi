@@ -1,44 +1,189 @@
 import type { FastifyInstance } from 'fastify';
-import type { WebSocket } from '@fastify/websocket';
+import type { Server as SocketIOServer } from 'socket.io';
 import * as os from 'os';
 import * as path from 'path';
-import { ptyManager } from '../pty-manager';
+import { ptyManager } from '../pty-manager.js';
+import { generateSettingsLocalJson } from '../claude-settings.js';
+import { prisma } from '../../src/lib/db.js';
+
+interface FastifyWithIO extends FastifyInstance {
+  io: SocketIOServer;
+}
 
 interface CreateSessionBody {
   cwd?: string;
   env?: Record<string, string>;
-}
-
-interface WsMessage {
-  type: 'input' | 'resize';
-  data?: string;
-  cols?: number;
-  rows?: number;
+  /** 指定した場合そのIDをセッションIDとして使用する（tab_idと一致させる） */
+  sessionId?: string;
+  /** settings.local.json を生成するworktreeパス */
+  worktreePath?: string;
+  /**
+   * PTY起動後にシェルへ書き込むコマンド文字列。
+   * 例: "claude --session-id <uuid>\n"
+   * 末尾に \n がない場合は自動付加する。
+   */
+  command?: string;
 }
 
 export async function terminalRoutes(fastify: FastifyInstance) {
+  const io = (fastify as FastifyWithIO).io;
+
+  // socket.io イベントハンドラ
+  io.on('connection', (socket) => {
+    let boundSessionId: string | null = null;
+    let dataHandlerDispose: (() => void) | null = null;
+    let exitHandlerDispose: (() => void) | null = null;
+
+    // join: roomに参加してPTYセッションと接続
+    socket.on('join', ({ room }: { room: string }) => {
+      const sessionId = room.startsWith('tab:') ? room.slice(4) : room;
+      boundSessionId = sessionId;
+
+      const session = ptyManager.getSession(sessionId);
+      if (!session) {
+        socket.emit('error', { message: `Session not found: ${sessionId}` });
+        return;
+      }
+
+      socket.join(room);
+
+      // 接続確立 → GCタイマーをキャンセル
+      ptyManager.cancelGc(sessionId);
+
+      const { pty: ptyProcess } = session;
+      const isReused = session.scrollback.length > 0;
+
+      // リングバッファの内容を一括送信（再接続時の画面復元）
+      if (isReused) {
+        const buffered = session.scrollback.join('');
+        // 末尾の \r\n / \n / \r をトリムする。
+        const trimmed = buffered.replace(/[\r\n]+$/, '');
+        socket.emit('output', { data: trimmed });
+      }
+
+      // reused の場合、最初の resize まで onData 出力をバッファリング
+      let initialResizeHandled = !isReused;
+      const pendingOutput: string[] = [];
+
+      // PTY出力 → クライアントへ送信
+      const dataHandler = ptyProcess.onData((data: string) => {
+        if (!initialResizeHandled) {
+          pendingOutput.push(data);
+          return;
+        }
+        io.to(room).emit('output', { data });
+      });
+      dataHandlerDispose = () => dataHandler.dispose();
+
+      // PTYプロセス終了 → クライアントへ通知 + セッション削除
+      const exitHandler = ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
+        io.to(room).emit('exit', { exitCode });
+        ptyManager.deleteSession(sessionId);
+      });
+      exitHandlerDispose = () => exitHandler.dispose();
+
+      // resize イベント: PTYリサイズ
+      socket.on(
+        'resize',
+        ({ sessionId: sid, cols, rows }: { sessionId: string; cols: number; rows: number }) => {
+          if (sid !== sessionId) return;
+          ptyProcess.resize(cols, rows);
+
+          // reused時: 初回 resize 後にバッファリングしていた出力をフラッシュ
+          if (!initialResizeHandled) {
+            initialResizeHandled = true;
+            if (pendingOutput.length > 0) {
+              const flushed = pendingOutput.join('');
+              pendingOutput.length = 0;
+              io.to(room).emit('output', { data: flushed });
+            }
+          }
+        }
+      );
+
+      // input イベント: PTYへ書き込み
+      socket.on('input', ({ sessionId: sid, data }: { sessionId: string; data: string }) => {
+        if (sid !== sessionId) return;
+        ptyProcess.write(data);
+      });
+    });
+
+    // disconnect → ハンドラ解除・GCタイマーセット
+    socket.on('disconnect', () => {
+      dataHandlerDispose?.();
+      exitHandlerDispose?.();
+      if (boundSessionId) {
+        ptyManager.scheduleGc(boundSessionId);
+      }
+    });
+  });
+
   // GET /api/terminal/sessions - セッション一覧（デバッグ用）
   fastify.get('/api/terminal/sessions', async () => {
     return { sessions: ptyManager.listSessions() };
   });
 
-  // POST /api/terminal/sessions - セッション作成
+  // POST /api/terminal/sessions - セッション作成（または既存セッション再利用）
   fastify.post<{ Body: CreateSessionBody }>('/api/terminal/sessions', async (request, reply) => {
-    const { cwd, env } = request.body ?? {};
+    const { cwd, env, sessionId: requestedSessionId, worktreePath, command } = request.body ?? {};
 
-    const sessionId = crypto.randomUUID();
+    const sessionId = requestedSessionId ?? crypto.randomUUID();
     const workingDir = cwd ?? path.join(os.homedir(), '.tsunagi', 'workspaces');
 
+    // 既存セッションが生きていれば再利用
+    const existing = ptyManager.getSession(sessionId);
+    if (existing) {
+      fastify.log.info({ sessionId }, 'Reusing existing PTY session');
+      return reply.status(200).send({ sessionId, reused: true });
+    }
+
     try {
-      ptyManager.createSession(sessionId, workingDir, env);
-      return reply.status(201).send({ sessionId });
+      // worktreePathが指定されていればsettings.local.jsonを生成
+      if (worktreePath) {
+        try {
+          generateSettingsLocalJson(worktreePath);
+          fastify.log.info({ worktreePath }, 'Generated .claude/settings.local.json');
+        } catch (err) {
+          fastify.log.warn({ err, worktreePath }, 'Failed to generate settings.local.json');
+        }
+      }
+
+      // DBからglobal環境変数を取得（有効なもののみ）
+      const globalEnv: Record<string, string> = {};
+      try {
+        const globalEnvVars = await prisma.environmentVariable.findMany({
+          where: { scope: 'global', enabled: true },
+        });
+        globalEnvVars.forEach((e: { key: string; value: string }) => {
+          globalEnv[e.key] = e.value;
+        });
+        fastify.log.info({ count: globalEnvVars.length }, 'Loaded global env vars');
+      } catch (err) {
+        fastify.log.warn({ err }, 'Failed to load global env vars');
+      }
+
+      // 優先順位: リクエストで渡されたenv > DBのglobal env
+      const mergedEnv = { ...globalEnv, ...env };
+
+      const session = ptyManager.createSession(sessionId, workingDir, mergedEnv);
+
+      // コマンドが指定されていればPTY起動後にシェルへ書き込む
+      if (command) {
+        const cmd = command.endsWith('\n') ? command : command + '\n';
+        // シェルの初期化（プロンプト表示）を待つため少し遅延させて書き込む
+        setTimeout(() => {
+          session.pty.write(cmd);
+        }, 300);
+      }
+
+      return reply.status(201).send({ sessionId, reused: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: message });
     }
   });
 
-  // DELETE /api/terminal/sessions/:sessionId - セッション削除
+  // DELETE /api/terminal/sessions/:sessionId - セッション明示削除（PTY kill）
   fastify.delete<{ Params: { sessionId: string } }>(
     '/api/terminal/sessions/:sessionId',
     async (request, reply) => {
@@ -48,58 +193,24 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // WebSocket /api/terminal/sessions/:sessionId/ws - PTY入出力
+  // GET /api/terminal/sessions/:sessionId/scrollback - リングバッファ内容をdump（デバッグ用）
   fastify.get<{ Params: { sessionId: string } }>(
-    '/api/terminal/sessions/:sessionId/ws',
-    { websocket: true },
-    (socket: WebSocket, request) => {
-      const { sessionId } = request.params as { sessionId: string };
+    '/api/terminal/sessions/:sessionId/scrollback',
+    async (request, reply) => {
+      const { sessionId } = request.params;
       const session = ptyManager.getSession(sessionId);
-
       if (!session) {
-        socket.send(JSON.stringify({ type: 'error', message: `Session not found: ${sessionId}` }));
-        socket.close();
-        return;
+        return reply.status(404).send({ error: 'Session not found' });
       }
-
-      const { pty: ptyProcess } = session;
-
-      // PTY出力 → クライアントへ送信
-      const dataHandler = ptyProcess.onData((data: string) => {
-        if (socket.readyState === socket.OPEN) {
-          socket.send(JSON.stringify({ type: 'output', data }));
-        }
-      });
-
-      // PTYプロセス終了 → クライアントへ通知 + セッション削除
-      const exitHandler = ptyProcess.onExit(({ exitCode }) => {
-        if (socket.readyState === socket.OPEN) {
-          socket.send(JSON.stringify({ type: 'exit', exitCode }));
-          socket.close();
-        }
-        ptyManager.deleteSession(sessionId);
-      });
-
-      // クライアントからのメッセージ処理
-      socket.on('message', (raw: Buffer | string) => {
-        let msg: WsMessage;
-        try {
-          msg = JSON.parse(raw.toString()) as WsMessage;
-        } catch {
-          return;
-        }
-
-        if (msg.type === 'input' && msg.data !== undefined) {
-          ptyProcess.write(msg.data);
-        } else if (msg.type === 'resize' && msg.cols && msg.rows) {
-          ptyProcess.resize(msg.cols, msg.rows);
-        }
-      });
-
-      // WebSocket切断 → ハンドラ解除（PTYは生かしておく）
-      socket.on('close', () => {
-        dataHandler.dispose();
-        exitHandler.dispose();
+      const raw = session.scrollback.join('');
+      // 制御文字を可視化して返す
+      const visible = raw.replace(/\x1b/g, '<ESC>').replace(/\r/g, '<CR>').replace(/\n/g, '<LF>\n');
+      return reply.send({
+        sessionId,
+        chunks: session.scrollback.length,
+        sizeBytes: session.scrollbackSize,
+        raw: Buffer.from(raw).toString('base64'),
+        visible,
       });
     }
   );

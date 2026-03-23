@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
 import * as worktreeManager from '@/lib/worktree-manager';
-import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -45,12 +44,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         await taskRepo.updateTask(id, { baseBranchCommit: result.baseBranchCommit });
       }
 
-      // SSE broadcast
-      sseManager.broadcast('task:rebase:completed', {
-        id,
-        message: result.message,
-      });
-
       return NextResponse.json({
         data: {
           success: true,
@@ -58,13 +51,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         },
       });
     } else {
-      // conflict発生
-      sseManager.broadcast('task:rebase:failed', {
-        id,
-        message: result.message,
-        conflicts: result.conflicts,
-      });
-
       return NextResponse.json(
         {
           error: result.message,

@@ -7,7 +7,6 @@ import { normalizeBranchName } from '@/lib/branch-utils';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { sseManager } from '@/lib/sse-manager';
 import { getTaskWorkflowPrompt } from '@/lib/system-prompts';
 
 type Params = {
@@ -79,17 +78,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Failed to save user prompt' }, { status: 500 });
     }
 
-    // SSE経由で差分ブロードキャスト
-    const messages = await tabRepo.getMergedMessages(tab_id);
-    const newMessage = messages.find((m) => m._sequence === result.sequence);
-
-    if (newMessage) {
-      sseManager.broadcast('tab:message:added', {
-        tab_id,
-        message: newMessage,
-      });
-    }
-
     // Prepare system prompt for new sessions
     // Get base URL from request headers
     const host = request.headers.get('host') || 'localhost:3000';
@@ -114,17 +102,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         // Raw messageをsessions.jsonに追加
         const result = await tabRepo.appendMessage(tab_id, rawMessage);
         if (!result.sessionData) return;
-
-        // SSE broadcast (差分更新)
-        const messages = await tabRepo.getMergedMessages(tab_id);
-        const newMessage = messages.find((m) => m._sequence === result.sequence);
-
-        if (newMessage) {
-          sseManager.broadcast('tab:message:added', {
-            tab_id,
-            message: newMessage,
-          });
-        }
       },
       onStatusChange: async (status) => {
         console.log('[onStatusChange] START:', { tab_id, status, taskId: task.id });
@@ -139,24 +116,6 @@ export async function POST(request: NextRequest, { params }: Params) {
           });
 
           await taskRepo.updateTask(task.id, {});
-
-          // SSE broadcast (tab status changed)
-          const updatedTab = await taskRepo.getTab(task.id, tab_id);
-          if (updatedTab) {
-            sseManager.broadcast('tab:updated', { taskId: task.id, tab: updatedTab });
-          } else {
-            console.error('[onStatusChange] ERROR: updatedTab is null!', {
-              tab_id,
-              taskId: task.id,
-            });
-          }
-
-          const updatedTask = await taskRepo.getTask(task.id);
-          if (updatedTask) {
-            sseManager.broadcast('task:updated', updatedTask);
-          } else {
-            console.error('[onStatusChange] ERROR: updatedTask is null!', { taskId: task.id });
-          }
 
           console.log('[onStatusChange] SUCCESS:', { tab_id, status });
         } catch (error) {
@@ -179,16 +138,6 @@ export async function POST(request: NextRequest, { params }: Params) {
           agentSessionId,
         });
         await taskRepo.updateTab(task.id, tab_id, { session_id: agentSessionId });
-
-        // SSE broadcast
-        const updatedTab = await taskRepo.getTab(task.id, tab_id);
-        if (updatedTab) {
-          console.log('[Tab Message] Tab updated with session_id:', {
-            tab_id,
-            session_id: updatedTab.session_id,
-          });
-          sseManager.broadcast('tab:updated', { taskId: task.id, tab: updatedTab });
-        }
       },
     }).catch(async (error) => {
       console.error('Claude execution error:', error);

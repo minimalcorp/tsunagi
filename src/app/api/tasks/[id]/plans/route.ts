@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
-import { sseManager } from '@/lib/sse-manager';
 
 // PUT /api/tasks/:id/plans - Update task planning documents
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -29,9 +28,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       design: design !== undefined ? design : currentTask.design,
       procedure: procedure !== undefined ? procedure : currentTask.procedure,
     });
-
-    // SSE broadcast to update UI immediately
-    sseManager.broadcast('task:updated', updatedTask);
 
     return NextResponse.json({ data: { task: updatedTask } });
   } catch (error) {

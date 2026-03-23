@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
-import { sseManager } from '@/lib/sse-manager';
 
 // POST /api/tasks/:id/complete - Complete task and merge PR
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -12,9 +11,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     if (!completedTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
-
-    // SSE broadcast
-    sseManager.broadcast('task:updated', completedTask);
 
     return NextResponse.json({
       data: { task: completedTask },

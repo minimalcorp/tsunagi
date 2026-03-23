@@ -4,7 +4,6 @@ import * as tabRepo from '@/lib/repositories/tab';
 import * as repoRepo from '@/lib/repositories/repository';
 import * as worktreeManager from '@/lib/worktree-manager';
 import type { Task } from '@/lib/types';
-import { sseManager } from '@/lib/sse-manager';
 
 // GET /api/tasks?status=...&owner=...&repo=...&includeDeleted=false
 export async function GET(request: NextRequest) {
@@ -150,9 +149,6 @@ export async function POST(request: NextRequest) {
 
     // 更新後のタスクを取得
     const updatedTask = await taskRepo.getTask(newTask.id);
-
-    // SSE broadcast
-    sseManager.broadcast('task:created', updatedTask);
 
     return NextResponse.json({ data: { task: updatedTask } }, { status: 201 });
   } catch (error) {

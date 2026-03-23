@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
 import type { Task } from '@/lib/types';
-import { sseManager } from '@/lib/sse-manager';
 
 // PUT /api/tasks/:id/status - Transition task status
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -23,9 +22,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!updatedTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
-
-    // SSE broadcast
-    sseManager.broadcast('task:updated', updatedTask);
 
     return NextResponse.json({ data: { task: updatedTask } });
   } catch (error) {

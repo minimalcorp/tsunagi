@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
-import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ id: string; tab_id: string }>;
@@ -16,9 +15,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (!updatedTab) {
       return NextResponse.json({ error: 'Tab not found' }, { status: 404 });
     }
-
-    // SSE broadcast
-    sseManager.broadcast('tab:updated', { taskId, tab: updatedTab });
 
     return NextResponse.json({ data: { tab: updatedTab } });
   } catch (error) {
@@ -36,9 +32,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     if (!success) {
       return NextResponse.json({ error: 'Tab not found' }, { status: 404 });
     }
-
-    // SSE broadcast
-    sseManager.broadcast('tab:deleted', { taskId, tab_id });
 
     return NextResponse.json({ data: { success: true } });
   } catch (error) {

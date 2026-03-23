@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
 import { interruptSession } from '@/lib/claude-client';
-import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ tab_id: string }>;
@@ -39,17 +38,6 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // Update tab status to idle after interrupt
     await taskRepo.updateTab(task.id, tab_id, { status: 'idle' });
-
-    // SSE broadcast (tab status changed)
-    const updatedTab = await taskRepo.getTab(task.id, tab_id);
-    if (updatedTab) {
-      sseManager.broadcast('tab:updated', { taskId: task.id, tab: updatedTab });
-    }
-
-    const updatedTask = await taskRepo.getTask(task.id);
-    if (updatedTask) {
-      sseManager.broadcast('task:updated', updatedTask);
-    }
 
     return NextResponse.json({ data: { success: true } });
   } catch (error) {
