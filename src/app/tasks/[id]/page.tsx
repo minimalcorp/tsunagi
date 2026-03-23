@@ -156,14 +156,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     }
   };
 
-  // TerminalPanel経由でPTYにプロンプトを送信（TaskActions用）
-  const handleSendPrompt = useCallback(async (tab_id: string, prompt: string) => {
-    const panel = terminalPanelRef.current;
-    if (!panel) throw new Error('Terminal panel not ready');
-    // プロンプトをPTYに直接書き込む（改行付き）
-    panel.sendInput(tab_id, prompt + '\n');
-  }, []);
-
   // タスク削除
   const handleTaskDelete = async (taskId: string) => {
     // 削除API呼び出し（非同期）
@@ -225,7 +217,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       {/* Scrollable content */}
       <div className="flex-1 flex flex-col min-h-0">
         {/* Task Info Detail Section */}
-        <div className="p-4 bg-theme-card flex-shrink-0">
+        <div className="px-4 bg-theme-card flex-shrink-0">
           <CollapsibleTaskInfo task={task} defaultExpanded={false} />
         </div>
 
@@ -244,12 +236,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
         {/* Quick Actions */}
         <div className="px-4 py-4 pr-[72px] border-t border-theme bg-theme-card flex-shrink-0">
-          <TaskActions
-            task={task}
-            onDelete={handleTaskDelete}
-            onSendPrompt={handleSendPrompt}
-            activeTabId={activeTabId}
-          />
+          <TaskActions task={task} onDelete={handleTaskDelete} />
         </div>
       </div>
 

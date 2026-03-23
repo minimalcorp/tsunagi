@@ -20,8 +20,8 @@ services:
       # GitHub MCP用環境変数（ホストから引き継ぎ）
       - GITHUB_PAT=${GITHUB_PAT}
     ports:
-      - "2791:2791"
-      - "2792:2792"
+      - '2791:2791'
+      - '2792:2792'
     command: sh -c "npm run dev"
     profiles:
       - dev-container

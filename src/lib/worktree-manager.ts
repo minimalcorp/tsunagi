@@ -179,6 +179,16 @@ export async function createWorktree(
     await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${effectiveBaseBranch}`]);
   }
 
+  // worktreeにローカルスコープでMCPサーバーを登録
+  // claude CLIが存在しない環境でもエラーにしない
+  try {
+    await execAsync('claude mcp add --transport sse --scope local tsunagi http://localhost:2792/mcp', {
+      cwd: worktreePath,
+    });
+  } catch {
+    // claude CLI未インストール時は無視
+  }
+
   return { worktreePath, baseBranchCommit };
 }
 

@@ -10,6 +10,9 @@ import { Loader2, Copy, Play, Check } from 'lucide-react';
 
 const FASTIFY_API_BASE = 'http://localhost:2792';
 
+export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
+export type ClaudeStatus = 'idle' | 'running' | 'success' | 'error';
+
 export interface Todo {
   content: string;
   status: 'pending' | 'in_progress' | 'completed';
@@ -33,10 +36,13 @@ interface TerminalViewProps {
   className?: string;
   /** Todoリスト更新時のコールバック（KanbanカードのProgress Bar用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
+  /** terminal/claudeステータス変化時のコールバック（タブ表示用） */
+  onStatusChange?: (
+    tabId: string,
+    terminalStatus: TerminalStatus,
+    claudeStatus: ClaudeStatus
+  ) => void;
 }
-
-type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
-type ClaudeStatus = 'idle' | 'running' | 'success' | 'error';
 
 /** TerminalViewの外部からアクセス可能なハンドル */
 export interface TerminalViewHandle {
@@ -45,7 +51,7 @@ export interface TerminalViewHandle {
 }
 
 export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
-  { tabId, cwd, env, worktreePath, command, className = '', onTodosUpdated },
+  { tabId, cwd, env, worktreePath, command, className = '', onTodosUpdated, onStatusChange },
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,6 +69,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const [todos, setTodos] = useState<Todo[]>([]);
   const [copied, setCopied] = useState(false);
   const { effectiveTheme } = useTheme();
+  // onStatusChange をrefで保持（useEffectの依存配列に入れず常に最新を参照）
+  const onStatusChangeRef = useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
 
   const isDark = effectiveTheme === 'dark';
 
@@ -79,6 +88,11 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         cursor: '#1e1e1e',
         selectionBackground: '#add6ff',
       };
+
+  // status/claudeStatus 変化時に親へ通知
+  useEffect(() => {
+    onStatusChangeRef.current?.(tabId, status, claudeStatus);
+  }, [tabId, status, claudeStatus]);
 
   // connected になったタイミングで fit() を再呼び出し（オーバーレイ消滅後のサイズ確定）
   useEffect(() => {
@@ -309,28 +323,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     await connectSession(tabId, term);
   }
 
-  function pauseSession() {
-    // socketのみ切断。PTY はサーバー側で GC タイマーが管理（30分後に自動 kill）
-    socketRef.current?.disconnect();
-    socketRef.current = null;
-    setStatus('paused');
-  }
-
-  async function stopSession() {
-    // socket 切断 + PTY を明示的に終了（タブ削除相当）
-    socketRef.current?.disconnect();
-    socketRef.current = null;
-
-    if (sessionIdRef.current) {
-      await fetch(`${FASTIFY_API_BASE}/api/terminal/sessions/${sessionIdRef.current}`, {
-        method: 'DELETE',
-      }).catch(() => {});
-      sessionIdRef.current = null;
-    }
-    setStatus('idle');
-    if (termRef.current) clearTerminalDisplay(termRef.current);
-  }
-
   const handleCopyTabId = useCallback(() => {
     navigator.clipboard.writeText(tabId).then(() => {
       setCopied(true);
@@ -347,9 +339,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   }
 
   const isConnecting = status === 'connecting';
-  const isActive = status === 'connecting' || status === 'connected';
   const isPausedOrExited = status === 'paused' || status === 'exited' || status === 'error';
-  const isIdle = status === 'idle';
   const isConnected = status === 'connected';
 
   const completedTodos = todos.filter((t) => t.status === 'completed').length;
@@ -388,40 +378,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         </button>
       </div>
 
-      {/* ツールバー */}
-      <div className="flex items-center justify-between px-2 py-1 border-b border-theme flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <StatusBadge status={status} />
-          {claudeStatus !== 'idle' && <ClaudeStatusBadge status={claudeStatus} />}
-        </div>
-        <div className="flex gap-2">
-          {(isIdle || isPausedOrExited) && (
-            <button
-              onClick={reconnectSession}
-              className="text-xs px-2 py-1 rounded bg-primary text-white hover:opacity-80 cursor-pointer"
-            >
-              {isIdle ? 'Start' : 'Reconnect'}
-            </button>
-          )}
-          {isActive && (
-            <>
-              <button
-                onClick={pauseSession}
-                className="text-xs px-2 py-1 rounded border border-theme text-theme-fg hover:bg-theme-hover cursor-pointer"
-              >
-                Pause
-              </button>
-              <button
-                onClick={stopSession}
-                className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:opacity-80 cursor-pointer"
-              >
-                Stop
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
       {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
       <div className="relative flex-1 min-h-0 overflow-hidden">
         <div ref={containerRef} className="w-full h-full" style={{ padding: '4px' }} />
@@ -436,9 +392,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
           </div>
         )}
 
-        {/* idle / paused / exited / error: 操作案内を表示 */}
-        {(isIdle || isPausedOrExited) && (
-          <div className="absolute inset-0 flex items-center justify-center bg-theme-bg">
+        {/* exited / error: overlayで再接続を促す */}
+        {isPausedOrExited && (
+          <div className="absolute inset-0 flex items-center justify-center bg-theme-bg/90">
             <div className="text-center space-y-2">
               {status === 'error' && <p className="text-xs text-red-500">Connection failed</p>}
               {status === 'exited' && <p className="text-xs text-theme-muted">Session ended</p>}
@@ -447,7 +403,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
                 onClick={reconnectSession}
                 className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-80 cursor-pointer"
               >
-                {isIdle ? 'Start' : 'Reconnect'}
+                Reconnect
               </button>
             </div>
           </div>
@@ -479,27 +435,3 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     </div>
   );
 });
-
-function StatusBadge({ status }: { status: TerminalStatus }) {
-  const config: Record<TerminalStatus, { label: string; color: string }> = {
-    idle: { label: 'Idle', color: 'text-theme-muted' },
-    connecting: { label: 'Connecting...', color: 'text-yellow-500' },
-    connected: { label: 'Connected', color: 'text-green-500' },
-    paused: { label: 'Paused', color: 'text-theme-muted' },
-    exited: { label: 'Exited', color: 'text-theme-muted' },
-    error: { label: 'Error', color: 'text-red-500' },
-  };
-  const { label, color } = config[status];
-  return <span className={`text-xs font-medium ${color}`}>{label}</span>;
-}
-
-function ClaudeStatusBadge({ status }: { status: 'idle' | 'running' | 'success' | 'error' }) {
-  const config = {
-    idle: { label: 'Claude: Idle', color: 'text-theme-muted' },
-    running: { label: 'Claude: Running', color: 'text-yellow-500' },
-    success: { label: 'Claude: Done', color: 'text-green-500' },
-    error: { label: 'Claude: Error', color: 'text-red-500' },
-  };
-  const { label, color } = config[status];
-  return <span className={`text-xs ${color}`}>{label}</span>;
-}

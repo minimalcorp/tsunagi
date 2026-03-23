@@ -3,7 +3,18 @@
 import { useState, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
 import type { Tab, Task } from '@/lib/types';
 import { SessionTabs } from '@/components/SessionTabs';
-import { TerminalView, type Todo, type TerminalViewHandle } from '@/components/TerminalView';
+import {
+  TerminalView,
+  type Todo,
+  type TerminalViewHandle,
+  type TerminalStatus,
+  type ClaudeStatus,
+} from '@/components/TerminalView';
+
+export interface TabStatusEntry {
+  terminal: TerminalStatus;
+  claude: ClaudeStatus;
+}
 
 interface TerminalPanelProps {
   task: Task;
@@ -15,6 +26,9 @@ interface TerminalPanelProps {
   /** Todoリスト更新時のコールバック（KanbanカードのProgress Bar用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
 }
+
+/** タブ追加モード */
+type TabCreateMode = 'terminal' | 'claude';
 
 /** TerminalPanelの外部からアクセス可能なハンドル */
 export interface TerminalPanelHandle {
@@ -37,8 +51,25 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       () => new Set(activeTabId ? [activeTabId] : [])
     );
 
+    // タブごとのリアルタイムステータス（TerminalViewからの通知）
+    const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(new Map());
+
+    // タブごとの起動モード（terminal: claudeなし / claude: claude自動起動）
+    const [tabModeMap, setTabModeMap] = useState<Map<string, TabCreateMode>>(new Map());
+
     // 各TerminalViewへのrefマップ
     const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
+
+    const handleStatusChange = useCallback(
+      (tabId: string, terminal: TerminalStatus, claude: ClaudeStatus) => {
+        setTabStatusMap((prev) => {
+          const next = new Map(prev);
+          next.set(tabId, { terminal, claude });
+          return next;
+        });
+      },
+      []
+    );
 
     useImperativeHandle(ref, () => ({
       sendInput: (tabId: string, data: string) => {
@@ -61,22 +92,46 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       [onTabChange]
     );
 
-    const handleTabCreate = useCallback(async () => {
-      const newTabId = await onTabCreate();
-      // 新規タブを即座にマウント済みとしてマーク（onTabChangeを経由しないため手動追加）
-      if (newTabId) {
-        setMountedTabIds((prev) => {
-          const next = new Set(prev);
-          next.add(newTabId);
-          return next;
-        });
-      }
-    }, [onTabCreate]);
+    const handleTabCreate = useCallback(
+      async (mode: TabCreateMode) => {
+        const newTabId = await onTabCreate();
+        if (newTabId) {
+          setMountedTabIds((prev) => {
+            const next = new Set(prev);
+            next.add(newTabId);
+            return next;
+          });
+          setTabModeMap((prev) => {
+            const next = new Map(prev);
+            next.set(newTabId, mode);
+            return next;
+          });
+        }
+      },
+      [onTabCreate]
+    );
+
+    const handleTabCreateTerminal = useCallback(
+      () => handleTabCreate('terminal'),
+      [handleTabCreate]
+    );
+
+    const handleTabCreateClaude = useCallback(() => handleTabCreate('claude'), [handleTabCreate]);
 
     const handleTabDelete = useCallback(
       (tabId: string) => {
         setMountedTabIds((prev) => {
           const next = new Set(prev);
+          next.delete(tabId);
+          return next;
+        });
+        setTabStatusMap((prev) => {
+          const next = new Map(prev);
+          next.delete(tabId);
+          return next;
+        });
+        setTabModeMap((prev) => {
+          const next = new Map(prev);
           next.delete(tabId);
           return next;
         });
@@ -95,14 +150,16 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               tabs={tabs}
               activeTabId={activeTabId}
               onTabChange={handleTabChange}
-              onTabCreate={handleTabCreate}
+              onTabCreateTerminal={handleTabCreateTerminal}
+              onTabCreateClaude={handleTabCreateClaude}
               onTabDelete={handleTabDelete}
+              tabStatusMap={tabStatusMap}
             />
           ) : (
             <div className="text-center py-8">
               <p className="text-theme-muted mb-4">No tabs yet</p>
               <button
-                onClick={handleTabCreate}
+                onClick={handleTabCreateClaude}
                 className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 cursor-pointer"
               >
                 + Create First Tab
@@ -136,9 +193,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   tabId={tab.tab_id}
                   cwd={task.worktreePath}
                   worktreePath={task.worktreePath}
-                  command={`claude --resume ${tab.tab_id} 2>/dev/null || claude --session-id ${tab.tab_id}`}
+                  command={
+                    tabModeMap.get(tab.tab_id) !== 'terminal'
+                      ? `claude --resume ${tab.tab_id} 2>/dev/null || claude --session-id ${tab.tab_id}`
+                      : undefined
+                  }
                   className="h-full"
                   onTodosUpdated={onTodosUpdated}
+                  onStatusChange={handleStatusChange}
                 />
               </div>
             );
