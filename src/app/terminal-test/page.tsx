@@ -68,7 +68,7 @@ export default function TerminalTestPage() {
   // --resume を先に試みて失敗したら --session-id にフォールバック。
   // --resume 失敗時のエラー出力は 2>/dev/null で捨てるため PTY 上には表示されない。
   const claudeCommand = sessionId
-    ? `claude --resume ${sessionId} 2>/dev/null || claude --session-id ${sessionId}`
+    ? `claude --dangerously-skip-permissions --resume ${sessionId} 2>/dev/null || claude --dangerously-skip-permissions --session-id ${sessionId}`
     : undefined;
 
   return (
