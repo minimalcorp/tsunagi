@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useSSE } from './useSSE';
+import { useState, useCallback } from 'react';
 
 interface BatchDeleteState {
   batchId: string | null;
@@ -10,8 +9,8 @@ interface BatchDeleteState {
   isCompleted: boolean;
 }
 
+// バッチ削除フック（フェーズ3でsocket.ioによる進捗通知に再実装予定）
 export function useBatchDelete() {
-  const { eventSource } = useSSE();
   const [state, setState] = useState<BatchDeleteState>({
     batchId: null,
     totalCount: 0,
@@ -42,13 +41,14 @@ export function useBatchDelete() {
         return { batchId, totalCount };
       }
 
+      // SSE廃止により進捗追跡はできないため、即座に完了とする
       setState({
         batchId,
         totalCount,
-        deletedCount: 0,
+        deletedCount: totalCount,
         errorCount: 0,
-        isDeleting: true,
-        isCompleted: false,
+        isDeleting: false,
+        isCompleted: true,
       });
 
       return { batchId, totalCount };
@@ -57,67 +57,6 @@ export function useBatchDelete() {
       throw error;
     }
   }, []);
-
-  // 削除完了イベントと削除エラーイベントを購読
-  useEffect(() => {
-    if (!eventSource || !state.batchId) return;
-
-    const handleTaskDeleted = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        // このbatchIdに属するイベントのみカウント
-        if (data.batchId === state.batchId) {
-          setState((prev) => {
-            const newDeletedCount = prev.deletedCount + 1;
-            const processedCount = newDeletedCount + prev.errorCount;
-            const isCompleted = processedCount >= prev.totalCount;
-
-            return {
-              ...prev,
-              deletedCount: newDeletedCount,
-              isCompleted,
-              isDeleting: !isCompleted,
-            };
-          });
-        }
-      } catch (error) {
-        console.error('Failed to parse task:deleted event:', error);
-      }
-    };
-
-    const handleTaskDeleteError = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        // このbatchIdに属するイベントのみカウント
-        if (data.batchId === state.batchId) {
-          setState((prev) => {
-            const newErrorCount = prev.errorCount + 1;
-            const processedCount = prev.deletedCount + newErrorCount;
-            const isCompleted = processedCount >= prev.totalCount;
-
-            return {
-              ...prev,
-              errorCount: newErrorCount,
-              isCompleted,
-              isDeleting: !isCompleted,
-            };
-          });
-        }
-      } catch (error) {
-        console.error('Failed to parse task:delete:error event:', error);
-      }
-    };
-
-    eventSource.addEventListener('task:deleted', handleTaskDeleted);
-    eventSource.addEventListener('task:delete:error', handleTaskDeleteError);
-
-    return () => {
-      eventSource.removeEventListener('task:deleted', handleTaskDeleted);
-      eventSource.removeEventListener('task:delete:error', handleTaskDeleteError);
-    };
-  }, [eventSource, state.batchId]);
 
   // リセット
   const reset = useCallback(() => {

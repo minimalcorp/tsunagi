@@ -16,6 +16,39 @@
 - アイコンだけでは理解が難しい場合は、最低限のテキストで補助する
 - 複雑な情報は「？」アイコン + Tooltipなどで補助情報を提供する
 
+## Reactのベストプラクティス
+
+### 非同期状態の表現
+
+- **`requestAnimationFrame` や `setTimeout` で描画タイミングを操作しない**
+- 非同期リソース（WebSocket・fetch等）の状態はstateで管理し、Reactのレンダリングサイクルに委ねる
+- リソースが準備できていない場合はローディングUIを表示し、準備できたらコンテンツを表示する
+
+```tsx
+// ❌ 避けるべき実装
+useEffect(() => {
+  ws.onopen = () => {
+    requestAnimationFrame(() => {
+      // タイミングに依存した描画
+      term.write(buffer);
+    });
+  };
+}, []);
+
+// ✅ 推奨実装
+// 状態をstateで管理し、条件付きレンダリングで表現する
+const [isConnected, setIsConnected] = useState(false);
+
+if (!isConnected) return <LoadingUI />;
+return <ConnectedUI />;
+```
+
+### 条件付きレンダリング
+
+- コンポーネントが依存するリソースが未準備の場合、そのコンポーネント自体をレンダリングしない
+- `status === 'connected'` のような状態フラグで表示・非表示を制御する
+- 「表示しながら中身だけ変える」より「状態に応じて別コンポーネントを出し分ける」を優先する
+
 ## Git操作のルール
 
 - **作業完了後に勝手にcommitしない**

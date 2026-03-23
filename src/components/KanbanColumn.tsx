@@ -3,7 +3,7 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus, Trash } from 'lucide-react';
 import type { Task } from '@/lib/types';
-import { TaskCard } from './TaskCard';
+import { TaskCard, type TabTodo } from './TaskCard';
 
 interface KanbanColumnProps {
   title: string;
@@ -15,6 +15,7 @@ interface KanbanColumnProps {
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isAddTaskDialogOpen?: boolean;
   hasApiKey?: boolean;
+  tabTodosMap?: Map<string, TabTodo[]>;
 }
 
 export function KanbanColumn({
@@ -27,6 +28,7 @@ export function KanbanColumn({
   nextStep,
   isAddTaskDialogOpen = false,
   hasApiKey = false,
+  tabTodosMap,
 }: KanbanColumnProps) {
   const showAddButton = status === 'backlog' && onAddTaskClick;
   const showBatchDeleteButton = status === 'done' && onBatchDeleteClick;
@@ -85,6 +87,7 @@ export function KanbanColumn({
                       task={task}
                       isDragging={snapshot.isDragging}
                       dragHandleProps={provided.dragHandleProps}
+                      tabTodosMap={tabTodosMap}
                     />
                   </div>
                 )}

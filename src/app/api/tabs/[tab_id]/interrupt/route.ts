@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
 import { interruptSession } from '@/lib/claude-client';
-import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ tab_id: string }>;
@@ -40,15 +39,15 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Update tab status to idle after interrupt
     await taskRepo.updateTab(task.id, tab_id, { status: 'idle' });
 
-    // SSE broadcast (tab status changed)
-    const updatedTab = await taskRepo.getTab(task.id, tab_id);
-    if (updatedTab) {
-      sseManager.broadcast('tab:updated', { taskId: task.id, tab: updatedTab });
-    }
-
-    const updatedTask = await taskRepo.getTask(task.id);
-    if (updatedTask) {
-      sseManager.broadcast('task:updated', updatedTask);
+    // Socket.IO経由でclaudeStatusをidleに通知（Fastify側でemit）
+    try {
+      await fetch('http://localhost:2792/internal/emit-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: tab_id, status: 'idle' }),
+      });
+    } catch {
+      /* Socket.IO通知失敗は無視 */
     }
 
     return NextResponse.json({ data: { success: true } });

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import * as taskRepo from '@/lib/repositories/task';
 import * as worktreeManager from '@/lib/worktree-manager';
-import { sseManager } from '@/lib/sse-manager';
 
 // POST /api/tasks/batch-delete
 export async function POST(request: NextRequest) {
@@ -59,18 +58,9 @@ export async function POST(request: NextRequest) {
             } catch (error) {
               console.error(`Failed to remove worktree for task ${task.id}:`, error);
             }
-
-            // 削除完了イベントをbatchIdと共にbroadcast
-            sseManager.broadcast('task:deleted', { id: task.id, batchId });
           }
         } catch (error) {
           console.error(`Failed to delete task ${task.id}:`, error);
-          // エラーが発生してもbatchIdを含めてbroadcast（失敗として通知）
-          sseManager.broadcast('task:delete:error', {
-            id: task.id,
-            batchId,
-            error: String(error),
-          });
         }
       };
 

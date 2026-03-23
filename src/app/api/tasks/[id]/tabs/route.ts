@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
-import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -37,9 +36,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!newTab) {
       return NextResponse.json({ error: 'Failed to create tab' }, { status: 500 });
     }
-
-    // SSE broadcast
-    sseManager.broadcast('tab:created', { taskId, tab: newTab });
 
     return NextResponse.json({ data: { tab: newTab } }, { status: 201 });
   } catch (error) {

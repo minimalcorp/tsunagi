@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
 import * as tabRepo from '@/lib/repositories/tab';
 import * as worktreeManager from '@/lib/worktree-manager';
-import { sseManager } from '@/lib/sse-manager';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -29,9 +28,12 @@ export async function GET(request: NextRequest, { params }: Params) {
       })
     );
 
+    const worktreePath = worktreeManager.getWorktreePath(task.owner, task.repo, task.branch);
+
     const taskWithCounts = {
       ...task,
       tabs: tabsWithCounts,
+      worktreePath,
     };
 
     return NextResponse.json({ data: { task: taskWithCounts } });
@@ -52,9 +54,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (!updatedTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
-
-    // SSE broadcast
-    sseManager.broadcast('task:updated', updatedTask);
 
     return NextResponse.json({ data: { task: updatedTask } });
   } catch (error) {
@@ -88,9 +87,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       console.error('Failed to remove worktree:', error);
       // worktree削除に失敗してもタスク削除は成功とする
     }
-
-    // SSE broadcast
-    sseManager.broadcast('task:deleted', { id });
 
     return NextResponse.json({ data: { success: true } });
   } catch (error) {
