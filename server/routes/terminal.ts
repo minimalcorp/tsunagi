@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
+import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { ptyManager } from '../pty-manager.js';
@@ -136,7 +137,18 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     const { cwd, env, sessionId: requestedSessionId, worktreePath, command } = request.body ?? {};
 
     const sessionId = requestedSessionId ?? crypto.randomUUID();
-    const workingDir = cwd ?? path.join(os.homedir(), '.tsunagi', 'workspaces');
+    const defaultDir = path.join(os.homedir(), '.tsunagi', 'workspaces');
+    let workingDir = cwd ?? defaultDir;
+
+    // cwd が存在するか確認、なければデフォルトにフォールバック
+    try {
+      await fs.access(workingDir);
+    } catch {
+      fastify.log.warn({ workingDir }, 'cwd does not exist, falling back to default');
+      workingDir = defaultDir;
+    }
+    // デフォルトディレクトリが存在しない場合も作成する
+    await fs.mkdir(workingDir, { recursive: true });
 
     // 既存セッションが生きていれば再利用
     const existing = ptyManager.getSession(sessionId);
