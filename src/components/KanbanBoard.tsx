@@ -3,6 +3,7 @@
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import type { Task } from '@/lib/types';
 import { KanbanColumn } from './KanbanColumn';
+import type { TabTodo } from './TaskCard';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -13,6 +14,7 @@ interface KanbanBoardProps {
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isAddTaskDialogOpen?: boolean;
   hasApiKey?: boolean;
+  tabTodosMap?: Map<string, TabTodo[]>;
 }
 
 export function KanbanBoard({
@@ -24,6 +26,7 @@ export function KanbanBoard({
   nextStep,
   isAddTaskDialogOpen = false,
   hasApiKey = false,
+  tabTodosMap,
 }: KanbanBoardProps) {
   // タスクソート: order 昇順（undefined は最後）
   const sortTasks = (a: Task, b: Task) => {
@@ -65,16 +68,33 @@ export function KanbanBoard({
           nextStep={nextStep}
           isAddTaskDialogOpen={isAddTaskDialogOpen}
           hasApiKey={hasApiKey}
+          tabTodosMap={tabTodosMap}
         />
-        <KanbanColumn title="Planning" status="planning" tasks={planningTasks} />
-        <KanbanColumn title="Coding" status="coding" tasks={codingTasks} />
-        <KanbanColumn title="Reviewing" status="reviewing" tasks={reviewingTasks} />
+        <KanbanColumn
+          title="Planning"
+          status="planning"
+          tasks={planningTasks}
+          tabTodosMap={tabTodosMap}
+        />
+        <KanbanColumn
+          title="Coding"
+          status="coding"
+          tasks={codingTasks}
+          tabTodosMap={tabTodosMap}
+        />
+        <KanbanColumn
+          title="Reviewing"
+          status="reviewing"
+          tasks={reviewingTasks}
+          tabTodosMap={tabTodosMap}
+        />
         <KanbanColumn
           title="Done"
           status="done"
           tasks={doneTasks}
           onBatchDeleteClick={onBatchDeleteClick}
           isBatchDeleting={isBatchDeleting}
+          tabTodosMap={tabTodosMap}
         />
       </div>
     </DragDropContext>

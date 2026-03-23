@@ -7,16 +7,32 @@ import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
 import { MessageCircle } from 'lucide-react';
 
+export interface TabTodo {
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
 interface TaskCardProps {
   task: Task;
   isDragging: boolean;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
+  /** タブIDをキーにしたTodosのMap（KanbanカードのProgress Bar表示用） */
+  tabTodosMap?: Map<string, TabTodo[]>;
 }
 
-export function TaskCard({ task, isDragging, dragHandleProps }: TaskCardProps) {
+export function TaskCard({ task, isDragging, dragHandleProps, tabTodosMap }: TaskCardProps) {
   const tabs = task.tabs || [];
   const isClaudeRunning = tabs.some((tab) => tab.status === 'running');
   const totalUserMessages = tabs.reduce((sum, tab) => sum + (tab.promptCount ?? 0), 0);
+
+  // running中のタブのTodo進捗（最初のrunning tabのみ表示）
+  const runningTab = tabs.find((tab) => tab.status === 'running');
+  const runningTabTodos =
+    runningTab && tabTodosMap ? tabTodosMap.get(runningTab.tab_id) : undefined;
+  const completedTodos = runningTabTodos?.filter((t) => t.status === 'completed').length ?? 0;
+  const totalTodos = runningTabTodos?.length ?? 0;
+  const showProgressBar = isClaudeRunning && totalTodos > 0;
+  const currentTodo = runningTabTodos?.find((t) => t.status === 'in_progress');
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     // ドラッグ中はリンク遷移を防止
@@ -62,6 +78,29 @@ export function TaskCard({ task, isDragging, dragHandleProps }: TaskCardProps) {
       >
         {task.owner}/{task.repo} @ {task.branch}
       </p>
+
+      {/* Progress Bar（running状態かつtodosがある場合） */}
+      {showProgressBar && (
+        <div className="mb-2">
+          <div className="flex items-center gap-1 mb-0.5">
+            <div className="flex-1 bg-theme h-1 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${totalTodos > 0 ? (completedTodos / totalTodos) * 100 : 0}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-theme-muted flex-shrink-0">
+              {completedTodos}/{totalTodos}
+            </span>
+          </div>
+          {currentTodo && (
+            <p className="text-[10px] text-theme-muted truncate">
+              {currentTodo.content.slice(0, 40)}
+              {currentTodo.content.length > 40 ? '…' : ''}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Claude状態とメタ情報 */}
       <div className="flex items-center justify-between gap-2">

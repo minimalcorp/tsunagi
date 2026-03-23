@@ -11,6 +11,7 @@ import { TaskDialog } from '@/components/TaskDialog';
 import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
+import { useTerminalTodos } from '@/hooks/useTerminalTodos';
 import { toaster } from '@/lib/toaster';
 
 export default function Home() {
@@ -101,6 +102,18 @@ export default function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // running中のタブのIDリスト（useTerminalTodosに渡す）
+  const runningTabIds = useMemo(
+    () =>
+      tasks.flatMap((t) =>
+        (t.tabs ?? []).filter((tab) => tab.status === 'running').map((tab) => tab.tab_id)
+      ),
+    [tasks]
+  );
+
+  // KanbanカードのProgress Bar用Todos
+  const tabTodosMap = useTerminalTodos(runningTabIds);
 
   // バッチ削除
   const { isDeleting, deletedCount, errorCount, totalCount, isCompleted, startBatchDelete, reset } =
@@ -274,6 +287,7 @@ export default function Home() {
           hasApiKey={
             onboardingState.state.hasAnthropicApiKey || onboardingState.state.hasClaudeCodeToken
           }
+          tabTodosMap={tabTodosMap}
         />
 
         {/* 初回セットアップ時の半透明オーバーレイ */}
