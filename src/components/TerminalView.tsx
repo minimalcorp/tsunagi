@@ -1,16 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { io, type Socket } from 'socket.io-client';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Copy, Play, Check } from 'lucide-react';
 
 const FASTIFY_API_BASE = 'http://localhost:2792';
 
+export interface Todo {
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
 interface TerminalViewProps {
+  /** タブID（PTYのsessionIdと一致させる）。必須。 */
+  tabId: string;
   /** PTYを起動する作業ディレクトリ */
   cwd?: string;
   /** PTYに渡す環境変数 */
@@ -18,39 +25,40 @@ interface TerminalViewProps {
   /** settings.local.json を生成するworktreeパス */
   worktreePath?: string;
   /**
-   * セッションID（tab_idを渡す）。
-   * 指定した場合、既存PTYセッションがあれば再接続し画面を復元する。
-   * 未指定の場合はサーバー側でUUIDを生成する。
-   */
-  sessionId?: string;
-  /**
    * PTY起動後にシェルへ自動入力するコマンド。
    * 例: "claude --session-id <uuid>"
    * 新規セッション作成時のみ有効（reused時は無視）。
    */
   command?: string;
   className?: string;
+  /** Todoリスト更新時のコールバック（KanbanカードのProgress Bar用） */
+  onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
 }
 
 type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
+type ClaudeStatus = 'idle' | 'running' | 'success' | 'error';
 
 export function TerminalView({
+  tabId,
   cwd,
   env,
   worktreePath,
-  sessionId: propSessionId,
   command,
   className = '',
+  onTodosUpdated,
 }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<Socket | null>(null);
-  const sessionIdRef = useRef<string | null>(propSessionId ?? null);
+  const sessionIdRef = useRef<string | null>(tabId);
   const unmountedRef = useRef(false);
   // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
   const suppressResizeRef = useRef(false);
   const [status, setStatus] = useState<TerminalStatus>('idle');
+  const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>('idle');
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [copied, setCopied] = useState(false);
   const { effectiveTheme } = useTheme();
 
   const isDark = effectiveTheme === 'dark';
@@ -109,9 +117,8 @@ export function TerminalView({
     });
     observer.observe(containerRef.current);
 
-    if (propSessionId) {
-      connectSession(propSessionId, term);
-    }
+    // tabIdが指定されている場合は自動接続
+    connectSession(tabId, term);
 
     return () => {
       unmountedRef.current = true;
@@ -238,6 +245,20 @@ export function TerminalView({
       }
     });
 
+    // claude hooksからのステータス変更
+    socket.on(
+      'status-changed',
+      ({ status: newStatus }: { sessionId: string; status: ClaudeStatus }) => {
+        setClaudeStatus(newStatus);
+      }
+    );
+
+    // claude hooksからのTodo更新
+    socket.on('todos-updated', ({ todos: newTodos }: { sessionId: string; todos: Todo[] }) => {
+      setTodos(newTodos);
+      onTodosUpdated?.(tabId, newTodos);
+    });
+
     term.onData((data) => {
       if (socket.connected && sessionIdRef.current) {
         socket.emit('input', { sessionId: sessionIdRef.current, data });
@@ -245,10 +266,10 @@ export function TerminalView({
     });
   }
 
-  async function startSession() {
+  async function reconnectSession() {
     const term = termRef.current;
     if (!term) return;
-    await connectSession(propSessionId ?? crypto.randomUUID(), term);
+    await connectSession(tabId, term);
   }
 
   function pauseSession() {
@@ -273,20 +294,73 @@ export function TerminalView({
     if (termRef.current) clearTerminalDisplay(termRef.current);
   }
 
+  const handleCopyTabId = useCallback(() => {
+    navigator.clipboard.writeText(tabId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [tabId]);
+
+  function handleRunClaude() {
+    const socket = socketRef.current;
+    const sid = sessionIdRef.current;
+    if (!socket || !socket.connected || !sid) return;
+    const claudeCmd = `claude --resume ${sid} 2>/dev/null || claude --session-id ${sid}\n`;
+    socket.emit('input', { sessionId: sid, data: claudeCmd });
+  }
+
   const isConnecting = status === 'connecting';
   const isActive = status === 'connecting' || status === 'connected';
   const isPausedOrExited = status === 'paused' || status === 'exited' || status === 'error';
   const isIdle = status === 'idle';
+  const isConnected = status === 'connected';
+
+  const completedTodos = todos.filter((t) => t.status === 'completed').length;
+  const totalTodos = todos.length;
+  const showTodoProgress = claudeStatus === 'running' && totalTodos > 0;
+
+  // 短縮表示用UUID（先頭8文字 + …）
+  const shortTabId = tabId.length > 8 ? `${tabId.slice(0, 8)}…` : tabId;
 
   return (
     <div className={`flex flex-col h-full min-h-0 ${className}`}>
+      {/* UUID表示バー */}
+      <div className="flex items-center gap-2 px-2 py-1 border-b border-theme flex-shrink-0 bg-theme-card">
+        <span className="font-mono text-xs text-theme-muted" title={tabId}>
+          {shortTabId}
+        </span>
+        <button
+          onClick={handleCopyTabId}
+          className="p-1 text-theme-muted hover:text-theme-fg rounded hover:bg-theme-hover cursor-pointer"
+          title="Copy tab ID"
+        >
+          {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+        </button>
+        <button
+          onClick={handleRunClaude}
+          disabled={!isConnected}
+          className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded cursor-pointer ${
+            isConnected
+              ? 'bg-primary text-white hover:opacity-80'
+              : 'bg-theme-hover text-theme-muted cursor-not-allowed opacity-50'
+          }`}
+          title="Run Claude"
+        >
+          <Play className="w-3 h-3" />
+          Run Claude
+        </button>
+      </div>
+
       {/* ツールバー */}
       <div className="flex items-center justify-between px-2 py-1 border-b border-theme flex-shrink-0">
-        <StatusBadge status={status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={status} />
+          {claudeStatus !== 'idle' && <ClaudeStatusBadge status={claudeStatus} />}
+        </div>
         <div className="flex gap-2">
           {(isIdle || isPausedOrExited) && (
             <button
-              onClick={startSession}
+              onClick={reconnectSession}
               className="text-xs px-2 py-1 rounded bg-primary text-white hover:opacity-80 cursor-pointer"
             >
               {isIdle ? 'Start' : 'Reconnect'}
@@ -333,12 +407,35 @@ export function TerminalView({
               {status === 'exited' && <p className="text-xs text-theme-muted">Session ended</p>}
               {status === 'paused' && <p className="text-xs text-theme-muted">Paused</p>}
               <button
-                onClick={startSession}
+                onClick={reconnectSession}
                 className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-80 cursor-pointer"
               >
                 {isIdle ? 'Start' : 'Reconnect'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Todo進捗（running時かつtodosがある場合のみ表示） */}
+        {showTodoProgress && (
+          <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-theme-card/90 border-t border-theme">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-theme-hover rounded-full h-1 overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${totalTodos > 0 ? (completedTodos / totalTodos) * 100 : 0}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-theme-muted flex-shrink-0">
+                {completedTodos}/{totalTodos}
+              </span>
+            </div>
+            {/* 現在in_progressのtodo */}
+            {todos.find((t) => t.status === 'in_progress') && (
+              <p className="text-[10px] text-theme-muted truncate mt-0.5">
+                {todos.find((t) => t.status === 'in_progress')?.content}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -357,4 +454,15 @@ function StatusBadge({ status }: { status: TerminalStatus }) {
   };
   const { label, color } = config[status];
   return <span className={`text-xs font-medium ${color}`}>{label}</span>;
+}
+
+function ClaudeStatusBadge({ status }: { status: 'idle' | 'running' | 'success' | 'error' }) {
+  const config = {
+    idle: { label: 'Claude: Idle', color: 'text-theme-muted' },
+    running: { label: 'Claude: Running', color: 'text-yellow-500' },
+    success: { label: 'Claude: Done', color: 'text-green-500' },
+    error: { label: 'Claude: Error', color: 'text-red-500' },
+  };
+  const { label, color } = config[status];
+  return <span className={`text-xs ${color}`}>{label}</span>;
 }

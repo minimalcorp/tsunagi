@@ -100,7 +100,7 @@ export default function TerminalTestPage() {
         <div className="flex-1 min-h-0 min-w-0">
           {sessionId && (
             <TerminalView
-              sessionId={sessionId}
+              tabId={sessionId}
               cwd={WORKSPACE_PATH}
               worktreePath={WORKSPACE_PATH}
               command={claudeCommand}
