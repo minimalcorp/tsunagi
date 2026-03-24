@@ -34,7 +34,7 @@ export interface Task {
 export interface Tab {
   tab_id: string; // UUID（タブ作成時に生成）
   order: number; // タブ表示用の連番
-  status: 'idle' | 'running' | 'success' | 'error';
+  status: 'idle' | 'running' | 'waiting' | 'success' | 'error';
   startedAt: string;
   completedAt?: string;
   updatedAt: string;

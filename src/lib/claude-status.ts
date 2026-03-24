@@ -1,6 +1,6 @@
 import type { Tab } from './types';
 
-export type TabStatus = 'idle' | 'running' | 'success' | 'error';
+export type TabStatus = 'idle' | 'running' | 'waiting' | 'success' | 'error';
 
 /**
  * Get the current Claude tab status
