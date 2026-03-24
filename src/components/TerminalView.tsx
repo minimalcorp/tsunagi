@@ -59,7 +59,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const sessionIdRef = useRef<string | null>(tabId);
-  const unmountedRef = useRef(false);
   // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
   const suppressResizeRef = useRef(false);
   // IME composition中（日本語変換中）はPTYへの入力を抑制する
@@ -148,11 +147,14 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     });
     observer.observe(containerRef.current);
 
-    // tabIdが指定されている場合は自動接続
-    connectSession(tabId, term);
+    // AbortController をエフェクトのローカルスコープで作成
+    // cleanup で abort() を呼ぶことで in-flight な fetch を実際にキャンセルする
+    const abortController = new AbortController();
+
+    connectSession(tabId, term, abortController.signal);
 
     return () => {
-      unmountedRef.current = true;
+      abortController.abort();
       observer.disconnect();
       if (textarea) {
         textarea.removeEventListener('compositionstart', onCompositionStart);
@@ -206,7 +208,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     term.write('\x1b[2J\x1b[3J\x1b[H');
   }
 
-  async function connectSession(sessionId: string, term: Terminal) {
+  async function connectSession(sessionId: string, term: Terminal, signal: AbortSignal) {
     setStatus('connecting');
 
     try {
@@ -214,6 +216,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cwd, env, worktreePath, sessionId, command }),
+        signal,
       });
 
       if (!res.ok) {
@@ -222,6 +225,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       }
 
       const body = (await res.json()) as { sessionId: string; reused: boolean };
+
+      // await 後にキャンセル済みかチェック（StrictMode の cleanup 等による中断）
+      if (signal.aborted) return;
+
       sessionIdRef.current = body.sessionId;
 
       // 新規セッションのみ画面をクリア（reused の場合はリングバッファで復元するため触らない）
@@ -229,15 +236,17 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         clearTerminalDisplay(term);
       }
 
-      connectSocket(body.sessionId, body.reused, term);
+      connectSocket(body.sessionId, body.reused, term, signal);
     } catch (err) {
+      // AbortError はクリーンアップによる正常なキャンセル → エラーとして扱わない
+      if (err instanceof Error && err.name === 'AbortError') return;
       const message = err instanceof Error ? err.message : String(err);
       console.error('[TerminalView] connectSession error:', message);
       setStatus('error');
     }
   }
 
-  function connectSocket(sessionId: string, reused: boolean, term: Terminal) {
+  function connectSocket(sessionId: string, reused: boolean, term: Terminal, signal: AbortSignal) {
     const socket = io(FASTIFY_API_BASE, { transports: ['websocket'] });
     socketRef.current = socket;
     // reused時: 最初のoutputイベント（リングバッファ）受信後にリサイズを再送する
@@ -285,8 +294,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     });
 
     socket.on('disconnect', () => {
-      // アンマウント済み・pause/stop操作由来の切断はstateを更新しない
-      if (!unmountedRef.current) {
+      // signal.aborted = true の場合は cleanup 由来の切断 → 状態を更新しない
+      if (!signal.aborted) {
         setStatus((prev) => {
           if (prev === 'exited' || prev === 'paused' || prev === 'idle') return prev;
           return 'exited';
@@ -320,7 +329,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   async function reconnectSession() {
     const term = termRef.current;
     if (!term) return;
-    await connectSession(tabId, term);
+    // 手動再接続は unmount を待たないため、独立した AbortController を使用
+    const abortController = new AbortController();
+    await connectSession(tabId, term, abortController.signal);
   }
 
   const handleCopyTabId = useCallback(() => {

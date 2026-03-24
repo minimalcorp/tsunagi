@@ -49,7 +49,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       if (!taskResponse.ok) throw new Error('Failed to fetch task');
       const taskData = await taskResponse.json();
       const loadedTask = taskData.data.task;
-      setTask(loadedTask);
 
       // タスクからタブを取得（既にpromptCountを含む）
       let loadedTabs = loadedTask.tabs || [];
@@ -67,6 +66,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         }
       }
 
+      // 全 await 完了後にまとめて state 更新（中間レンダリングを防ぐ）
+      setTask(loadedTask);
       setTabs(loadedTabs);
 
       // アクティブタブ設定
