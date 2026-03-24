@@ -91,6 +91,7 @@ export async function hooksRoutes(fastify: FastifyInstance) {
 
         case 'PermissionRequest':
           // ツール実行許可待ち → waiting状態に更新
+          await updateTabStatus(sessionId, 'waiting');
           io.to(room).emit('status-changed', { sessionId, status: 'waiting' });
           break;
 
@@ -106,6 +107,7 @@ export async function hooksRoutes(fastify: FastifyInstance) {
               io.to(room).emit('todos-updated', { sessionId, todos });
             }
           }
+          await updateTabStatus(sessionId, 'running');
           io.to(room).emit('status-changed', { sessionId, status: 'running' });
           break;
 
@@ -115,7 +117,7 @@ export async function hooksRoutes(fastify: FastifyInstance) {
 
         case 'Stop':
           // 正常完了 → success状態に更新
-          await updateTabStatus(sessionId, 'idle');
+          await updateTabStatus(sessionId, 'success');
           io.to(room).emit('status-changed', { sessionId, status: 'success' });
           break;
 

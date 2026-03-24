@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, CheckCircle2, XCircle, Circle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Circle, MessageSquare } from 'lucide-react';
 import type { TabStatus } from '@/lib/claude-status';
 
 interface ClaudeStateProps {
@@ -13,6 +13,8 @@ export function ClaudeState({ status, showLabel = true }: ClaudeStateProps) {
     switch (status) {
       case 'running':
         return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
+      case 'waiting':
+        return <MessageSquare className="w-4 h-4 text-yellow-500" />;
       case 'success':
         return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case 'error':

@@ -13,6 +13,7 @@ import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { useTerminalTodos } from '@/hooks/useTerminalTodos';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
+import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
 import { toaster } from '@/lib/toaster';
 
 export default function Home() {
@@ -104,6 +105,12 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 全タスクの全タブIDリスト（useTabStatusEventsに渡す）
+  const allTabIds = useMemo(
+    () => tasks.flatMap((t) => (t.tabs ?? []).map((tab) => tab.tab_id)),
+    [tasks]
+  );
+
   // running中のタブのIDリスト（useTerminalTodosに渡す）
   const runningTabIds = useMemo(
     () =>
@@ -115,6 +122,16 @@ export default function Home() {
 
   // KanbanカードのProgress Bar用Todos
   const tabTodosMap = useTerminalTodos(runningTabIds);
+
+  // タブのステータス変更をリアルタイムでKanbanボードに反映
+  useTabStatusEvents(allTabIds, (tabId, status) => {
+    setTasks((prev) =>
+      prev.map((task) => ({
+        ...task,
+        tabs: (task.tabs ?? []).map((tab) => (tab.tab_id === tabId ? { ...tab, status } : tab)),
+      }))
+    );
+  });
 
   // task:created イベントを受信してKanbanボードを即時更新
   useTaskEvents((newTask) => {

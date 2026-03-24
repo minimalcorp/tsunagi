@@ -293,12 +293,12 @@ export async function mcpRoutes(fastify: FastifyInstance) {
       transports.delete(transport.sessionId);
     });
 
-    const server = createMcpServer();
-    await server.connect(transport);
-
     // Fastifyのデフォルトレスポンス処理をスキップ
     await reply.hijack();
-    await transport.start();
+
+    const server = createMcpServer();
+    // server.connect() が内部で transport.start() を呼ぶため、明示的な start() は不要
+    await server.connect(transport);
   });
 
   // POST /mcp - tool呼び出しエンドポイント
