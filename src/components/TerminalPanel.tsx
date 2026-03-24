@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useState, useCallback, useRef, useImperativeHandle, forwardRef, useEffect } from 'react';
 import type { Tab, Task } from '@/lib/types';
 import { SessionTabs } from '@/components/SessionTabs';
 import {
@@ -50,6 +50,20 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const [mountedTabIds, setMountedTabIds] = useState<Set<string>>(
       () => new Set(activeTabId ? [activeTabId] : [])
     );
+
+    // activeTabId が変化したとき（初回マウント後も含む）に mountedTabIds へ追加
+    // Fix 1（page.tsx）が不完全な場合の防御的フォールバックとして機能する
+    useEffect(() => {
+      if (activeTabId) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setMountedTabIds((prev) => {
+          if (prev.has(activeTabId)) return prev;
+          const next = new Set(prev);
+          next.add(activeTabId);
+          return next;
+        });
+      }
+    }, [activeTabId]);
 
     // タブごとのリアルタイムステータス（TerminalViewからの通知）
     const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(new Map());
