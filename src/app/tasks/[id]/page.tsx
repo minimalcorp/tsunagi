@@ -201,7 +201,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             Back to Board
           </button>
 
-          <h1 className="text-xl font-bold text-theme-fg absolute left-1/2 -translate-x-1/2">
+          <h1 className="text-base font-semibold text-theme-fg absolute left-1/2 -translate-x-1/2 max-w-[50vw] truncate">
             {task.title}
           </h1>
 

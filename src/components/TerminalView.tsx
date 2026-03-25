@@ -1,12 +1,21 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+  useImperativeHandle,
+  forwardRef,
+} from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { io, type Socket } from 'socket.io-client';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Loader2, Copy, Play, Check } from 'lucide-react';
+import { Loader2, Copy, Play, Check, SquarePen } from 'lucide-react';
+import { MonacoEditorModal } from '@/components/MonacoEditorModal';
 
 const FASTIFY_API_BASE = 'http://localhost:2792';
 
@@ -36,6 +45,8 @@ interface TerminalViewProps {
   className?: string;
   /** Todoリスト更新時のコールバック（KanbanカードのProgress Bar用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
+  /** タブがアクティブかどうか（フォーカス制御用） */
+  isActive?: boolean;
   /** terminal/claudeステータス変化時のコールバック（タブ表示用） */
   onStatusChange?: (
     tabId: string,
@@ -48,10 +59,22 @@ interface TerminalViewProps {
 export interface TerminalViewHandle {
   /** PTYにテキストを書き込む（末尾改行は自動付加しない） */
   sendInput: (data: string) => void;
+  /** xterm.js にフォーカスを当てる */
+  focus: () => void;
 }
 
 export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
-  { tabId, cwd, env, worktreePath, command, className = '', onTodosUpdated, onStatusChange },
+  {
+    tabId,
+    cwd,
+    env,
+    worktreePath,
+    command,
+    className = '',
+    isActive,
+    onTodosUpdated,
+    onStatusChange,
+  },
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,10 +82,14 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const sessionIdRef = useRef<string | null>(tabId);
+  const unmountedRef = useRef(false);
+  const [showEditorModal, setShowEditorModal] = useState(false);
+  // EditorSessionProvider 経由（Ctrl+G）でエディタが開いているかを追跡するref。
+  // xterm の customKeyEventHandler（_keyUp内のfocus再取得）から参照する。
+  const isExternalEditorOpenRef = useRef(false);
+  const isActiveRef = useRef(isActive);
   // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
   const suppressResizeRef = useRef(false);
-  // IME composition中（日本語変換中）はPTYへの入力を抑制する
-  const isComposingRef = useRef(false);
   const [status, setStatus] = useState<TerminalStatus>('idle');
   const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>('idle');
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -92,6 +119,31 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   useEffect(() => {
     onStatusChangeRef.current?.(tabId, status, claudeStatus);
   }, [tabId, status, claudeStatus]);
+
+  useLayoutEffect(() => {
+    isActiveRef.current = isActive;
+  });
+
+  // アクティブになったタイミングで xterm にフォーカスを当てる
+  // タブヘッダーのクリックでは xterm の mousedown handler が呼ばれないため明示的にフォーカスする
+  useEffect(() => {
+    if (!isActive) return;
+    termRef.current?.focus();
+  }, [isActive]);
+
+  // Editor Modal の開閉に合わせてフォーカスを制御
+  // 開く: xterm を blur → Monaco がフォーカスを取得できるようにする
+  // 閉じる: Dialog close 処理完了後に xterm にフォーカスを戻す
+  useEffect(() => {
+    if (showEditorModal) {
+      termRef.current?.blur();
+    } else if (isActive) {
+      const textarea = containerRef.current?.querySelector<HTMLTextAreaElement>(
+        'textarea.xterm-helper-textarea'
+      );
+      textarea?.focus();
+    }
+  }, [showEditorModal, isActive]);
 
   // connected になったタイミングで fit() を再呼び出し（オーバーレイ消滅後のサイズ確定）
   useEffect(() => {
@@ -124,19 +176,16 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    // IME composition中はPTYへの入力を抑制する
-    // xterm.js の内部 textarea に compositionstart/end を登録する
-    const textarea = containerRef.current.querySelector('textarea');
-    const onCompositionStart = () => {
-      isComposingRef.current = true;
-    };
-    const onCompositionEnd = () => {
-      isComposingRef.current = false;
-    };
-    if (textarea) {
-      textarea.addEventListener('compositionstart', onCompositionStart);
-      textarea.addEventListener('compositionend', onCompositionEnd);
-    }
+    // エディタモーダルが開いている間は xterm の _keyUp が this.focus() を呼んでフォーカスを
+    // 奪い返すのを防ぐ。customKeyEventHandler が false を返すと _keyUp が早期リターンする。
+    term.attachCustomKeyEventHandler(() => {
+      if (isExternalEditorOpenRef.current) return false;
+      return true;
+    });
+
+    // xterm.js は CompositionHelper 内で composition 中のキーストロークを内部で抑制し、
+    // compositionend 後の setTimeout で確定テキストのみ triggerDataEvent → onData で通知する。
+    // そのため我々が compositionstart/end を監視して onData をガードする必要はない。
 
     const observer = new ResizeObserver(() => {
       fitAddon.fit();
@@ -156,10 +205,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     return () => {
       abortController.abort();
       observer.disconnect();
-      if (textarea) {
-        textarea.removeEventListener('compositionstart', onCompositionStart);
-        textarea.removeEventListener('compositionend', onCompositionEnd);
-      }
       term.dispose();
       termRef.current = null;
       fitAddonRef.current = null;
@@ -175,6 +220,38 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       termRef.current.options.theme = xtermTheme;
     }
   }, [isDark]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // エディタセッション開閉イベント（EditorSessionProvider → TerminalView 通知）
+  useEffect(() => {
+    function handleEditorSessionOpen() {
+      // xterm の _keyUp による focus 再取得を防ぐフラグを立てる
+      isExternalEditorOpenRef.current = true;
+      // xterm から明示的に blur して Monaco がフォーカスを取得できるようにする
+      termRef.current?.blur();
+    }
+    function handleEditorSessionDone() {
+      isExternalEditorOpenRef.current = false;
+      // Ctrl+L で Claude Code に再描画させる
+      const socket = socketRef.current;
+      const sid = sessionIdRef.current;
+      if (socket?.connected && sid) {
+        socket.emit('input', { sessionId: sid, data: '\x0c' });
+      }
+      // アクティブタブのみフォーカスを復帰する
+      if (!isActiveRef.current) return;
+      // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない）
+      const textarea = containerRef.current?.querySelector<HTMLTextAreaElement>(
+        'textarea.xterm-helper-textarea'
+      );
+      textarea?.focus();
+    }
+    window.addEventListener('editor-session-open', handleEditorSessionOpen);
+    window.addEventListener('editor-session-done', handleEditorSessionDone);
+    return () => {
+      window.removeEventListener('editor-session-open', handleEditorSessionOpen);
+      window.removeEventListener('editor-session-done', handleEditorSessionDone);
+    };
+  }, []);
 
   function sendResize() {
     const socket = socketRef.current;
@@ -192,6 +269,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       if (socket?.connected && sid) {
         socket.emit('input', { sessionId: sid, data });
       }
+    },
+    focus: () => {
+      termRef.current?.focus();
     },
   }));
 
@@ -318,8 +398,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     });
 
     term.onData((data) => {
-      // IME composition中（日本語変換中）はPTYに送信しない
-      if (isComposingRef.current) return;
       if (socket.connected && sessionIdRef.current) {
         socket.emit('input', { sessionId: sessionIdRef.current, data });
       }
@@ -361,88 +439,124 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const shortTabId = tabId.length > 8 ? `${tabId.slice(0, 8)}…` : tabId;
 
   return (
-    <div className={`flex flex-col h-full min-h-0 ${className}`}>
-      {/* UUID表示バー */}
-      <div className="flex items-center gap-2 px-2 py-1 border-b border-theme flex-shrink-0 bg-theme-card">
-        <span className="font-mono text-xs text-theme-muted" title={tabId}>
-          {shortTabId}
-        </span>
-        <button
-          onClick={handleCopyTabId}
-          className="p-1 text-theme-muted hover:text-theme-fg rounded hover:bg-theme-hover cursor-pointer"
-          title="Copy tab ID"
-        >
-          {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-        </button>
-        <button
-          onClick={handleRunClaude}
-          disabled={!isConnected}
-          className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded cursor-pointer ${
-            isConnected
-              ? 'bg-primary text-white hover:opacity-80'
-              : 'bg-theme-hover text-theme-muted cursor-not-allowed opacity-50'
-          }`}
-          title="Run Claude"
-        >
-          <Play className="w-3 h-3" />
-          Run Claude
-        </button>
-      </div>
+    <>
+      <div className={`flex flex-col h-full min-h-0 ${className}`}>
+        {/* UUID表示バー */}
+        <div className="flex items-center gap-2 px-2 py-1 border-b border-theme flex-shrink-0 bg-theme-card">
+          <span className="font-mono text-xs text-theme-muted" title={tabId}>
+            {shortTabId}
+          </span>
+          <button
+            onClick={handleCopyTabId}
+            className="p-1 text-theme-muted hover:text-theme-fg rounded hover:bg-theme-hover cursor-pointer"
+            title="Copy tab ID"
+          >
+            {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={handleRunClaude}
+            disabled={!isConnected}
+            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded cursor-pointer ${
+              isConnected
+                ? 'bg-primary text-white hover:opacity-80'
+                : 'bg-theme-hover text-theme-muted cursor-not-allowed opacity-50'
+            }`}
+            title="Run Claude"
+          >
+            <Play className="w-3 h-3" />
+            Run Claude
+          </button>
+          <button
+            onClick={() => setShowEditorModal(true)}
+            disabled={!isConnected}
+            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded cursor-pointer ${
+              isConnected
+                ? 'text-theme-muted hover:bg-theme-hover hover:text-theme-fg'
+                : 'text-theme-muted cursor-not-allowed opacity-50'
+            }`}
+            title="Open editor input"
+          >
+            <SquarePen className="w-3 h-3" />
+            Open Editor
+          </button>
+        </div>
 
-      {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
-      <div className="relative flex-1 min-h-0 overflow-hidden">
-        <div ref={containerRef} className="w-full h-full" style={{ padding: '4px' }} />
+        {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
+        <div className="relative flex-1 min-h-0 overflow-hidden">
+          <div ref={containerRef} className="w-full h-full" style={{ padding: '4px' }} />
 
-        {/* 接続中オーバーレイ: connected になると消える */}
-        {isConnecting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-theme-bg">
-            <div className="flex items-center gap-2 text-theme-muted text-xs">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Connecting...</span>
-            </div>
-          </div>
-        )}
-
-        {/* exited / error: overlayで再接続を促す */}
-        {isPausedOrExited && (
-          <div className="absolute inset-0 flex items-center justify-center bg-theme-bg/90">
-            <div className="text-center space-y-2">
-              {status === 'error' && <p className="text-xs text-red-500">Connection failed</p>}
-              {status === 'exited' && <p className="text-xs text-theme-muted">Session ended</p>}
-              {status === 'paused' && <p className="text-xs text-theme-muted">Paused</p>}
-              <button
-                onClick={reconnectSession}
-                className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-80 cursor-pointer"
-              >
-                Reconnect
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Todo進捗（running時かつtodosがある場合のみ表示） */}
-        {showTodoProgress && (
-          <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-theme-card/90 border-t border-theme">
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-theme-hover rounded-full h-1 overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${totalTodos > 0 ? (completedTodos / totalTodos) * 100 : 0}%` }}
-                />
+          {/* 接続中オーバーレイ: connected になると消える */}
+          {isConnecting && (
+            <div className="absolute inset-0 flex items-center justify-center bg-theme-bg">
+              <div className="flex items-center gap-2 text-theme-muted text-xs">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Connecting...</span>
               </div>
-              <span className="text-[10px] text-theme-muted flex-shrink-0">
-                {completedTodos}/{totalTodos}
-              </span>
             </div>
-            {/* 現在in_progressのtodo */}
-            {todos.find((t) => t.status === 'in_progress') && (
-              <p className="text-[10px] text-theme-muted truncate mt-0.5">
-                {todos.find((t) => t.status === 'in_progress')?.content}
-              </p>
-            )}
-          </div>
-        )}
+          )}
+
+          {/* exited / error: overlayで再接続を促す */}
+          {isPausedOrExited && (
+            <div className="absolute inset-0 flex items-center justify-center bg-theme-bg/90">
+              <div className="text-center space-y-2">
+                {status === 'error' && <p className="text-xs text-red-500">Connection failed</p>}
+                {status === 'exited' && <p className="text-xs text-theme-muted">Session ended</p>}
+                {status === 'paused' && <p className="text-xs text-theme-muted">Paused</p>}
+                <button
+                  onClick={reconnectSession}
+                  className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-80 cursor-pointer"
+                >
+                  Reconnect
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Todo進捗（running時かつtodosがある場合のみ表示） */}
+          {showTodoProgress && (
+            <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-theme-card/90 border-t border-theme">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-theme-hover rounded-full h-1 overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{
+                      width: `${totalTodos > 0 ? (completedTodos / totalTodos) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+                <span className="text-[10px] text-theme-muted flex-shrink-0">
+                  {completedTodos}/{totalTodos}
+                </span>
+              </div>
+              {/* 現在in_progressのtodo */}
+              {todos.find((t) => t.status === 'in_progress') && (
+                <p className="text-[10px] text-theme-muted truncate mt-0.5">
+                  {todos.find((t) => t.status === 'in_progress')?.content}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Editor Input Modal */}
+      <MonacoEditorModal
+        open={showEditorModal}
+        onOpenChange={(details) => {
+          if (!details.open) setShowEditorModal(false);
+        }}
+        onSubmit={(text) => {
+          // term.paste() を使うことで xterm の Bracketed Paste Mode を自動処理する。
+          // bracketedPasteMode ON（Claude Code等）: \x1b[200~...\x1b[201~ でラップして改行をそのまま挿入
+          // bracketedPasteMode OFF（通常シェル）: \r?\n → \r に変換（xterm 内部処理）
+          if (termRef.current && text) {
+            termRef.current.paste(text);
+          }
+          setShowEditorModal(false);
+        }}
+        title="Terminal Input"
+        submitLabel="Paste"
+      />
+    </>
   );
 });

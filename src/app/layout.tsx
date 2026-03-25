@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { ToastProvider } from '@/components/ToastProvider';
+import { EditorSessionProvider } from '@/components/EditorSessionProvider';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -32,6 +33,7 @@ export default function RootLayout({
           {children}
           <ConnectionStatus />
           <ToastProvider />
+          <EditorSessionProvider />
         </ThemeProvider>
       </body>
     </html>

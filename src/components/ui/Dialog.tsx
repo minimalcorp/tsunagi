@@ -9,8 +9,14 @@ interface DialogProps {
   onOpenChange: (details: { open: boolean }) => void;
   title?: ReactNode;
   children: ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl' | '6xl';
   showCloseButton?: boolean;
+  /** ダイアログを開いた時に最初にフォーカスする要素を返す関数 */
+  initialFocusEl?: () => HTMLElement | null;
+  /** フォーカストラップを有効にするか（デフォルト: true） */
+  trapFocus?: boolean;
+  /** ダイアログを閉じた時にフォーカスを元の要素に戻すか（デフォルト: true） */
+  restoreFocus?: boolean;
 }
 
 const maxWidthClasses = {
@@ -19,6 +25,8 @@ const maxWidthClasses = {
   lg: 'max-w-lg',
   xl: 'max-w-xl',
   '2xl': 'max-w-2xl',
+  '4xl': 'max-w-4xl',
+  '6xl': 'max-w-6xl',
 };
 
 export function Dialog({
@@ -28,9 +36,19 @@ export function Dialog({
   children,
   maxWidth = '2xl',
   showCloseButton = true,
+  initialFocusEl,
+  trapFocus = true,
+  restoreFocus = true,
 }: DialogProps) {
   return (
-    <ArkDialog.Root open={open} onOpenChange={onOpenChange} modal trapFocus>
+    <ArkDialog.Root
+      open={open}
+      onOpenChange={onOpenChange}
+      modal
+      trapFocus={trapFocus}
+      restoreFocus={restoreFocus}
+      initialFocusEl={initialFocusEl}
+    >
       <ArkDialog.Backdrop className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
       <ArkDialog.Positioner className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <ArkDialog.Content
@@ -39,7 +57,7 @@ export function Dialog({
           {(title || showCloseButton) && (
             <div className="flex items-center justify-between p-6 pb-4">
               {title && (
-                <ArkDialog.Title className="text-xl font-bold text-theme-fg">
+                <ArkDialog.Title className="text-base font-semibold text-theme-fg">
                   {title}
                 </ArkDialog.Title>
               )}

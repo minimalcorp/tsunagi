@@ -6,6 +6,9 @@ import * as path from 'path';
 import { ptyManager } from '../pty-manager.js';
 import { prisma } from '../../src/lib/db.js';
 
+// サーバーはプロジェクトルートから起動されるため process.cwd() でルートを取得
+const TSUNAGI_EDITOR_PATH = path.resolve(process.cwd(), 'scripts/monaco-editor.sh');
+
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
 }
@@ -172,8 +175,11 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         fastify.log.warn({ err }, 'Failed to load global env vars');
       }
 
-      // 優先順位: リクエストで渡されたenv > DBのglobal env
-      const mergedEnv = { ...globalEnv, ...env };
+      // 優先順位: リクエストで渡されたenv > DBのglobal env > tsunagi独自のEDITOR設定
+      // tsunagi-editor.sh をデフォルトにすることで Ctrl+G が Monaco Modal を開く。
+      // DB / リクエストで EDITOR が明示設定されている場合はそちらが優先される。
+      const tsunagiDefaultEnv: Record<string, string> = { EDITOR: TSUNAGI_EDITOR_PATH };
+      const mergedEnv = { ...tsunagiDefaultEnv, ...globalEnv, ...env };
 
       const session = ptyManager.createSession(sessionId, workingDir, mergedEnv);
 

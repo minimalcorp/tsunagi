@@ -74,6 +74,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     // 各TerminalViewへのrefマップ
     const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
 
+    // アクティブタブが変わったら xterm にフォーカスを移す
+    // TerminalPanel の effect は子コンポーネントの effects より後に実行されるため、
+    // termRef.current が確実に設定済みの状態でフォーカスできる
+    useEffect(() => {
+      if (!activeTabId) return;
+      terminalRefs.current.get(activeTabId)?.focus();
+    }, [activeTabId]);
+
     const handleStatusChange = useCallback(
       (tabId: string, terminal: TerminalStatus, claude: ClaudeStatus) => {
         setTabStatusMap((prev) => {
@@ -182,8 +190,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           )}
         </div>
 
-        {/* TerminalViewエリア（display:none方式で複数を保持） */}
-        <div className="flex-1 min-h-0 px-4 pb-4 pt-2">
+        {/* TerminalViewエリア（visibility:hidden方式で複数を保持） */}
+        {/* absolute で全タブを重ねることで、visibility:hidden のタブが空白として残らないようにする */}
+        <div className="flex-1 min-h-0 relative">
           {tabs.map((tab) => {
             const isMounted = mountedTabIds.has(tab.tab_id);
             const isActive = tab.tab_id === activeTabId;
@@ -193,8 +202,11 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             return (
               <div
                 key={tab.tab_id}
-                style={{ display: isActive ? 'flex' : 'none' }}
-                className="h-full flex-col"
+                className="absolute inset-0 flex flex-col px-4 pb-4 pt-2"
+                style={{
+                  visibility: isActive ? 'visible' : 'hidden',
+                  pointerEvents: isActive ? 'auto' : 'none',
+                }}
               >
                 <TerminalView
                   ref={(handle) => {
@@ -205,6 +217,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                     }
                   }}
                   tabId={tab.tab_id}
+                  isActive={isActive}
                   cwd={task.worktreePath}
                   worktreePath={task.worktreePath}
                   command={

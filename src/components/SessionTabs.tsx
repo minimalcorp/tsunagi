@@ -126,17 +126,14 @@ export function SessionTabs({
   );
 
   // アクティブタブのインジケーター位置を更新
+  // offsetLeft/offsetWidth を使用（position:absolute の参照座標と一致し、スクロール時もズレない）
   useEffect(() => {
     const activeIndex = tabs.findIndex((t) => t.tab_id === activeTabId);
     if (activeIndex !== -1 && tabRefs.current[activeIndex]) {
       const tabElement = tabRefs.current[activeIndex];
       if (tabElement) {
-        const containerLeft = tabElement.parentElement?.getBoundingClientRect().left || 0;
-        const tabLeft = tabElement.getBoundingClientRect().left;
-        const relativeLeft = tabLeft - containerLeft;
-
         setIndicatorStyle({
-          left: relativeLeft,
+          left: tabElement.offsetLeft,
           width: tabElement.offsetWidth,
         });
       }
