@@ -26,11 +26,16 @@ export function EditorSessionProvider() {
     };
   }, []);
 
-  // session が非null → null に変化したタイミングで正確に1回だけ発火する。
-  // Esc / Cancel / Submit どのパスで閉じても確実に Ctrl+L がターミナルに送られる。
+  // session の変化を監視してカスタムイベントを発火する。
+  // open: xterm の blur と customKeyEventHandler の無効化を TerminalView に通知
+  // done: Ctrl+L 送信と focus 復帰を TerminalView に通知
   const prevSessionRef = useRef<EditorSession | null>(null);
   useEffect(() => {
-    if (prevSessionRef.current !== null && session === null) {
+    const prev = prevSessionRef.current;
+    if (prev === null && session !== null) {
+      window.dispatchEvent(new CustomEvent('editor-session-open'));
+    }
+    if (prev !== null && session === null) {
       window.dispatchEvent(new CustomEvent('editor-session-done'));
     }
     prevSessionRef.current = session;

@@ -30,6 +30,8 @@ export function MonacoEditorModal({
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const handleSubmitRef = useRef<() => void>(() => {});
   const handleCancelRef = useRef<() => void>(() => {});
+  // open 状態を ref で保持: onDidLayoutChange ハンドラから参照するため
+  const openRef = useRef(open);
   const { effectiveTheme } = useTheme();
 
   function handleSubmit() {
@@ -43,16 +45,27 @@ export function MonacoEditorModal({
   useLayoutEffect(() => {
     handleSubmitRef.current = handleSubmit;
     handleCancelRef.current = handleCancel;
+    openRef.current = open;
   });
 
-  // open または initialValue が変化したとき、既にマウント済みのエディタに反映
+  // open が true になったとき editor.layout() を呼ぶ。
+  // layout() によりサイズが 0→実サイズに変わると onDidLayoutChange が発火し、
+  // そこで focus() が呼ばれる（onMount で登録済み）。
   useEffect(() => {
-    if (open && editorRef.current) {
-      editorRef.current.setValue(initialValue ?? '');
-      // カーソルを先頭に移動してフォーカス
-      editorRef.current.setPosition({ lineNumber: 1, column: 1 });
-      editorRef.current.focus();
-    }
+    if (!open || !editorRef.current) return;
+    editorRef.current.setValue(initialValue ?? '');
+    editorRef.current.setPosition({ lineNumber: 1, column: 1 });
+    // layout() → onDidLayoutChange → focus() のチェーンを起動
+    editorRef.current.layout();
+
+    // フォールバック: onDidLayoutChange が発火しない場合（サイズ変化なし等）に備える
+    const timer = setTimeout(() => {
+      if (openRef.current) {
+        editorRef.current?.layout();
+        editorRef.current?.focus();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
   }, [open, initialValue]);
 
   return (
@@ -77,18 +90,26 @@ export function MonacoEditorModal({
             defaultValue=""
             onMount={(editorInstance, monacoInstance) => {
               editorRef.current = editorInstance;
-              // 初期コンテンツをセットしカーソルを先頭に
               editorInstance.setValue(initialValue ?? '');
               editorInstance.setPosition({ lineNumber: 1, column: 1 });
+
+              // レイアウト変化時に自動フォーカス（Dialog 表示で 0→実サイズに変化した瞬間）
+              editorInstance.onDidLayoutChange(() => {
+                if (openRef.current && !editorInstance.hasTextFocus()) {
+                  editorInstance.focus();
+                }
+              });
+
+              // 初回マウント時
+              editorInstance.layout();
               editorInstance.focus();
+
               editorInstance.onKeyDown((e) => {
-                // Cmd/Ctrl+Enter: 送信
                 if (e.keyCode === monacoInstance.KeyCode.Enter && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
                   e.stopPropagation();
                   handleSubmitRef.current();
                 }
-                // Esc: キャンセル（Monaco がイベントを消費するため明示的に処理）
                 if (e.keyCode === monacoInstance.KeyCode.Escape) {
                   e.preventDefault();
                   e.stopPropagation();

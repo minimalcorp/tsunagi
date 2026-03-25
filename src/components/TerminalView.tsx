@@ -76,6 +76,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const sessionIdRef = useRef<string | null>(tabId);
   const unmountedRef = useRef(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
+  // EditorSessionProvider 経由（Ctrl+G）でエディタが開いているかを追跡するref。
+  // xterm の customKeyEventHandler（_keyUp内のfocus再取得）から参照する。
+  const isExternalEditorOpenRef = useRef(false);
   // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
   const suppressResizeRef = useRef(false);
   const [status, setStatus] = useState<TerminalStatus>('idle');
@@ -157,6 +160,13 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
+    // エディタモーダルが開いている間は xterm の _keyUp が this.focus() を呼んでフォーカスを
+    // 奪い返すのを防ぐ。customKeyEventHandler が false を返すと _keyUp が早期リターンする。
+    term.attachCustomKeyEventHandler(() => {
+      if (isExternalEditorOpenRef.current) return false;
+      return true;
+    });
+
     // xterm.js は CompositionHelper 内で composition 中のキーストロークを内部で抑制し、
     // compositionend 後の setTimeout で確定テキストのみ triggerDataEvent → onData で通知する。
     // そのため我々が compositionstart/end を監視して onData をガードする必要はない。
@@ -195,17 +205,29 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     }
   }, [isDark]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // エディタセッション完了後に Ctrl+L を送信して Claude Code に再描画させる
+  // エディタセッション開閉イベント（EditorSessionProvider → TerminalView 通知）
   useEffect(() => {
+    function handleEditorSessionOpen() {
+      // xterm の _keyUp による focus 再取得を防ぐフラグを立てる
+      isExternalEditorOpenRef.current = true;
+      // xterm から明示的に blur して Monaco がフォーカスを取得できるようにする
+      termRef.current?.blur();
+    }
     function handleEditorSessionDone() {
+      isExternalEditorOpenRef.current = false;
+      // Ctrl+L で Claude Code に再描画させる
       const socket = socketRef.current;
       const sid = sessionIdRef.current;
       if (socket?.connected && sid) {
         socket.emit('input', { sessionId: sid, data: '\x0c' });
       }
     }
+    window.addEventListener('editor-session-open', handleEditorSessionOpen);
     window.addEventListener('editor-session-done', handleEditorSessionDone);
-    return () => window.removeEventListener('editor-session-done', handleEditorSessionDone);
+    return () => {
+      window.removeEventListener('editor-session-open', handleEditorSessionOpen);
+      window.removeEventListener('editor-session-done', handleEditorSessionDone);
+    };
   }, []);
 
   function sendResize() {
