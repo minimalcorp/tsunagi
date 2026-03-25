@@ -36,6 +36,8 @@ interface TerminalViewProps {
   className?: string;
   /** Todoリスト更新時のコールバック（KanbanカードのProgress Bar用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
+  /** タブがアクティブかどうか（フォーカス制御用） */
+  isActive?: boolean;
   /** terminal/claudeステータス変化時のコールバック（タブ表示用） */
   onStatusChange?: (
     tabId: string,
@@ -51,7 +53,17 @@ export interface TerminalViewHandle {
 }
 
 export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(function TerminalView(
-  { tabId, cwd, env, worktreePath, command, className = '', onTodosUpdated, onStatusChange },
+  {
+    tabId,
+    cwd,
+    env,
+    worktreePath,
+    command,
+    className = '',
+    isActive,
+    onTodosUpdated,
+    onStatusChange,
+  },
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -92,6 +104,13 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   useEffect(() => {
     onStatusChangeRef.current?.(tabId, status, claudeStatus);
   }, [tabId, status, claudeStatus]);
+
+  // アクティブになったタイミングで xterm にフォーカスを当てる
+  // タブヘッダーのクリックでは xterm の mousedown handler が呼ばれないため明示的にフォーカスする
+  useEffect(() => {
+    if (!isActive) return;
+    termRef.current?.focus();
+  }, [isActive]);
 
   // connected になったタイミングで fit() を再呼び出し（オーバーレイ消滅後のサイズ確定）
   useEffect(() => {
