@@ -81,6 +81,7 @@ export function MonacoEditorModal({
       maxWidth="xl"
       showCloseButton={true}
       trapFocus={false}
+      restoreFocus={false}
     >
       <div className="space-y-4">
         <div className="border border-theme rounded overflow-hidden" style={{ height: '300px' }}>

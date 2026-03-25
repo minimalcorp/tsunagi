@@ -1,6 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+  useImperativeHandle,
+  forwardRef,
+} from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -79,6 +87,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   // EditorSessionProvider 経由（Ctrl+G）でエディタが開いているかを追跡するref。
   // xterm の customKeyEventHandler（_keyUp内のfocus再取得）から参照する。
   const isExternalEditorOpenRef = useRef(false);
+  const isActiveRef = useRef(isActive);
   // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
   const suppressResizeRef = useRef(false);
   const [status, setStatus] = useState<TerminalStatus>('idle');
@@ -111,6 +120,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     onStatusChangeRef.current?.(tabId, status, claudeStatus);
   }, [tabId, status, claudeStatus]);
 
+  useLayoutEffect(() => {
+    isActiveRef.current = isActive;
+  });
+
   // アクティブになったタイミングで xterm にフォーカスを当てる
   // タブヘッダーのクリックでは xterm の mousedown handler が呼ばれないため明示的にフォーカスする
   useEffect(() => {
@@ -120,12 +133,15 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
   // Editor Modal の開閉に合わせてフォーカスを制御
   // 開く: xterm を blur → Monaco がフォーカスを取得できるようにする
-  // 閉じる: xterm にフォーカスを戻す
+  // 閉じる: Dialog close 処理完了後に xterm にフォーカスを戻す
   useEffect(() => {
     if (showEditorModal) {
       termRef.current?.blur();
     } else if (isActive) {
-      termRef.current?.focus();
+      const textarea = containerRef.current?.querySelector<HTMLTextAreaElement>(
+        'textarea.xterm-helper-textarea'
+      );
+      textarea?.focus();
     }
   }, [showEditorModal, isActive]);
 
@@ -221,6 +237,13 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       if (socket?.connected && sid) {
         socket.emit('input', { sessionId: sid, data: '\x0c' });
       }
+      // アクティブタブのみフォーカスを復帰する
+      if (!isActiveRef.current) return;
+      // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない）
+      const textarea = containerRef.current?.querySelector<HTMLTextAreaElement>(
+        'textarea.xterm-helper-textarea'
+      );
+      textarea?.focus();
     }
     window.addEventListener('editor-session-open', handleEditorSessionOpen);
     window.addEventListener('editor-session-done', handleEditorSessionDone);

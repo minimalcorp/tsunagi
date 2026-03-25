@@ -15,6 +15,8 @@ interface DialogProps {
   initialFocusEl?: () => HTMLElement | null;
   /** フォーカストラップを有効にするか（デフォルト: true） */
   trapFocus?: boolean;
+  /** ダイアログを閉じた時にフォーカスを元の要素に戻すか（デフォルト: true） */
+  restoreFocus?: boolean;
 }
 
 const maxWidthClasses = {
@@ -34,6 +36,7 @@ export function Dialog({
   showCloseButton = true,
   initialFocusEl,
   trapFocus = true,
+  restoreFocus = true,
 }: DialogProps) {
   return (
     <ArkDialog.Root
@@ -41,6 +44,7 @@ export function Dialog({
       onOpenChange={onOpenChange}
       modal
       trapFocus={trapFocus}
+      restoreFocus={restoreFocus}
       initialFocusEl={initialFocusEl}
     >
       <ArkDialog.Backdrop className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
