@@ -74,6 +74,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     // 各TerminalViewへのrefマップ
     const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
 
+    // アクティブタブが変わったら xterm にフォーカスを移す
+    // TerminalPanel の effect は子コンポーネントの effects より後に実行されるため、
+    // termRef.current が確実に設定済みの状態でフォーカスできる
+    useEffect(() => {
+      if (!activeTabId) return;
+      terminalRefs.current.get(activeTabId)?.focus();
+    }, [activeTabId]);
+
     const handleStatusChange = useCallback(
       (tabId: string, terminal: TerminalStatus, claude: ClaudeStatus) => {
         setTabStatusMap((prev) => {

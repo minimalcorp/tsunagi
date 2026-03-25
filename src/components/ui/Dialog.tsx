@@ -11,6 +11,10 @@ interface DialogProps {
   children: ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   showCloseButton?: boolean;
+  /** ダイアログを開いた時に最初にフォーカスする要素を返す関数 */
+  initialFocusEl?: () => HTMLElement | null;
+  /** フォーカストラップを有効にするか（デフォルト: true） */
+  trapFocus?: boolean;
 }
 
 const maxWidthClasses = {
@@ -28,9 +32,17 @@ export function Dialog({
   children,
   maxWidth = '2xl',
   showCloseButton = true,
+  initialFocusEl,
+  trapFocus = true,
 }: DialogProps) {
   return (
-    <ArkDialog.Root open={open} onOpenChange={onOpenChange} modal trapFocus>
+    <ArkDialog.Root
+      open={open}
+      onOpenChange={onOpenChange}
+      modal
+      trapFocus={trapFocus}
+      initialFocusEl={initialFocusEl}
+    >
       <ArkDialog.Backdrop className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
       <ArkDialog.Positioner className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <ArkDialog.Content
