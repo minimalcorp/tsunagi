@@ -78,15 +78,18 @@ export function MonacoEditorModal({
         }
       }}
       title={title}
-      maxWidth="xl"
+      maxWidth="4xl"
       showCloseButton={true}
       trapFocus={false}
       restoreFocus={false}
     >
       <div className="space-y-4">
-        <div className="border border-theme rounded overflow-hidden" style={{ height: '300px' }}>
+        <div
+          className="border border-theme rounded overflow-hidden"
+          style={{ height: 'clamp(200px, 50vh, 600px)' }}
+        >
           <Editor
-            height="300px"
+            height="100%"
             defaultLanguage="plaintext"
             defaultValue=""
             onMount={(editorInstance, monacoInstance) => {

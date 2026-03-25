@@ -9,7 +9,7 @@ interface DialogProps {
   onOpenChange: (details: { open: boolean }) => void;
   title?: ReactNode;
   children: ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl' | '6xl';
   showCloseButton?: boolean;
   /** ダイアログを開いた時に最初にフォーカスする要素を返す関数 */
   initialFocusEl?: () => HTMLElement | null;
@@ -25,6 +25,8 @@ const maxWidthClasses = {
   lg: 'max-w-lg',
   xl: 'max-w-xl',
   '2xl': 'max-w-2xl',
+  '4xl': 'max-w-4xl',
+  '6xl': 'max-w-6xl',
 };
 
 export function Dialog({
@@ -55,7 +57,7 @@ export function Dialog({
           {(title || showCloseButton) && (
             <div className="flex items-center justify-between p-6 pb-4">
               {title && (
-                <ArkDialog.Title className="text-xl font-bold text-theme-fg">
+                <ArkDialog.Title className="text-base font-semibold text-theme-fg">
                   {title}
                 </ArkDialog.Title>
               )}
