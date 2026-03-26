@@ -19,6 +19,14 @@ export interface MonacoEditorModalProps {
 
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
 
+function moveCursorToEnd(instance: editor.IStandaloneCodeEditor) {
+  const model = instance.getModel();
+  if (!model) return;
+  const lastLine = model.getLineCount();
+  const lastColumn = model.getLineMaxColumn(lastLine);
+  instance.setPosition({ lineNumber: lastLine, column: lastColumn });
+}
+
 export function MonacoEditorModal({
   open,
   onOpenChange,
@@ -54,12 +62,7 @@ export function MonacoEditorModal({
   useEffect(() => {
     if (!open || !editorRef.current) return;
     editorRef.current.setValue(initialValue ?? '');
-    const model = editorRef.current.getModel();
-    if (model) {
-      const lastLine = model.getLineCount();
-      const lastColumn = model.getLineMaxColumn(lastLine);
-      editorRef.current.setPosition({ lineNumber: lastLine, column: lastColumn });
-    }
+    moveCursorToEnd(editorRef.current);
     // layout() → onDidLayoutChange → focus() のチェーンを起動
     editorRef.current.layout();
 
@@ -100,14 +103,7 @@ export function MonacoEditorModal({
             onMount={(editorInstance, monacoInstance) => {
               editorRef.current = editorInstance;
               editorInstance.setValue(initialValue ?? '');
-              {
-                const model = editorInstance.getModel();
-                if (model) {
-                  const lastLine = model.getLineCount();
-                  const lastColumn = model.getLineMaxColumn(lastLine);
-                  editorInstance.setPosition({ lineNumber: lastLine, column: lastColumn });
-                }
-              }
+              moveCursorToEnd(editorInstance);
 
               // レイアウト変化時に自動フォーカス（Dialog 表示で 0→実サイズに変化した瞬間）
               editorInstance.onDidLayoutChange(() => {
