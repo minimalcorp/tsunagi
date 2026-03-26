@@ -264,62 +264,9 @@ select:hover:not(:focus):not(:disabled) {
   border-color: var(--ring);
 }
 
-/* Focus-visible — 3px ring at 50% opacity */
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
+/* Focus-visible reset — shadcn/ui components manage their own focus rings via Tailwind */
+*:focus-visible {
   outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
-}
-
-button:focus-visible {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
-}
-
-a:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
-}
-
-/* Error state focus ring */
-input[class*='border-destructive']:focus-visible,
-textarea[class*='border-destructive']:focus-visible,
-select[class*='border-destructive']:focus-visible,
-input.input-error:focus-visible,
-textarea.input-error:focus-visible,
-select.input-error:focus-visible {
-  outline: none;
-  border-color: var(--error);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--error) 50%, transparent);
-}
-
-/* Form input class */
-.form-input {
-  border: 1px solid var(--input);
-  background-color: transparent;
-  color: var(--foreground);
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  transition:
-    border-color 130ms,
-    box-shadow 130ms;
-}
-
-.form-input:hover:not(:focus):not(:disabled) {
-  border-color: var(--ring);
-}
-
-.form-input:focus-visible {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
-}
-
-.form-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .form-input-error {
