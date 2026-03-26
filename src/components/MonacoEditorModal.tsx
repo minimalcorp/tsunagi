@@ -54,7 +54,12 @@ export function MonacoEditorModal({
   useEffect(() => {
     if (!open || !editorRef.current) return;
     editorRef.current.setValue(initialValue ?? '');
-    editorRef.current.setPosition({ lineNumber: 1, column: 1 });
+    const model = editorRef.current.getModel();
+    if (model) {
+      const lastLine = model.getLineCount();
+      const lastColumn = model.getLineMaxColumn(lastLine);
+      editorRef.current.setPosition({ lineNumber: lastLine, column: lastColumn });
+    }
     // layout() → onDidLayoutChange → focus() のチェーンを起動
     editorRef.current.layout();
 
@@ -95,7 +100,14 @@ export function MonacoEditorModal({
             onMount={(editorInstance, monacoInstance) => {
               editorRef.current = editorInstance;
               editorInstance.setValue(initialValue ?? '');
-              editorInstance.setPosition({ lineNumber: 1, column: 1 });
+              {
+                const model = editorInstance.getModel();
+                if (model) {
+                  const lastLine = model.getLineCount();
+                  const lastColumn = model.getLineMaxColumn(lastLine);
+                  editorInstance.setPosition({ lineNumber: lastLine, column: lastColumn });
+                }
+              }
 
               // レイアウト変化時に自動フォーカス（Dialog 表示で 0→実サイズに変化した瞬間）
               editorInstance.onDidLayoutChange(() => {
