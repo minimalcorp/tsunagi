@@ -71,19 +71,19 @@ export function ClaudeSettingsEditor({ scope, owner, repo }: ClaudeSettingsEdito
   };
 
   if (loading) {
-    return <div className="text-theme-muted text-sm">Loading...</div>;
+    return <div className="text-muted-foreground text-sm">Loading...</div>;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Settings className="w-5 h-5 text-primary-light" />
-        <h3 className="text-lg font-semibold text-theme-fg">Claude Settings Sources</h3>
+        <h3 className="text-lg font-semibold text-foreground">Claude Settings Sources</h3>
       </div>
 
-      <div className="bg-theme-card-hover border border-theme rounded p-4 space-y-3">
+      <div className="bg-card-hover border border-border rounded-xl p-4 space-y-3">
         {/* 説明 */}
-        <div className="flex gap-2 text-sm text-theme-muted">
+        <div className="flex gap-2 text-sm text-muted-foreground">
           <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <p>
             設定ファイル（.mcp.json、CLAUDE.md、.claude/settings.json）の読み込み方法を選択します。
@@ -100,9 +100,9 @@ export function ClaudeSettingsEditor({ scope, owner, repo }: ClaudeSettingsEdito
               onChange={(e) => handleToggle('user', e.target.checked)}
               className="w-4 h-4 rounded border-theme-border"
             />
-            <span className="text-theme-fg">
+            <span className="text-foreground">
               User settings{' '}
-              <span className="text-theme-muted text-sm">(~/.claude/settings.json)</span>
+              <span className="text-muted-foreground text-sm">(~/.claude/settings.json)</span>
             </span>
           </label>
 
@@ -113,9 +113,9 @@ export function ClaudeSettingsEditor({ scope, owner, repo }: ClaudeSettingsEdito
               onChange={(e) => handleToggle('project', e.target.checked)}
               className="w-4 h-4 rounded border-theme-border"
             />
-            <span className="text-theme-fg">
+            <span className="text-foreground">
               Project settings{' '}
-              <span className="text-theme-muted text-sm">
+              <span className="text-muted-foreground text-sm">
                 (.claude/settings.json, CLAUDE.md, .mcp.json)
               </span>
             </span>
@@ -128,18 +128,18 @@ export function ClaudeSettingsEditor({ scope, owner, repo }: ClaudeSettingsEdito
               onChange={(e) => handleToggle('local', e.target.checked)}
               className="w-4 h-4 rounded border-theme-border"
             />
-            <span className="text-theme-fg">
+            <span className="text-foreground">
               Local settings{' '}
-              <span className="text-theme-muted text-sm">(.claude/settings.local.json)</span>
+              <span className="text-muted-foreground text-sm">(.claude/settings.local.json)</span>
             </span>
           </label>
         </div>
 
         {/* 現在の状態表示 */}
-        <div className="mt-4 pt-4 border-t border-theme">
-          <p className="text-sm text-theme-muted">
+        <div className="mt-4 pt-4 border-t border-border">
+          <p className="text-sm text-muted-foreground">
             {sources.length === 0 ? (
-              <span className="text-yellow-500 font-medium">
+              <span className="text-warning font-medium">
                 Isolation mode (設定ファイルを読み込みません)
               </span>
             ) : (

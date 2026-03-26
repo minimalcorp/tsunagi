@@ -103,12 +103,12 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
     return (
       <div className="flex flex-col h-full min-h-0">
         <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
-          <h3 className="text-sm font-semibold text-theme-fg">Prompt</h3>
+          <h3 className="text-sm font-semibold text-foreground">Prompt</h3>
           <div className="flex items-center gap-2">
             {isSupported && (
               <button
                 onClick={isListening ? stopListening : startListening}
-                className="p-2 text-primary hover:text-primary-light rounded hover:bg-theme-hover cursor-pointer"
+                className="size-8 rounded-md inline-flex items-center justify-center text-primary hover:text-primary-light hover:bg-accent transition-colors cursor-pointer"
                 title={isListening ? 'Stop voice input' : 'Start voice input'}
               >
                 {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -119,7 +119,7 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
               <button
                 onClick={handleExecute}
                 disabled={!canExecute}
-                className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 cursor-pointer flex items-center gap-1"
+                className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
               >
                 <Send className="w-3 h-3" />
                 Send
@@ -129,7 +129,7 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
             {isRunning && (
               <button
                 onClick={handleInterrupt}
-                className="px-3 py-1 bg-red-700 text-white rounded text-sm hover:bg-red-600 cursor-pointer flex items-center gap-1"
+                className="h-8 px-3 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer flex items-center gap-1"
               >
                 <Square className="w-3 h-3" />
                 Interrupt
@@ -138,7 +138,7 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 border border-theme rounded overflow-hidden">
+        <div className="flex-1 min-h-0 border border-border rounded overflow-hidden">
           <Editor
             height="100%"
             defaultLanguage="markdown"

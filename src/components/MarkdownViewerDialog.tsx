@@ -21,10 +21,12 @@ export function MarkdownViewerDialog({
     <ArkDialog.Root open={open} onOpenChange={onOpenChange} modal trapFocus>
       <ArkDialog.Backdrop className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
       <ArkDialog.Positioner className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <ArkDialog.Content className="bg-theme-card rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col p-6">
+        <ArkDialog.Content className="bg-card rounded-xl shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col p-6">
           <div className="flex items-center justify-between mb-4">
-            <ArkDialog.Title className="text-xl font-bold text-theme-fg">{title}</ArkDialog.Title>
-            <ArkDialog.CloseTrigger className="ml-auto p-1 rounded hover:bg-theme-hover text-theme-fg cursor-pointer">
+            <ArkDialog.Title className="text-lg font-semibold leading-none text-foreground">
+              {title}
+            </ArkDialog.Title>
+            <ArkDialog.CloseTrigger className="ml-auto size-8 rounded-md inline-flex items-center justify-center hover:bg-accent transition-colors text-foreground cursor-pointer">
               <span className="text-2xl leading-none">&times;</span>
             </ArkDialog.CloseTrigger>
           </div>
@@ -36,7 +38,7 @@ export function MarkdownViewerDialog({
           <div className="mt-6 flex justify-end">
             <button
               onClick={() => onOpenChange({ open: false })}
-              className="px-4 py-2 bg-theme-card text-theme-fg rounded-lg hover:bg-theme-hover border border-theme font-medium"
+              className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground"
             >
               Close
             </button>

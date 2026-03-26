@@ -185,19 +185,19 @@ export function Header({
   const getButtonStyle = (step: string) => {
     const isHighlighted = nextStep === step;
     const baseStyle =
-      'px-4 h-10 rounded transition-transform active:scale-95 cursor-pointer flex items-center justify-center';
+      'size-9 rounded-md inline-flex items-center justify-center transition-[color,background-color,transform] active:scale-95 cursor-pointer';
 
     if (isHighlighted) {
       return `${baseStyle} bg-primary text-white shadow-lg ring-2 ring-primary`;
     }
 
-    return `${baseStyle} bg-theme-hover text-theme-fg`;
+    return `${baseStyle} bg-accent text-foreground`;
   };
 
   return (
-    <header className="h-16 border-b border-theme flex items-center gap-6 px-6 bg-theme-card">
+    <header className="h-14 border-b border-border flex items-center gap-3 px-4 bg-card">
       {/* Logo */}
-      <h1 className="text-2xl font-bold text-theme-fg flex-shrink-0">繋</h1>
+      <h1 className="text-2xl font-bold text-foreground flex-shrink-0">繋</h1>
 
       {/* Filters - Desktop (>= 1024px) */}
       <div className="hidden lg:flex gap-4 flex-1 justify-center">
@@ -217,7 +217,7 @@ export function Header({
           placeholder="Search tasks..."
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="px-3 py-1.5 border border-theme rounded w-64 text-theme-fg bg-theme-card"
+          className="h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs w-64"
         />
       </div>
 
@@ -233,17 +233,19 @@ export function Header({
         <div className="lg:hidden relative" ref={filterRef}>
           <button
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="px-4 h-10 bg-theme-hover rounded text-theme-fg active:scale-95 cursor-pointer flex items-center justify-center"
+            className="size-9 rounded-md inline-flex items-center justify-center bg-accent text-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
             title="Filters"
           >
             <Filter className="w-5 h-5" />
           </button>
 
           {isFilterOpen && (
-            <div className="absolute top-full right-0 mt-2 bg-theme-card border border-theme rounded-lg shadow-lg p-4 w-80 z-50">
+            <div className="absolute top-full right-0 mt-2 bg-card border border-border rounded-lg shadow-lg p-4 w-80 z-50">
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-theme-fg">Repository</label>
+                  <label className="block text-sm font-medium mb-1 text-foreground">
+                    Repository
+                  </label>
                   <Combobox
                     options={[{ value: '', label: 'All Repositories' }, ...repoOptions]}
                     value={repoFilter}
@@ -253,13 +255,13 @@ export function Header({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-theme-fg">Search</label>
+                  <label className="block text-sm font-medium mb-1 text-foreground">Search</label>
                   <input
                     type="text"
                     placeholder="Search tasks..."
                     value={searchQuery}
                     onChange={(e) => handleSearchChange(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-theme rounded text-theme-fg bg-theme-card"
+                    className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs"
                   />
                 </div>
               </div>
@@ -269,26 +271,26 @@ export function Header({
         <div className="relative">
           <button
             onClick={onCloneClick}
-            className={`px-4 h-10 rounded active:scale-95 cursor-pointer flex items-center justify-center ${
+            className={`size-9 rounded-md inline-flex items-center justify-center active:scale-95 transition-[color,background-color,transform] cursor-pointer ${
               nextStep === 'clone'
                 ? 'bg-primary text-white shadow-lg ring-2 ring-primary'
-                : 'bg-theme-hover text-theme-fg'
+                : 'bg-accent text-foreground'
             }`}
             title="Clone Repository"
           >
             <FolderDown className="w-5 h-5" />
           </button>
           {nextStep === 'clone' && !isCloneDialogOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-tooltip backdrop-blur-sm border-2 border-amber-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-tooltip backdrop-blur-sm border-2 border-warning text-foreground px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
               Clone a repository
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-tooltip backdrop-blur-sm border-l-2 border-t-2 border-amber-500 rotate-45" />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-tooltip backdrop-blur-sm border-l-2 border-t-2 border-warning rotate-45" />
             </div>
           )}
         </div>
 
         <button
           onClick={onReload}
-          className="px-4 h-10 bg-theme-hover rounded text-theme-fg active:scale-95 cursor-pointer flex items-center justify-center"
+          className="size-9 rounded-md inline-flex items-center justify-center bg-accent text-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
           title="Reload"
         >
           <RefreshCw className="w-5 h-5" />
@@ -303,9 +305,9 @@ export function Header({
             <Settings className="w-5 h-5" />
           </button>
           {nextStep === 'env' && (
-            <div className="absolute top-full mt-2 right-[-2px] bg-tooltip backdrop-blur-sm border-2 border-amber-500 text-theme-fg px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
+            <div className="absolute top-full mt-2 right-[-2px] bg-tooltip backdrop-blur-sm border-2 border-warning text-foreground px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
               Set up tokens
-              <div className="absolute -top-1 right-[21px] w-2 h-2 bg-tooltip backdrop-blur-sm border-l-2 border-t-2 border-amber-500 rotate-45" />
+              <div className="absolute -top-1 right-[21px] w-2 h-2 bg-tooltip backdrop-blur-sm border-l-2 border-t-2 border-warning rotate-45" />
             </div>
           )}
         </div>

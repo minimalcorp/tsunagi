@@ -71,9 +71,9 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-theme-bg">
+    <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-50 p-4 border-b border-theme bg-theme-card">
+      <div className="sticky top-0 z-50 p-4 border-b border-border bg-card">
         <div className="flex items-center justify-between">
           <button
             onClick={() => router.push('/')}
@@ -83,7 +83,7 @@ export default function SettingsPage() {
             Back to Board
           </button>
 
-          <h1 className="text-xl font-bold text-theme-fg absolute left-1/2 -translate-x-1/2">
+          <h1 className="text-xl font-bold text-foreground absolute left-1/2 -translate-x-1/2">
             Settings
           </h1>
         </div>
@@ -92,12 +92,12 @@ export default function SettingsPage() {
       {/* Split Layout */}
       <div className="flex-1 flex min-h-0">
         {/* Left Panel: Tree Navigation */}
-        <div className="w-64 border-r border-theme bg-theme-card">
+        <div className="w-64 border-r border-border bg-card">
           <EnvTreeNavigation selectedNode={selectedNode} onNodeSelect={handleNodeSelect} />
         </div>
 
         {/* Right Panel: Editor */}
-        <div className="flex-1 bg-theme-card p-4 overflow-y-auto">
+        <div className="flex-1 bg-card p-4 overflow-y-auto">
           {selectedNode ? (
             <div className="space-y-6">
               {/* Claude Token Section (All scopes) */}
@@ -114,7 +114,7 @@ export default function SettingsPage() {
               <EnvVariableEditor selectedNode={selectedNode} />
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-theme-muted text-sm">
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
               Select a node from the left panel
             </div>
           )}

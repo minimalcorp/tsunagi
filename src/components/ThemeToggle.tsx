@@ -13,7 +13,7 @@ export function ThemeToggle() {
   ];
 
   return (
-    <div className="flex items-center gap-1 bg-theme-hover rounded p-1">
+    <div className="flex items-center gap-1 bg-accent rounded p-1">
       {themes.map(({ value, icon: Icon, label }) => (
         <button
           key={value}
@@ -21,7 +21,7 @@ export function ThemeToggle() {
           className={`px-2 h-8 rounded text-sm cursor-pointer flex items-center justify-center ${
             theme === value
               ? 'bg-primary text-white shadow-sm'
-              : 'text-theme-muted hover:text-theme-fg'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
           title={label}
         >

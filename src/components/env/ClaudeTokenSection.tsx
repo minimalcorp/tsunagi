@@ -270,8 +270,8 @@ export function ClaudeTokenSection({
 
   if (isLoading) {
     return (
-      <div className="border-2 border-primary rounded-lg p-4 bg-theme-card">
-        <h2 className="text-lg font-bold text-theme-fg mb-4">Claude Tokens</h2>
+      <div className="border-2 border-primary rounded-xl p-4 bg-card">
+        <h2 className="text-lg font-bold text-foreground mb-4">Claude Tokens</h2>
         <div className="flex items-center justify-center py-8">
           <LoadingSpinner size="sm" message="Loading tokens..." />
         </div>
@@ -281,9 +281,9 @@ export function ClaudeTokenSection({
 
   if (error) {
     return (
-      <div className="border-2 border-primary rounded-lg p-4 bg-theme-card">
-        <h2 className="text-lg font-bold text-theme-fg mb-4">Claude Tokens</h2>
-        <div className="text-red-500 text-sm">{error}</div>
+      <div className="border-2 border-primary rounded-xl p-4 bg-card">
+        <h2 className="text-lg font-bold text-foreground mb-4">Claude Tokens</h2>
+        <div className="text-destructive text-sm">{error}</div>
       </div>
     );
   }
@@ -292,13 +292,13 @@ export function ClaudeTokenSection({
     onboardingStatus && !onboardingStatus.completed && selectedNode.scope !== 'global';
 
   return (
-    <div className="border-2 border-primary rounded-lg p-4 bg-theme-card">
+    <div className="border-2 border-primary rounded-xl p-4 bg-card">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-theme-fg">Claude Tokens</h2>
+        <h2 className="text-lg font-bold text-foreground">Claude Tokens</h2>
         {!isAdding && tokens.length === 0 && (
           <button
             onClick={() => setIsAdding(true)}
-            className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer flex items-center gap-2 text-sm"
+            className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Add Token
@@ -308,17 +308,17 @@ export function ClaudeTokenSection({
 
       {/* Warning Banner */}
       {showWarning && (
-        <div className="mb-4 border-2 border-amber-500 bg-amber-50/50 rounded-lg p-3 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div className="mb-4 border-2 border-warning bg-warning/10 rounded-xl p-3 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm text-amber-900">
+            <p className="text-sm text-warning">
               オンボーディングを完了するには、Globalスコープにトークンを追加してください
             </p>
           </div>
           {onSwitchToGlobal && (
             <button
               onClick={onSwitchToGlobal}
-              className="px-3 py-1.5 bg-amber-600 text-white rounded active:scale-95 transition-transform cursor-pointer text-sm whitespace-nowrap"
+              className="h-8 px-3 rounded-md text-sm font-medium bg-warning text-white active:scale-95 transition-[color,background-color,transform] cursor-pointer whitespace-nowrap"
             >
               Switch to Global
             </button>
@@ -329,34 +329,32 @@ export function ClaudeTokenSection({
       <div className="space-y-3">
         {/* Add Token Form */}
         {isAdding && (
-          <div className="border border-theme rounded p-3 bg-theme-hover">
-            <div className="text-sm font-medium text-theme-fg mb-2">New Token</div>
+          <div className="border border-border rounded p-3 bg-accent">
+            <div className="text-sm font-medium text-foreground mb-2">New Token</div>
             <div className="space-y-2">
               <input
                 type="password"
                 value={addValue}
                 onChange={(e) => handleAddValueChange(e.target.value)}
                 placeholder="sk-ant-api... or sk-ant-oat..."
-                className="w-full px-3 py-2 border border-theme rounded font-mono text-sm text-theme-fg bg-theme-card"
+                className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
                 autoFocus
               />
               {detectedKey && !addError && (
-                <div className="text-xs text-green-600">
-                  → Detected: {TOKEN_LABELS[detectedKey]}
-                </div>
+                <div className="text-xs text-success">→ Detected: {TOKEN_LABELS[detectedKey]}</div>
               )}
-              {addError && <div className="text-xs text-red-500">{addError}</div>}
+              {addError && <div className="text-xs text-destructive">{addError}</div>}
               <div className="flex justify-end gap-2">
                 <button
                   onClick={handleCancelAdd}
-                  className="px-3 py-1.5 border border-theme rounded text-theme-fg hover:bg-theme-hover active:scale-95 transition-transform cursor-pointer text-sm"
+                  className="h-8 px-3 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleAddToken}
                   disabled={!detectedKey || !!addError}
-                  className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
+                  className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <Check className="w-4 h-4" />
                 </button>
@@ -367,41 +365,41 @@ export function ClaudeTokenSection({
 
         {/* Existing Tokens */}
         {tokens.length === 0 && !isAdding ? (
-          <div className="text-center text-theme-muted text-sm py-4">
+          <div className="text-center text-muted-foreground text-sm py-4">
             No Claude tokens configured
           </div>
         ) : (
           tokens.map((token) => (
-            <div key={token.key} className="border border-theme rounded p-3 space-y-2">
+            <div key={token.key} className="border border-border rounded p-3 space-y-2">
               {editingKey === token.key ? (
                 // Edit Mode (same UI as Add)
                 <>
-                  <div className="text-sm font-medium text-theme-fg mb-2">Edit Token</div>
+                  <div className="text-sm font-medium text-foreground mb-2">Edit Token</div>
                   <input
                     type="password"
                     value={editValue}
                     onChange={(e) => handleEditValueChange(e.target.value)}
                     placeholder="sk-ant-api... or sk-ant-oat..."
-                    className="w-full px-3 py-2 border border-theme rounded font-mono text-sm text-theme-fg bg-theme-card"
+                    className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
                     autoFocus
                   />
                   {editDetectedKey && !editError && (
-                    <div className="text-xs text-green-600">
+                    <div className="text-xs text-success">
                       → Detected: {TOKEN_LABELS[editDetectedKey]}
                     </div>
                   )}
-                  {editError && <div className="text-xs text-red-500">{editError}</div>}
+                  {editError && <div className="text-xs text-destructive">{editError}</div>}
                   <div className="flex justify-end gap-2">
                     <button
                       onClick={handleCancelEdit}
-                      className="px-3 py-1.5 border border-theme rounded text-theme-fg hover:bg-theme-hover active:scale-95 transition-transform cursor-pointer text-sm"
+                      className="h-8 px-3 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
                     >
                       <X className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleSaveEdit(token.key)}
                       disabled={!editDetectedKey || !!editError}
-                      className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
+                      className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                       <Check className="w-4 h-4" />
                     </button>
@@ -411,35 +409,35 @@ export function ClaudeTokenSection({
                 // View Mode
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-theme-fg">{token.label}</span>
+                    <span className="text-sm font-medium text-foreground">{token.label}</span>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() =>
                           setShowValue((prev) => ({ ...prev, [token.key]: !prev[token.key] }))
                         }
-                        className="p-1 hover:bg-theme-hover rounded cursor-pointer"
+                        className="size-8 rounded-md inline-flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
                         title={showValue[token.key] ? 'Hide value' : 'Show value'}
                       >
                         {showValue[token.key] ? (
-                          <EyeOff className="w-4 h-4 text-theme-muted" />
+                          <EyeOff className="w-4 h-4 text-muted-foreground" />
                         ) : (
-                          <Eye className="w-4 h-4 text-theme-muted" />
+                          <Eye className="w-4 h-4 text-muted-foreground" />
                         )}
                       </button>
                       <button
                         onClick={() => handleEdit(token.key)}
-                        className="p-1 hover:bg-theme-hover rounded cursor-pointer"
+                        className="size-8 rounded-md inline-flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
                         title="Edit"
                       >
-                        <Pencil className="w-4 h-4 text-theme-muted" />
+                        <Pencil className="w-4 h-4 text-muted-foreground" />
                       </button>
                       {selectedNode.scope !== 'global' && (
                         <button
                           onClick={() => handleDelete(token.key)}
-                          className="p-1 hover:bg-red-50 rounded cursor-pointer"
+                          className="size-8 rounded-md inline-flex items-center justify-center hover:bg-destructive/10 transition-colors cursor-pointer"
                           title="Delete"
                         >
-                          <Trash2 className="w-4 h-4 text-red-500" />
+                          <Trash2 className="w-4 h-4 text-destructive" />
                         </button>
                       )}
                     </div>
@@ -448,7 +446,7 @@ export function ClaudeTokenSection({
                     type={showValue[token.key] ? 'text' : 'password'}
                     value={token.value}
                     readOnly
-                    className="w-full px-3 py-2 border border-theme rounded font-mono text-sm text-theme-fg bg-theme-card"
+                    className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
                   />
                 </>
               )}

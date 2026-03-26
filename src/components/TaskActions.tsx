@@ -80,7 +80,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
       <div className="flex items-center gap-2">
         <button
           onClick={() => setDeleteConfirmOpen(true)}
-          className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600 flex items-center gap-2 cursor-pointer font-medium text-sm"
+          className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 flex items-center gap-2 cursor-pointer"
         >
           <Trash2 className="w-4 h-4" />
           Delete Task
@@ -88,7 +88,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
 
         <button
           onClick={handleOpenVSCode}
-          className="px-4 py-2 rounded-lg font-medium text-sm cursor-pointer bg-primary-600 hover:bg-primary-hover text-white flex items-center gap-2"
+          className="h-9 px-4 py-2 rounded-md text-sm font-medium cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2"
         >
           <Code2 className="w-4 h-4" />
           Open VS Code

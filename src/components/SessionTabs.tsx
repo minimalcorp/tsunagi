@@ -34,7 +34,7 @@ interface SessionTabsProps {
 function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
   if (!entry || entry.terminal === 'idle') {
     return (
-      <div className="flex items-center gap-1 text-xs text-theme-muted">
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <CirclePause className="w-3 h-3" />
         <span>idle</span>
       </div>
@@ -43,7 +43,7 @@ function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
 
   if (entry.terminal === 'connecting') {
     return (
-      <div className="flex items-center gap-1 text-xs text-theme-muted">
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <Loader2 className="w-3 h-3 animate-spin" />
         <span>connecting</span>
       </div>
@@ -52,7 +52,7 @@ function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
 
   if (entry.terminal === 'error') {
     return (
-      <div className="flex items-center gap-1 text-xs text-red-500">
+      <div className="flex items-center gap-1 text-xs text-destructive">
         <AlertCircle className="w-3 h-3" />
         <span>error</span>
       </div>
@@ -61,7 +61,7 @@ function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
 
   if (entry.terminal === 'exited' || entry.terminal === 'paused') {
     return (
-      <div className="flex items-center gap-1 text-xs text-theme-muted">
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
         <WifiOff className="w-3 h-3" />
         <span>{entry.terminal}</span>
       </div>
@@ -79,14 +79,14 @@ function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
       );
     case 'waiting':
       return (
-        <div className="flex items-center gap-1 text-xs text-yellow-500">
+        <div className="flex items-center gap-1 text-xs text-warning">
           <MessageSquare className="w-3 h-3" />
           <span>waiting</span>
         </div>
       );
     case 'success':
       return (
-        <div className="flex items-center gap-1 text-xs text-green-500">
+        <div className="flex items-center gap-1 text-xs text-success">
           <CheckCircle2 className="w-3 h-3" />
           <span>success</span>
         </div>
@@ -94,7 +94,7 @@ function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
     case 'failure':
     case 'error':
       return (
-        <div className="flex items-center gap-1 text-xs text-red-500">
+        <div className="flex items-center gap-1 text-xs text-destructive">
           <XCircle className="w-3 h-3" />
           <span>{entry.claude === 'failure' ? 'failure' : 'error'}</span>
         </div>
@@ -102,7 +102,7 @@ function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
     default:
       // claude: idle
       return (
-        <div className="flex items-center gap-1 text-xs text-theme-muted">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <CirclePause className="w-3 h-3" />
           <span>idle</span>
         </div>
@@ -160,7 +160,7 @@ export function SessionTabs({
         }}
         variant="danger"
       />
-      <div className="relative flex items-center gap-2 overflow-x-auto border-b border-theme pb-1">
+      <div className="relative flex items-center gap-2 overflow-x-auto border-b border-border pb-1">
         {tabs.map((tab, index) => {
           const isActive = activeTabId === tab.tab_id;
           const entry = tabStatusMap?.get(tab.tab_id);
@@ -182,7 +182,7 @@ export function SessionTabs({
                   ? 'text-primary'
                   : isRunning
                     ? 'text-primary-light'
-                    : 'text-theme-muted hover:text-theme-fg'
+                    : 'text-muted-foreground hover:text-foreground'
               }
             `}
             >
@@ -195,7 +195,7 @@ export function SessionTabs({
                     e.stopPropagation();
                     setDeleteTarget({ tabId: tab.tab_id, isRunning });
                   }}
-                  className="hover:bg-theme-hover rounded cursor-pointer"
+                  className="hover:bg-accent rounded-md cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -225,7 +225,7 @@ export function SessionTabs({
 
         {/* Material Design Indicator */}
         <div
-          className="absolute bottom-0 h-0.5 bg-primary transition-all"
+          className="absolute bottom-0 h-0.5 bg-primary transition-[left,width]"
           style={{
             left: `${indicatorStyle.left}px`,
             width: `${indicatorStyle.width}px`,

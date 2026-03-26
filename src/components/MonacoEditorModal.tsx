@@ -85,7 +85,7 @@ export function MonacoEditorModal({
     >
       <div className="space-y-4">
         <div
-          className="border border-theme rounded overflow-hidden"
+          className="border border-border rounded overflow-hidden"
           style={{ height: 'clamp(200px, 50vh, 600px)' }}
         >
           <Editor
@@ -131,19 +131,19 @@ export function MonacoEditorModal({
             theme={effectiveTheme === 'dark' ? 'vs-dark' : 'vs-light'}
           />
         </div>
-        <p className="text-xs text-theme-muted">
+        <p className="text-xs text-muted-foreground">
           {isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} で{submitLabel}、Esc でキャンセル
         </p>
         <div className="flex justify-end gap-2">
           <button
             onClick={handleCancel}
-            className="px-4 py-2 border border-theme rounded text-theme-fg hover:bg-theme-hover cursor-pointer"
+            className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover cursor-pointer"
+            className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
           >
             {submitLabel}
           </button>

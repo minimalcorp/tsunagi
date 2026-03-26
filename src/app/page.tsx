@@ -277,9 +277,9 @@ export default function Home() {
   // 初回ロード時のみローディング表示
   if (isLoading && tasks.length === 0) {
     return (
-      <div className="h-screen flex items-center justify-center bg-theme-bg">
+      <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="text-2xl text-theme-fg">Loading...</div>
+          <div className="text-2xl text-foreground">Loading...</div>
         </div>
       </div>
     );
@@ -298,7 +298,7 @@ export default function Home() {
       />
 
       {/* カンバンボード（常に表示） */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden px-4 py-4 md:px-6">
         <KanbanBoard
           tasks={filteredTasks}
           onTaskMove={handleTaskMove}

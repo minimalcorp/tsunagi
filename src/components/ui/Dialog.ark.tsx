@@ -52,23 +52,23 @@ export function Dialog({
       <ArkDialog.Backdrop className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
       <ArkDialog.Positioner className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <ArkDialog.Content
-          className={`bg-theme-card rounded-lg shadow-xl w-full ${maxWidthClasses[maxWidth]} max-h-[90vh] overflow-y-auto relative`}
+          className={`bg-background rounded-lg border border-border shadow-lg w-full ${maxWidthClasses[maxWidth]} max-h-[90vh] overflow-y-auto relative`}
         >
           {(title || showCloseButton) && (
-            <div className="flex items-center justify-between p-6 pb-4">
+            <div className="flex items-center justify-between px-6 pt-6 pb-2">
               {title && (
-                <ArkDialog.Title className="text-base font-semibold text-theme-fg">
+                <ArkDialog.Title className="text-lg font-semibold leading-none text-foreground">
                   {title}
                 </ArkDialog.Title>
               )}
               {showCloseButton && (
-                <ArkDialog.CloseTrigger className="ml-auto p-1 rounded hover:bg-theme-hover text-theme-fg cursor-pointer">
-                  <X className="w-5 h-5" />
+                <ArkDialog.CloseTrigger className="ml-auto size-8 rounded-md inline-flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                  <X className="size-4" />
                 </ArkDialog.CloseTrigger>
               )}
             </div>
           )}
-          <div className={title || showCloseButton ? 'px-6 pb-6' : 'p-6'}>{children}</div>
+          <div className={title || showCloseButton ? 'px-6 pb-6 pt-2' : 'p-6'}>{children}</div>
         </ArkDialog.Content>
       </ArkDialog.Positioner>
     </ArkDialog.Root>
@@ -103,17 +103,17 @@ export function ConfirmDialog({
 
   const confirmButtonClass =
     variant === 'danger'
-      ? 'px-4 py-2 bg-red-700 text-white rounded hover:bg-red-600 active:scale-95 transition-transform cursor-pointer'
-      : 'px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover active:scale-95 transition-transform cursor-pointer';
+      ? 'h-9 px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer'
+      : 'h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} maxWidth="md" showCloseButton={false}>
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-theme-fg">{title}</h2>
-        <div className="text-theme-fg whitespace-pre-line">{message}</div>
+        <h2 className="text-lg font-semibold leading-none text-foreground">{title}</h2>
+        <div className="text-sm text-muted-foreground whitespace-pre-line">{message}</div>
         <div className="flex justify-end gap-2 pt-2">
           <ArkDialog.CloseTrigger asChild>
-            <button className="px-4 py-2 border border-theme rounded text-theme-fg hover:bg-theme-hover active:scale-95 transition-transform cursor-pointer">
+            <button className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer">
               {cancelLabel}
             </button>
           </ArkDialog.CloseTrigger>

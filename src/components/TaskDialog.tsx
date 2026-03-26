@@ -296,7 +296,7 @@ export function TaskDialog({
       showCloseButton={!isLoading}
     >
       {isLoading && (
-        <div className="absolute inset-0 bg-theme-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
+        <div className="absolute inset-0 bg-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
           <LoadingSpinner
             size="lg"
             message={isCreateMode ? 'Creating task...' : 'Saving task...'}
@@ -305,7 +305,7 @@ export function TaskDialog({
       )}
 
       {fieldErrors.global && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded text-red-500 text-sm">
+        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/50 rounded text-destructive text-sm">
           {fieldErrors.global}
         </div>
       )}
@@ -314,7 +314,7 @@ export function TaskDialog({
         {/* Create mode: Repository選択 */}
         {isCreateMode && (
           <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">Repository *</label>
+            <label className="block text-sm font-medium mb-1 text-foreground">Repository *</label>
             <Combobox
               options={repoOptions}
               value={combinedRepo}
@@ -327,26 +327,26 @@ export function TaskDialog({
 
         {/* 共通: Title */}
         <div>
-          <label className="block text-sm font-medium mb-1 text-theme-fg">Title *</label>
+          <label className="block text-sm font-medium mb-1 text-foreground">Title *</label>
           <input
             type="text"
             required
             maxLength={200}
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+            className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
             disabled={isLoading}
           />
         </div>
 
         {/* 共通: Description */}
         <div>
-          <label className="block text-sm font-medium mb-1 text-theme-fg">Description</label>
+          <label className="block text-sm font-medium mb-1 text-foreground">Description</label>
           <textarea
             maxLength={5000}
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="w-full px-3 py-2 border border-theme rounded h-24 text-theme-fg bg-theme-card"
+            className="w-full px-3 py-2 rounded-md border border-input bg-transparent text-sm shadow-xs min-h-24 text-foreground"
             disabled={isLoading}
           />
         </div>
@@ -354,13 +354,13 @@ export function TaskDialog({
         {/* Edit mode: Status */}
         {!isCreateMode && (
           <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">Status</label>
+            <label className="block text-sm font-medium mb-1 text-foreground">Status</label>
             <select
               value={formData.status}
               onChange={(e) =>
                 setFormData({ ...formData, status: e.target.value as Task['status'] })
               }
-              className="w-full pl-3 pr-10 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+              className="w-full h-9 pl-3 pr-10 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
               disabled={isLoading}
             >
               <option value="backlog">Backlog</option>
@@ -376,7 +376,7 @@ export function TaskDialog({
         {/* Edit mode: Effort */}
         {!isCreateMode && (
           <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">Effort (hours)</label>
+            <label className="block text-sm font-medium mb-1 text-foreground">Effort (hours)</label>
             <input
               type="number"
               step="0.5"
@@ -386,7 +386,7 @@ export function TaskDialog({
               onChange={(e) =>
                 setFormData({ ...formData, effort: parseFloat(e.target.value) || undefined })
               }
-              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+              className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
               placeholder="e.g. 2.5"
               disabled={isLoading}
             />
@@ -396,7 +396,7 @@ export function TaskDialog({
         {/* Edit mode: Order */}
         {!isCreateMode && (
           <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">Order</label>
+            <label className="block text-sm font-medium mb-1 text-foreground">Order</label>
             <input
               type="number"
               min="0"
@@ -404,7 +404,7 @@ export function TaskDialog({
               onChange={(e) =>
                 setFormData({ ...formData, order: parseInt(e.target.value) || undefined })
               }
-              className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+              className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
               placeholder="e.g. 0 (highest priority)"
               disabled={isLoading}
             />
@@ -414,9 +414,9 @@ export function TaskDialog({
         {/* Create mode: Base Branch */}
         {isCreateMode && (
           <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">Base Branch *</label>
+            <label className="block text-sm font-medium mb-1 text-foreground">Base Branch *</label>
             {isFetchingBranches ? (
-              <div className="w-full h-10 px-3 border border-theme rounded text-theme-muted bg-theme-card flex items-center gap-2">
+              <div className="w-full h-9 px-3 rounded-md border border-input bg-transparent text-muted-foreground flex items-center gap-2">
                 <LoadingSpinner size="sm" />
                 <span className="text-xs">Loading branches...</span>
               </div>
@@ -432,11 +432,11 @@ export function TaskDialog({
                 disabled={isLoading}
               />
             ) : (
-              <div className="w-full h-10 px-3 border border-theme rounded text-sm text-theme-muted bg-theme-card flex items-center">
+              <div className="w-full h-9 px-3 rounded-md border border-input bg-transparent text-sm text-muted-foreground flex items-center">
                 {branchError || 'Select repository first'}
               </div>
             )}
-            <p className="text-xs text-theme-muted mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Your new branch will be created from this branch
             </p>
           </div>
@@ -445,7 +445,7 @@ export function TaskDialog({
         {/* Create mode: New Branch Name */}
         {isCreateMode && (
           <div>
-            <label className="block text-sm font-medium mb-1 text-theme-fg">
+            <label className="block text-sm font-medium mb-1 text-foreground">
               New Branch Name *
             </label>
             <input
@@ -454,17 +454,17 @@ export function TaskDialog({
               maxLength={255}
               value={formData.branch}
               onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-              className={`w-full px-3 py-2 border rounded text-theme-fg bg-theme-card ${
-                fieldErrors.branch ? 'border-red-500 input-error' : 'border-theme'
+              className={`w-full h-9 px-3 py-1 rounded-md border bg-transparent text-sm shadow-xs text-foreground ${
+                fieldErrors.branch ? 'border-destructive input-error' : 'border-input'
               }`}
               placeholder="feature/new-feature"
               disabled={isLoading}
             />
             {fieldErrors.branch && (
-              <p className="text-xs text-red-500 mt-1">{fieldErrors.branch}</p>
+              <p className="text-xs text-destructive mt-1">{fieldErrors.branch}</p>
             )}
             {!fieldErrors.branch && (
-              <p className="text-xs text-theme-muted mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Will be created from {formData.baseBranch || 'base branch'}
               </p>
             )}
@@ -475,14 +475,14 @@ export function TaskDialog({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-transform cursor-pointer"
+            className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
             disabled={isLoading}
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             disabled={isLoading || (isCreateMode && isFetchingBranches)}
           >
             {submitButtonText}

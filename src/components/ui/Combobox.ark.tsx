@@ -136,7 +136,7 @@ export function Combobox({
     >
       <ArkCombobox.Control className={`relative ${className}`}>
         <ArkCombobox.Input
-          className={`w-full pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} py-2 border border-theme rounded text-theme-fg bg-theme-card disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap`}
+          className={`w-full pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} py-2 border border-border rounded text-foreground bg-card disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap`}
           placeholder={placeholder}
         />
         {showClearButton && onClear && (
@@ -146,33 +146,33 @@ export function Combobox({
               e.stopPropagation();
               onClear();
             }}
-            className="absolute right-8 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-fg transition-colors cursor-pointer"
+            className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             aria-label="Clear selection"
           >
             <X className="w-4 h-4" />
           </button>
         )}
-        <ArkCombobox.Trigger className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-muted">
+        <ArkCombobox.Trigger className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
           <ChevronsUpDown className="w-4 h-4" />
         </ArkCombobox.Trigger>
       </ArkCombobox.Control>
 
       <Portal>
         <ArkCombobox.Positioner>
-          <ArkCombobox.Content className="bg-theme-card border border-theme rounded shadow-lg mt-1 max-h-60 overflow-auto z-50 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out">
+          <ArkCombobox.Content className="bg-card border border-border rounded shadow-lg mt-1 max-h-60 overflow-auto z-50 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out">
             {collection.items.length > 0 ? (
               hasGroups ? (
                 <>
                   {Object.entries(groupedItems).map(([groupName, groupItems]) => (
                     <ArkCombobox.ItemGroup key={groupName}>
-                      <ArkCombobox.ItemGroupLabel className="px-3 py-1.5 text-xs font-semibold text-theme-muted uppercase">
+                      <ArkCombobox.ItemGroupLabel className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase">
                         {groupName}
                       </ArkCombobox.ItemGroupLabel>
                       {groupItems.map((item) => (
                         <ArkCombobox.Item
                           key={item.value}
                           item={item}
-                          className="px-3 py-2 cursor-pointer hover:bg-theme-hover text-theme-fg flex items-center justify-between"
+                          className="px-3 py-2 cursor-pointer hover:bg-accent text-foreground flex items-center justify-between"
                         >
                           <ArkCombobox.ItemText>{item.label}</ArkCombobox.ItemText>
                           <ArkCombobox.ItemIndicator>
@@ -189,7 +189,7 @@ export function Combobox({
                     <ArkCombobox.Item
                       key={item.value}
                       item={item}
-                      className="px-3 py-2 cursor-pointer hover:bg-theme-hover text-theme-fg flex items-center justify-between"
+                      className="px-3 py-2 cursor-pointer hover:bg-accent text-foreground flex items-center justify-between"
                     >
                       <ArkCombobox.ItemText>{item.label}</ArkCombobox.ItemText>
                       <ArkCombobox.ItemIndicator>
@@ -200,7 +200,7 @@ export function Combobox({
                 </ArkCombobox.ItemGroup>
               )
             ) : (
-              <div className="px-3 py-2 text-theme-muted text-sm">No options found</div>
+              <div className="px-3 py-2 text-muted-foreground text-sm">No options found</div>
             )}
           </ArkCombobox.Content>
         </ArkCombobox.Positioner>

@@ -134,11 +134,11 @@ export function EnvTreeNavigation({ selectedNode, onNodeSelect }: EnvTreeNavigat
   };
 
   if (isLoading) {
-    return <div className="p-4 text-theme-muted text-sm">Loading...</div>;
+    return <div className="p-4 text-muted-foreground text-sm">Loading...</div>;
   }
 
   if (treeData.length === 0) {
-    return <div className="p-4 text-theme-muted text-sm">No repositories found</div>;
+    return <div className="p-4 text-muted-foreground text-sm">No repositories found</div>;
   }
 
   return (

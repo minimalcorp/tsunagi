@@ -179,10 +179,10 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             />
           ) : (
             <div className="text-center py-8">
-              <p className="text-theme-muted mb-4">No tabs yet</p>
+              <p className="text-muted-foreground mb-4">No tabs yet</p>
               <button
                 onClick={handleTabCreateClaude}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 cursor-pointer"
+                className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
               >
                 + Create First Tab
               </button>
@@ -234,7 +234,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           })}
 
           {tabs.length > 0 && !activeTabId && (
-            <div className="h-full flex items-center justify-center text-theme-muted text-sm">
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
               Select a tab to view terminal
             </div>
           )}

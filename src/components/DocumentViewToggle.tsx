@@ -16,7 +16,7 @@ export function DocumentViewToggle({ mode, onChange }: DocumentViewToggleProps) 
   ];
 
   return (
-    <div className="bg-theme-hover rounded p-1 inline-flex gap-0.5">
+    <div className="bg-accent rounded p-1 inline-flex gap-0.5">
       {buttons.map(({ mode: buttonMode, icon: Icon, label }) => (
         <button
           key={buttonMode}
@@ -24,7 +24,7 @@ export function DocumentViewToggle({ mode, onChange }: DocumentViewToggleProps) 
           className={`px-2 py-1 rounded text-sm flex items-center gap-1.5 transition-colors cursor-pointer ${
             mode === buttonMode
               ? 'bg-primary text-white shadow-sm'
-              : 'text-theme-muted hover:text-theme-fg'
+              : 'text-muted-foreground hover:text-foreground'
           }`}
           title={label}
         >

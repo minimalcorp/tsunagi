@@ -49,6 +49,44 @@ return <ConnectedUI />;
 - `status === 'connected'` のような状態フラグで表示・非表示を制御する
 - 「表示しながら中身だけ変える」より「状態に応じて別コンポーネントを出し分ける」を優先する
 
+## デザインシステム
+
+shadcn/ui preset `b2W68tmsa` 準拠。
+
+### カラー
+
+- OKLCH色空間、セマンティックペア（background/foreground, card/card-foreground 等）
+- ステータス: success(緑), warning(黄), error(赤), info(青)
+
+### スペーシング
+
+- ヘッダー: `h-14 px-4`
+- ページコンテナ: `px-4 py-4` (mobile), `md:px-6` (desktop)
+- カード: `p-3`
+- カラム: `p-2`
+- カード間: `space-y-2`
+- ダイアログ: `p-6 gap-4`
+
+### アニメーション
+
+- 操作(hover/press/focus): `130ms cubic-bezier(0.4, 0, 0.2, 1)`
+- テーマ切替: `200ms`
+- hover: `hover:bg-accent`（brightness filter不使用）
+- press: `active:scale-95`
+- focus: `ring-[3px] ring-ring/50`
+
+### ボタンパターン
+
+- Primary: `h-9 rounded-md bg-primary text-primary-foreground hover:bg-primary/90`
+- Outline: `h-9 rounded-md border border-input bg-background shadow-xs hover:bg-accent`
+- Ghost: `h-9 rounded-md hover:bg-accent`
+- Destructive: `h-9 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90`
+- Icon: `size-8 rounded-md hover:bg-accent`
+
+### 入力パターン
+
+- `h-9 rounded-md border border-input bg-transparent shadow-xs`
+
 ## Git操作のルール
 
 - **作業完了後に勝手にcommitしない**

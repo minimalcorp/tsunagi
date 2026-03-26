@@ -17,22 +17,22 @@ const getIcon = (type?: ToastType) => {
     case 'loading':
       return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
     case 'success':
-      return <CheckCircle className="h-5 w-5 text-green-500" />;
+      return <CheckCircle className="h-5 w-5 text-success" />;
     case 'error':
-      return <CircleAlert className="h-5 w-5 text-red-500" />;
+      return <CircleAlert className="h-5 w-5 text-destructive" />;
     case 'info':
-      return <Info className="h-5 w-5 text-blue-500" />;
+      return <Info className="h-5 w-5 text-info" />;
     default:
-      return <Info className="h-5 w-5 text-blue-500" />;
+      return <Info className="h-5 w-5 text-info" />;
   }
 };
 
 const getProgressBarColor = (type?: ToastType) => {
   switch (type) {
     case 'success':
-      return 'bg-green-500';
+      return 'bg-success';
     case 'info':
-      return 'bg-blue-500';
+      return 'bg-info';
     default:
       return '';
   }
@@ -44,7 +44,7 @@ export function Toast({ type, title, description, duration, ...props }: ToastPro
 
   return (
     <ArkToast.Root
-      className="relative bg-theme-card border border-theme rounded-lg shadow-lg p-4 min-w-[320px] max-w-md group"
+      className="relative bg-card border border-border rounded-xl shadow-lg p-4 min-w-[320px] max-w-md group"
       {...props}
     >
       {/* Progress Bar */}
@@ -65,17 +65,19 @@ export function Toast({ type, title, description, duration, ...props }: ToastPro
         {/* Content */}
         <div className="flex-1 min-w-0">
           {title && (
-            <ArkToast.Title className="text-sm font-semibold text-theme-fg">{title}</ArkToast.Title>
+            <ArkToast.Title className="text-sm font-semibold text-foreground">
+              {title}
+            </ArkToast.Title>
           )}
           {description && (
-            <ArkToast.Description className="text-sm text-theme-muted mt-1 break-words">
+            <ArkToast.Description className="text-sm text-muted-foreground mt-1 break-words">
               {description}
             </ArkToast.Description>
           )}
         </div>
 
         {/* Close Button */}
-        <ArkToast.CloseTrigger className="flex-shrink-0 text-theme-muted hover:text-theme-fg transition-colors">
+        <ArkToast.CloseTrigger className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors">
           <X className="h-4 w-4" />
         </ArkToast.CloseTrigger>
       </div>

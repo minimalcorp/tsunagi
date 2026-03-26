@@ -26,14 +26,14 @@ export function CodeBlock({ language, code, children }: CodeBlockProps) {
     <div className="relative group">
       <button
         onClick={handleCopy}
-        className="absolute top-2 right-2 p-1.5 rounded bg-theme-card hover:bg-theme-hover transition-colors opacity-80 hover:opacity-100"
+        className="absolute top-2 right-2 p-1.5 rounded bg-card hover:bg-accent transition-colors opacity-80 hover:opacity-100"
         title={copied ? 'Copied!' : 'Copy code'}
         aria-label={copied ? 'Copied to clipboard' : 'Copy code to clipboard'}
       >
         {copied ? (
           <Check className="w-4 h-4 text-success" />
         ) : (
-          <Copy className="w-4 h-4 text-theme-fg" />
+          <Copy className="w-4 h-4 text-foreground" />
         )}
       </button>
       <pre>

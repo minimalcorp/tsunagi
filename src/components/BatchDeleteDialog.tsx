@@ -33,29 +33,29 @@ export function BatchDeleteDialog({
       showCloseButton={false}
     >
       <div className="space-y-4">
-        <p className="text-theme-fg">
+        <p className="text-foreground">
           Delete tasks completed more than{' '}
           <input
             type="number"
             min="1"
             value={daysAgo}
             onChange={(e) => setDaysAgo(Number(e.target.value))}
-            className="w-16 px-2 py-1 mx-1 border border-theme rounded bg-theme-card text-theme-fg text-center"
+            className="w-16 h-8 px-2 mx-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground text-center"
           />{' '}
           days ago?
         </p>
-        <p className="text-sm text-theme-muted">
+        <p className="text-sm text-muted-foreground">
           This action will permanently delete the selected tasks and their associated worktrees.
         </p>
         <div className="flex justify-end gap-2 pt-2">
           <ArkDialog.CloseTrigger asChild>
-            <button className="px-4 py-2 border border-theme rounded text-theme-fg hover:bg-theme-hover active:scale-95 transition-transform cursor-pointer">
+            <button className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer">
               Cancel
             </button>
           </ArkDialog.CloseTrigger>
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 bg-red-700 text-white rounded hover:bg-red-600 active:scale-95 transition-transform cursor-pointer"
+            className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer"
           >
             Delete
           </button>

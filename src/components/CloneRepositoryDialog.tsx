@@ -54,16 +54,16 @@ export function CloneRepositoryDialog({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1 text-theme-fg">Git URL *</label>
+          <label className="block text-sm font-medium mb-1 text-foreground">Git URL *</label>
           <input
             type="text"
             required
             placeholder="https://github.com/owner/repo.git"
             value={gitUrl}
             onChange={(e) => setGitUrl(e.target.value)}
-            className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+            className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
           />
-          <p className="text-xs text-theme-muted mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             HTTPS or SSH形式のGit URLを入力してください
           </p>
         </div>
@@ -73,14 +73,14 @@ export function CloneRepositoryDialog({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-theme rounded text-theme-fg hover:bg-theme-card active:scale-95 cursor-pointer"
+              className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
             >
               Cancel
             </button>
           )}
           <button
             type="submit"
-            className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer"
+            className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer"
           >
             Clone
           </button>

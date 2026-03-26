@@ -29,14 +29,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
 
     const updateEffectiveTheme = () => {
-      if (theme === 'system') {
-        const systemTheme = mediaQuery.matches ? 'dark' : 'light';
-        setEffectiveTheme(systemTheme);
-        root.setAttribute('data-theme', systemTheme); // システム設定の結果を適用
-      } else {
-        setEffectiveTheme(theme);
-        root.setAttribute('data-theme', theme); // 手動選択を適用
-      }
+      const resolved = theme === 'system' ? (mediaQuery.matches ? 'dark' : 'light') : theme;
+      setEffectiveTheme(resolved);
+      root.classList.toggle('dark', resolved === 'dark');
     };
 
     updateEffectiveTheme();
