@@ -37,7 +37,7 @@ export function KanbanColumn({
   return (
     <div className="flex-1 flex flex-col bg-accent rounded-xl p-2 h-full min-w-64">
       {/* ヘッダー */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+      <div className="flex items-center justify-between py-1 px-2 m-0 flex-shrink-0">
         <h2 className="text-lg font-semibold text-foreground">{title}</h2>
         <div className="flex items-center gap-2">
           {showAddButton && (
