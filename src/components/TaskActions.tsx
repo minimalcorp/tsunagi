@@ -6,6 +6,7 @@ import { normalizeBranchName } from '@/lib/branch-utils';
 import { Code2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmDialog } from './ui/Dialog';
+import { Button } from '@/components/ui/button';
 
 interface TaskActionsProps {
   task: Task;
@@ -78,21 +79,15 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
       />
 
       <div className="flex items-center gap-2">
-        <button
-          onClick={() => setDeleteConfirmOpen(true)}
-          className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 flex items-center gap-2 cursor-pointer"
-        >
+        <Button variant="destructive" size="lg" onClick={() => setDeleteConfirmOpen(true)}>
           <Trash2 className="w-4 h-4" />
           Delete Task
-        </button>
+        </Button>
 
-        <button
-          onClick={handleOpenVSCode}
-          className="h-9 px-4 py-2 rounded-md text-sm font-medium cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2"
-        >
+        <Button size="lg" onClick={handleOpenVSCode}>
           <Code2 className="w-4 h-4" />
           Open VS Code
-        </button>
+        </Button>
       </div>
     </>
   );

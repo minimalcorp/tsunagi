@@ -1,6 +1,7 @@
 'use client';
 
 import { Globe, Folder, GitBranch, ChevronRight, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export type TreeNodeType = 'global' | 'owner' | 'repo';
 
@@ -70,13 +71,13 @@ export function EnvNodeItem({
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
     >
       {hasChildren && (
-        <button onClick={handleChevronClick} className="p-0 hover:bg-accent rounded cursor-pointer">
+        <Button variant="ghost" size="icon-xs" onClick={handleChevronClick} className="size-4">
           {isExpanded ? (
             <ChevronDown className="w-3 h-3 text-muted-foreground" />
           ) : (
             <ChevronRight className="w-3 h-3 text-muted-foreground" />
           )}
-        </button>
+        </Button>
       )}
       {!hasChildren && <div className="w-3" />}
       <div className="text-foreground">{getIcon()}</div>

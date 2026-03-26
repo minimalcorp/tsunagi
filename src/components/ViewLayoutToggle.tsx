@@ -1,6 +1,7 @@
 'use client';
 
 import { Columns2, FileEdit, ScrollText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export type ViewMode = 'split' | 'editor' | 'logs';
 
@@ -20,18 +21,20 @@ export function ViewLayoutToggle({ mode, onChange }: ViewLayoutToggleProps) {
     <div className="flex items-center gap-2">
       <div className="flex items-center gap-1 bg-accent rounded p-1">
         {views.map(({ value, icon: Icon, label }) => (
-          <button
+          <Button
             key={value}
+            variant="ghost"
+            size="sm"
             onClick={() => onChange(value)}
-            className={`px-2 py-1 rounded text-sm cursor-pointer ${
+            className={
               mode === value
-                ? 'bg-primary text-white shadow-sm'
+                ? 'bg-primary text-white shadow-sm hover:bg-primary/80'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
+            }
             title={label}
           >
             <Icon className="w-4 h-4" />
-          </button>
+          </Button>
         ))}
       </div>
     </div>

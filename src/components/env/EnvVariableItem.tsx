@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Eye, EyeOff, Trash2, Pencil, X, Check } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 export interface EnvironmentVariable {
   key: string;
@@ -82,9 +84,10 @@ export function EnvVariableItem({
               />
               <span className="text-xs text-muted-foreground">Enabled</span>
             </label>
-            <button
+            <Button
+              variant="ghost"
+              size="icon-lg"
               onClick={() => setShowValue(!showValue)}
-              className="size-8 rounded-md inline-flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
               title={showValue ? 'Hide value' : 'Show value'}
             >
               {showValue ? (
@@ -92,22 +95,14 @@ export function EnvVariableItem({
               ) : (
                 <Eye className="w-4 h-4 text-muted-foreground" />
               )}
-            </button>
-            <button
-              onClick={handleEdit}
-              className="size-8 rounded-md inline-flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
-              title="Edit"
-            >
+            </Button>
+            <Button variant="ghost" size="icon-lg" onClick={handleEdit} title="Edit">
               <Pencil className="w-4 h-4 text-muted-foreground" />
-            </button>
+            </Button>
             {isDeletable && (
-              <button
-                onClick={handleDelete}
-                className="size-8 rounded-md inline-flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
-                title="Delete"
-              >
+              <Button variant="ghost" size="icon-lg" onClick={handleDelete} title="Delete">
                 <Trash2 className="w-4 h-4 text-destructive" />
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -116,35 +111,34 @@ export function EnvVariableItem({
       {/* Value */}
       {isEditing ? (
         <div className="space-y-2">
-          <input
+          <Input
             type="password"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+            className="w-full font-mono"
             autoFocus
           />
           <div className="flex justify-end gap-2">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleCancelEdit}
-              className="h-8 px-3 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
+              className="active:scale-95"
             >
               <X className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleSaveEdit}
-              className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer"
-            >
+            </Button>
+            <Button size="sm" onClick={handleSaveEdit} className="active:scale-95">
               <Check className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
         <div>
-          <input
+          <Input
             type={showValue ? 'text' : 'password'}
             value={variable.value}
             readOnly
-            className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+            className="w-full font-mono"
           />
         </div>
       )}

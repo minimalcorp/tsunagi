@@ -4,6 +4,7 @@ import { Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus, Trash } from 'lucide-react';
 import type { Task } from '@/lib/types';
 import { TaskCard, type TabTodo } from './TaskCard';
+import { Button } from '@/components/ui/button';
 
 interface KanbanColumnProps {
   title: string;
@@ -41,14 +42,15 @@ export function KanbanColumn({
         <div className="flex items-center gap-2">
           {showAddButton && (
             <div className="relative">
-              <button
+              <Button
+                size="sm"
                 onClick={onAddTaskClick}
-                className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="active:scale-95"
                 title="Add Task"
                 disabled={!hasApiKey}
               >
                 <Plus className="w-4 h-4" />
-              </button>
+              </Button>
               {nextStep === 'task' && status === 'backlog' && !isAddTaskDialogOpen && (
                 <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-tooltip backdrop-blur-sm border-2 border-warning text-foreground px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
                   Create a task
@@ -58,14 +60,16 @@ export function KanbanColumn({
             </div>
           )}
           {showBatchDeleteButton && (
-            <button
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={onBatchDeleteClick}
-              className="h-8 px-3 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="active:scale-95"
               title="Delete Old Tasks"
               disabled={tasks.length === 0 || isBatchDeleting}
             >
               <Trash className="w-4 h-4" />
-            </button>
+            </Button>
           )}
           <span className="text-sm text-muted-foreground">{tasks.length}</span>
         </div>

@@ -1,8 +1,17 @@
 'use client';
 
-import { Dialog as ArkDialog } from '@ark-ui/react/dialog';
+import { useEffect, type ReactNode } from 'react';
+import {
+  Dialog as BaseDialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogContent as BaseDialogContent,
+  DialogTitle as BaseDialogTitle,
+  DialogClose,
+} from './dialog-primitives';
+import { Button } from './button';
 import { X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
 interface DialogProps {
   open: boolean;
@@ -20,13 +29,13 @@ interface DialogProps {
 }
 
 const maxWidthClasses = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  '2xl': 'max-w-2xl',
-  '4xl': 'max-w-4xl',
-  '6xl': 'max-w-6xl',
+  sm: 'sm:max-w-sm',
+  md: 'sm:max-w-md',
+  lg: 'sm:max-w-lg',
+  xl: 'sm:max-w-xl',
+  '2xl': 'sm:max-w-2xl',
+  '4xl': 'sm:max-w-4xl',
+  '6xl': 'sm:max-w-6xl',
 };
 
 export function Dialog({
@@ -37,41 +46,62 @@ export function Dialog({
   maxWidth = '2xl',
   showCloseButton = true,
   initialFocusEl,
-  trapFocus = true,
-  restoreFocus = true,
 }: DialogProps) {
+  // Handle initialFocusEl by focusing the element after dialog opens
+  useEffect(() => {
+    if (open && initialFocusEl) {
+      const rafId = requestAnimationFrame(() => {
+        const el = initialFocusEl();
+        if (el) {
+          el.focus();
+        }
+      });
+      return () => cancelAnimationFrame(rafId);
+    }
+  }, [open, initialFocusEl]);
+
+  const handleOpenChange = (openState: boolean) => {
+    onOpenChange({ open: openState });
+  };
+
   return (
-    <ArkDialog.Root
-      open={open}
-      onOpenChange={onOpenChange}
-      modal
-      trapFocus={trapFocus}
-      restoreFocus={restoreFocus}
-      initialFocusEl={initialFocusEl}
-    >
-      <ArkDialog.Backdrop className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
-      <ArkDialog.Positioner className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <ArkDialog.Content
-          className={`bg-background rounded-lg border border-border shadow-lg w-full ${maxWidthClasses[maxWidth]} max-h-[90vh] overflow-y-auto relative`}
+    <BaseDialog open={open} onOpenChange={handleOpenChange} modal>
+      <DialogPortal>
+        <DialogOverlay className="bg-black/50 backdrop-blur-sm" />
+        <BaseDialogContent
+          showCloseButton={false}
+          className={cn(
+            'bg-background rounded-lg border border-border shadow-lg max-h-[90vh] overflow-y-auto',
+            'gap-0 p-0',
+            maxWidthClasses[maxWidth]
+          )}
         >
           {(title || showCloseButton) && (
             <div className="flex items-center justify-between px-6 pt-6 pb-2">
               {title && (
-                <ArkDialog.Title className="text-lg font-semibold leading-none text-foreground">
+                <BaseDialogTitle className="text-lg font-semibold leading-none text-foreground">
                   {title}
-                </ArkDialog.Title>
+                </BaseDialogTitle>
               )}
               {showCloseButton && (
-                <ArkDialog.CloseTrigger className="ml-auto size-8 rounded-md inline-flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                <DialogClose
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="ml-auto text-muted-foreground hover:text-foreground"
+                    />
+                  }
+                >
                   <X className="size-4" />
-                </ArkDialog.CloseTrigger>
+                </DialogClose>
               )}
             </div>
           )}
           <div className={title || showCloseButton ? 'px-6 pb-6 pt-2' : 'p-6'}>{children}</div>
-        </ArkDialog.Content>
-      </ArkDialog.Positioner>
-    </ArkDialog.Root>
+        </BaseDialogContent>
+      </DialogPortal>
+    </BaseDialog>
   );
 }
 
@@ -101,25 +131,22 @@ export function ConfirmDialog({
     onOpenChange({ open: false });
   };
 
-  const confirmButtonClass =
-    variant === 'danger'
-      ? 'h-9 px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer'
-      : 'h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer';
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange} maxWidth="md" showCloseButton={false}>
       <div className="space-y-4">
         <h2 className="text-lg font-semibold leading-none text-foreground">{title}</h2>
         <div className="text-sm text-muted-foreground whitespace-pre-line">{message}</div>
         <div className="flex justify-end gap-2 pt-2">
-          <ArkDialog.CloseTrigger asChild>
-            <button className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer">
-              {cancelLabel}
-            </button>
-          </ArkDialog.CloseTrigger>
-          <button onClick={handleConfirm} className={confirmButtonClass}>
+          <DialogClose render={<Button variant="outline" className="cursor-pointer" />}>
+            {cancelLabel}
+          </DialogClose>
+          <Button
+            variant={variant === 'danger' ? 'destructive' : 'default'}
+            onClick={handleConfirm}
+            className="cursor-pointer"
+          >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </Dialog>

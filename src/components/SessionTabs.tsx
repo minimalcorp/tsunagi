@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { TabStatusEntry } from '@/components/TerminalPanel';
 import { ConfirmDialog } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/button';
 
 interface SessionTabsProps {
   tabs: Tab[];
@@ -190,15 +191,16 @@ export function SessionTabs({
                 <TabStatusIndicator entry={entry} />
               </div>
               {tabs.length > 1 && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={(e) => {
                     e.stopPropagation();
                     setDeleteTarget({ tabId: tab.tab_id, isRunning });
                   }}
-                  className="hover:bg-accent rounded-md cursor-pointer"
                 >
                   <X className="w-4 h-4" />
-                </button>
+                </Button>
               )}
             </div>
           );
@@ -207,20 +209,24 @@ export function SessionTabs({
         {/* divider + アクションボタン群 */}
         <div className="flex items-center flex-shrink-0 ml-auto">
           <div className="w-px self-stretch bg-theme mx-1" />
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onTabCreateTerminal}
-            className="px-2 pt-1 pb-2 h-10 text-primary hover:text-primary-hover flex items-center justify-center cursor-pointer"
+            className="text-primary hover:text-primary-hover"
             title="Open terminal"
           >
             <Terminal className="w-4 h-4" />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onTabCreateClaude}
-            className="px-2 pt-1 pb-2 h-10 text-primary hover:text-primary-hover flex items-center justify-center cursor-pointer"
+            className="text-primary hover:text-primary-hover"
             title="Open terminal with Claude"
           >
             <Bot className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Material Design Indicator */}

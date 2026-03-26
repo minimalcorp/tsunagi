@@ -16,6 +16,7 @@ import { io, type Socket } from 'socket.io-client';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Loader2, Copy, Play, Check, SquarePen } from 'lucide-react';
 import { MonacoEditorModal } from '@/components/MonacoEditorModal';
+import { Button } from '@/components/ui/button';
 
 const FASTIFY_API_BASE = 'http://localhost:2792';
 
@@ -446,39 +447,30 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
           <span className="font-mono text-xs text-muted-foreground" title={tabId}>
             {shortTabId}
           </span>
-          <button
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={handleCopyTabId}
-            className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-accent cursor-pointer"
+            className="text-muted-foreground hover:text-foreground"
             title="Copy tab ID"
           >
             {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={handleRunClaude}
-            disabled={!isConnected}
-            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded cursor-pointer ${
-              isConnected
-                ? 'bg-primary text-white hover:opacity-80'
-                : 'bg-accent text-muted-foreground cursor-not-allowed opacity-50'
-            }`}
-            title="Run Claude"
-          >
+          </Button>
+          <Button size="xs" onClick={handleRunClaude} disabled={!isConnected} title="Run Claude">
             <Play className="w-3 h-3" />
             Run Claude
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => setShowEditorModal(true)}
             disabled={!isConnected}
-            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded cursor-pointer ${
-              isConnected
-                ? 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                : 'text-muted-foreground cursor-not-allowed opacity-50'
-            }`}
+            className="text-muted-foreground hover:text-foreground"
             title="Open editor input"
           >
             <SquarePen className="w-3 h-3" />
             Open Editor
-          </button>
+          </Button>
         </div>
 
         {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
@@ -506,12 +498,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
                   <p className="text-xs text-muted-foreground">Session ended</p>
                 )}
                 {status === 'paused' && <p className="text-xs text-muted-foreground">Paused</p>}
-                <button
-                  onClick={reconnectSession}
-                  className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-80 cursor-pointer"
-                >
+                <Button size="xs" onClick={reconnectSession}>
                   Reconnect
-                </button>
+                </Button>
               </div>
             </div>
           )}

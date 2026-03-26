@@ -7,6 +7,7 @@ import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNa
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
 import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
 import { ClaudeSettingsEditor } from '@/components/settings/ClaudeSettingsEditor';
+import { Button } from '@/components/ui/button';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -75,13 +76,14 @@ export default function SettingsPage() {
       {/* Header */}
       <div className="sticky top-0 z-50 p-4 border-b border-border bg-card">
         <div className="flex items-center justify-between">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => router.push('/')}
-            className="text-primary-light font-medium flex items-center gap-2 cursor-pointer"
+            className="text-primary-light font-medium"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Board
-          </button>
+          </Button>
 
           <h1 className="text-xl font-bold text-foreground absolute left-1/2 -translate-x-1/2">
             Settings

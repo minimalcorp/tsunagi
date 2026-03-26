@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { Dialog } from './ui/Dialog';
-import { Dialog as ArkDialog } from '@ark-ui/react/dialog';
+import { DialogClose } from './ui/dialog-primitives';
+import { Button } from './ui/button';
+import { Input } from '@/components/ui/input';
 
 interface BatchDeleteDialogProps {
   isOpen: boolean;
@@ -35,12 +37,12 @@ export function BatchDeleteDialog({
       <div className="space-y-4">
         <p className="text-foreground">
           Delete tasks completed more than{' '}
-          <input
+          <Input
             type="number"
             min="1"
             value={daysAgo}
             onChange={(e) => setDaysAgo(Number(e.target.value))}
-            className="w-16 h-8 px-2 mx-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground text-center"
+            className="w-16 mx-1 text-center inline-block"
           />{' '}
           days ago?
         </p>
@@ -48,17 +50,12 @@ export function BatchDeleteDialog({
           This action will permanently delete the selected tasks and their associated worktrees.
         </p>
         <div className="flex justify-end gap-2 pt-2">
-          <ArkDialog.CloseTrigger asChild>
-            <button className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer">
-              Cancel
-            </button>
-          </ArkDialog.CloseTrigger>
-          <button
-            onClick={handleConfirm}
-            className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer"
-          >
+          <DialogClose render={<Button variant="outline" className="cursor-pointer" />}>
+            Cancel
+          </DialogClose>
+          <Button variant="destructive" onClick={handleConfirm} className="cursor-pointer">
             Delete
-          </button>
+          </Button>
         </div>
       </div>
     </Dialog>

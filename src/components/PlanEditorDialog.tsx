@@ -1,14 +1,22 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Dialog as ArkDialog } from '@ark-ui/react/dialog';
+import {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogContent,
+  DialogTitle,
+  DialogClose,
+} from './ui/dialog-primitives';
+import { Button } from './ui/button';
 import { Editor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownComponents } from '@/components/MarkdownComponents';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Columns2, FileEdit, Eye, Loader2 } from 'lucide-react';
+import { Columns2, FileEdit, Eye, Loader2, X } from 'lucide-react';
 
 type ViewMode = 'split' | 'editor' | 'viewer';
 type PlanType = 'requirement' | 'design' | 'procedure';
@@ -90,6 +98,10 @@ export function PlanEditorDialog({
     setEditedContent(value || '');
   };
 
+  const handleOpenChange = (openState: boolean) => {
+    onOpenChange({ open: openState });
+  };
+
   const title = `Edit ${PLAN_TITLES[planType]}`;
 
   const viewModes = [
@@ -99,39 +111,52 @@ export function PlanEditorDialog({
   ];
 
   return (
-    <ArkDialog.Root open={open} onOpenChange={onOpenChange} modal trapFocus>
-      <ArkDialog.Backdrop className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
-      <ArkDialog.Positioner className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <ArkDialog.Content className="bg-card rounded-xl shadow-xl w-full max-w-7xl h-[90vh] flex flex-col p-6">
+    <Dialog open={open} onOpenChange={handleOpenChange} modal>
+      <DialogPortal>
+        <DialogOverlay className="bg-black/50 backdrop-blur-sm" />
+        <DialogContent
+          showCloseButton={false}
+          className="bg-card rounded-xl shadow-xl max-w-7xl h-[90vh] flex flex-col p-6"
+        >
           {/* Header */}
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-4">
-              <ArkDialog.Title className="text-lg font-semibold leading-none text-foreground">
+              <DialogTitle className="text-lg font-semibold leading-none text-foreground">
                 {title}
-              </ArkDialog.Title>
+              </DialogTitle>
 
               {/* View Mode Toggle */}
               <div className="flex items-center gap-1 bg-accent rounded p-1">
                 {viewModes.map(({ value, icon: Icon, label }) => (
-                  <button
+                  <Button
                     key={value}
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setViewMode(value)}
-                    className={`px-2 py-1 rounded-md text-sm cursor-pointer ${
+                    className={
                       viewMode === value
-                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/80'
                         : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                    }
                     title={label}
                   >
                     <Icon className="w-4 h-4" />
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
 
-            <ArkDialog.CloseTrigger className="ml-auto size-8 rounded-md inline-flex items-center justify-center hover:bg-accent transition-colors text-foreground cursor-pointer">
-              <span className="text-2xl leading-none">&times;</span>
-            </ArkDialog.CloseTrigger>
+            <DialogClose
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="ml-auto text-foreground hover:bg-accent"
+                />
+              }
+            >
+              <X className="size-4" />
+            </DialogClose>
           </div>
 
           {/* Content Area */}
@@ -187,24 +212,16 @@ export function PlanEditorDialog({
 
           {/* Actions */}
           <div className="flex justify-end gap-3 flex-shrink-0">
-            <button
-              onClick={handleCancel}
-              disabled={isSaving}
-              className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
               Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
               {isSaving ? 'Updating...' : 'Update'}
-            </button>
+            </Button>
           </div>
-        </ArkDialog.Content>
-      </ArkDialog.Positioner>
-    </ArkDialog.Root>
+        </DialogContent>
+      </DialogPortal>
+    </Dialog>
   );
 }

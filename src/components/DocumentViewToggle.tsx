@@ -1,4 +1,5 @@
 import { MessagesSquare, Megaphone, Palette, ListTodo } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export type DocumentViewMode = 'logs' | 'requirement' | 'design' | 'procedure';
 
@@ -18,18 +19,20 @@ export function DocumentViewToggle({ mode, onChange }: DocumentViewToggleProps) 
   return (
     <div className="bg-accent rounded p-1 inline-flex gap-0.5">
       {buttons.map(({ mode: buttonMode, icon: Icon, label }) => (
-        <button
+        <Button
           key={buttonMode}
+          variant="ghost"
+          size="sm"
           onClick={() => onChange(buttonMode)}
-          className={`px-2 py-1 rounded text-sm flex items-center gap-1.5 transition-colors cursor-pointer ${
+          className={
             mode === buttonMode
-              ? 'bg-primary text-white shadow-sm'
+              ? 'bg-primary text-white shadow-sm hover:bg-primary/80'
               : 'text-muted-foreground hover:text-foreground'
-          }`}
+          }
           title={label}
         >
           <Icon size={16} />
-        </button>
+        </Button>
       ))}
     </div>
   );

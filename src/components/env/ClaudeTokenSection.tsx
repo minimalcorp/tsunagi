@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Eye, EyeOff, Pencil, Plus, X, Check, AlertCircle, Trash2 } from 'lucide-react';
 import { LoadingSpinner } from '../LoadingSpinner';
 import type { SelectedNode } from './EnvTreeNavigation';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface TokenItem {
   key: string;
@@ -296,13 +298,10 @@ export function ClaudeTokenSection({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-foreground">Claude Tokens</h2>
         {!isAdding && tokens.length === 0 && (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer flex items-center gap-2"
-          >
+          <Button size="sm" onClick={() => setIsAdding(true)} className="active:scale-95">
             <Plus className="w-4 h-4" />
             Add Token
-          </button>
+          </Button>
         )}
       </div>
 
@@ -316,12 +315,13 @@ export function ClaudeTokenSection({
             </p>
           </div>
           {onSwitchToGlobal && (
-            <button
+            <Button
+              size="sm"
               onClick={onSwitchToGlobal}
-              className="h-8 px-3 rounded-md text-sm font-medium bg-warning text-white active:scale-95 transition-[color,background-color,transform] cursor-pointer whitespace-nowrap"
+              className="bg-warning text-white hover:bg-warning/80 active:scale-95 whitespace-nowrap"
             >
               Switch to Global
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -332,12 +332,12 @@ export function ClaudeTokenSection({
           <div className="border border-border rounded p-3 bg-accent">
             <div className="text-sm font-medium text-foreground mb-2">New Token</div>
             <div className="space-y-2">
-              <input
+              <Input
                 type="password"
                 value={addValue}
                 onChange={(e) => handleAddValueChange(e.target.value)}
                 placeholder="sk-ant-api... or sk-ant-oat..."
-                className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+                className="w-full font-mono"
                 autoFocus
               />
               {detectedKey && !addError && (
@@ -345,19 +345,22 @@ export function ClaudeTokenSection({
               )}
               {addError && <div className="text-xs text-destructive">{addError}</div>}
               <div className="flex justify-end gap-2">
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleCancelAdd}
-                  className="h-8 px-3 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
+                  className="active:scale-95"
                 >
                   <X className="w-4 h-4" />
-                </button>
-                <button
+                </Button>
+                <Button
+                  size="sm"
                   onClick={handleAddToken}
                   disabled={!detectedKey || !!addError}
-                  className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  className="active:scale-95"
                 >
                   <Check className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -375,12 +378,12 @@ export function ClaudeTokenSection({
                 // Edit Mode (same UI as Add)
                 <>
                   <div className="text-sm font-medium text-foreground mb-2">Edit Token</div>
-                  <input
+                  <Input
                     type="password"
                     value={editValue}
                     onChange={(e) => handleEditValueChange(e.target.value)}
                     placeholder="sk-ant-api... or sk-ant-oat..."
-                    className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+                    className="w-full font-mono"
                     autoFocus
                   />
                   {editDetectedKey && !editError && (
@@ -390,19 +393,22 @@ export function ClaudeTokenSection({
                   )}
                   {editError && <div className="text-xs text-destructive">{editError}</div>}
                   <div className="flex justify-end gap-2">
-                    <button
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleCancelEdit}
-                      className="h-8 px-3 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
+                      className="active:scale-95"
                     >
                       <X className="w-4 h-4" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      size="sm"
                       onClick={() => handleSaveEdit(token.key)}
                       disabled={!editDetectedKey || !!editError}
-                      className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      className="active:scale-95"
                     >
                       <Check className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
                 </>
               ) : (
@@ -411,11 +417,12 @@ export function ClaudeTokenSection({
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-foreground">{token.label}</span>
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon-lg"
                         onClick={() =>
                           setShowValue((prev) => ({ ...prev, [token.key]: !prev[token.key] }))
                         }
-                        className="size-8 rounded-md inline-flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
                         title={showValue[token.key] ? 'Hide value' : 'Show value'}
                       >
                         {showValue[token.key] ? (
@@ -423,30 +430,33 @@ export function ClaudeTokenSection({
                         ) : (
                           <Eye className="w-4 h-4 text-muted-foreground" />
                         )}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-lg"
                         onClick={() => handleEdit(token.key)}
-                        className="size-8 rounded-md inline-flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4 text-muted-foreground" />
-                      </button>
+                      </Button>
                       {selectedNode.scope !== 'global' && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon-lg"
                           onClick={() => handleDelete(token.key)}
-                          className="size-8 rounded-md inline-flex items-center justify-center hover:bg-destructive/10 transition-colors cursor-pointer"
+                          className="hover:bg-destructive/10"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
-                  <input
+                  <Input
                     type={showValue[token.key] ? 'text' : 'password'}
                     value={token.value}
                     readOnly
-                    className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+                    className="w-full font-mono"
                   />
                 </>
               )}

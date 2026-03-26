@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { Dialog } from './ui/Dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface CloneRepositoryDialogProps {
   isOpen: boolean;
@@ -55,13 +57,13 @@ export function CloneRepositoryDialog({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1 text-foreground">Git URL *</label>
-          <input
+          <Input
             type="text"
             required
             placeholder="https://github.com/owner/repo.git"
             value={gitUrl}
             onChange={(e) => setGitUrl(e.target.value)}
-            className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
+            className="w-full"
           />
           <p className="text-xs text-muted-foreground mt-1">
             HTTPS or SSH形式のGit URLを入力してください
@@ -70,20 +72,19 @@ export function CloneRepositoryDialog({
 
         <div className="flex justify-end gap-2">
           {!isOnboarding && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="lg"
               onClick={onClose}
-              className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
+              className="active:scale-95"
             >
               Cancel
-            </button>
+            </Button>
           )}
-          <button
-            type="submit"
-            className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer"
-          >
+          <Button type="submit" size="lg" className="active:scale-95">
             Clone
-          </button>
+          </Button>
         </div>
       </form>
     </Dialog>

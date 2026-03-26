@@ -5,9 +5,9 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { ToastProvider } from '@/components/ToastProvider';
 import { EditorSessionProvider } from '@/components/EditorSessionProvider';
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", inter.variable)}>
+    <html lang="en" className={cn('font-sans', inter.variable)}>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
           {children}

@@ -6,6 +6,9 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { Dialog } from './ui/Dialog';
 import { Combobox } from './ui/Combobox';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 
 interface FieldError {
   field: string;
@@ -328,13 +331,13 @@ export function TaskDialog({
         {/* 共通: Title */}
         <div>
           <label className="block text-sm font-medium mb-1 text-foreground">Title *</label>
-          <input
+          <Input
             type="text"
             required
             maxLength={200}
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
+            className="w-full"
             disabled={isLoading}
           />
         </div>
@@ -342,11 +345,11 @@ export function TaskDialog({
         {/* 共通: Description */}
         <div>
           <label className="block text-sm font-medium mb-1 text-foreground">Description</label>
-          <textarea
+          <Textarea
             maxLength={5000}
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="w-full px-3 py-2 rounded-md border border-input bg-transparent text-sm shadow-xs min-h-24 text-foreground"
+            className="min-h-24 w-full"
             disabled={isLoading}
           />
         </div>
@@ -377,7 +380,7 @@ export function TaskDialog({
         {!isCreateMode && (
           <div>
             <label className="block text-sm font-medium mb-1 text-foreground">Effort (hours)</label>
-            <input
+            <Input
               type="number"
               step="0.5"
               min="0.5"
@@ -386,7 +389,7 @@ export function TaskDialog({
               onChange={(e) =>
                 setFormData({ ...formData, effort: parseFloat(e.target.value) || undefined })
               }
-              className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
+              className="w-full"
               placeholder="e.g. 2.5"
               disabled={isLoading}
             />
@@ -397,14 +400,14 @@ export function TaskDialog({
         {!isCreateMode && (
           <div>
             <label className="block text-sm font-medium mb-1 text-foreground">Order</label>
-            <input
+            <Input
               type="number"
               min="0"
               value={formData.order ?? ''}
               onChange={(e) =>
                 setFormData({ ...formData, order: parseInt(e.target.value) || undefined })
               }
-              className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
+              className="w-full"
               placeholder="e.g. 0 (highest priority)"
               disabled={isLoading}
             />
@@ -448,17 +451,16 @@ export function TaskDialog({
             <label className="block text-sm font-medium mb-1 text-foreground">
               New Branch Name *
             </label>
-            <input
+            <Input
               type="text"
               required
               maxLength={255}
               value={formData.branch}
               onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-              className={`w-full h-9 px-3 py-1 rounded-md border bg-transparent text-sm shadow-xs text-foreground ${
-                fieldErrors.branch ? 'border-destructive input-error' : 'border-input'
-              }`}
+              className={`w-full ${fieldErrors.branch ? 'border-destructive' : ''}`}
               placeholder="feature/new-feature"
               disabled={isLoading}
+              aria-invalid={!!fieldErrors.branch}
             />
             {fieldErrors.branch && (
               <p className="text-xs text-destructive mt-1">{fieldErrors.branch}</p>
@@ -472,21 +474,24 @@ export function TaskDialog({
         )}
 
         <div className="flex justify-end gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="lg"
             onClick={onClose}
-            className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
+            className="active:scale-95"
             disabled={isLoading}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            size="lg"
+            className="active:scale-95"
             disabled={isLoading || (isCreateMode && isFetchingBranches)}
           >
             {submitButtonText}
-          </button>
+          </Button>
         </div>
       </form>
     </Dialog>

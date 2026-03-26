@@ -10,6 +10,7 @@ import {
   type TerminalStatus,
   type ClaudeStatus,
 } from '@/components/TerminalView';
+import { Button } from '@/components/ui/button';
 
 export interface TabStatusEntry {
   terminal: TerminalStatus;
@@ -180,12 +181,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           ) : (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">No tabs yet</p>
-              <button
-                onClick={handleTabCreateClaude}
-                className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
-              >
+              <Button size="lg" onClick={handleTabCreateClaude}>
                 + Create First Tab
-              </button>
+              </Button>
             </div>
           )}
         </div>

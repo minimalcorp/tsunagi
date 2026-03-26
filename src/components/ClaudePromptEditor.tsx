@@ -16,6 +16,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { getClaudeStatus } from '@/lib/claude-status';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { Send, Square, Mic } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ClaudePromptEditorProps {
   tab: Tab;
@@ -106,34 +107,29 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
           <h3 className="text-sm font-semibold text-foreground">Prompt</h3>
           <div className="flex items-center gap-2">
             {isSupported && (
-              <button
+              <Button
+                variant="ghost"
+                size="icon-lg"
                 onClick={isListening ? stopListening : startListening}
-                className="size-8 rounded-md inline-flex items-center justify-center text-primary hover:text-primary-light hover:bg-accent transition-colors cursor-pointer"
+                className="text-primary hover:text-primary-light"
                 title={isListening ? 'Stop voice input' : 'Start voice input'}
               >
                 {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              </button>
+              </Button>
             )}
 
             {!isRunning && (
-              <button
-                onClick={handleExecute}
-                disabled={!canExecute}
-                className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
-              >
+              <Button size="sm" onClick={handleExecute} disabled={!canExecute}>
                 <Send className="w-3 h-3" />
                 Send
-              </button>
+              </Button>
             )}
 
             {isRunning && (
-              <button
-                onClick={handleInterrupt}
-                className="h-8 px-3 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer flex items-center gap-1"
-              >
+              <Button variant="destructive" size="sm" onClick={handleInterrupt}>
                 <Square className="w-3 h-3" />
                 Interrupt
-              </button>
+              </Button>
             )}
           </div>
         </div>

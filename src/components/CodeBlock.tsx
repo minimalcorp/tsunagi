@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface CodeBlockProps {
   language?: string;
@@ -24,9 +25,11 @@ export function CodeBlock({ language, code, children }: CodeBlockProps) {
 
   return (
     <div className="relative group">
-      <button
+      <Button
+        variant="ghost"
+        size="icon-sm"
         onClick={handleCopy}
-        className="absolute top-2 right-2 p-1.5 rounded bg-card hover:bg-accent transition-colors opacity-80 hover:opacity-100"
+        className="absolute top-2 right-2 opacity-80 hover:opacity-100"
         title={copied ? 'Copied!' : 'Copy code'}
         aria-label={copied ? 'Copied to clipboard' : 'Copy code to clipboard'}
       >
@@ -35,7 +38,7 @@ export function CodeBlock({ language, code, children }: CodeBlockProps) {
         ) : (
           <Copy className="w-4 h-4 text-foreground" />
         )}
-      </button>
+      </Button>
       <pre>
         <code className={language ? `language-${language}` : ''}>{children}</code>
       </pre>

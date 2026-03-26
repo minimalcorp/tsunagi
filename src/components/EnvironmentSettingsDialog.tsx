@@ -2,6 +2,8 @@
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface EnvironmentSettingsDialogProps {
   isOpen: boolean;
@@ -159,12 +161,12 @@ export function EnvironmentSettingsDialog({
                 <span className="text-xs text-muted-foreground">Enabled</span>
               </label>
             </div>
-            <input
+            <Input
               type="password"
               placeholder="sk-ant-xxx"
               value={anthropicApiKey}
               onChange={(e) => setAnthropicApiKey(e.target.value)}
-              className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+              className="w-full font-mono"
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -197,12 +199,12 @@ export function EnvironmentSettingsDialog({
                 <span className="text-xs text-muted-foreground">Enabled</span>
               </label>
             </div>
-            <input
+            <Input
               type="password"
               placeholder="oauth_xxx"
               value={claudeCodeToken}
               onChange={(e) => setClaudeCodeToken(e.target.value)}
-              className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+              className="w-full font-mono"
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -233,12 +235,12 @@ export function EnvironmentSettingsDialog({
                 <span className="text-xs text-muted-foreground">Enabled</span>
               </label>
             </div>
-            <input
+            <Input
               type="password"
               placeholder="ghp_xxx or github_pat_xxx"
               value={githubPat}
               onChange={(e) => setGithubPat(e.target.value)}
-              className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+              className="w-full font-mono"
               disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -258,21 +260,19 @@ export function EnvironmentSettingsDialog({
           {error && <div className="text-destructive text-sm">{error}</div>}
 
           <div className="flex justify-end gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="lg"
               onClick={onClose}
-              className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
+              className="active:scale-95"
               disabled={isLoading}
             >
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              disabled={isLoading}
-            >
+            </Button>
+            <Button type="submit" size="lg" className="active:scale-95" disabled={isLoading}>
               Save
-            </button>
+            </Button>
           </div>
         </form>
       </div>

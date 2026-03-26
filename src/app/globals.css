@@ -1,11 +1,10 @@
 @import 'tailwindcss';
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 /* ===== shadcn/ui preset b2W68tmsa ===== */
 
 :root {
-
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.148 0.004 228.8);
 
@@ -342,11 +341,6 @@ select {
   background-repeat: no-repeat;
 }
 
-/* Combobox highlighted item */
-[data-scope='combobox'][data-part='item'][data-highlighted] {
-  background-color: var(--accent);
-}
-
 /* Animations */
 @keyframes subtle-bounce {
   0%,
@@ -393,21 +387,6 @@ select {
 
 .animate-fade-out {
   animation: fade-out 200ms ease-in forwards;
-}
-
-/* Combobox positioner */
-[data-scope='combobox'][data-part='positioner'],
-[data-scope='combobox'][data-part='positioner'] * {
-  transition-property: none !important;
-}
-
-[data-scope='combobox'][data-part='content'] {
-  opacity: 0;
-  transition-property: none !important;
-}
-
-[data-scope='combobox'][data-part='content'][data-state='open'] {
-  opacity: 1;
 }
 
 /* Tooltip */

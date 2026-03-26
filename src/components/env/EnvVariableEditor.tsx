@@ -5,6 +5,8 @@ import { Plus, X, Check } from 'lucide-react';
 import { EnvVariableItem, type EnvironmentVariable } from './EnvVariableItem';
 import type { SelectedNode } from './EnvTreeNavigation';
 import { LoadingSpinner } from '../LoadingSpinner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 // Claude Tokens (excluded from variables section)
 const CLAUDE_TOKENS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
@@ -258,13 +260,10 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-foreground">Environment Variables</h2>
         {!isAdding && (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer flex items-center gap-2"
-          >
+          <Button size="sm" onClick={() => setIsAdding(true)} className="active:scale-95">
             <Plus className="w-4 h-4" />
             Add Variable
-          </button>
+          </Button>
         )}
       </div>
 
@@ -273,35 +272,34 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
         {isAdding && (
           <div className="border border-border rounded p-3 bg-accent space-y-2">
             <div className="text-sm font-medium text-foreground">New Variable</div>
-            <input
+            <Input
               type="text"
               value={addKey}
               onChange={(e) => setAddKey(e.target.value.toUpperCase())}
               placeholder="VARIABLE_NAME"
-              className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+              className="w-full font-mono"
               autoFocus
             />
-            <input
+            <Input
               type="password"
               value={addValue}
               onChange={(e) => setAddValue(e.target.value)}
               placeholder="value"
-              className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent font-mono text-sm shadow-xs text-foreground"
+              className="w-full font-mono"
             />
             {addError && <div className="text-xs text-destructive">{addError}</div>}
             <div className="flex justify-end gap-2">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleCancelAdd}
-                className="h-8 px-3 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
+                className="active:scale-95"
               >
                 <X className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleAdd}
-                className="h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-[color,background-color,transform] cursor-pointer"
-              >
+              </Button>
+              <Button size="sm" onClick={handleAdd} className="active:scale-95">
                 <Check className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         )}

@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Settings, Filter, RefreshCw, FolderDown } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { Combobox } from './ui/Combobox';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const STORAGE_KEY = 'tsunagi-repository-filter';
 
@@ -182,16 +184,12 @@ export function Header({
     onFilterChange({ owner: '', repo: '', search: searchQuery, selectedRepos: ['all'] });
   };
 
-  const getButtonStyle = (step: string) => {
+  const getButtonHighlightClass = (step: string) => {
     const isHighlighted = nextStep === step;
-    const baseStyle =
-      'size-9 rounded-md inline-flex items-center justify-center transition-[color,background-color,transform] active:scale-95 cursor-pointer';
-
     if (isHighlighted) {
-      return `${baseStyle} bg-primary text-white shadow-lg ring-2 ring-primary`;
+      return 'bg-primary text-white shadow-lg ring-2 ring-primary hover:bg-primary/80';
     }
-
-    return `${baseStyle} bg-accent text-foreground`;
+    return 'bg-accent text-foreground';
   };
 
   return (
@@ -212,12 +210,12 @@ export function Header({
           showClearButton={!repoFilter.includes('all')}
         />
 
-        <input
+        <Input
           type="text"
           placeholder="Search tasks..."
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs w-64"
+          className="w-64"
         />
       </div>
 
@@ -231,13 +229,15 @@ export function Header({
       <div className="flex gap-2 flex-shrink-0">
         {/* Filters - Mobile/Tablet (< 1024px) */}
         <div className="lg:hidden relative" ref={filterRef}>
-          <button
+          <Button
+            variant="ghost"
+            size="icon-lg"
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="size-9 rounded-md inline-flex items-center justify-center bg-accent text-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
+            className="size-9 bg-accent text-foreground active:scale-95"
             title="Filters"
           >
             <Filter className="w-5 h-5" />
-          </button>
+          </Button>
 
           {isFilterOpen && (
             <div className="absolute top-full right-0 mt-2 bg-card border border-border rounded-lg shadow-lg p-4 w-80 z-50">
@@ -256,12 +256,12 @@ export function Header({
 
                 <div>
                   <label className="block text-sm font-medium mb-1 text-foreground">Search</label>
-                  <input
+                  <Input
                     type="text"
                     placeholder="Search tasks..."
                     value={searchQuery}
                     onChange={(e) => handleSearchChange(e.target.value)}
-                    className="w-full h-9 px-3 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs"
+                    className="w-full"
                   />
                 </div>
               </div>
@@ -269,17 +269,15 @@ export function Header({
           )}
         </div>
         <div className="relative">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-lg"
             onClick={onCloneClick}
-            className={`size-9 rounded-md inline-flex items-center justify-center active:scale-95 transition-[color,background-color,transform] cursor-pointer ${
-              nextStep === 'clone'
-                ? 'bg-primary text-white shadow-lg ring-2 ring-primary'
-                : 'bg-accent text-foreground'
-            }`}
+            className={`size-9 active:scale-95 ${getButtonHighlightClass('clone')}`}
             title="Clone Repository"
           >
             <FolderDown className="w-5 h-5" />
-          </button>
+          </Button>
           {nextStep === 'clone' && !isCloneDialogOpen && (
             <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-tooltip backdrop-blur-sm border-2 border-warning text-foreground px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
               Clone a repository
@@ -288,22 +286,26 @@ export function Header({
           )}
         </div>
 
-        <button
+        <Button
+          variant="ghost"
+          size="icon-lg"
           onClick={onReload}
-          className="size-9 rounded-md inline-flex items-center justify-center bg-accent text-foreground active:scale-95 transition-[color,background-color,transform] cursor-pointer"
+          className="size-9 bg-accent text-foreground active:scale-95"
           title="Reload"
         >
           <RefreshCw className="w-5 h-5" />
-        </button>
+        </Button>
 
         <div className="relative">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-lg"
             onClick={onSettingsClick}
-            className={getButtonStyle('env')}
+            className={`size-9 active:scale-95 ${getButtonHighlightClass('env')}`}
             title="Environment Settings"
           >
             <Settings className="w-5 h-5" />
-          </button>
+          </Button>
           {nextStep === 'env' && (
             <div className="absolute top-full mt-2 right-[-2px] bg-tooltip backdrop-blur-sm border-2 border-warning text-foreground px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
               Set up tokens

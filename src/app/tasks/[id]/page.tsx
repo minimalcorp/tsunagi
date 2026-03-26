@@ -10,6 +10,7 @@ import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
+import { Button } from '@/components/ui/button';
 
 interface TaskDetailPageProps {
   params: Promise<{
@@ -193,25 +194,28 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       {/* Header - Fixed at top */}
       <div className="sticky top-0 z-50 p-4 border-b border-border bg-card">
         <div className="flex items-center justify-between">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => router.push('/')}
-            className="text-primary-light font-medium flex items-center gap-2 cursor-pointer"
+            className="text-primary-light font-medium"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Board
-          </button>
+          </Button>
 
           <h1 className="text-base font-semibold text-foreground absolute left-1/2 -translate-x-1/2 max-w-[50vw] truncate">
             {task.title}
           </h1>
 
-          <button
+          <Button
+            variant="ghost"
+            size="icon-lg"
             onClick={() => setIsEditDialogOpen(true)}
-            className="p-2 text-primary hover:text-primary-light rounded hover:bg-accent cursor-pointer"
+            className="text-primary hover:text-primary-light"
             title="Edit task"
           >
             <Edit className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import { Editor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Dialog } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/button';
 
 export interface MonacoEditorModalProps {
   open: boolean;
@@ -135,18 +136,12 @@ export function MonacoEditorModal({
           {isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} で{submitLabel}、Esc でキャンセル
         </p>
         <div className="flex justify-end gap-2">
-          <button
-            onClick={handleCancel}
-            className="h-9 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground cursor-pointer"
-          >
+          <Button variant="outline" size="lg" onClick={handleCancel}>
             Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="h-9 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
-          >
+          </Button>
+          <Button size="lg" onClick={handleSubmit}>
             {submitLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </Dialog>

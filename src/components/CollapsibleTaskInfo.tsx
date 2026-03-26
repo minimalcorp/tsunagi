@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { Task } from '@/lib/types';
+import { Button } from '@/components/ui/button';
 
 interface CollapsibleTaskInfoProps {
   task: Task;
@@ -14,9 +15,10 @@ export function CollapsibleTaskInfo({ task, defaultExpanded = false }: Collapsib
 
   return (
     <div className="border-b border-border py-1">
-      <button
+      <Button
+        variant="ghost"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 w-full text-left py-2 hover:bg-accent rounded-md px-2 -mx-2 cursor-pointer"
+        className="flex items-center gap-2 w-full text-left py-2 px-2 -mx-2"
       >
         {isExpanded ? (
           <ChevronUp className="w-4 h-4 text-foreground" />
@@ -24,7 +26,7 @@ export function CollapsibleTaskInfo({ task, defaultExpanded = false }: Collapsib
           <ChevronDown className="w-4 h-4 text-foreground" />
         )}
         <h3 className="text-base font-medium text-foreground">Task Details</h3>
-      </button>
+      </Button>
 
       {isExpanded && (
         <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
