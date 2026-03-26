@@ -10,6 +10,7 @@ import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
+import { Button } from '@/components/ui/button';
 
 interface TaskDetailPageProps {
   params: Promise<{
@@ -173,7 +174,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // 初回ロード時のみローディング表示
   if (isLoading && !task) {
     return (
-      <div className="h-screen flex items-center justify-center bg-theme-bg">
+      <div className="h-screen flex items-center justify-center bg-background">
         <LoadingSpinner size="lg" message="Loading task..." />
       </div>
     );
@@ -182,48 +183,51 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // taskがnullの場合（エラー時など）
   if (!task) {
     return (
-      <div className="h-screen flex items-center justify-center bg-theme-bg">
-        <div className="text-center text-theme-fg">Task not found</div>
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center text-foreground">Task not found</div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-theme-bg">
+    <div className="h-screen flex flex-col bg-background">
       {/* Header - Fixed at top */}
-      <div className="sticky top-0 z-50 p-4 border-b border-theme bg-theme-card">
+      <div className="sticky top-0 z-50 p-4 border-b border-border bg-card">
         <div className="flex items-center justify-between">
-          <button
+          <Button
+            variant="ghost"
             onClick={() => router.push('/')}
-            className="text-primary-light font-medium flex items-center gap-2 cursor-pointer"
+            className="text-primary font-medium hover:bg-primary/10 hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Board
-          </button>
+          </Button>
 
-          <h1 className="text-base font-semibold text-theme-fg absolute left-1/2 -translate-x-1/2 max-w-[50vw] truncate">
+          <h1 className="text-base font-semibold text-foreground absolute left-1/2 -translate-x-1/2 max-w-[50vw] truncate">
             {task.title}
           </h1>
 
-          <button
+          <Button
+            variant="ghost"
+            size="icon-lg"
             onClick={() => setIsEditDialogOpen(true)}
-            className="p-2 text-primary hover:text-primary-light rounded hover:bg-theme-hover cursor-pointer"
+            className="text-primary hover:bg-primary/10 hover:text-foreground"
             title="Edit task"
           >
             <Edit className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Scrollable content */}
       <div className="flex-1 flex flex-col min-h-0">
         {/* Task Info Detail Section */}
-        <div className="px-4 bg-theme-card flex-shrink-0">
+        <div className="px-4 bg-card flex-shrink-0">
           <CollapsibleTaskInfo task={task} defaultExpanded={false} />
         </div>
 
         {/* TerminalPanel */}
-        <div className="bg-theme-card flex flex-col flex-1 min-h-0">
+        <div className="bg-card flex flex-col flex-1 min-h-0">
           <TerminalPanel
             ref={terminalPanelRef}
             task={task}
@@ -236,7 +240,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         </div>
 
         {/* Quick Actions */}
-        <div className="px-4 py-4 pr-[72px] border-t border-theme bg-theme-card flex-shrink-0">
+        <div className="px-4 py-4 pr-[72px] border-t border-border bg-card flex-shrink-0">
           <TaskActions task={task} onDelete={handleTaskDelete} />
         </div>
       </div>

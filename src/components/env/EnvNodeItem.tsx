@@ -1,6 +1,7 @@
 'use client';
 
 import { Globe, Folder, GitBranch, ChevronRight, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export type TreeNodeType = 'global' | 'owner' | 'repo';
 
@@ -65,25 +66,22 @@ export function EnvNodeItem({
       className={`
         flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer
         transition-colors
-        ${isSelected ? 'bg-theme-hover' : 'hover:bg-theme-hover'}
+        ${isSelected ? 'bg-accent' : 'hover:bg-accent'}
       `}
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
     >
       {hasChildren && (
-        <button
-          onClick={handleChevronClick}
-          className="p-0 hover:bg-theme-hover rounded cursor-pointer"
-        >
+        <Button variant="ghost" size="icon-xs" onClick={handleChevronClick} className="size-4">
           {isExpanded ? (
-            <ChevronDown className="w-3 h-3 text-theme-muted" />
+            <ChevronDown className="w-3 h-3 text-muted-foreground" />
           ) : (
-            <ChevronRight className="w-3 h-3 text-theme-muted" />
+            <ChevronRight className="w-3 h-3 text-muted-foreground" />
           )}
-        </button>
+        </Button>
       )}
       {!hasChildren && <div className="w-3" />}
-      <div className="text-theme-fg">{getIcon()}</div>
-      <span className="text-sm text-theme-fg truncate">{node.label}</span>
+      <div className="text-foreground">{getIcon()}</div>
+      <span className="text-sm text-foreground truncate">{node.label}</span>
     </div>
   );
 }

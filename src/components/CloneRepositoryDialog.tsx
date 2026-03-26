@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { Dialog } from './ui/Dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface CloneRepositoryDialogProps {
   isOpen: boolean;
@@ -54,36 +56,35 @@ export function CloneRepositoryDialog({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1 text-theme-fg">Git URL *</label>
-          <input
+          <label className="block text-sm font-medium mb-1 text-foreground">Git URL *</label>
+          <Input
             type="text"
             required
             placeholder="https://github.com/owner/repo.git"
             value={gitUrl}
             onChange={(e) => setGitUrl(e.target.value)}
-            className="w-full px-3 py-2 border border-theme rounded text-theme-fg bg-theme-card"
+            className="w-full"
           />
-          <p className="text-xs text-theme-muted mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             HTTPS or SSH形式のGit URLを入力してください
           </p>
         </div>
 
         <div className="flex justify-end gap-2">
           {!isOnboarding && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="lg"
               onClick={onClose}
-              className="px-4 py-2 border border-theme rounded text-theme-fg hover:bg-theme-card active:scale-95 cursor-pointer"
+              className="active:scale-95"
             >
               Cancel
-            </button>
+            </Button>
           )}
-          <button
-            type="submit"
-            className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer"
-          >
+          <Button type="submit" size="lg" className="active:scale-95">
             Clone
-          </button>
+          </Button>
         </div>
       </form>
     </Dialog>

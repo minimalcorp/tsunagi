@@ -1,67 +1,44 @@
 'use client';
 
-import { toaster } from '@/lib/toaster';
-import type { ToastType } from '@/components/Toast';
+import { toast } from 'sonner';
 
 export const useToast = () => {
   const loading = (title: string, description?: string): string => {
-    return toaster.create({
-      type: 'loading' as ToastType,
-      title,
-      description,
-      duration: Infinity,
-    });
+    const id = crypto.randomUUID();
+    toast.loading(title, { id, description, duration: Infinity });
+    return id;
   };
 
   const success = (id: string | undefined, title: string, description?: string): string => {
     if (id) {
-      toaster.update(id, {
-        type: 'success' as ToastType,
-        title,
-        description,
-        duration: 5000,
-      });
+      toast.success(title, { id, description, duration: 5000 });
       return id;
     } else {
-      return toaster.create({
-        type: 'success' as ToastType,
-        title,
-        description,
-        duration: 5000,
-      });
+      const newId = crypto.randomUUID();
+      toast.success(title, { id: newId, description, duration: 5000 });
+      return newId;
     }
   };
 
   const error = (id: string | undefined, title: string, description?: string): string => {
     if (id) {
-      toaster.update(id, {
-        type: 'error' as ToastType,
-        title,
-        description,
-        duration: Infinity,
-      });
+      toast.error(title, { id, description, duration: Infinity });
       return id;
     } else {
-      return toaster.create({
-        type: 'error' as ToastType,
-        title,
-        description,
-        duration: Infinity,
-      });
+      const newId = crypto.randomUUID();
+      toast.error(title, { id: newId, description, duration: Infinity });
+      return newId;
     }
   };
 
   const info = (title: string, description?: string): string => {
-    return toaster.create({
-      type: 'info' as ToastType,
-      title,
-      description,
-      duration: 5000,
-    });
+    const id = crypto.randomUUID();
+    toast.info(title, { id, description, duration: 5000 });
+    return id;
   };
 
   const dismiss = (id: string) => {
-    toaster.dismiss(id);
+    toast.dismiss(id);
   };
 
   return { loading, success, error, info, dismiss };

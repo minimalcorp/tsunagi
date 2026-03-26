@@ -49,16 +49,16 @@ export function TaskCard({ task, isDragging, dragHandleProps, tabTodosMap }: Tas
       href={`/tasks/${task.id}`}
       onClick={handleClick}
       className={`
-        block bg-theme-card border border-theme rounded-lg p-4 cursor-grab active:cursor-grabbing
+        block bg-card border border-border rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing flex flex-col gap-1.5
         ${isDragging ? 'shadow-xl rotate-2' : ''}
-        ${isClaudeRunning ? 'opacity-50 bg-theme-hover' : ''}
+        ${isClaudeRunning ? 'opacity-50 bg-accent' : ''}
       `}
     >
       {/* Order Badge */}
       {task.order !== undefined && (
         <div
-          className={`inline-block px-2 py-0.5 text-xs font-medium rounded mb-2 ${
-            isClaudeRunning ? 'bg-gray-200 text-gray-600' : 'bg-primary-100 text-primary-700'
+          className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${
+            isClaudeRunning ? 'bg-muted text-muted-foreground' : 'bg-primary-100 text-primary-700'
           }`}
         >
           #{task.order}
@@ -67,34 +67,34 @@ export function TaskCard({ task, isDragging, dragHandleProps, tabTodosMap }: Tas
 
       {/* タイトル */}
       <h3
-        className={`font-semibold mb-2 ${isClaudeRunning ? 'text-theme-muted' : 'text-theme-fg'}`}
+        className={`font-semibold ${isClaudeRunning ? 'text-muted-foreground' : 'text-foreground'}`}
       >
         {task.title}
       </h3>
 
       {/* Owner/Repo/Branch */}
       <p
-        className={`text-sm mb-2 ${isClaudeRunning ? 'opacity-60 text-theme-muted' : 'text-theme-muted'}`}
+        className={`text-sm ${isClaudeRunning ? 'opacity-60 text-muted-foreground' : 'text-muted-foreground'}`}
       >
         {task.owner}/{task.repo} @ {task.branch}
       </p>
 
       {/* Progress Bar（running状態かつtodosがある場合） */}
       {showProgressBar && (
-        <div className="mb-2">
+        <div>
           <div className="flex items-center gap-1 mb-0.5">
             <div className="flex-1 bg-theme h-1 rounded-full overflow-hidden">
               <div
-                className="h-full bg-primary transition-all duration-300"
+                className="h-full bg-primary transition-[width]"
                 style={{ width: `${totalTodos > 0 ? (completedTodos / totalTodos) * 100 : 0}%` }}
               />
             </div>
-            <span className="text-[10px] text-theme-muted flex-shrink-0">
+            <span className="text-[10px] text-muted-foreground flex-shrink-0">
               {completedTodos}/{totalTodos}
             </span>
           </div>
           {currentTodo && (
-            <p className="text-[10px] text-theme-muted truncate">
+            <p className="text-[10px] text-muted-foreground truncate">
               {currentTodo.content.slice(0, 40)}
               {currentTodo.content.length > 40 ? '…' : ''}
             </p>
@@ -115,7 +115,7 @@ export function TaskCard({ task, isDragging, dragHandleProps, tabTodosMap }: Tas
           )}
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-theme-muted flex-shrink-0">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-shrink-0">
           {/* 工数 */}
           {task.effort && <span className="font-medium">{task.effort}h</span>}
 

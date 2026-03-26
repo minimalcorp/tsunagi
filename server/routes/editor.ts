@@ -12,33 +12,40 @@ export async function editorRoutes(fastify: FastifyInstance) {
   const f = fastify as FastifyWithIO;
 
   // セッション作成: CLIスクリプトが filePath を送信、サーバーがファイルを読む
-  f.post<{ Body: { filePath: string } }>('/api/editor/session', async (request, reply) => {
-    const { filePath } = request.body;
-    if (!filePath) {
-      return reply.status(400).send('filePath is required');
+  f.post<{ Body: { filePath: string; tabId?: string } }>(
+    '/api/editor/session',
+    async (request, reply) => {
+      const { filePath, tabId } = request.body;
+      if (!filePath) {
+        return reply.status(400).send('filePath is required');
+      }
+
+      let content = '';
+      try {
+        content = await readFile(filePath, 'utf8');
+      } catch {
+        // ファイルが存在しない or 空の場合は空文字で続行
+      }
+
+      const sessionId = randomUUID();
+      editorSessionStore.set(sessionId, {
+        filePath,
+        content,
+        status: 'pending',
+        createdAt: Date.now(),
+      });
+
+      // tabIdが指定されていればそのタブのルームにのみ送信、なければ全体ブロードキャスト（後方互換）
+      if (tabId) {
+        f.io.to(`tab:${tabId}`).emit('editor:open', { sessionId, content });
+      } else {
+        f.io.emit('editor:open', { sessionId, content });
+      }
+
+      // sessionId のみプレーンテキストで返す（Shell script が JSON パース不要）
+      return reply.type('text/plain').send(sessionId);
     }
-
-    let content = '';
-    try {
-      content = await readFile(filePath, 'utf8');
-    } catch {
-      // ファイルが存在しない or 空の場合は空文字で続行
-    }
-
-    const sessionId = randomUUID();
-    editorSessionStore.set(sessionId, {
-      filePath,
-      content,
-      status: 'pending',
-      createdAt: Date.now(),
-    });
-
-    // 全ブラウザクライアントに editor:open を送信
-    f.io.emit('editor:open', { sessionId, content });
-
-    // sessionId のみプレーンテキストで返す（Shell script が JSON パース不要）
-    return reply.type('text/plain').send(sessionId);
-  });
+  );
 
   // セッション状態取得: CLIスクリプトがポーリングで使用
   // "done" or "pending" をプレーンテキストで返す（Shell script が JSON パース不要）

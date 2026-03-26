@@ -5,6 +5,7 @@ import { Editor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Dialog } from '@/components/ui/Dialog';
+import { Button } from '@/components/ui/button';
 
 export interface MonacoEditorModalProps {
   open: boolean;
@@ -93,7 +94,7 @@ export function MonacoEditorModal({
     >
       <div className="space-y-4">
         <div
-          className="border border-theme rounded overflow-hidden"
+          className="border border-border rounded overflow-hidden"
           style={{ height: 'clamp(200px, 50vh, 600px)' }}
         >
           <Editor
@@ -139,22 +140,16 @@ export function MonacoEditorModal({
             theme={effectiveTheme === 'dark' ? 'vs-dark' : 'vs-light'}
           />
         </div>
-        <p className="text-xs text-theme-muted">
+        <p className="text-xs text-muted-foreground">
           {isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} で{submitLabel}、Esc でキャンセル
         </p>
         <div className="flex justify-end gap-2">
-          <button
-            onClick={handleCancel}
-            className="px-4 py-2 border border-theme rounded text-theme-fg hover:bg-theme-hover cursor-pointer"
-          >
+          <Button variant="outline" size="lg" onClick={handleCancel}>
             Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover cursor-pointer"
-          >
+          </Button>
+          <Button size="lg" onClick={handleSubmit}>
             {submitLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </Dialog>

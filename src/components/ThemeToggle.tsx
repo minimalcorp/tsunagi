@@ -2,6 +2,7 @@
 
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Button } from '@/components/ui/button';
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -13,20 +14,22 @@ export function ThemeToggle() {
   ];
 
   return (
-    <div className="flex items-center gap-1 bg-theme-hover rounded p-1">
+    <div className="flex items-center gap-0.5 bg-input/20 dark:bg-input/30 rounded-md p-0.5">
       {themes.map(({ value, icon: Icon, label }) => (
-        <button
+        <Button
           key={value}
+          variant="ghost"
+          size="icon-lg"
           onClick={() => setTheme(value)}
-          className={`px-2 h-8 rounded text-sm cursor-pointer flex items-center justify-center ${
+          className={
             theme === value
-              ? 'bg-primary text-white shadow-sm'
-              : 'text-theme-muted hover:text-theme-fg'
-          }`}
+              ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/80 hover:text-primary-foreground dark:hover:bg-primary/80'
+              : 'text-muted-foreground hover:text-foreground'
+          }
           title={label}
         >
-          <Icon className="w-4 h-4" />
-        </button>
+          <Icon />
+        </Button>
       ))}
     </div>
   );

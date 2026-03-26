@@ -2,6 +2,8 @@
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface EnvironmentSettingsDialogProps {
   isOpen: boolean;
@@ -125,25 +127,27 @@ export function EnvironmentSettingsDialog({
       onClick={!isOnboarding && !isLoading ? onClose : undefined}
     >
       <div
-        className="bg-theme-card rounded-lg p-6 w-full max-w-md relative"
+        className="bg-card rounded-xl p-6 w-full max-w-md relative"
         onClick={(e) => e.stopPropagation()}
       >
         {isLoading && (
-          <div className="absolute inset-0 bg-theme-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
             <LoadingSpinner size="lg" message="Saving settings..." />
           </div>
         )}
 
-        <h2 className="text-xl font-bold mb-4 text-theme-fg">Environment Settings</h2>
+        <h2 className="text-lg font-semibold leading-none mb-4 text-foreground">
+          Environment Settings
+        </h2>
 
-        <div className="mb-4 p-3 bg-primary/10 border border-primary/50 rounded text-sm text-theme-fg">
+        <div className="mb-4 p-3 bg-primary/10 border border-primary/50 rounded text-sm text-foreground">
           どちらか片方の認証情報を設定してください
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-theme-fg">
+              <label className="text-sm font-medium text-foreground">
                 ANTHROPIC_API_KEY (Optional)
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -154,18 +158,18 @@ export function EnvironmentSettingsDialog({
                   disabled={isLoading}
                   className="w-4 h-4 cursor-pointer"
                 />
-                <span className="text-xs text-theme-muted">Enabled</span>
+                <span className="text-xs text-muted-foreground">Enabled</span>
               </label>
             </div>
-            <input
+            <Input
               type="password"
               placeholder="sk-ant-xxx"
               value={anthropicApiKey}
               onChange={(e) => setAnthropicApiKey(e.target.value)}
-              className="w-full px-3 py-2 border border-theme rounded font-mono text-sm text-theme-fg bg-theme-card"
+              className="w-full font-mono"
               disabled={isLoading}
             />
-            <p className="text-xs text-theme-muted mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Claude APIキー（
               <a
                 href="https://console.anthropic.com/"
@@ -181,7 +185,7 @@ export function EnvironmentSettingsDialog({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-theme-fg">
+              <label className="text-sm font-medium text-foreground">
                 CLAUDE_CODE_OAUTH_TOKEN (Optional)
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -192,18 +196,18 @@ export function EnvironmentSettingsDialog({
                   disabled={isLoading}
                   className="w-4 h-4 cursor-pointer"
                 />
-                <span className="text-xs text-theme-muted">Enabled</span>
+                <span className="text-xs text-muted-foreground">Enabled</span>
               </label>
             </div>
-            <input
+            <Input
               type="password"
               placeholder="oauth_xxx"
               value={claudeCodeToken}
               onChange={(e) => setClaudeCodeToken(e.target.value)}
-              className="w-full px-3 py-2 border border-theme rounded font-mono text-sm text-theme-fg bg-theme-card"
+              className="w-full font-mono"
               disabled={isLoading}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Claude Code OAuth Token（
               <a
                 href="https://claude.ai/settings/developer"
@@ -219,7 +223,7 @@ export function EnvironmentSettingsDialog({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-theme-fg">GITHUB_PAT (Optional)</label>
+              <label className="text-sm font-medium text-foreground">GITHUB_PAT (Optional)</label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -228,18 +232,18 @@ export function EnvironmentSettingsDialog({
                   disabled={isLoading}
                   className="w-4 h-4 cursor-pointer"
                 />
-                <span className="text-xs text-theme-muted">Enabled</span>
+                <span className="text-xs text-muted-foreground">Enabled</span>
               </label>
             </div>
-            <input
+            <Input
               type="password"
               placeholder="ghp_xxx or github_pat_xxx"
               value={githubPat}
               onChange={(e) => setGithubPat(e.target.value)}
-              className="w-full px-3 py-2 border border-theme rounded font-mono text-sm text-theme-fg bg-theme-card"
+              className="w-full font-mono"
               disabled={isLoading}
             />
-            <p className="text-xs text-theme-muted mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               GitHub Personal Access Token（
               <a
                 href="https://github.com/settings/tokens"
@@ -253,24 +257,22 @@ export function EnvironmentSettingsDialog({
             </p>
           </div>
 
-          {error && <div className="text-red-500 text-sm">{error}</div>}
+          {error && <div className="text-destructive text-sm">{error}</div>}
 
           <div className="flex justify-end gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="lg"
               onClick={onClose}
-              className="px-4 py-2 border border-theme rounded text-theme-fg active:scale-95 transition-transform cursor-pointer"
+              className="active:scale-95"
               disabled={isLoading}
             >
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-primary text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              disabled={isLoading}
-            >
+            </Button>
+            <Button type="submit" size="lg" className="active:scale-95" disabled={isLoading}>
               Save
-            </button>
+            </Button>
           </div>
         </form>
       </div>

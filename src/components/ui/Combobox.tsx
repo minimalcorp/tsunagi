@@ -1,10 +1,16 @@
 'use client';
 
-import { Combobox as ArkCombobox, useListCollection } from '@ark-ui/react/combobox';
-import { useFilter } from '@ark-ui/react/locale';
-import { Portal } from '@ark-ui/react/portal';
-import { Check, ChevronsUpDown, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { ChevronsUpDown, X } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 
 interface ComboboxOption {
   value: string;
@@ -37,108 +43,92 @@ export function Combobox({
   onClear,
   showClearButton = false,
 }: ComboboxProps) {
-  const { contains } = useFilter({ sensitivity: 'base' });
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const { collection, filter } = useListCollection({
-    initialItems: options,
-    filter: contains,
-  });
+  // Normalize value to array for internal use
+  const normalizedValue = useMemo(() => (Array.isArray(value) ? value : [value]), [value]);
 
-  // Manage input value with state
-  const [inputValue, setInputValue] = useState('');
-
-  const handleValueChange = (details: { value: string[] }) => {
-    // onChange を呼び出すだけで、表示の更新は useEffect に任せる
-    // これにより、親コンポーネントで値が正規化された後に正しい表示が適用される
-    if (multiple) {
-      onChange(details.value);
-    } else {
-      const newValue = details.value[0];
-      if (newValue !== undefined) {
-        onChange(newValue);
-      }
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setSearch('');
     }
   };
 
-  const handleInputValueChange = (details: { inputValue: string }) => {
-    // ユーザーが入力している時は、入力値を更新してフィルタリング
-    setInputValue(details.inputValue);
-    filter(details.inputValue);
-    if (allowCustomValue && !multiple) {
-      onChange(details.inputValue);
-    }
-  };
-
-  // Sync input value when value prop changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const normalizedValue = Array.isArray(value) ? value : [value];
-
-    // 複数選択モードの場合、親から渡された値を元に表示を更新
+  // Compute display label
+  const displayLabel = useMemo(() => {
     if (multiple) {
-      // "all"のみの場合は"All Repositories"のみ表示
       if (normalizedValue.length === 1 && normalizedValue[0] === 'all') {
         const allOption = options.find((opt) => opt.value === 'all');
-        setInputValue(allOption?.label || '');
-      } else {
-        // "all"を除外して、選択されたrepository名のみ表示
-        const labels = normalizedValue
-          .filter((v) => v !== 'all')
-          .map((v) => options.find((opt) => opt.value === v)?.label)
-          .filter(Boolean)
-          .join(', ');
-        setInputValue(labels);
+        return allOption?.label || '';
       }
-    } else {
-      // 単一選択モード
       const labels = normalizedValue
+        .filter((v) => v !== 'all')
         .map((v) => options.find((opt) => opt.value === v)?.label)
         .filter(Boolean)
         .join(', ');
-      setInputValue(labels);
+      return labels;
     }
-  }, [value, options, multiple]);
+    const labels = normalizedValue
+      .map((v) => options.find((opt) => opt.value === v)?.label)
+      .filter(Boolean)
+      .join(', ');
+    return labels;
+  }, [normalizedValue, options, multiple]);
 
-  // Normalize value to array
-  const normalizedValue = Array.isArray(value) ? value : [value];
+  // Group options
+  const groupedOptions = useMemo(() => {
+    const groups: Record<string, ComboboxOption[]> = {};
+    for (const opt of options) {
+      const group = opt.group || 'Other';
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(opt);
+    }
+    return groups;
+  }, [options]);
 
-  // Group items by group property
-  const groupedItems = collection.items.reduce(
-    (acc, item) => {
-      const group = item.group || 'Other';
-      if (!acc[group]) {
-        acc[group] = [];
+  const hasGroups = useMemo(() => {
+    const keys = Object.keys(groupedOptions);
+    return keys.length > 1 || !groupedOptions['Other'];
+  }, [groupedOptions]);
+
+  const handleSelect = (selectedValue: string) => {
+    if (multiple) {
+      const current = [...normalizedValue];
+      const idx = current.indexOf(selectedValue);
+      if (idx >= 0) {
+        current.splice(idx, 1);
+      } else {
+        current.push(selectedValue);
       }
-      acc[group].push(item);
-      return acc;
-    },
-    {} as Record<string, typeof collection.items>
-  );
+      onChange(current.length > 0 ? current : []);
+    } else {
+      onChange(selectedValue);
+      setOpen(false);
+    }
+  };
 
-  const hasGroups = Object.keys(groupedItems).length > 1 || !groupedItems['Other'];
+  const handleCustomValue = () => {
+    if (allowCustomValue && search && !multiple) {
+      onChange(search);
+      setOpen(false);
+    }
+  };
 
   return (
-    <ArkCombobox.Root
-      collection={collection}
-      value={normalizedValue}
-      inputValue={inputValue}
-      onValueChange={handleValueChange}
-      onInputValueChange={handleInputValueChange}
-      positioning={{ sameWidth: true }}
-      disabled={disabled}
-      allowCustomValue={allowCustomValue}
-      openOnClick={true}
-      inputBehavior="autohighlight"
-      selectionBehavior="preserve"
-      multiple={multiple}
-      lazyMount
-      unmountOnExit
-    >
-      <ArkCombobox.Control className={`relative ${className}`}>
-        <ArkCombobox.Input
-          className={`w-full pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} py-2 border border-theme rounded text-theme-fg bg-theme-card disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap`}
-          placeholder={placeholder}
-        />
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <div className={`relative ${className}`}>
+        <PopoverTrigger
+          ref={triggerRef}
+          disabled={disabled}
+          className={`flex h-9 w-full items-center justify-between pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} border border-input rounded-md text-sm bg-input/20 dark:bg-input/30 text-foreground transition-colors outline-none hover:border-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 data-[state=open]:border-ring data-[state=open]:ring-2 data-[state=open]:ring-ring/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-left shadow-xs`}
+        >
+          <span className="truncate">
+            {displayLabel || <span className="text-muted-foreground">{placeholder}</span>}
+          </span>
+        </PopoverTrigger>
         {showClearButton && onClear && (
           <button
             type="button"
@@ -146,65 +136,80 @@ export function Combobox({
               e.stopPropagation();
               onClear();
             }}
-            className="absolute right-8 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-fg transition-colors cursor-pointer"
+            className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer z-10"
             aria-label="Clear selection"
           >
             <X className="w-4 h-4" />
           </button>
         )}
-        <ArkCombobox.Trigger className="absolute right-2 top-1/2 -translate-y-1/2 text-theme-muted">
-          <ChevronsUpDown className="w-4 h-4" />
-        </ArkCombobox.Trigger>
-      </ArkCombobox.Control>
-
-      <Portal>
-        <ArkCombobox.Positioner>
-          <ArkCombobox.Content className="bg-theme-card border border-theme rounded shadow-lg mt-1 max-h-60 overflow-auto z-50 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out">
-            {collection.items.length > 0 ? (
-              hasGroups ? (
-                <>
-                  {Object.entries(groupedItems).map(([groupName, groupItems]) => (
-                    <ArkCombobox.ItemGroup key={groupName}>
-                      <ArkCombobox.ItemGroupLabel className="px-3 py-1.5 text-xs font-semibold text-theme-muted uppercase">
-                        {groupName}
-                      </ArkCombobox.ItemGroupLabel>
-                      {groupItems.map((item) => (
-                        <ArkCombobox.Item
-                          key={item.value}
-                          item={item}
-                          className="px-3 py-2 cursor-pointer hover:bg-theme-hover text-theme-fg flex items-center justify-between"
-                        >
-                          <ArkCombobox.ItemText>{item.label}</ArkCombobox.ItemText>
-                          <ArkCombobox.ItemIndicator>
-                            <Check className="w-4 h-4 text-primary" />
-                          </ArkCombobox.ItemIndicator>
-                        </ArkCombobox.Item>
-                      ))}
-                    </ArkCombobox.ItemGroup>
-                  ))}
-                </>
+        <ChevronsUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+      </div>
+      <PopoverContent className="w-[var(--anchor-width)] p-0" align="start" sideOffset={4}>
+        <Command
+          filter={(value, search) => {
+            const option = options.find((opt) => opt.value === value);
+            if (!option) return 0;
+            const target = `${option.label} ${option.group || ''}`.toLowerCase();
+            if (target.includes(search.toLowerCase())) return 1;
+            return 0;
+          }}
+        >
+          <CommandInput
+            placeholder={`Search...`}
+            value={search}
+            onValueChange={setSearch}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && allowCustomValue) {
+                handleCustomValue();
+              }
+            }}
+          />
+          <CommandList>
+            <CommandEmpty>
+              {allowCustomValue && search ? (
+                <button
+                  type="button"
+                  className="w-full px-2 py-1.5 text-left text-xs cursor-pointer hover:bg-accent rounded"
+                  onClick={handleCustomValue}
+                >
+                  Use &quot;{search}&quot;
+                </button>
               ) : (
-                <ArkCombobox.ItemGroup>
-                  {collection.items.map((item) => (
-                    <ArkCombobox.Item
-                      key={item.value}
-                      item={item}
-                      className="px-3 py-2 cursor-pointer hover:bg-theme-hover text-theme-fg flex items-center justify-between"
+                'No options found'
+              )}
+            </CommandEmpty>
+            {hasGroups ? (
+              Object.entries(groupedOptions).map(([groupName, groupItems]) => (
+                <CommandGroup key={groupName} heading={groupName}>
+                  {groupItems.map((opt) => (
+                    <CommandItem
+                      key={opt.value}
+                      value={opt.value}
+                      data-checked={normalizedValue.includes(opt.value)}
+                      onSelect={() => handleSelect(opt.value)}
                     >
-                      <ArkCombobox.ItemText>{item.label}</ArkCombobox.ItemText>
-                      <ArkCombobox.ItemIndicator>
-                        <Check className="w-4 h-4 text-primary" />
-                      </ArkCombobox.ItemIndicator>
-                    </ArkCombobox.Item>
+                      <span className="truncate">{opt.label}</span>
+                    </CommandItem>
                   ))}
-                </ArkCombobox.ItemGroup>
-              )
+                </CommandGroup>
+              ))
             ) : (
-              <div className="px-3 py-2 text-theme-muted text-sm">No options found</div>
+              <CommandGroup>
+                {options.map((opt) => (
+                  <CommandItem
+                    key={opt.value}
+                    value={opt.value}
+                    data-checked={normalizedValue.includes(opt.value)}
+                    onSelect={() => handleSelect(opt.value)}
+                  >
+                    <span className="truncate">{opt.label}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
             )}
-          </ArkCombobox.Content>
-        </ArkCombobox.Positioner>
-      </Portal>
-    </ArkCombobox.Root>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

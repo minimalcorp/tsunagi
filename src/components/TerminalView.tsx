@@ -16,6 +16,7 @@ import { io, type Socket } from 'socket.io-client';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Loader2, Copy, Play, Check, SquarePen } from 'lucide-react';
 import { MonacoEditorModal } from '@/components/MonacoEditorModal';
+import { Button } from '@/components/ui/button';
 
 const FASTIFY_API_BASE = 'http://localhost:2792';
 
@@ -397,6 +398,18 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       onTodosUpdated?.(tabId, newTodos);
     });
 
+    // editor:open イベント（tabルーム経由で受信）→ カスタムイベントでEditorSessionProviderに通知
+    socket.on(
+      'editor:open',
+      ({ sessionId: editorSessionId, content }: { sessionId: string; content: string }) => {
+        window.dispatchEvent(
+          new CustomEvent('editor-session-open-request', {
+            detail: { sessionId: editorSessionId, content },
+          })
+        );
+      }
+    );
+
     term.onData((data) => {
       if (socket.connected && sessionIdRef.current) {
         socket.emit('input', { sessionId: sessionIdRef.current, data });
@@ -442,43 +455,34 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     <>
       <div className={`flex flex-col h-full min-h-0 ${className}`}>
         {/* UUID表示バー */}
-        <div className="flex items-center gap-2 px-2 py-1 border-b border-theme flex-shrink-0 bg-theme-card">
-          <span className="font-mono text-xs text-theme-muted" title={tabId}>
+        <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0 bg-card">
+          <span className="font-mono text-xs text-muted-foreground" title={tabId}>
             {shortTabId}
           </span>
-          <button
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={handleCopyTabId}
-            className="p-1 text-theme-muted hover:text-theme-fg rounded hover:bg-theme-hover cursor-pointer"
+            className="text-muted-foreground hover:text-foreground"
             title="Copy tab ID"
           >
-            {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={handleRunClaude}
-            disabled={!isConnected}
-            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded cursor-pointer ${
-              isConnected
-                ? 'bg-primary text-white hover:opacity-80'
-                : 'bg-theme-hover text-theme-muted cursor-not-allowed opacity-50'
-            }`}
-            title="Run Claude"
-          >
+            {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+          </Button>
+          <Button size="xs" onClick={handleRunClaude} disabled={!isConnected} title="Run Claude">
             <Play className="w-3 h-3" />
             Run Claude
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => setShowEditorModal(true)}
             disabled={!isConnected}
-            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded cursor-pointer ${
-              isConnected
-                ? 'text-theme-muted hover:bg-theme-hover hover:text-theme-fg'
-                : 'text-theme-muted cursor-not-allowed opacity-50'
-            }`}
+            className="text-muted-foreground hover:text-foreground"
             title="Open editor input"
           >
             <SquarePen className="w-3 h-3" />
             Open Editor
-          </button>
+          </Button>
         </div>
 
         {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
@@ -487,8 +491,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
           {/* 接続中オーバーレイ: connected になると消える */}
           {isConnecting && (
-            <div className="absolute inset-0 flex items-center justify-center bg-theme-bg">
-              <div className="flex items-center gap-2 text-theme-muted text-xs">
+            <div className="absolute inset-0 flex items-center justify-center bg-background">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Connecting...</span>
               </div>
@@ -497,40 +501,41 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
           {/* exited / error: overlayで再接続を促す */}
           {isPausedOrExited && (
-            <div className="absolute inset-0 flex items-center justify-center bg-theme-bg/90">
+            <div className="absolute inset-0 flex items-center justify-center bg-background/90">
               <div className="text-center space-y-2">
-                {status === 'error' && <p className="text-xs text-red-500">Connection failed</p>}
-                {status === 'exited' && <p className="text-xs text-theme-muted">Session ended</p>}
-                {status === 'paused' && <p className="text-xs text-theme-muted">Paused</p>}
-                <button
-                  onClick={reconnectSession}
-                  className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-80 cursor-pointer"
-                >
+                {status === 'error' && (
+                  <p className="text-xs text-destructive">Connection failed</p>
+                )}
+                {status === 'exited' && (
+                  <p className="text-xs text-muted-foreground">Session ended</p>
+                )}
+                {status === 'paused' && <p className="text-xs text-muted-foreground">Paused</p>}
+                <Button size="xs" onClick={reconnectSession}>
                   Reconnect
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
           {/* Todo進捗（running時かつtodosがある場合のみ表示） */}
           {showTodoProgress && (
-            <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-theme-card/90 border-t border-theme">
+            <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-card/90 border-t border-border">
               <div className="flex items-center gap-2">
-                <div className="flex-1 bg-theme-hover rounded-full h-1 overflow-hidden">
+                <div className="flex-1 bg-accent rounded-full h-1 overflow-hidden">
                   <div
-                    className="h-full bg-primary transition-all duration-300"
+                    className="h-full bg-primary transition-[width]"
                     style={{
                       width: `${totalTodos > 0 ? (completedTodos / totalTodos) * 100 : 0}%`,
                     }}
                   />
                 </div>
-                <span className="text-[10px] text-theme-muted flex-shrink-0">
+                <span className="text-[10px] text-muted-foreground flex-shrink-0">
                   {completedTodos}/{totalTodos}
                 </span>
               </div>
               {/* 現在in_progressのtodo */}
               {todos.find((t) => t.status === 'in_progress') && (
-                <p className="text-[10px] text-theme-muted truncate mt-0.5">
+                <p className="text-[10px] text-muted-foreground truncate mt-0.5">
                   {todos.find((t) => t.status === 'in_progress')?.content}
                 </p>
               )}

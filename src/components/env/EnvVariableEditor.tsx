@@ -5,6 +5,8 @@ import { Plus, X, Check } from 'lucide-react';
 import { EnvVariableItem, type EnvironmentVariable } from './EnvVariableItem';
 import type { SelectedNode } from './EnvTreeNavigation';
 import { LoadingSpinner } from '../LoadingSpinner';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 // Claude Tokens (excluded from variables section)
 const CLAUDE_TOKENS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
@@ -248,7 +250,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
   if (error) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-red-500 text-sm">{error}</div>
+        <div className="text-destructive text-sm">{error}</div>
       </div>
     );
   }
@@ -256,59 +258,57 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-theme-fg">Environment Variables</h2>
+        <h2 className="text-lg font-bold text-foreground">Environment Variables</h2>
         {!isAdding && (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer flex items-center gap-2 text-sm"
-          >
+          <Button size="sm" onClick={() => setIsAdding(true)} className="active:scale-95">
             <Plus className="w-4 h-4" />
             Add Variable
-          </button>
+          </Button>
         )}
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-3">
         {/* Add Variable Form */}
         {isAdding && (
-          <div className="border border-theme rounded p-3 bg-theme-hover space-y-2">
-            <div className="text-sm font-medium text-theme-fg">New Variable</div>
-            <input
+          <div className="border border-border rounded p-3 bg-accent space-y-2">
+            <div className="text-sm font-medium text-foreground">New Variable</div>
+            <Input
               type="text"
               value={addKey}
               onChange={(e) => setAddKey(e.target.value.toUpperCase())}
               placeholder="VARIABLE_NAME"
-              className="w-full px-3 py-2 border border-theme rounded font-mono text-sm text-theme-fg bg-theme-card"
+              className="w-full font-mono"
               autoFocus
             />
-            <input
+            <Input
               type="password"
               value={addValue}
               onChange={(e) => setAddValue(e.target.value)}
               placeholder="value"
-              className="w-full px-3 py-2 border border-theme rounded font-mono text-sm text-theme-fg bg-theme-card"
+              className="w-full font-mono"
             />
-            {addError && <div className="text-xs text-red-500">{addError}</div>}
+            {addError && <div className="text-xs text-destructive">{addError}</div>}
             <div className="flex justify-end gap-2">
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleCancelAdd}
-                className="px-3 py-1.5 border border-theme rounded text-theme-fg hover:bg-theme-hover active:scale-95 transition-transform cursor-pointer text-sm"
+                className="active:scale-95"
               >
                 <X className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleAdd}
-                className="px-3 py-1.5 bg-primary text-white rounded active:scale-95 transition-transform cursor-pointer text-sm"
-              >
+              </Button>
+              <Button size="sm" onClick={handleAdd} className="active:scale-95">
                 <Check className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
         {/* Existing Variables */}
         {envVars.length === 0 && !isAdding ? (
-          <div className="text-center text-theme-muted text-sm py-4">No environment variables</div>
+          <div className="text-center text-muted-foreground text-sm py-4">
+            No environment variables
+          </div>
         ) : (
           envVars.map((variable) => (
             <EnvVariableItem

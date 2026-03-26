@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import type { UIMessage, Tab } from '@/lib/types';
 import { UIMessageConverter } from '@/lib/ui-message-converter';
-import { useTheme } from '@/contexts/ThemeContext';
 import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
 import { markdownComponents } from '@/components/MarkdownComponents';
@@ -121,16 +120,16 @@ const ExecutionLogsChatComponent = forwardRef<ExecutionLogsChatHandle, Execution
     return (
       <div className="flex flex-col h-full min-h-0">
         <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
-          <h3 className="text-sm font-semibold text-theme-fg">Logs</h3>
+          <h3 className="text-sm font-semibold text-foreground">Logs</h3>
           <ClaudeState status={status} />
         </div>
 
         <div
           ref={scrollContainerRef}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-theme rounded p-4 space-y-3 bg-theme-hover"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-border rounded-xl p-4 space-y-3 bg-accent"
         >
           {uiMessages.length === 0 ? (
-            <p className="text-theme-muted text-sm text-center mt-8">
+            <p className="text-muted-foreground text-sm text-center mt-8">
               No logs yet. Execute a prompt to start.
             </p>
           ) : (
@@ -176,21 +175,21 @@ function getToolStatusIcon(
     case 'running':
       return {
         icon: <Loader2 className="w-3 h-3 animate-spin" />,
-        colorClass: 'text-theme-fg',
+        colorClass: 'text-foreground',
       };
     case 'pending':
       return sessionCompleted
-        ? { icon: <Ban className="w-3 h-3" />, colorClass: 'text-theme-fg' }
-        : { icon: <Loader2 className="w-3 h-3 animate-spin" />, colorClass: 'text-theme-fg' };
+        ? { icon: <Ban className="w-3 h-3" />, colorClass: 'text-foreground' }
+        : { icon: <Loader2 className="w-3 h-3 animate-spin" />, colorClass: 'text-foreground' };
     case 'success':
       return {
         icon: <CircleCheck className="w-3 h-3" />,
-        colorClass: 'text-green-500',
+        colorClass: 'text-success',
       };
     case 'error':
       return {
         icon: <CircleAlert className="w-3 h-3" />,
-        colorClass: 'text-red-500',
+        colorClass: 'text-destructive',
       };
   }
 }
@@ -203,15 +202,15 @@ function getGroupStatusIcon(
   // hasRunningは従来通り優先
   if (groupStatus.hasRunning) {
     return sessionCompleted
-      ? { icon: <Ban className="w-3 h-3" />, colorClass: 'text-theme-fg' }
-      : { icon: <Loader2 className="w-3 h-3 animate-spin" />, colorClass: 'text-theme-fg' };
+      ? { icon: <Ban className="w-3 h-3" />, colorClass: 'text-foreground' }
+      : { icon: <Loader2 className="w-3 h-3 animate-spin" />, colorClass: 'text-foreground' };
   }
 
   // all error → CircleAlert (red)
   if (groupStatus.allError) {
     return {
       icon: <CircleAlert className="w-3 h-3" />,
-      colorClass: 'text-red-500',
+      colorClass: 'text-destructive',
     };
   }
 
@@ -219,14 +218,14 @@ function getGroupStatusIcon(
   if (groupStatus.allSuccess) {
     return {
       icon: <CircleCheck className="w-3 h-3" />,
-      colorClass: 'text-green-500',
+      colorClass: 'text-success',
     };
   }
 
   // anything else (混在状態) → CircleEllipsis (yellow)
   return {
     icon: <CircleEllipsis className="w-3 h-3" />,
-    colorClass: 'text-yellow-500',
+    colorClass: 'text-warning',
   };
 }
 
@@ -242,9 +241,6 @@ function UIMessageItem({
   expandedTools: Record<string, boolean>;
   setExpandedTools: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }) {
-  const { effectiveTheme } = useTheme();
-  const isDark = effectiveTheme === 'dark';
-
   if (message.type === 'user_message') {
     const content = message.content;
     if (content.type !== 'user_message') return null;
@@ -252,12 +248,12 @@ function UIMessageItem({
     return (
       <div className="flex justify-end">
         <div className="text-right max-w-full">
-          <div className="inline-block text-left rounded-lg p-2 bg-primary text-white max-w-full">
+          <div className="inline-block text-left rounded-xl p-3 bg-primary text-white max-w-full">
             <div className="text-xs whitespace-pre-wrap break-words overflow-wrap-anywhere">
               {content.text}
             </div>
           </div>
-          <div className="text-xs text-theme-muted mt-1 text-right">
+          <div className="text-xs text-muted-foreground mt-1 text-right">
             {new Date(message.timestamp).toLocaleString()}
           </div>
         </div>
@@ -279,16 +275,8 @@ function UIMessageItem({
             return (
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
-                  <div
-                    className={`inline-block text-left rounded-lg p-2 max-w-full ${
-                      isDark ? 'bg-yellow-900/20' : 'bg-yellow-50'
-                    }`}
-                  >
-                    <div
-                      className={`text-xs whitespace-pre-wrap italic flex items-start gap-1 ${
-                        isDark ? 'text-yellow-300' : 'text-yellow-800'
-                      }`}
-                    >
+                  <div className="inline-block text-left rounded-xl p-3 max-w-full bg-warning/10">
+                    <div className="text-xs whitespace-pre-wrap italic flex items-start gap-1 text-warning">
                       <Brain className="w-3 h-3 flex-shrink-0 mt-0.5" />
                       <span className="break-words overflow-wrap-anywhere">{block.content}</span>
                     </div>
@@ -302,8 +290,8 @@ function UIMessageItem({
             return (
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
-                  <div className="inline-block text-left rounded-lg p-2 bg-theme-card max-w-full">
-                    <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-theme-fg text-xs break-words overflow-wrap-anywhere">
+                  <div className="inline-block text-left rounded-xl p-3 bg-card max-w-full">
+                    <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-foreground text-xs break-words overflow-wrap-anywhere">
                       <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
                         {block.content}
                       </ReactMarkdown>
@@ -329,11 +317,7 @@ function UIMessageItem({
             return (
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
-                  <div
-                    className={`inline-block text-left rounded-lg p-2 max-w-full ${
-                      isDark ? 'bg-purple-900/20' : 'bg-purple-50'
-                    }`}
-                  >
+                  <div className={`inline-block text-left rounded-xl p-3 max-w-full bg-secondary`}>
                     {hasDetails ? (
                       <button
                         onClick={() =>
@@ -342,41 +326,25 @@ function UIMessageItem({
                         className="flex items-center gap-1 w-full text-left cursor-pointer"
                       >
                         <Wrench className="w-3 h-3" />
-                        <span
-                          className={`text-xs font-medium ${
-                            isDark ? 'text-purple-300' : 'text-purple-950'
-                          }`}
-                        >
+                        <span className={`text-xs font-medium text-secondary-foreground`}>
                           {tool.toolName}
                         </span>
                         {statusIcon && <span className={colorClass}>{statusIcon}</span>}
                         {isExpanded ? (
-                          <ChevronUp
-                            className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
-                          />
+                          <ChevronUp className={`w-3 h-3 text-secondary-foreground`} />
                         ) : (
-                          <ChevronDown
-                            className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
-                          />
+                          <ChevronDown className={`w-3 h-3 text-secondary-foreground`} />
                         )}
                       </button>
                     ) : (
-                      <div
-                        className={`text-xs font-medium flex items-center gap-1 ${
-                          isDark ? 'text-purple-300' : 'text-purple-950'
-                        }`}
-                      >
+                      <div className="text-xs font-medium flex items-center gap-1 text-secondary-foreground">
                         <Wrench className="w-3 h-3" />
                         {tool.toolName}
                         {statusIcon && <span className={colorClass}>{statusIcon}</span>}
                       </div>
                     )}
                     {isExpanded && tool.input && (
-                      <pre
-                        className={`text-xs p-2 rounded overflow-x-auto mt-2 ${
-                          isDark ? 'bg-gray-800' : 'bg-white'
-                        }`}
-                      >
+                      <pre className="text-xs p-2 rounded overflow-x-auto mt-2 bg-card">
                         {JSON.stringify(tool.input, null, 2)}
                       </pre>
                     )}
@@ -384,12 +352,8 @@ function UIMessageItem({
                       <div
                         className={`text-xs mt-2 p-2 rounded break-words overflow-wrap-anywhere ${
                           tool.status === 'error'
-                            ? isDark
-                              ? 'bg-red-900/20 text-red-300'
-                              : 'bg-red-50 text-red-800'
-                            : isDark
-                              ? 'bg-green-900/20 text-green-300'
-                              : 'bg-green-50 text-green-800'
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-success/10 text-success'
                         }`}
                       >
                         {tool.status === 'success' ? '✓' : '✗'} {tool.result}
@@ -420,11 +384,7 @@ function UIMessageItem({
             return (
               <div key={index}>
                 <div className="flex justify-start items-center gap-2">
-                  <div
-                    className={`inline-block text-left rounded-lg p-2 max-w-full ${
-                      isDark ? 'bg-purple-900/20' : 'bg-purple-50'
-                    }`}
-                  >
+                  <div className={`inline-block text-left rounded-xl p-3 max-w-full bg-secondary`}>
                     <button
                       onClick={() =>
                         setExpandedTools((prev) => ({ ...prev, [groupKey]: !isGroupExpanded }))
@@ -432,24 +392,16 @@ function UIMessageItem({
                       className="flex items-center gap-1 hover:opacity-70 w-full text-left cursor-pointer"
                     >
                       <Wrench className="w-3 h-3" />
-                      <span
-                        className={`text-xs font-medium ${
-                          isDark ? 'text-purple-300' : 'text-purple-950'
-                        }`}
-                      >
+                      <span className="text-xs font-medium text-secondary-foreground">
                         Tool Uses ({executions.length})
                       </span>
                       {groupStatusIcon && (
                         <span className={groupColorClass}>{groupStatusIcon}</span>
                       )}
                       {isGroupExpanded ? (
-                        <ChevronUp
-                          className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
-                        />
+                        <ChevronUp className={`w-3 h-3 text-secondary-foreground`} />
                       ) : (
-                        <ChevronDown
-                          className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
-                        />
+                        <ChevronDown className={`w-3 h-3 text-secondary-foreground`} />
                       )}
                     </button>
 
@@ -465,10 +417,7 @@ function UIMessageItem({
                             getToolStatusIcon(exec.status, sessionCompleted);
 
                           return (
-                            <div
-                              key={execIndex}
-                              className={`p-2 rounded ${isDark ? 'bg-gray-800/50' : 'bg-white/50'}`}
-                            >
+                            <div key={execIndex} className="p-2 rounded bg-card/50">
                               {hasDetails ? (
                                 <button
                                   onClick={() =>
@@ -479,32 +428,20 @@ function UIMessageItem({
                                   }
                                   className="flex items-center gap-1 hover:opacity-70 w-full text-left cursor-pointer"
                                 >
-                                  <span
-                                    className={`text-xs font-medium ${
-                                      isDark ? 'text-purple-300' : 'text-purple-950'
-                                    }`}
-                                  >
+                                  <span className="text-xs font-medium text-secondary-foreground">
                                     {exec.toolName}
                                   </span>
                                   {execStatusIcon && (
                                     <span className={execColorClass}>{execStatusIcon}</span>
                                   )}
                                   {isToolExpanded ? (
-                                    <ChevronUp
-                                      className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
-                                    />
+                                    <ChevronUp className={`w-3 h-3 text-secondary-foreground`} />
                                   ) : (
-                                    <ChevronDown
-                                      className={`w-3 h-3 ${isDark ? 'text-purple-300' : 'text-purple-950'}`}
-                                    />
+                                    <ChevronDown className={`w-3 h-3 text-secondary-foreground`} />
                                   )}
                                 </button>
                               ) : (
-                                <div
-                                  className={`text-xs font-medium flex items-center gap-1 ${
-                                    isDark ? 'text-purple-300' : 'text-purple-950'
-                                  }`}
-                                >
+                                <div className="text-xs font-medium flex items-center gap-1 text-secondary-foreground">
                                   {exec.toolName}
                                   {execStatusIcon && (
                                     <span className={execColorClass}>{execStatusIcon}</span>
@@ -512,11 +449,7 @@ function UIMessageItem({
                                 </div>
                               )}
                               {isToolExpanded && exec.input && (
-                                <pre
-                                  className={`text-xs p-2 rounded overflow-x-auto mt-2 ${
-                                    isDark ? 'bg-gray-900' : 'bg-gray-50'
-                                  }`}
-                                >
+                                <pre className="text-xs p-2 rounded overflow-x-auto mt-2 bg-muted">
                                   {JSON.stringify(exec.input, null, 2)}
                                 </pre>
                               )}
@@ -524,12 +457,8 @@ function UIMessageItem({
                                 <div
                                   className={`text-xs mt-2 p-2 rounded break-words overflow-wrap-anywhere ${
                                     exec.status === 'error'
-                                      ? isDark
-                                        ? 'bg-red-900/20 text-red-300'
-                                        : 'bg-red-50 text-red-800'
-                                      : isDark
-                                        ? 'bg-green-900/20 text-green-300'
-                                        : 'bg-green-50 text-green-800'
+                                      ? 'bg-destructive/10 text-destructive'
+                                      : 'bg-success/10 text-success'
                                   }`}
                                 >
                                   {exec.status === 'success' ? '✓' : '✗'} {exec.result}
@@ -548,7 +477,7 @@ function UIMessageItem({
 
           return null;
         })}
-        <div className="text-xs text-theme-muted mt-1">
+        <div className="text-xs text-muted-foreground mt-1">
           {new Date(message.timestamp).toLocaleString()}
         </div>
       </div>
@@ -562,25 +491,19 @@ function UIMessageItem({
     return (
       <div>
         <div className="flex justify-start items-center gap-2">
-          <div
-            className={`inline-block text-left rounded-lg p-2 border max-w-full ${
-              isDark ? 'bg-red-900/20 border-red-700' : 'bg-red-100 border-red-300'
-            }`}
-          >
-            <div
-              className={`text-xs whitespace-pre-wrap flex items-start gap-1 ${isDark ? 'text-red-300' : 'text-red-950'}`}
-            >
+          <div className="inline-block text-left rounded-xl p-3 border max-w-full bg-destructive/10 border-destructive/30">
+            <div className="text-xs whitespace-pre-wrap flex items-start gap-1 text-destructive">
               <XCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
               <span className="break-words overflow-wrap-anywhere">{content.message}</span>
             </div>
             {content.details && (
-              <div className="text-xs text-theme-muted mt-1 break-words overflow-wrap-anywhere">
+              <div className="text-xs text-muted-foreground mt-1 break-words overflow-wrap-anywhere">
                 {content.details}
               </div>
             )}
           </div>
         </div>
-        <div className="text-xs text-theme-muted mt-1">
+        <div className="text-xs text-muted-foreground mt-1">
           {new Date(message.timestamp).toLocaleString()}
         </div>
       </div>
@@ -594,14 +517,14 @@ function UIMessageItem({
     return (
       <div>
         <div className="flex justify-start items-center gap-2">
-          <div className="inline-block text-left rounded-lg p-2 bg-theme-hover border border-theme max-w-full">
-            <div className="text-xs text-theme-muted flex items-start gap-1">
+          <div className="inline-block text-left rounded-xl p-3 bg-accent border border-border max-w-full">
+            <div className="text-xs text-muted-foreground flex items-start gap-1">
               <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
               <span className="break-words overflow-wrap-anywhere">{content.description}</span>
             </div>
           </div>
         </div>
-        <div className="text-xs text-theme-muted mt-1">
+        <div className="text-xs text-muted-foreground mt-1">
           {new Date(message.timestamp).toLocaleString()}
         </div>
       </div>

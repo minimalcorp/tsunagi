@@ -59,7 +59,7 @@ export function KanbanBoard({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex-1 flex gap-4 p-6 overflow-x-auto h-full">
+      <div className="flex-1 flex gap-3 overflow-x-auto h-full">
         <KanbanColumn
           title="Backlog"
           status="backlog"

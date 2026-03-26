@@ -39,16 +39,16 @@ export const markdownComponents: Components = {
   ),
   table: ({ children }) => (
     <div className="overflow-x-auto my-2 w-fit max-w-full">
-      <table className="border-collapse border border-theme rounded-lg overflow-hidden text-xs">
+      <table className="border-collapse border border-border rounded-lg overflow-hidden text-xs">
         {children}
       </table>
     </div>
   ),
-  thead: ({ children }) => <thead className="bg-theme-hover">{children}</thead>,
+  thead: ({ children }) => <thead className="bg-accent">{children}</thead>,
   tbody: ({ children }) => <tbody>{children}</tbody>,
   tr: ({ children }) => <tr>{children}</tr>,
   th: ({ children }) => (
-    <th className="border border-theme px-3 py-2 text-left font-semibold">{children}</th>
+    <th className="border border-border px-3 py-2 text-left font-semibold">{children}</th>
   ),
-  td: ({ children }) => <td className="border border-theme px-3 py-2">{children}</td>,
+  td: ({ children }) => <td className="border border-border px-3 py-2">{children}</td>,
 };

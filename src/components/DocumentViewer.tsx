@@ -25,18 +25,18 @@ export function DocumentViewer({ mode, task, rawMessages, tabId, tab }: Document
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
-        <h3 className="text-sm font-semibold text-theme-fg">{documentTitle}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{documentTitle}</h3>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-theme rounded p-4 bg-[#1e1e1e]">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-border rounded-xl p-4 bg-[#1e1e1e]">
         {documentContent ? (
-          <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-theme-fg text-sm break-words overflow-wrap-anywhere">
+          <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-foreground text-sm break-words overflow-wrap-anywhere">
             <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
               {documentContent}
             </ReactMarkdown>
           </div>
         ) : (
-          <div className="text-theme-muted text-sm text-center mt-8">No {mode} yet</div>
+          <div className="text-muted-foreground text-sm text-center mt-8">No {mode} yet</div>
         )}
       </div>
     </div>

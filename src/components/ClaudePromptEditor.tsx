@@ -16,6 +16,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { getClaudeStatus } from '@/lib/claude-status';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { Send, Square, Mic } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ClaudePromptEditorProps {
   tab: Tab;
@@ -103,42 +104,37 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
     return (
       <div className="flex flex-col h-full min-h-0">
         <div className="flex items-center justify-between mb-2 flex-shrink-0 h-8">
-          <h3 className="text-sm font-semibold text-theme-fg">Prompt</h3>
+          <h3 className="text-sm font-semibold text-foreground">Prompt</h3>
           <div className="flex items-center gap-2">
             {isSupported && (
-              <button
+              <Button
+                variant="ghost"
+                size="icon-lg"
                 onClick={isListening ? stopListening : startListening}
-                className="p-2 text-primary hover:text-primary-light rounded hover:bg-theme-hover cursor-pointer"
+                className="text-primary hover:bg-primary/10 hover:text-foreground"
                 title={isListening ? 'Stop voice input' : 'Start voice input'}
               >
                 {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              </button>
+              </Button>
             )}
 
             {!isRunning && (
-              <button
-                onClick={handleExecute}
-                disabled={!canExecute}
-                className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 cursor-pointer flex items-center gap-1"
-              >
+              <Button size="sm" onClick={handleExecute} disabled={!canExecute}>
                 <Send className="w-3 h-3" />
                 Send
-              </button>
+              </Button>
             )}
 
             {isRunning && (
-              <button
-                onClick={handleInterrupt}
-                className="px-3 py-1 bg-red-700 text-white rounded text-sm hover:bg-red-600 cursor-pointer flex items-center gap-1"
-              >
+              <Button variant="destructive" size="sm" onClick={handleInterrupt}>
                 <Square className="w-3 h-3" />
                 Interrupt
-              </button>
+              </Button>
             )}
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 border border-theme rounded overflow-hidden">
+        <div className="flex-1 min-h-0 border border-border rounded overflow-hidden">
           <Editor
             height="100%"
             defaultLanguage="markdown"

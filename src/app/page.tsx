@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { CircleCheck } from 'lucide-react';
 import type { Task, Repository } from '@/lib/types';
 import { Header } from '@/components/Header';
 import { KanbanBoard } from '@/components/KanbanBoard';
@@ -174,12 +173,7 @@ export default function Home() {
 
         toaster.create({
           type: errorCount > 0 ? 'warning' : 'success',
-          title: (
-            <div className="flex items-center gap-2">
-              <CircleCheck className="w-5 h-5" />
-              <span>{successMessage}</span>
-            </div>
-          ),
+          title: successMessage,
           duration: 5000,
         });
 
@@ -277,9 +271,9 @@ export default function Home() {
   // 初回ロード時のみローディング表示
   if (isLoading && tasks.length === 0) {
     return (
-      <div className="h-screen flex items-center justify-center bg-theme-bg">
+      <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="text-2xl text-theme-fg">Loading...</div>
+          <div className="text-2xl text-foreground">Loading...</div>
         </div>
       </div>
     );
@@ -298,7 +292,7 @@ export default function Home() {
       />
 
       {/* カンバンボード（常に表示） */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden px-4 py-4 md:px-6">
         <KanbanBoard
           tasks={filteredTasks}
           onTaskMove={handleTaskMove}
