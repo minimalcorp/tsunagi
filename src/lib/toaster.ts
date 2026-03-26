@@ -14,56 +14,35 @@ interface ToastOptions {
 }
 
 function createToast(options: ToastOptions): string {
-  const { id, type, title, description, duration } = options;
+  const { type, title, description, duration } = options;
+  const id = options.id ?? crypto.randomUUID();
   const opts = { id, description, duration };
 
   switch (type) {
     case 'loading':
-      return String(toast.loading(title, opts));
+      toast.loading(title, opts);
+      break;
     case 'success':
-      return String(toast.success(title, opts));
+      toast.success(title, opts);
+      break;
     case 'error':
-      return String(toast.error(title, opts));
+      toast.error(title, opts);
+      break;
     case 'warning':
-      return String(toast.warning(title, opts));
+      toast.warning(title, opts);
+      break;
     case 'info':
-      return String(toast.info(title, opts));
+      toast.info(title, opts);
+      break;
     default:
-      return String(toast(title, opts));
+      toast(title, opts);
+      break;
   }
+  return id;
 }
 
 function updateToast(id: string, options: ToastOptions): void {
-  const { type, title, description, duration } = options;
-
-  // sonner doesn't have a direct update method like Ark UI.
-  // We dismiss and recreate with the same id to simulate update.
-  toast.dismiss(id);
-
-  // Use a microtask to ensure the dismiss is processed before creating
-  queueMicrotask(() => {
-    const opts = { id, description, duration };
-    switch (type) {
-      case 'loading':
-        toast.loading(title, opts);
-        break;
-      case 'success':
-        toast.success(title, opts);
-        break;
-      case 'error':
-        toast.error(title, opts);
-        break;
-      case 'warning':
-        toast.warning(title, opts);
-        break;
-      case 'info':
-        toast.info(title, opts);
-        break;
-      default:
-        toast(title, opts);
-        break;
-    }
-  });
+  createToast({ ...options, id });
 }
 
 export const toaster = {

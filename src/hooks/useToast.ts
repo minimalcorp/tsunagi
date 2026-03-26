@@ -4,7 +4,9 @@ import { toast } from 'sonner';
 
 export const useToast = () => {
   const loading = (title: string, description?: string): string => {
-    return String(toast.loading(title, { description, duration: Infinity }));
+    const id = crypto.randomUUID();
+    toast.loading(title, { id, description, duration: Infinity });
+    return id;
   };
 
   const success = (id: string | undefined, title: string, description?: string): string => {
@@ -12,7 +14,9 @@ export const useToast = () => {
       toast.success(title, { id, description, duration: 5000 });
       return id;
     } else {
-      return String(toast.success(title, { description, duration: 5000 }));
+      const newId = crypto.randomUUID();
+      toast.success(title, { id: newId, description, duration: 5000 });
+      return newId;
     }
   };
 
@@ -21,12 +25,16 @@ export const useToast = () => {
       toast.error(title, { id, description, duration: Infinity });
       return id;
     } else {
-      return String(toast.error(title, { description, duration: Infinity }));
+      const newId = crypto.randomUUID();
+      toast.error(title, { id: newId, description, duration: Infinity });
+      return newId;
     }
   };
 
   const info = (title: string, description?: string): string => {
-    return String(toast.info(title, { description, duration: 5000 }));
+    const id = crypto.randomUUID();
+    toast.info(title, { id, description, duration: 5000 });
+    return id;
   };
 
   const dismiss = (id: string) => {

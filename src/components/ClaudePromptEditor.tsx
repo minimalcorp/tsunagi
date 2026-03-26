@@ -111,7 +111,7 @@ const ClaudePromptEditorComponent = forwardRef<ClaudePromptEditorHandle, ClaudeP
                 variant="ghost"
                 size="icon-lg"
                 onClick={isListening ? stopListening : startListening}
-                className="text-primary hover:text-primary-light"
+                className="text-primary hover:bg-primary/10 hover:text-foreground"
                 title={isListening ? 'Stop voice input' : 'Start voice input'}
               >
                 {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}

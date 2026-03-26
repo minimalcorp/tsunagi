@@ -79,7 +79,7 @@ export default function SettingsPage() {
           <Button
             variant="ghost"
             onClick={() => router.push('/')}
-            className="text-primary-light font-medium"
+            className="text-primary font-medium hover:bg-primary/10 hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Board

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
-import { Check, ChevronsUpDown, X } from 'lucide-react';
+import { ChevronsUpDown, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
@@ -123,7 +123,7 @@ export function Combobox({
         <PopoverTrigger
           ref={triggerRef}
           disabled={disabled}
-          className={`flex w-full items-center justify-between pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} py-2 border border-input rounded-md text-sm bg-card text-foreground disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-left shadow-xs`}
+          className={`flex h-9 w-full items-center justify-between pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} border border-input rounded-md text-sm bg-card text-foreground disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-left shadow-xs`}
         >
           <span className="truncate">
             {displayLabel || <span className="text-muted-foreground">{placeholder}</span>}
@@ -189,9 +189,6 @@ export function Combobox({
                       onSelect={() => handleSelect(opt.value)}
                     >
                       <span className="truncate">{opt.label}</span>
-                      {normalizedValue.includes(opt.value) && (
-                        <Check className="ml-auto w-4 h-4 text-primary" />
-                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -206,9 +203,6 @@ export function Combobox({
                     onSelect={() => handleSelect(opt.value)}
                   >
                     <span className="truncate">{opt.label}</span>
-                    {normalizedValue.includes(opt.value) && (
-                      <Check className="ml-auto w-4 h-4 text-primary" />
-                    )}
                   </CommandItem>
                 ))}
               </CommandGroup>

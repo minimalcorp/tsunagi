@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { CircleCheck } from 'lucide-react';
 import type { Task, Repository } from '@/lib/types';
 import { Header } from '@/components/Header';
 import { KanbanBoard } from '@/components/KanbanBoard';
@@ -174,12 +173,7 @@ export default function Home() {
 
         toaster.create({
           type: errorCount > 0 ? 'warning' : 'success',
-          title: (
-            <div className="flex items-center gap-2">
-              <CircleCheck className="w-5 h-5" />
-              <span>{successMessage}</span>
-            </div>
-          ),
+          title: successMessage,
           duration: 5000,
         });
 

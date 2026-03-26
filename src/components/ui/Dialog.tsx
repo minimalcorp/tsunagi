@@ -3,8 +3,6 @@
 import { useEffect, type ReactNode } from 'react';
 import {
   Dialog as BaseDialog,
-  DialogPortal,
-  DialogOverlay,
   DialogContent as BaseDialogContent,
   DialogTitle as BaseDialogTitle,
   DialogClose,
@@ -66,41 +64,38 @@ export function Dialog({
 
   return (
     <BaseDialog open={open} onOpenChange={handleOpenChange} modal>
-      <DialogPortal>
-        <DialogOverlay className="bg-black/50 backdrop-blur-sm" />
-        <BaseDialogContent
-          showCloseButton={false}
-          className={cn(
-            'bg-background rounded-lg border border-border shadow-lg max-h-[90vh] overflow-y-auto',
-            'gap-0 p-0',
-            maxWidthClasses[maxWidth]
-          )}
-        >
-          {(title || showCloseButton) && (
-            <div className="flex items-center justify-between px-6 pt-6 pb-2">
-              {title && (
-                <BaseDialogTitle className="text-lg font-semibold leading-none text-foreground">
-                  {title}
-                </BaseDialogTitle>
-              )}
-              {showCloseButton && (
-                <DialogClose
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="ml-auto text-muted-foreground hover:text-foreground"
-                    />
-                  }
-                >
-                  <X className="size-4" />
-                </DialogClose>
-              )}
-            </div>
-          )}
-          <div className={title || showCloseButton ? 'px-6 pb-6 pt-2' : 'p-6'}>{children}</div>
-        </BaseDialogContent>
-      </DialogPortal>
+      <BaseDialogContent
+        showCloseButton={false}
+        className={cn(
+          'bg-background rounded-lg border border-border shadow-lg max-h-[90vh] overflow-y-auto',
+          'gap-0 p-0',
+          maxWidthClasses[maxWidth]
+        )}
+      >
+        {(title || showCloseButton) && (
+          <div className="flex items-center justify-between px-6 pt-6 pb-2">
+            {title && (
+              <BaseDialogTitle className="text-lg font-semibold leading-none text-foreground">
+                {title}
+              </BaseDialogTitle>
+            )}
+            {showCloseButton && (
+              <DialogClose
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto text-muted-foreground hover:text-foreground"
+                  />
+                }
+              >
+                <X className="size-4" />
+              </DialogClose>
+            )}
+          </div>
+        )}
+        <div className={title || showCloseButton ? 'px-6 pb-6 pt-2' : 'p-6'}>{children}</div>
+      </BaseDialogContent>
     </BaseDialog>
   );
 }

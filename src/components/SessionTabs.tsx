@@ -207,24 +207,12 @@ export function SessionTabs({
         })}
 
         {/* divider + アクションボタン群 */}
-        <div className="flex items-center flex-shrink-0 ml-auto">
-          <div className="w-px self-stretch bg-theme mx-1" />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onTabCreateTerminal}
-            className="text-primary hover:text-primary-hover"
-            title="Open terminal"
-          >
+        <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+          <div className="w-px self-stretch bg-theme" />
+          <Button size="icon" onClick={onTabCreateTerminal} title="Open terminal">
             <Terminal className="w-4 h-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onTabCreateClaude}
-            className="text-primary hover:text-primary-hover"
-            title="Open terminal with Claude"
-          >
+          <Button size="icon" onClick={onTabCreateClaude} title="Open terminal with Claude">
             <Bot className="w-4 h-4" />
           </Button>
         </div>

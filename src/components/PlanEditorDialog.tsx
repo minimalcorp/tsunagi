@@ -1,14 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  Dialog,
-  DialogPortal,
-  DialogOverlay,
-  DialogContent,
-  DialogTitle,
-  DialogClose,
-} from './ui/dialog-primitives';
+import { Dialog, DialogContent, DialogTitle, DialogClose } from './ui/dialog-primitives';
 import { Button } from './ui/button';
 import { Editor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
@@ -112,116 +105,113 @@ export function PlanEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange} modal>
-      <DialogPortal>
-        <DialogOverlay className="bg-black/50 backdrop-blur-sm" />
-        <DialogContent
-          showCloseButton={false}
-          className="bg-card rounded-xl shadow-xl max-w-7xl h-[90vh] flex flex-col p-6"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
-            <div className="flex items-center gap-4">
-              <DialogTitle className="text-lg font-semibold leading-none text-foreground">
-                {title}
-              </DialogTitle>
+      <DialogContent
+        showCloseButton={false}
+        className="bg-card rounded-xl shadow-xl max-w-7xl h-[90vh] flex flex-col p-6"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <DialogTitle className="text-lg font-semibold leading-none text-foreground">
+              {title}
+            </DialogTitle>
 
-              {/* View Mode Toggle */}
-              <div className="flex items-center gap-1 bg-accent rounded p-1">
-                {viewModes.map(({ value, icon: Icon, label }) => (
-                  <Button
-                    key={value}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setViewMode(value)}
-                    className={
-                      viewMode === value
-                        ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/80'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }
-                    title={label}
-                  >
-                    <Icon className="w-4 h-4" />
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <DialogClose
-              render={
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-accent rounded p-1">
+              {viewModes.map(({ value, icon: Icon, label }) => (
                 <Button
+                  key={value}
                   variant="ghost"
-                  size="icon"
-                  className="ml-auto text-foreground hover:bg-accent"
-                />
-              }
-            >
-              <X className="size-4" />
-            </DialogClose>
-          </div>
-
-          {/* Content Area */}
-          <div className="flex-1 min-h-0 mb-6">
-            <div className={`h-full ${viewMode === 'split' ? 'grid grid-cols-2 gap-4' : ''}`}>
-              {/* Editor */}
-              {(viewMode === 'split' || viewMode === 'editor') && (
-                <div className="flex flex-col h-full min-h-0">
-                  <h3 className="text-sm font-semibold text-foreground mb-2">Editor</h3>
-                  <div className="flex-1 min-h-0 border border-border rounded overflow-hidden">
-                    <Editor
-                      height="100%"
-                      defaultLanguage="markdown"
-                      defaultValue={content}
-                      onChange={handleEditorChange}
-                      onMount={async (editor) => {
-                        editorRef.current = editor;
-
-                        // Context Keyを設定（このエディタがPlan Editorであることを示す）
-                        editor.createContextKey('isPlanEditor', true);
-
-                        // コマンド登録は不要（ClaudePromptEditorで既に登録済み）
-                      }}
-                      options={{
-                        minimap: { enabled: false },
-                        lineNumbers: 'on',
-                        wordWrap: 'on',
-                        fontSize: 14,
-                        scrollBeyondLastLine: false,
-                        readOnly: false,
-                      }}
-                      theme={effectiveTheme === 'dark' ? 'vs-dark' : 'vs-light'}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Viewer */}
-              {(viewMode === 'split' || viewMode === 'viewer') && (
-                <div className="flex flex-col h-full min-h-0">
-                  <h3 className="text-sm font-semibold text-foreground mb-2">Preview</h3>
-                  <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-border rounded p-4 bg-[#1e1e1e]">
-                    <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-foreground text-sm break-words overflow-wrap-anywhere">
-                      <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
-                        {editedContent}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                </div>
-              )}
+                  size="sm"
+                  onClick={() => setViewMode(value)}
+                  className={
+                    viewMode === value
+                      ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/80'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }
+                  title={label}
+                >
+                  <Icon className="w-4 h-4" />
+                </Button>
+              ))}
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3 flex-shrink-0">
-            <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isSaving ? 'Updating...' : 'Update'}
-            </Button>
+          <DialogClose
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="ml-auto text-foreground hover:bg-accent"
+              />
+            }
+          >
+            <X className="size-4" />
+          </DialogClose>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 min-h-0 mb-6">
+          <div className={`h-full ${viewMode === 'split' ? 'grid grid-cols-2 gap-4' : ''}`}>
+            {/* Editor */}
+            {(viewMode === 'split' || viewMode === 'editor') && (
+              <div className="flex flex-col h-full min-h-0">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Editor</h3>
+                <div className="flex-1 min-h-0 border border-border rounded overflow-hidden">
+                  <Editor
+                    height="100%"
+                    defaultLanguage="markdown"
+                    defaultValue={content}
+                    onChange={handleEditorChange}
+                    onMount={async (editor) => {
+                      editorRef.current = editor;
+
+                      // Context Keyを設定（このエディタがPlan Editorであることを示す）
+                      editor.createContextKey('isPlanEditor', true);
+
+                      // コマンド登録は不要（ClaudePromptEditorで既に登録済み）
+                    }}
+                    options={{
+                      minimap: { enabled: false },
+                      lineNumbers: 'on',
+                      wordWrap: 'on',
+                      fontSize: 14,
+                      scrollBeyondLastLine: false,
+                      readOnly: false,
+                    }}
+                    theme={effectiveTheme === 'dark' ? 'vs-dark' : 'vs-light'}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Viewer */}
+            {(viewMode === 'split' || viewMode === 'viewer') && (
+              <div className="flex flex-col h-full min-h-0">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Preview</h3>
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border border-border rounded p-4 bg-[#1e1e1e]">
+                  <div className="prose prose-pre:overflow-x-hidden prose-pre:whitespace-pre-wrap prose-pre:break-words prose-code:break-words prose-a:break-all max-w-none text-foreground text-sm break-words overflow-wrap-anywhere">
+                    <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
+                      {editedContent}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </DialogContent>
-      </DialogPortal>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3 flex-shrink-0">
+          <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isSaving ? 'Updating...' : 'Update'}
+          </Button>
+        </div>
+      </DialogContent>
     </Dialog>
   );
 }

@@ -197,7 +197,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
           <Button
             variant="ghost"
             onClick={() => router.push('/')}
-            className="text-primary-light font-medium"
+            className="text-primary font-medium hover:bg-primary/10 hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Board
@@ -211,7 +211,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             variant="ghost"
             size="icon-lg"
             onClick={() => setIsEditDialogOpen(true)}
-            className="text-primary hover:text-primary-light"
+            className="text-primary hover:bg-primary/10 hover:text-foreground"
             title="Edit task"
           >
             <Edit className="w-5 h-5" />
