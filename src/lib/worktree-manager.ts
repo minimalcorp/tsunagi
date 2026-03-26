@@ -6,6 +6,7 @@ import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { normalizeBranchName } from './branch-utils';
+import { generateSettingsLocalJson } from './claude-settings';
 
 const execAsync = promisify(exec);
 
@@ -182,53 +183,7 @@ export async function createWorktree(
 
   // .claude/settings.local.json にhooks設定を生成
   try {
-    const claudeDir = path.join(worktreePath, '.claude');
-    const settingsPath = path.join(claudeDir, 'settings.local.json');
-    if (!fssync.existsSync(claudeDir)) {
-      fssync.mkdirSync(claudeDir, { recursive: true });
-    }
-    let existing: Record<string, unknown> = {};
-    if (fssync.existsSync(settingsPath)) {
-      try {
-        existing = JSON.parse(fssync.readFileSync(settingsPath, 'utf-8')) as Record<
-          string,
-          unknown
-        >;
-      } catch {
-        /* パースエラーは無視 */
-      }
-    }
-    const hookCommand =
-      "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-";
-    const hook = [{ hooks: [{ type: 'command', command: hookCommand }] }];
-    const updated = {
-      ...existing,
-      hooks: {
-        SessionStart: hook,
-        SessionEnd: hook,
-        UserPromptSubmit: hook,
-        PreToolUse: hook,
-        PostToolUse: hook,
-        PostToolUseFailure: hook,
-        PermissionRequest: hook,
-        Notification: hook,
-        Stop: hook,
-        StopFailure: hook,
-        SubagentStart: hook,
-        SubagentStop: hook,
-        TeammateIdle: hook,
-        TaskCompleted: hook,
-        InstructionsLoaded: hook,
-        ConfigChange: hook,
-        WorktreeCreate: hook,
-        WorktreeRemove: hook,
-        PreCompact: hook,
-        PostCompact: hook,
-        Elicitation: hook,
-        ElicitationResult: hook,
-      },
-    };
-    fssync.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf-8');
+    generateSettingsLocalJson(worktreePath);
   } catch {
     // settings.local.json生成失敗は無視
   }

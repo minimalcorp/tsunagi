@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { Task } from '@/lib/types';
 import { normalizeBranchName } from '@/lib/branch-utils';
-import { Code2, Trash2 } from 'lucide-react';
+import { Code2, Settings, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmDialog } from './ui/Dialog';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,22 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
   const worktreePath = getWorktreePath(task);
   const toast = useToast();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const handleGenerateSettingsLocal = async () => {
+    const notificationId = toast.loading('Generating settings.local.json...');
+
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/generate-settings-local`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) throw new Error('Failed to generate settings.local.json');
+
+      toast.success(notificationId, 'Generated settings.local.json', worktreePath);
+    } catch {
+      toast.error(notificationId, 'Failed to generate settings.local.json');
+    }
+  };
 
   const handleOpenVSCode = async () => {
     const notificationId = toast.loading('Opening VS Code...', worktreePath);
@@ -82,6 +98,11 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
         <Button variant="destructive" size="lg" onClick={() => setDeleteConfirmOpen(true)}>
           <Trash2 className="w-4 h-4" />
           Delete Task
+        </Button>
+
+        <Button size="lg" onClick={handleGenerateSettingsLocal}>
+          <Settings className="w-4 h-4" />
+          Add Local Settings
         </Button>
 
         <Button size="lg" onClick={handleOpenVSCode}>

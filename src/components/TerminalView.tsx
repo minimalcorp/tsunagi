@@ -177,6 +177,13 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     termRef.current = term;
     fitAddonRef.current = fitAddon;
 
+    // マウント時にアクティブタブなら即座にフォーカス（新規タブ作成時用）
+    // useEffect([isActive]) はこのマウントeffectより先に実行されるため termRef.current が null でスキップされる。
+    // ここで補完することで新規タブでも確実にフォーカスが当たる。
+    if (isActiveRef.current) {
+      term.focus();
+    }
+
     // エディタモーダルが開いている間は xterm の _keyUp が this.focus() を呼んでフォーカスを
     // 奪い返すのを防ぐ。customKeyEventHandler が false を返すと _keyUp が早期リターンする。
     term.attachCustomKeyEventHandler(() => {
