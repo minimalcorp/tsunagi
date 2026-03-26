@@ -398,6 +398,18 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       onTodosUpdated?.(tabId, newTodos);
     });
 
+    // editor:open イベント（tabルーム経由で受信）→ カスタムイベントでEditorSessionProviderに通知
+    socket.on(
+      'editor:open',
+      ({ sessionId: editorSessionId, content }: { sessionId: string; content: string }) => {
+        window.dispatchEvent(
+          new CustomEvent('editor-session-open-request', {
+            detail: { sessionId: editorSessionId, content },
+          })
+        );
+      }
+    );
+
     term.onData((data) => {
       if (socket.connected && sessionIdRef.current) {
         socket.emit('input', { sessionId: sessionIdRef.current, data });

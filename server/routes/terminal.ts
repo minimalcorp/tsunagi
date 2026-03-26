@@ -178,7 +178,10 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       // 優先順位: リクエストで渡されたenv > DBのglobal env > tsunagi独自のEDITOR設定
       // tsunagi-editor.sh をデフォルトにすることで Ctrl+G が Monaco Modal を開く。
       // DB / リクエストで EDITOR が明示設定されている場合はそちらが優先される。
-      const tsunagiDefaultEnv: Record<string, string> = { EDITOR: TSUNAGI_EDITOR_PATH };
+      const tsunagiDefaultEnv: Record<string, string> = {
+        EDITOR: TSUNAGI_EDITOR_PATH,
+        TSUNAGI_SESSION_ID: sessionId,
+      };
       const mergedEnv = { ...tsunagiDefaultEnv, ...globalEnv, ...env };
 
       const session = ptyManager.createSession(sessionId, workingDir, mergedEnv);

@@ -19,10 +19,11 @@ if [ -z "$TMPFILE" ]; then
 fi
 
 # ファイルパスを送信。サーバー側がファイルの読み書きを行う。
+# TSUNAGI_SESSION_ID はPTY作成時に設定される環境変数（= tab_id）
 # レスポンスはプレーンテキストの sessionId のみ（JSON パース不要）
 SESSION_ID=$(curl -sf -X POST "$API_BASE/api/editor/session" \
   -H "Content-Type: application/json" \
-  -d "{\"filePath\": \"$TMPFILE\"}")
+  -d "{\"filePath\": \"$TMPFILE\", \"tabId\": \"$TSUNAGI_SESSION_ID\"}")
 
 if [ -z "$SESSION_ID" ]; then
   echo "Error: Failed to create editor session (is tsunagi running? check monaco-editor.sh setup)" >&2

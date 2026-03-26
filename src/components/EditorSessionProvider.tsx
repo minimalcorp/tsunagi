@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
 import { MonacoEditorModal } from '@/components/MonacoEditorModal';
 
 const FASTIFY_API_BASE = 'http://localhost:2792';
@@ -14,15 +13,17 @@ interface EditorSession {
 export function EditorSessionProvider() {
   const [session, setSession] = useState<EditorSession | null>(null);
 
+  // TerminalViewのsocketから転送されるカスタムイベントをリッスン
+  // （editor:openはtabルーム宛に送信されるため、該当タブのTerminalViewのみが受信→転送する）
   useEffect(() => {
-    const socket = io(FASTIFY_API_BASE, { transports: ['websocket'] });
-
-    socket.on('editor:open', ({ sessionId, content }: EditorSession) => {
+    function handleOpenRequest(e: Event) {
+      const { sessionId, content } = (e as CustomEvent<EditorSession>).detail;
       setSession({ sessionId, content });
-    });
+    }
 
+    window.addEventListener('editor-session-open-request', handleOpenRequest);
     return () => {
-      socket.disconnect();
+      window.removeEventListener('editor-session-open-request', handleOpenRequest);
     };
   }, []);
 
