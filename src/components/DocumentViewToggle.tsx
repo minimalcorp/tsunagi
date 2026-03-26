@@ -17,21 +17,21 @@ export function DocumentViewToggle({ mode, onChange }: DocumentViewToggleProps) 
   ];
 
   return (
-    <div className="bg-accent rounded p-1 inline-flex gap-0.5">
+    <div className="inline-flex gap-0.5 bg-input/20 dark:bg-input/30 rounded-md p-0.5">
       {buttons.map(({ mode: buttonMode, icon: Icon, label }) => (
         <Button
           key={buttonMode}
           variant="ghost"
-          size="sm"
+          size="icon-lg"
           onClick={() => onChange(buttonMode)}
           className={
             mode === buttonMode
-              ? 'bg-primary text-white shadow-sm hover:bg-primary/80'
+              ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/80 hover:text-primary-foreground dark:hover:bg-primary/80'
               : 'text-muted-foreground hover:text-foreground'
           }
           title={label}
         >
-          <Icon size={16} />
+          <Icon />
         </Button>
       ))}
     </div>

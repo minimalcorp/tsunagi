@@ -123,7 +123,7 @@ export function Combobox({
         <PopoverTrigger
           ref={triggerRef}
           disabled={disabled}
-          className={`flex h-9 w-full items-center justify-between pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} border border-input rounded-md text-sm bg-card text-foreground disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-left shadow-xs`}
+          className={`flex h-9 w-full items-center justify-between pl-3 ${showClearButton ? 'pr-16' : 'pr-10'} border border-input rounded-md text-sm bg-input/20 dark:bg-input/30 text-foreground transition-colors outline-none hover:border-ring focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 data-[state=open]:border-ring data-[state=open]:ring-2 data-[state=open]:ring-ring/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-left shadow-xs`}
         >
           <span className="truncate">
             {displayLabel || <span className="text-muted-foreground">{placeholder}</span>}

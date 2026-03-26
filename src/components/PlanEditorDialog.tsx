@@ -117,21 +117,21 @@ export function PlanEditorDialog({
             </DialogTitle>
 
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 bg-accent rounded p-1">
+            <div className="flex items-center gap-0.5 bg-input/20 dark:bg-input/30 rounded-md p-0.5">
               {viewModes.map(({ value, icon: Icon, label }) => (
                 <Button
                   key={value}
                   variant="ghost"
-                  size="sm"
+                  size="icon-lg"
                   onClick={() => setViewMode(value)}
                   className={
                     viewMode === value
-                      ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/80'
+                      ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/80 hover:text-primary-foreground dark:hover:bg-primary/80'
                       : 'text-muted-foreground hover:text-foreground'
                   }
                   title={label}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon />
                 </Button>
               ))}
             </div>

@@ -27,7 +27,7 @@
 
   --border: oklch(0.925 0.005 214.3);
   --input: oklch(0.925 0.005 214.3);
-  --ring: oklch(0.723 0.014 214.4);
+  --ring: oklch(0.457 0.24 277.023);
 
   /* Status */
   --success: oklch(0.6 0.15 145);
