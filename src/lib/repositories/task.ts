@@ -1,6 +1,5 @@
 import { prisma } from '../db';
 import type { Task, Tab } from '../types';
-import { createSessionData, deleteSessionData } from './tab';
 
 // タスク一覧取得（deleted: false のみデフォルト）
 export async function getTasks(filter?: {
@@ -26,38 +25,7 @@ export async function getTasks(filter?: {
     orderBy: { createdAt: 'desc' },
   });
 
-  return tasks.map((task) => ({
-    id: task.id,
-    status: task.status as Task['status'],
-    title: task.title,
-    description: task.description,
-    owner: task.owner,
-    repo: task.repo,
-    branch: task.branch,
-    baseBranch: task.baseBranch,
-    baseBranchCommit: task.baseBranchCommit ?? undefined,
-    repoId: task.repoId,
-    worktreeStatus: task.worktreeStatus as Task['worktreeStatus'],
-    requirement: task.requirement ?? undefined,
-    design: task.design ?? undefined,
-    procedure: task.procedure ?? undefined,
-    pullRequestUrl: task.pullRequestUrl ?? undefined,
-    effort: task.effort ?? undefined,
-    order: task.order ?? undefined,
-    deletedAt: task.deletedAt?.toISOString(),
-    createdAt: task.createdAt.toISOString(),
-    updatedAt: task.updatedAt.toISOString(),
-    tabs: task.tabs.map((tab) => ({
-      tab_id: tab.tabId,
-      order: tab.order,
-      status: tab.status as Tab['status'],
-      session_id: tab.sessionId ?? undefined,
-      promptCount: tab.promptCount ?? undefined,
-      startedAt: tab.startedAt.toISOString(),
-      completedAt: tab.completedAt?.toISOString(),
-      updatedAt: tab.updatedAt.toISOString(),
-    })),
-  }));
+  return tasks.map((task) => mapTask(task));
 }
 
 // タスク取得
@@ -73,38 +41,7 @@ export async function getTask(id: string): Promise<Task | null> {
 
   if (!task) return null;
 
-  return {
-    id: task.id,
-    status: task.status as Task['status'],
-    title: task.title,
-    description: task.description,
-    owner: task.owner,
-    repo: task.repo,
-    branch: task.branch,
-    baseBranch: task.baseBranch,
-    baseBranchCommit: task.baseBranchCommit ?? undefined,
-    repoId: task.repoId,
-    worktreeStatus: task.worktreeStatus as Task['worktreeStatus'],
-    requirement: task.requirement ?? undefined,
-    design: task.design ?? undefined,
-    procedure: task.procedure ?? undefined,
-    pullRequestUrl: task.pullRequestUrl ?? undefined,
-    effort: task.effort ?? undefined,
-    order: task.order ?? undefined,
-    deletedAt: task.deletedAt?.toISOString(),
-    createdAt: task.createdAt.toISOString(),
-    updatedAt: task.updatedAt.toISOString(),
-    tabs: task.tabs.map((tab) => ({
-      tab_id: tab.tabId,
-      order: tab.order,
-      status: tab.status as Tab['status'],
-      session_id: tab.sessionId ?? undefined,
-      promptCount: tab.promptCount ?? undefined,
-      startedAt: tab.startedAt.toISOString(),
-      completedAt: tab.completedAt?.toISOString(),
-      updatedAt: tab.updatedAt.toISOString(),
-    })),
-  };
+  return mapTask(task);
 }
 
 // タスク作成
@@ -123,9 +60,6 @@ export async function createTask(
       baseBranchCommit: task.baseBranchCommit,
       repoId: task.repoId,
       worktreeStatus: task.worktreeStatus,
-      requirement: task.requirement,
-      design: task.design,
-      procedure: task.procedure,
       pullRequestUrl: task.pullRequestUrl,
       effort: task.effort,
       order: task.order,
@@ -135,28 +69,7 @@ export async function createTask(
     },
   });
 
-  return {
-    id: newTask.id,
-    status: newTask.status as Task['status'],
-    title: newTask.title,
-    description: newTask.description,
-    owner: newTask.owner,
-    repo: newTask.repo,
-    branch: newTask.branch,
-    baseBranch: newTask.baseBranch,
-    repoId: newTask.repoId,
-    worktreeStatus: newTask.worktreeStatus as Task['worktreeStatus'],
-    requirement: newTask.requirement ?? undefined,
-    design: newTask.design ?? undefined,
-    procedure: newTask.procedure ?? undefined,
-    pullRequestUrl: newTask.pullRequestUrl ?? undefined,
-    effort: newTask.effort ?? undefined,
-    order: newTask.order ?? undefined,
-    deletedAt: newTask.deletedAt?.toISOString(),
-    createdAt: newTask.createdAt.toISOString(),
-    updatedAt: newTask.updatedAt.toISOString(),
-    tabs: [],
-  };
+  return mapTask(newTask);
 }
 
 // タスク更新
@@ -179,9 +92,6 @@ export async function updateTask(
         baseBranchCommit: updates.baseBranchCommit,
       }),
       ...(updates.worktreeStatus !== undefined && { worktreeStatus: updates.worktreeStatus }),
-      ...(updates.requirement !== undefined && { requirement: updates.requirement }),
-      ...(updates.design !== undefined && { design: updates.design }),
-      ...(updates.procedure !== undefined && { procedure: updates.procedure }),
       ...(updates.pullRequestUrl !== undefined && { pullRequestUrl: updates.pullRequestUrl }),
       ...(updates.effort !== undefined && { effort: updates.effort }),
       ...(updates.order !== undefined && { order: updates.order }),
@@ -193,37 +103,7 @@ export async function updateTask(
     },
   });
 
-  return {
-    id: updatedTask.id,
-    status: updatedTask.status as Task['status'],
-    title: updatedTask.title,
-    description: updatedTask.description,
-    owner: updatedTask.owner,
-    repo: updatedTask.repo,
-    branch: updatedTask.branch,
-    baseBranch: updatedTask.baseBranch,
-    repoId: updatedTask.repoId,
-    worktreeStatus: updatedTask.worktreeStatus as Task['worktreeStatus'],
-    requirement: updatedTask.requirement ?? undefined,
-    design: updatedTask.design ?? undefined,
-    procedure: updatedTask.procedure ?? undefined,
-    pullRequestUrl: updatedTask.pullRequestUrl ?? undefined,
-    effort: updatedTask.effort ?? undefined,
-    order: updatedTask.order ?? undefined,
-    deletedAt: updatedTask.deletedAt?.toISOString(),
-    createdAt: updatedTask.createdAt.toISOString(),
-    updatedAt: updatedTask.updatedAt.toISOString(),
-    tabs: updatedTask.tabs.map((tab) => ({
-      tab_id: tab.tabId,
-      order: tab.order,
-      status: tab.status as Tab['status'],
-      session_id: tab.sessionId ?? undefined,
-      promptCount: tab.promptCount ?? undefined,
-      startedAt: tab.startedAt.toISOString(),
-      completedAt: tab.completedAt?.toISOString(),
-      updatedAt: tab.updatedAt.toISOString(),
-    })),
-  };
+  return mapTask(updatedTask);
 }
 
 // タスク論理削除
@@ -268,19 +148,7 @@ export async function createTab(taskId: string): Promise<Tab | null> {
     },
   });
 
-  // sessions.jsonも初期化
-  await createSessionData(newTab.tabId);
-
-  return {
-    tab_id: newTab.tabId,
-    order: newTab.order,
-    status: newTab.status as Tab['status'],
-    session_id: newTab.sessionId ?? undefined,
-    promptCount: newTab.promptCount ?? undefined,
-    startedAt: newTab.startedAt.toISOString(),
-    completedAt: newTab.completedAt?.toISOString(),
-    updatedAt: newTab.updatedAt.toISOString(),
-  };
+  return mapTab(newTab);
 }
 
 // タブ取得
@@ -291,16 +159,7 @@ export async function getTab(taskId: string, tab_id: string): Promise<Tab | null
 
   if (!tab) return null;
 
-  return {
-    tab_id: tab.tabId,
-    order: tab.order,
-    status: tab.status as Tab['status'],
-    session_id: tab.sessionId ?? undefined,
-    promptCount: tab.promptCount ?? undefined,
-    startedAt: tab.startedAt.toISOString(),
-    completedAt: tab.completedAt?.toISOString(),
-    updatedAt: tab.updatedAt.toISOString(),
-  };
+  return mapTab(tab);
 }
 
 // タブ更新
@@ -319,24 +178,13 @@ export async function updateTab(
     where: { tabId: tab_id },
     data: {
       ...(updates.status && { status: updates.status }),
-      ...(updates.session_id !== undefined && { sessionId: updates.session_id }),
-      ...(updates.promptCount !== undefined && { promptCount: updates.promptCount }),
       ...(updates.completedAt !== undefined && {
         completedAt: updates.completedAt ? new Date(updates.completedAt) : null,
       }),
     },
   });
 
-  return {
-    tab_id: updatedTab.tabId,
-    order: updatedTab.order,
-    status: updatedTab.status as Tab['status'],
-    session_id: updatedTab.sessionId ?? undefined,
-    promptCount: updatedTab.promptCount ?? undefined,
-    startedAt: updatedTab.startedAt.toISOString(),
-    completedAt: updatedTab.completedAt?.toISOString(),
-    updatedAt: updatedTab.updatedAt.toISOString(),
-  };
+  return mapTab(updatedTab);
 }
 
 // タブ削除
@@ -350,9 +198,6 @@ export async function deleteTab(taskId: string, tab_id: string): Promise<boolean
 
     await prisma.tab.delete({ where: { tabId: tab_id } });
 
-    // sessions.jsonからも削除
-    await deleteSessionData(tab_id);
-
     return true;
   } catch {
     return false;
@@ -364,27 +209,7 @@ export async function deleteTab(taskId: string, tab_id: string): Promise<boolean
 // ============================================
 
 /**
- * タスクの計画ドキュメント（requirement, design, procedure）を更新
- * Claudeがplanning時に使用
- */
-export async function updateTaskPlans(
-  taskId: string,
-  plans: {
-    requirement: string;
-    design: string;
-    procedure: string;
-  }
-): Promise<Task | null> {
-  return updateTask(taskId, {
-    requirement: plans.requirement,
-    design: plans.design,
-    procedure: plans.procedure,
-  });
-}
-
-/**
  * タスクステータスを遷移させる
- * Claudeが実装完了時にreviewing へ自動遷移する際に使用
  */
 export async function transitionTaskStatus(
   taskId: string,
@@ -399,7 +224,6 @@ export async function transitionTaskStatus(
 
 /**
  * タスクを完了する
- * Pull Requestをマージし、タスクをdoneステータスに遷移
  */
 export async function completeTask(taskId: string): Promise<Task | null> {
   const task = await getTask(taskId);
@@ -408,18 +232,75 @@ export async function completeTask(taskId: string): Promise<Task | null> {
     throw new Error(`Task not found: ${taskId}`);
   }
 
-  // TODO: PRマージ処理を実装（gh CLIを使用）
-  // if (task.pullRequestUrl) {
-  //   const prNumber = extractPRNumber(task.pullRequestUrl);
-  //   try {
-  //     await execCommand(`gh pr merge ${prNumber} --merge`);
-  //   } catch (error) {
-  //     console.warn('PR merge failed or already merged:', error);
-  //   }
-  // }
-
-  // タスクをdoneに遷移
   return updateTask(taskId, {
     status: 'done',
   });
+}
+
+// ============================================
+// 内部ヘルパー
+// ============================================
+
+type PrismaTask = {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  owner: string;
+  repo: string;
+  branch: string;
+  baseBranch: string;
+  baseBranchCommit: string | null;
+  repoId: string;
+  worktreeStatus: string;
+  pullRequestUrl: string | null;
+  effort: number | null;
+  order: number | null;
+  deletedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  tabs: PrismaTab[];
+};
+
+type PrismaTab = {
+  tabId: string;
+  order: number;
+  status: string;
+  startedAt: Date;
+  completedAt: Date | null;
+  updatedAt: Date;
+};
+
+function mapTask(task: PrismaTask): Task {
+  return {
+    id: task.id,
+    status: task.status as Task['status'],
+    title: task.title,
+    description: task.description,
+    owner: task.owner,
+    repo: task.repo,
+    branch: task.branch,
+    baseBranch: task.baseBranch,
+    baseBranchCommit: task.baseBranchCommit ?? undefined,
+    repoId: task.repoId,
+    worktreeStatus: task.worktreeStatus as Task['worktreeStatus'],
+    pullRequestUrl: task.pullRequestUrl ?? undefined,
+    effort: task.effort ?? undefined,
+    order: task.order ?? undefined,
+    deletedAt: task.deletedAt?.toISOString(),
+    createdAt: task.createdAt.toISOString(),
+    updatedAt: task.updatedAt.toISOString(),
+    tabs: task.tabs.map((tab) => mapTab(tab)),
+  };
+}
+
+function mapTab(tab: PrismaTab): Tab {
+  return {
+    tab_id: tab.tabId,
+    order: tab.order,
+    status: tab.status as Tab['status'],
+    startedAt: tab.startedAt.toISOString(),
+    completedAt: tab.completedAt?.toISOString(),
+    updatedAt: tab.updatedAt.toISOString(),
+  };
 }

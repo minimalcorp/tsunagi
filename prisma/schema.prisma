@@ -17,7 +17,6 @@ model Repository {
 
   tasks           Task[]
   environmentVars EnvironmentVariable[]
-  claudeSettings  ClaudeSetting[]
 
   @@unique([owner, repo])
   @@map("repositories")
@@ -36,11 +35,6 @@ model Task {
   baseBranchCommit   String? @map("base_branch_commit") // worktree作成時のbaseBranchのコミットハッシュ
   repoId             String  @map("repo_id")
   worktreeStatus     String  @map("worktree_status") // 'pending' | 'created' | 'error'
-
-  // 計画ドキュメント（planning時に作成）
-  requirement    String?   // Markdown形式、要求仕様
-  design         String?   // Markdown形式、IF定義・設計
-  procedure      String?   // Markdown形式、実装手順チェックリスト
 
   // Pull Request情報
   pullRequestUrl String?   @map("pull_request_url")
@@ -66,32 +60,15 @@ model Tab {
   taskId       String    @map("task_id")
   order        Int       // タブ表示用の連番
   status       String    // 'idle' | 'running' | 'success' | 'error'
-  sessionId    String?   @map("session_id") // Claude Agent SDKのセッションID
-  promptCount  Int?      @map("prompt_count")
   createdAt    DateTime  @default(now()) @map("created_at")
   startedAt    DateTime  @map("started_at")
   completedAt  DateTime? @map("completed_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  sessionData SessionData?
 
   @@index([taskId])
   @@map("tabs")
-}
-
-// SessionData
-model SessionData {
-  tabId       String   @id @map("tab_id")
-  sdkMessages String   @map("sdk_messages") // Claude Agent SDKからのメッセージ（JSON配列）
-  prompts     String   // ユーザー送信プロンプト（JSON配列）
-  nextSequence Int     @default(1) @map("next_sequence")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  tab Tab @relation(fields: [tabId], references: [tabId], onDelete: Cascade)
-
-  @@map("session_data")
 }
 
 // EnvironmentVariable
@@ -113,20 +90,3 @@ model EnvironmentVariable {
   @@map("environment_variables")
 }
 
-// ClaudeSetting
-model ClaudeSetting {
-  id        String   @id @default(uuid())
-  scope     String   // 'global' | 'owner' | 'repo' - 階層構造の優先順位制御
-  owner     String?
-  repo      String?
-  sources   String   // JSON配列をテキストで保存: ['user', 'project', 'local']
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  repository Repository? @relation(fields: [owner, repo], references: [owner, repo], onDelete: Cascade)
-
-  @@unique([scope, owner, repo])
-  @@index([scope, owner, repo])
-  @@map("claude_settings")
-}

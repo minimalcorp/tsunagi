@@ -6,7 +6,6 @@ import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { normalizeBranchName } from './branch-utils';
-import { generateSettingsLocalJson } from './claude-settings';
 
 const execAsync = promisify(exec);
 
@@ -179,13 +178,6 @@ export async function createWorktree(
   } else {
     // 新規ブランチを作成（常にorigin/baseBranchから）
     await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${effectiveBaseBranch}`]);
-  }
-
-  // .claude/settings.local.json にhooks設定を生成
-  try {
-    generateSettingsLocalJson(worktreePath);
-  } catch {
-    // settings.local.json生成失敗は無視
   }
 
   // worktreeにローカルスコープでMCPサーバーを登録

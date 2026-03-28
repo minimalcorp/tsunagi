@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
-import * as tabRepo from '@/lib/repositories/tab';
 import * as repoRepo from '@/lib/repositories/repository';
 import * as worktreeManager from '@/lib/worktree-manager';
 import type { Task } from '@/lib/types';
@@ -21,26 +20,7 @@ export async function GET(request: NextRequest) {
       includeDeleted,
     });
 
-    // 各タスクのタブにpromptCountを追加
-    const tasksWithCounts = await Promise.all(
-      tasks.map(async (task) => {
-        const tabsWithCounts = await Promise.all(
-          task.tabs.map(async (tab) => {
-            const sessionData = await tabRepo.getSessionData(tab.tab_id);
-            return {
-              ...tab,
-              promptCount: sessionData?.prompts?.length ?? 0,
-            };
-          })
-        );
-        return {
-          ...task,
-          tabs: tabsWithCounts,
-        };
-      })
-    );
-
-    return NextResponse.json({ data: { tasks: tasksWithCounts } });
+    return NextResponse.json({ data: { tasks } });
   } catch (error) {
     console.error('GET /api/tasks error:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });

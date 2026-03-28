@@ -5,7 +5,6 @@ import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
 import type { Task } from '@/lib/types';
 import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
-import { MessageCircle } from 'lucide-react';
 
 export interface TabTodo {
   content: string;
@@ -23,7 +22,6 @@ interface TaskCardProps {
 export function TaskCard({ task, isDragging, dragHandleProps, tabTodosMap }: TaskCardProps) {
   const tabs = task.tabs || [];
   const isClaudeRunning = tabs.some((tab) => tab.status === 'running');
-  const totalUserMessages = tabs.reduce((sum, tab) => sum + (tab.promptCount ?? 0), 0);
 
   // running中のタブのTodo進捗（最初のrunning tabのみ表示）
   const runningTab = tabs.find((tab) => tab.status === 'running');
@@ -118,14 +116,6 @@ export function TaskCard({ task, isDragging, dragHandleProps, tabTodosMap }: Tas
         <div className="flex items-center gap-2 text-xs text-muted-foreground flex-shrink-0">
           {/* 工数 */}
           {task.effort && <span className="font-medium">{task.effort}h</span>}
-
-          {/* ユーザーメッセージ数 */}
-          {totalUserMessages > 0 && (
-            <div className="flex items-center gap-1">
-              <span>{totalUserMessages}</span>
-              <MessageCircle className="w-3 h-3" />
-            </div>
-          )}
         </div>
       </div>
     </Link>

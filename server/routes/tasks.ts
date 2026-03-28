@@ -142,15 +142,8 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     const updatedTask = await taskRepo.getTask(newTask.id);
 
     // task:created イベントを全クライアントにbroadcast
-    const taskForBroadcast = {
-      ...updatedTask,
-      tabs: (updatedTask?.tabs ?? []).map((tab) => ({
-        ...tab,
-        promptCount: tab.promptCount ?? 0,
-      })),
-    };
-    io.emit('task:created', { task: taskForBroadcast });
+    io.emit('task:created', { task: updatedTask });
 
-    return reply.status(201).send({ data: { task: taskForBroadcast } });
+    return reply.status(201).send({ data: { task: updatedTask } });
   });
 }
