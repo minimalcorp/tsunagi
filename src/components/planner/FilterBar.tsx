@@ -152,7 +152,7 @@ function FilterDialog({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-50" onClick={onClose} />
+      <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose} />
 
       {/* Dialog */}
       <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 pointer-events-none">

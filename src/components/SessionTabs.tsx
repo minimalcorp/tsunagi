@@ -22,8 +22,8 @@ interface SessionTabsProps {
   tabs: Tab[];
   activeTabId?: string;
   onTabChange: (tabId: string) => void;
-  /** Terminalのみ起動するタブ追加 */
-  onTabCreateTerminal: () => void;
+  /** Terminalのみ起動するタブ追加（省略時はボタン非表示） */
+  onTabCreateTerminal?: () => void;
   /** Terminalを追加してClaudeを起動するタブ追加 */
   onTabCreateClaude: () => void;
   onTabDelete: (tabId: string) => void;
@@ -209,9 +209,11 @@ export function SessionTabs({
         {/* divider + アクションボタン群 */}
         <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
           <div className="w-px self-stretch bg-theme" />
-          <Button size="icon" onClick={onTabCreateTerminal} title="Open terminal">
-            <Terminal className="w-4 h-4" />
-          </Button>
+          {onTabCreateTerminal && (
+            <Button size="icon" onClick={onTabCreateTerminal} title="Open terminal">
+              <Terminal className="w-4 h-4" />
+            </Button>
+          )}
           <Button size="icon" onClick={onTabCreateClaude} title="Open terminal with Claude">
             <Bot className="w-4 h-4" />
           </Button>
