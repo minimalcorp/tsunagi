@@ -317,7 +317,7 @@ export default function Home() {
         </div>
 
         {/* Right: Planner Panel */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 h-full flex flex-col">
           <PlannerPanel />
         </div>
 
