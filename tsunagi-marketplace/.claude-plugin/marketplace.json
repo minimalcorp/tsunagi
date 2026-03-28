@@ -1,0 +1,11 @@
+{
+  "name": "tsunagi-marketplace",
+  "owner": { "name": "minimalcorp" },
+  "plugins": [
+    {
+      "name": "tsunagi-plugin",
+      "source": "./plugins/tsunagi-plugin",
+      "description": "tsunagiサーバーへClaude CLIイベントを転送し、MCPサーバーとタスク管理スキルを提供する"
+    }
+  ]
+}
