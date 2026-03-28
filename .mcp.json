@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"]
+    },
     "serena": {
       "command": "docker",
       "args": [
