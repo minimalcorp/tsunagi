@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import type { Tab } from '@/lib/types';
 import { SessionTabs } from '@/components/SessionTabs';
 import {
@@ -24,7 +23,31 @@ export function PlannerPanel() {
   const [mountedTabIds, setMountedTabIds] = useState<Set<string>>(new Set());
   const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(new Map());
   const [tabModeMap, setTabModeMap] = useState<Map<string, TabCreateMode>>(new Map());
+  const [isLoaded, setIsLoaded] = useState(false);
   const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
+
+  // Load tabs from API on mount
+  useEffect(() => {
+    const loadTabs = async () => {
+      try {
+        const res = await fetch('/api/planner/tabs');
+        const data = await res.json();
+        if (data.data?.tabs) {
+          setTabs(data.data.tabs);
+          if (data.data.tabs.length > 0) {
+            const firstTabId = data.data.tabs[0].tab_id;
+            setActiveTabId(firstTabId);
+            setMountedTabIds(new Set([firstTabId]));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load planner tabs:', error);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    loadTabs();
+  }, []);
 
   // Focus active terminal on tab switch
   useEffect(() => {
@@ -33,8 +56,8 @@ export function PlannerPanel() {
   }, [activeTabId]);
 
   const createTab = useCallback(
-    (mode: TabCreateMode) => {
-      const tabId = uuidv4();
+    async (mode: TabCreateMode) => {
+      const tabId = crypto.randomUUID();
       const now = new Date().toISOString();
       const newTab: Tab = {
         tab_id: tabId,
@@ -43,6 +66,17 @@ export function PlannerPanel() {
         startedAt: now,
         updatedAt: now,
       };
+
+      // Persist to API
+      try {
+        await fetch('/api/planner/tabs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tabId }),
+        });
+      } catch (error) {
+        console.error('Failed to persist planner tab:', error);
+      }
 
       setTabs((prev) => [...prev, newTab]);
       setActiveTabId(tabId);
@@ -74,13 +108,18 @@ export function PlannerPanel() {
   }, []);
 
   const handleTabDelete = useCallback(
-    (tabId: string) => {
+    async (tabId: string) => {
+      // Delete from API
+      try {
+        await fetch(`/api/planner/tabs?tabId=${tabId}`, { method: 'DELETE' });
+      } catch (error) {
+        console.error('Failed to delete planner tab:', error);
+      }
+
       setTabs((prev) => {
         const next = prev.filter((t) => t.tab_id !== tabId);
-        // If active tab was deleted, switch to the last remaining tab
         if (activeTabId === tabId) {
           const newActive = next.length > 0 ? next[next.length - 1].tab_id : undefined;
-          // Use setTimeout to avoid setState during render
           setTimeout(() => setActiveTabId(newActive), 0);
         }
         return next;
@@ -115,6 +154,14 @@ export function PlannerPanel() {
     },
     []
   );
+
+  if (!isLoaded) {
+    return (
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0">

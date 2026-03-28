@@ -70,6 +70,19 @@ model Tab {
   @@map("tabs")
 }
 
+// PlannerTab - プランナーClaude用のタブ（タスクに紐づかない）
+model PlannerTab {
+  tabId        String    @id @map("tab_id")
+  order        Int
+  status       String    // 'idle' | 'running' | 'success' | 'error'
+  createdAt    DateTime  @default(now()) @map("created_at")
+  startedAt    DateTime  @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("planner_tabs")
+}
+
 // EnvironmentVariable
 model EnvironmentVariable {
   id        String   @id @default(uuid())
