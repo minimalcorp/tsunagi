@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNavigation';
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
 import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
+import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
 import { Button } from '@/components/ui/button';
 
 export default function SettingsPage() {
@@ -110,6 +111,14 @@ export default function SettingsPage() {
 
               {/* Environment Variables Section */}
               <EnvVariableEditor selectedNode={selectedNode} />
+
+              {/* Repository Management (Global scope only) */}
+              {selectedNode.scope === 'global' && (
+                <div className="space-y-3">
+                  <h2 className="text-sm font-semibold text-foreground">Repositories</h2>
+                  <RepositoryManagement />
+                </div>
+              )}
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
