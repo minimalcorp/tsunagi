@@ -100,7 +100,6 @@ export function PlannerPanel() {
     [tabs.length]
   );
 
-  const handleTabCreateTerminal = useCallback(() => createTab('terminal'), [createTab]);
   const handleTabCreateClaude = useCallback(() => createTab('claude'), [createTab]);
 
   const handleTabChange = useCallback((tabId: string) => {
@@ -178,7 +177,6 @@ export function PlannerPanel() {
             tabs={tabs}
             activeTabId={activeTabId}
             onTabChange={handleTabChange}
-            onTabCreateTerminal={handleTabCreateTerminal}
             onTabCreateClaude={handleTabCreateClaude}
             onTabDelete={handleTabDelete}
             tabStatusMap={tabStatusMap}

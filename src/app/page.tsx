@@ -315,6 +315,7 @@ export default function Home() {
             filters={filterState}
             onFilterChange={setFilterState}
             onOrderChange={handleOrderChange}
+            onAddTask={() => setIsAddTaskDialogOpen(true)}
           />
         </div>
 

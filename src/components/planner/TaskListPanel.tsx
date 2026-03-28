@@ -10,6 +10,7 @@ interface TaskListPanelProps {
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
   onOrderChange: (taskId: string, newOrder: number) => void;
+  onAddTask?: () => void;
 }
 
 export function TaskListPanel({
@@ -18,6 +19,7 @@ export function TaskListPanel({
   filters,
   onFilterChange,
   onOrderChange,
+  onAddTask,
 }: TaskListPanelProps) {
   return (
     <div className="flex h-full flex-col">
@@ -27,6 +29,7 @@ export function TaskListPanel({
           repositories={repositories}
           filters={filters}
           onFilterChange={onFilterChange}
+          onAddTask={onAddTask}
         />
       </div>
 

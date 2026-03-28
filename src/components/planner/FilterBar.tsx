@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Search, SlidersHorizontal, X, Trash2 } from 'lucide-react';
+import { Search, SlidersHorizontal, X, Trash2, Plus } from 'lucide-react';
 import type { Repository } from '@/lib/types';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ interface SearchAndFilterBarProps {
   repositories: Repository[];
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
+  onAddTask?: () => void;
 }
 
 const STATUSES = ['backlog', 'planning', 'coding', 'reviewing', 'done'] as const;
@@ -49,6 +50,7 @@ export function SearchAndFilterBar({
   repositories,
   filters,
   onFilterChange,
+  onAddTask,
 }: SearchAndFilterBarProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -97,6 +99,19 @@ export function SearchAndFilterBar({
         >
           <SlidersHorizontal className="size-3.5" />
         </Button>
+
+        {/* Add task button */}
+        {onAddTask && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onAddTask}
+            className="size-8 flex-shrink-0"
+            title="Add task"
+          >
+            <Plus className="size-3.5" />
+          </Button>
+        )}
       </div>
 
       {/* Filter Dialog */}
