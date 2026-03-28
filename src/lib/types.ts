@@ -8,7 +8,6 @@ export interface Task {
   repo: string;
   branch: string;
   baseBranch: string; // rebase/merge判定用のベースブランチ
-  baseBranchCommit?: string; // worktree作成時のbaseBranchのコミットハッシュ
   repoId: string; // Repository IDへの参照
   worktreeStatus: 'pending' | 'created' | 'error';
 

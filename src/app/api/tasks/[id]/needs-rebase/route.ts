@@ -23,8 +23,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         task.owner,
         task.repo,
         task.branch,
-        task.baseBranch,
-        task.baseBranchCommit
+        task.baseBranch
       );
     }
 

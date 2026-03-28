@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
-import * as repoRepo from '@/lib/repositories/repository';
-import * as worktreeManager from '@/lib/worktree-manager';
 import type { Task } from '@/lib/types';
+import { createTask, TaskServiceError } from '@/lib/services/task-service';
 
 // GET /api/tasks?status=...&owner=...&repo=...&includeDeleted=false
 export async function GET(request: NextRequest) {
@@ -33,7 +32,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { title, description, owner, repo, branch, baseBranch } = body;
 
-    // Validation
     if (!title || !owner || !repo || !branch) {
       return NextResponse.json(
         {
@@ -48,90 +46,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ブランチ名重複チェック
-    const existingTasks = await taskRepo.getTasks({ includeDeleted: false });
-    const duplicateTask = existingTasks.find(
-      (task) => task.owner === owner && task.repo === repo && task.branch === branch
-    );
-
-    if (duplicateTask) {
-      return NextResponse.json(
-        {
-          errors: [
-            {
-              field: 'branch',
-              message: `Branch "${branch}" already exists. Task "${duplicateTask.title}" (ID: ${duplicateTask.id}) is already using this branch.`,
-            },
-          ],
-        },
-        { status: 409 }
-      );
-    }
-
-    // リポジトリIDを取得
-    const repository = await repoRepo.getRepo(owner, repo);
-    if (!repository) {
-      return NextResponse.json(
-        {
-          errors: [
-            {
-              field: 'global',
-              message: 'Repository not found. Please clone the repository first.',
-            },
-          ],
-        },
-        { status: 404 }
-      );
-    }
-
-    // タスクを作成
-    const newTask = await taskRepo.createTask({
+    const result = await createTask({
       title,
-      description: description || '',
-      status: 'backlog',
+      description,
       owner,
       repo,
       branch,
-      baseBranch: baseBranch || 'main',
-      repoId: repository.id,
-      worktreeStatus: 'pending',
+      baseBranch,
       effort: body.effort,
       order: body.order,
     });
 
-    // worktreeを自動作成
-    try {
-      // 最新のremote情報を取得
-      await worktreeManager.fetchRemote(owner, repo);
-      const { baseBranchCommit } = await worktreeManager.createWorktree(
-        owner,
-        repo,
-        branch,
-        baseBranch
-      );
-      await taskRepo.updateTask(newTask.id, {
-        worktreeStatus: 'created',
-        baseBranchCommit,
-      });
-    } catch (error) {
-      console.error('Failed to create worktree:', error);
-      await taskRepo.updateTask(newTask.id, { worktreeStatus: 'error' });
-      // worktreeエラーはタスク作成失敗にはしない（後で手動作成可能）
-    }
-
-    // 最初のタブを自動作成
-    try {
-      await taskRepo.createTab(newTask.id);
-    } catch (error) {
-      console.error('Failed to create initial tab:', error);
-      // タブエラーもタスク作成失敗にはしない
-    }
-
-    // 更新後のタスクを取得
-    const updatedTask = await taskRepo.getTask(newTask.id);
-
-    return NextResponse.json({ data: { task: updatedTask } }, { status: 201 });
+    return NextResponse.json({ data: { task: result.task } }, { status: 201 });
   } catch (error) {
+    if (error instanceof TaskServiceError) {
+      const statusCode =
+        error.code === 'REPO_NOT_FOUND' ? 404 : error.code === 'BRANCH_DUPLICATE' ? 409 : 500;
+      return NextResponse.json(
+        { errors: [{ field: 'global', message: error.message }] },
+        { status: statusCode }
+      );
+    }
     console.error('POST /api/tasks error:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
   }

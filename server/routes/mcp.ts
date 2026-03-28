@@ -6,6 +6,11 @@ import * as os from 'os';
 import * as path from 'path';
 import { prisma } from '../../src/lib/db.js';
 import { todoStore } from '../todo-store.js';
+import {
+  createTask,
+  ensureDefaultWorktree,
+  TaskServiceError,
+} from '../../src/lib/services/task-service.js';
 
 /** SSEセッションIDをキーにしたtransportのMap */
 const transports = new Map<string, SSEServerTransport>();
@@ -109,7 +114,8 @@ function createMcpServer(): Server {
       },
       {
         name: 'tsunagi_create_task',
-        description: 'タスクを作成する',
+        description:
+          'タスクを作成する。worktree作成・初期タブ作成・Socket.IO通知を含むフル作成フロー。branchを省略するとtitleから自動生成される。',
         inputSchema: {
           type: 'object',
           required: ['owner', 'repo', 'title'],
@@ -118,6 +124,11 @@ function createMcpServer(): Server {
             repo: { type: 'string', description: 'リポジトリ名' },
             title: { type: 'string', description: 'タスクタイトル' },
             description: { type: 'string', description: 'タスク詳細説明' },
+            branch: { type: 'string', description: 'ブランチ名（省略時はtitleから自動生成）' },
+            baseBranch: {
+              type: 'string',
+              description: 'ベースブランチ名（省略時はdefault branch）',
+            },
             effort: { type: 'number', description: '工数（時間）' },
             status: {
               type: 'string',
@@ -177,6 +188,19 @@ function createMcpServer(): Server {
           },
         },
       },
+      {
+        name: 'tsunagi_ensure_default_worktree',
+        description:
+          'リポジトリのdefault branch worktreeを確保する（なければ作成、あれば最新化）。返却されたパスを使ってリポジトリの内容を読むことができる。',
+        inputSchema: {
+          type: 'object',
+          required: ['owner', 'repo'],
+          properties: {
+            owner: { type: 'string', description: 'リポジトリオーナー' },
+            repo: { type: 'string', description: 'リポジトリ名' },
+          },
+        },
+      },
     ],
   }));
 
@@ -220,43 +244,43 @@ function createMcpServer(): Server {
       }
 
       case 'tsunagi_create_task': {
-        const { owner, repo, title, description, effort, status } = (args ?? {}) as {
+        const { owner, repo, title, description, effort, status, branch, baseBranch } = (args ??
+          {}) as {
           owner: string;
           repo: string;
           title: string;
           description?: string;
           effort?: number;
           status?: string;
+          branch?: string;
+          baseBranch?: string;
         };
 
-        // リポジトリを確認
-        const repository = await prisma.repository.findUnique({
-          where: { owner_repo: { owner, repo } },
-        });
-        if (!repository) {
+        try {
+          const result = await createTask({
+            owner,
+            repo,
+            title,
+            description,
+            effort,
+            status: status as import('../../src/lib/types.js').Task['status'] | undefined,
+            branch,
+            baseBranch,
+          });
           return {
-            content: [{ type: 'text', text: `Repository not found: ${owner}/${repo}` }],
+            content: [{ type: 'text', text: JSON.stringify(result.task, null, 2) }],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: error instanceof TaskServiceError ? error.message : String(error),
+              },
+            ],
             isError: true,
           };
         }
-
-        const task = await prisma.task.create({
-          data: {
-            owner,
-            repo,
-            repoId: repository.id,
-            title,
-            description: description ?? '',
-            status: status ?? 'backlog',
-            branch: '',
-            baseBranch: 'main',
-            worktreeStatus: 'pending',
-            effort: effort ?? null,
-          },
-        });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(task, null, 2) }],
-        };
       }
 
       case 'tsunagi_update_task': {
@@ -344,6 +368,34 @@ function createMcpServer(): Server {
             },
           ],
         };
+      }
+
+      case 'tsunagi_ensure_default_worktree': {
+        const { owner, repo } = (args ?? {}) as { owner: string; repo: string };
+        try {
+          const result = await ensureDefaultWorktree(owner, repo);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    worktreePath: result.worktreePath,
+                    defaultBranch: result.defaultBranch,
+                    message: `Default branch worktree ready at ${result.worktreePath}. You can read files from this path. Do NOT modify any files.`,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [{ type: 'text', text: String(error) }],
+            isError: true,
+          };
+        }
       }
 
       default:

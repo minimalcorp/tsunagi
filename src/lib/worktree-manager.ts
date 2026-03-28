@@ -1,6 +1,5 @@
 import simpleGit, { SimpleGit } from 'simple-git';
 import * as fs from 'fs/promises';
-import * as fssync from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
@@ -141,7 +140,7 @@ export async function createWorktree(
   repo: string,
   branch: string,
   baseBranch?: string
-): Promise<{ worktreePath: string; baseBranchCommit: string }> {
+): Promise<{ worktreePath: string }> {
   const bareRepoPath = await ensureBareRepository(owner, repo);
   const worktreePath = getWorktreePath(owner, repo, branch);
 
@@ -164,10 +163,7 @@ export async function createWorktree(
     (b) => b === `remotes/origin/${branch}` || b === `origin/${branch}`
   );
 
-  // baseBranchの現在のコミットハッシュを取得
   const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
-  const baseBranchCommitResult = await git.raw(['rev-parse', `origin/${effectiveBaseBranch}`]);
-  const baseBranchCommit = baseBranchCommitResult.trim();
 
   if (localBranchExists) {
     // Local branchが存在する場合は直接チェックアウト
@@ -180,20 +176,7 @@ export async function createWorktree(
     await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${effectiveBaseBranch}`]);
   }
 
-  // worktreeにローカルスコープでMCPサーバーを登録
-  // claude CLIが存在しない環境でもエラーにしない
-  try {
-    await execAsync(
-      'claude mcp add --transport sse --scope local tsunagi http://localhost:2792/mcp',
-      {
-        cwd: worktreePath,
-      }
-    );
-  } catch {
-    // claude CLI未インストール時は無視
-  }
-
-  return { worktreePath, baseBranchCommit };
+  return { worktreePath };
 }
 
 // worktreeを削除
@@ -276,8 +259,7 @@ export async function checkRebaseNeeded(
   owner: string,
   repo: string,
   branch: string,
-  baseBranch?: string,
-  baseBranchCommit?: string
+  baseBranch?: string
 ): Promise<boolean> {
   try {
     const bareRepoPath = await ensureBareRepository(owner, repo);
@@ -298,30 +280,18 @@ export async function checkRebaseNeeded(
     const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
     const targetRef = `origin/${effectiveBaseBranch}`;
 
-    // baseBranchCommitが指定されている場合は、それと現在のbaseBranchを比較
-    if (baseBranchCommit) {
-      const currentBaseBranchCommitResult = await bareGit.raw(['rev-parse', targetRef]);
-      const currentBaseBranchCommit = currentBaseBranchCommitResult.trim();
-
-      // worktree作成時のコミットと現在のコミットが異なる場合はrebase必要
-      return baseBranchCommit !== currentBaseBranchCommit;
-    }
-
-    // baseBranchCommitが指定されていない場合は従来のアルゴリズム（merge-base比較）
+    // merge-base（共通祖先）を使ってrebase必要性を判定
     const git: SimpleGit = simpleGit(worktreePath);
-
-    // merge-base（共通祖先）を取得
     const mergeBaseResult = await git.raw(['merge-base', 'HEAD', targetRef]);
     const mergeBaseCommit = mergeBaseResult.trim();
 
-    // merge-baseからbase branchが進んでいるコミット数を取得
     const behindResult = await git.raw(['rev-list', '--count', `${mergeBaseCommit}..${targetRef}`]);
     const behindCount = parseInt(behindResult.trim(), 10);
 
-    return behindCount > 0; // base branchがmerge-baseから進んでいる場合はtrue
+    return behindCount > 0;
   } catch (error) {
     console.error('Failed to check rebase needed:', error);
-    return false; // エラー時はrebase不要として扱う
+    return false;
   }
 }
 
@@ -331,7 +301,7 @@ export async function rebaseWorktree(
   repo: string,
   branch: string,
   baseBranch?: string
-): Promise<{ success: boolean; message: string; baseBranchCommit?: string; conflicts?: string[] }> {
+): Promise<{ success: boolean; message: string; conflicts?: string[] }> {
   const bareRepoPath = await ensureBareRepository(owner, repo);
   const worktreePath = getWorktreePath(owner, repo, branch);
 
@@ -358,10 +328,6 @@ export async function rebaseWorktree(
   const effectiveBaseBranch = baseBranch || (await getDefaultBranch(owner, repo));
   const targetRef = `origin/${effectiveBaseBranch}`;
 
-  // rebase後の新しいbaseBranchCommitを取得
-  const baseBranchCommitResult = await bareGit.raw(['rev-parse', targetRef]);
-  const baseBranchCommit = baseBranchCommitResult.trim();
-
   try {
     // rebaseを実行
     await git.rebase([targetRef]);
@@ -369,7 +335,6 @@ export async function rebaseWorktree(
     return {
       success: true,
       message: `Successfully rebased ${branch} onto ${targetRef}`,
-      baseBranchCommit,
     };
   } catch {
     // rebase失敗時の処理

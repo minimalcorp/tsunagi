@@ -32,7 +32,6 @@ model Task {
   repo           String
   branch             String
   baseBranch         String  @map("base_branch") // rebase/merge判定用のベースブランチ
-  baseBranchCommit   String? @map("base_branch_commit") // worktree作成時のbaseBranchのコミットハッシュ
   repoId             String  @map("repo_id")
   worktreeStatus     String  @map("worktree_status") // 'pending' | 'created' | 'error'
 
@@ -69,6 +68,19 @@ model Tab {
 
   @@index([taskId])
   @@map("tabs")
+}
+
+// PlannerTab - プランナーClaude用のタブ（タスクに紐づかない）
+model PlannerTab {
+  tabId        String    @id @map("tab_id")
+  order        Int
+  status       String    // 'idle' | 'running' | 'success' | 'error'
+  createdAt    DateTime  @default(now()) @map("created_at")
+  startedAt    DateTime  @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("planner_tabs")
 }
 
 // EnvironmentVariable

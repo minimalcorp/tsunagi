@@ -57,7 +57,6 @@ export async function createTask(
       repo: task.repo,
       branch: task.branch,
       baseBranch: task.baseBranch,
-      baseBranchCommit: task.baseBranchCommit,
       repoId: task.repoId,
       worktreeStatus: task.worktreeStatus,
       pullRequestUrl: task.pullRequestUrl,
@@ -88,9 +87,6 @@ export async function updateTask(
       ...(updates.description !== undefined && { description: updates.description }),
       ...(updates.branch !== undefined && { branch: updates.branch }),
       ...(updates.baseBranch !== undefined && { baseBranch: updates.baseBranch }),
-      ...(updates.baseBranchCommit !== undefined && {
-        baseBranchCommit: updates.baseBranchCommit,
-      }),
       ...(updates.worktreeStatus !== undefined && { worktreeStatus: updates.worktreeStatus }),
       ...(updates.pullRequestUrl !== undefined && { pullRequestUrl: updates.pullRequestUrl }),
       ...(updates.effort !== undefined && { effort: updates.effort }),
@@ -250,7 +246,6 @@ type PrismaTask = {
   repo: string;
   branch: string;
   baseBranch: string;
-  baseBranchCommit: string | null;
   repoId: string;
   worktreeStatus: string;
   pullRequestUrl: string | null;
@@ -281,7 +276,6 @@ function mapTask(task: PrismaTask): Task {
     repo: task.repo,
     branch: task.branch,
     baseBranch: task.baseBranch,
-    baseBranchCommit: task.baseBranchCommit ?? undefined,
     repoId: task.repoId,
     worktreeStatus: task.worktreeStatus as Task['worktreeStatus'],
     pullRequestUrl: task.pullRequestUrl ?? undefined,

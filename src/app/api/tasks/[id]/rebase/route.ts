@@ -39,11 +39,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     );
 
     if (result.success) {
-      // rebase成功時にbaseBranchCommitを更新
-      if (result.baseBranchCommit) {
-        await taskRepo.updateTask(id, { baseBranchCommit: result.baseBranchCommit });
-      }
-
       return NextResponse.json({
         data: {
           success: true,
