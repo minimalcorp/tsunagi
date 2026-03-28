@@ -172,10 +172,46 @@ behind_count=$(git rev-list --count ${merge_base}..origin/{baseBranch})
 
 ```
 TaskListPanel
-├── FilterBar（フィルタ・検索）
+├── SearchAndFilterBar（検索 + フィルタボタン）
+│   ├── 検索input
+│   └── [Filter]ボタン → FilterDialog
+│       ├── Repository filter（トグルチップ）
+│       └── Status filter（トグルチップ）
 └── TaskList（D&D対応リスト）
     └── TaskCard（個別タスク）
 ```
+
+### 検索・フィルタUI
+
+タスク一覧の最上部に配置。Headerからは検索・フィルタ機能を削除し、ここに集約する。
+
+```
+┌──────────────────────┐
+│ [🔍 Search...] [⚙]  │  ← 検索input + Filterボタン（横並び）
+├──────────────────────┤
+│ Task Card            │
+│ Task Card            │
+│ ...                  │
+└──────────────────────┘
+```
+
+- **検索input**: テキスト入力でタスクタイトルをフィルタ
+- **Filterボタン**: クリックでFilterDialogを表示
+- **FilterDialog**: リポジトリ / ステータスのトグルチップを表示
+  - Repository filter: リポジトリごとの色分けチップ（複数選択可）
+  - Status filter: backlog/planning/coding/reviewing/done のチップ（複数選択可）
+  - 選択状態はDialogを閉じても保持
+  - アクティブなフィルタ数をFilterボタンにバッジ表示
+
+### 修正対象
+
+| 変更                       | 内容                                         |
+| -------------------------- | -------------------------------------------- |
+| Header                     | 検索input・リポジトリフィルタを削除          |
+| SearchAndFilterBar（新規） | 検索input + Filterボタンのコンパクトなバー   |
+| FilterDialog（新規）       | repo/statusフィルタのDialog                  |
+| TaskListPanel              | SearchAndFilterBarを統合                     |
+| page.tsx                   | フィルタstateの管理をTaskListPanel起点に変更 |
 
 ### TaskCard 表示項目
 

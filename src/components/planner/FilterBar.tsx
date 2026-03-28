@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, SlidersHorizontal, X, Trash2 } from 'lucide-react';
 import type { Repository } from '@/lib/types';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 export interface FilterState {
   statuses: string[];
@@ -13,8 +14,9 @@ export interface FilterState {
   search: string;
 }
 
-interface FilterBarProps {
+interface SearchAndFilterBarProps {
   repositories: Repository[];
+  filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
 }
 
@@ -43,120 +45,192 @@ const STATUS_STYLES: Record<string, { active: string; inactive: string }> = {
   },
 };
 
-export function FilterBar({ repositories, onFilterChange }: FilterBarProps) {
-  const [filters, setFilters] = useState<FilterState>({
-    statuses: [],
-    repos: [],
-    search: '',
-  });
+export function SearchAndFilterBar({
+  repositories,
+  filters,
+  onFilterChange,
+}: SearchAndFilterBarProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const updateFilters = useCallback(
-    (partial: Partial<FilterState>) => {
-      const next = { ...filters, ...partial };
-      setFilters(next);
-      onFilterChange(next);
+  const hasActiveFilters = filters.statuses.length > 0 || filters.repos.length > 0;
+
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onFilterChange({ ...filters, search: e.target.value });
     },
     [filters, onFilterChange]
   );
 
+  const clearSearch = useCallback(() => {
+    onFilterChange({ ...filters, search: '' });
+  }, [filters, onFilterChange]);
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        {/* Search input */}
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            value={filters.search}
+            onChange={handleSearchChange}
+            placeholder="Search tasks..."
+            className="h-8 pl-8 pr-8 text-xs"
+          />
+          {filters.search && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2 size-4 inline-flex items-center justify-center rounded-sm hover:bg-accent"
+            >
+              <X className="size-3 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter button */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setIsDialogOpen(true)}
+          className={cn('size-8 flex-shrink-0', hasActiveFilters && 'border-primary text-primary')}
+          title="Filters"
+        >
+          <SlidersHorizontal className="size-3.5" />
+        </Button>
+      </div>
+
+      {/* Filter Dialog */}
+      {isDialogOpen && (
+        <FilterDialog
+          repositories={repositories}
+          filters={filters}
+          onFilterChange={onFilterChange}
+          onClose={() => setIsDialogOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+function FilterDialog({
+  repositories,
+  filters,
+  onFilterChange,
+  onClose,
+}: {
+  repositories: Repository[];
+  filters: FilterState;
+  onFilterChange: (filters: FilterState) => void;
+  onClose: () => void;
+}) {
   const toggleStatus = useCallback(
     (status: string) => {
-      const current = filters.statuses;
-      const next = current.includes(status)
-        ? current.filter((s) => s !== status)
-        : [...current, status];
-      updateFilters({ statuses: next });
+      const next = filters.statuses.includes(status)
+        ? filters.statuses.filter((s) => s !== status)
+        : [...filters.statuses, status];
+      onFilterChange({ ...filters, statuses: next });
     },
-    [filters.statuses, updateFilters]
+    [filters, onFilterChange]
   );
 
   const toggleRepo = useCallback(
     (repoKey: string) => {
-      const current = filters.repos;
-      const next = current.includes(repoKey)
-        ? current.filter((r) => r !== repoKey)
-        : [...current, repoKey];
-      updateFilters({ repos: next });
+      const next = filters.repos.includes(repoKey)
+        ? filters.repos.filter((r) => r !== repoKey)
+        : [...filters.repos, repoKey];
+      onFilterChange({ ...filters, repos: next });
     },
-    [filters.repos, updateFilters]
+    [filters, onFilterChange]
   );
 
-  const handleSearchChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateFilters({ search: e.target.value });
-    },
-    [updateFilters]
-  );
+  const clearAll = useCallback(() => {
+    onFilterChange({ ...filters, statuses: [], repos: [] });
+  }, [filters, onFilterChange]);
 
-  const clearSearch = useCallback(() => {
-    updateFilters({ search: '' });
-  }, [updateFilters]);
+  const hasActiveFilters = filters.statuses.length > 0 || filters.repos.length > 0;
 
   return (
-    <div className="space-y-2">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-        <Input
-          value={filters.search}
-          onChange={handleSearchChange}
-          placeholder="Search tasks..."
-          className="h-8 pl-8 pr-8 text-xs"
-        />
-        {filters.search && (
-          <button
-            onClick={clearSearch}
-            className="absolute right-2 top-1/2 -translate-y-1/2 size-4 inline-flex items-center justify-center rounded-sm hover:bg-accent"
-          >
-            <X className="size-3 text-muted-foreground" />
-          </button>
-        )}
-      </div>
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-50" onClick={onClose} />
 
-      {/* Status chips */}
-      <div className="flex flex-wrap items-center gap-1">
-        {STATUSES.map((status) => {
-          const isActive = filters.statuses.includes(status);
-          const style = STATUS_STYLES[status];
-          return (
-            <button
-              key={status}
-              onClick={() => toggleStatus(status)}
-              className={cn(
-                'inline-flex h-6 items-center rounded-full px-2.5 text-[0.625rem] font-medium transition-colors',
-                isActive ? style.active : style.inactive
+      {/* Dialog */}
+      <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 pointer-events-none">
+        <div
+          className="pointer-events-auto w-full max-w-sm rounded-lg border border-border bg-card p-4 shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Filters</h3>
+            <div className="flex items-center gap-2">
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearAll} className="h-7 text-xs gap-1">
+                  <Trash2 className="size-3" />
+                  Clear all
+                </Button>
               )}
-            >
-              {status}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Repository chips */}
-      {repositories.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1">
-          {repositories.map((repo) => {
-            const repoKey = `${repo.owner}/${repo.repo}`;
-            const isActive = filters.repos.includes(repoKey);
-            const color = getRepoColor(repo.owner, repo.repo);
-            return (
               <button
-                key={repo.id}
-                onClick={() => toggleRepo(repoKey)}
-                className={cn(
-                  'inline-flex h-6 items-center rounded-full px-2.5 text-[0.625rem] font-medium transition-colors',
-                  isActive
-                    ? `${color.bg} ${color.text}`
-                    : 'bg-transparent text-muted-foreground hover:bg-muted/50'
-                )}
+                onClick={onClose}
+                className="size-6 inline-flex items-center justify-center rounded-sm hover:bg-accent"
               >
-                {repoKey}
+                <X className="size-4 text-muted-foreground" />
               </button>
-            );
-          })}
+            </div>
+          </div>
+
+          {/* Status filter */}
+          <div className="space-y-2 mb-4">
+            <label className="text-xs font-medium text-muted-foreground">Status</label>
+            <div className="flex flex-wrap gap-1">
+              {STATUSES.map((status) => {
+                const isActive = filters.statuses.includes(status);
+                const style = STATUS_STYLES[status];
+                return (
+                  <button
+                    key={status}
+                    onClick={() => toggleStatus(status)}
+                    className={cn(
+                      'inline-flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors',
+                      isActive ? style.active : style.inactive
+                    )}
+                  >
+                    {status}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Repository filter */}
+          {repositories.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Repository</label>
+              <div className="flex flex-wrap gap-1">
+                {repositories.map((repo) => {
+                  const repoKey = `${repo.owner}/${repo.repo}`;
+                  const isActive = filters.repos.includes(repoKey);
+                  const color = getRepoColor(repo.owner, repo.repo);
+                  return (
+                    <button
+                      key={repo.id}
+                      onClick={() => toggleRepo(repoKey)}
+                      className={cn(
+                        'inline-flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors',
+                        isActive
+                          ? `${color.bg} ${color.text}`
+                          : 'bg-transparent text-muted-foreground hover:bg-muted/50'
+                      )}
+                    >
+                      {repoKey}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

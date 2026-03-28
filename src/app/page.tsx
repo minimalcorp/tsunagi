@@ -10,6 +10,7 @@ import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { TaskListPanel } from '@/components/planner/TaskListPanel';
 import { PlannerPanel } from '@/components/planner/PlannerPanel';
+import { type FilterState } from '@/components/planner/FilterBar';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { useTerminalTodos } from '@/hooks/useTerminalTodos';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
@@ -27,9 +28,12 @@ export default function Home() {
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
 
-  // Filter state (driven by Header's filter UI)
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
+  // Filter state (driven by TaskListPanel's SearchAndFilterBar)
+  const [filterState, setFilterState] = useState<FilterState>({
+    statuses: [],
+    repos: [],
+    search: '',
+  });
 
   // Resizable panel
   const [leftPanelWidth, setLeftPanelWidth] = useState(380);
@@ -63,18 +67,24 @@ export default function Home() {
   const filteredTasks = useMemo(() => {
     return tasks
       .filter((task) => {
+        // Status filter
+        if (filterState.statuses.length > 0 && !filterState.statuses.includes(task.status))
+          return false;
         // Repo filter
-        if (selectedRepos.length > 0 && !selectedRepos.includes('all')) {
+        if (filterState.repos.length > 0) {
           const taskRepo = `${task.owner}/${task.repo}`;
-          if (!selectedRepos.includes(taskRepo)) return false;
+          if (!filterState.repos.includes(taskRepo)) return false;
         }
         // Search filter
-        if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        if (
+          filterState.search &&
+          !task.title.toLowerCase().includes(filterState.search.toLowerCase())
+        )
           return false;
         return true;
       })
       .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
-  }, [tasks, selectedRepos, searchQuery]);
+  }, [tasks, filterState]);
 
   // 初回データロード
   const loadData = async () => {
@@ -289,11 +299,6 @@ export default function Home() {
         onSettingsClick={() => router.push('/settings')}
         onReload={loadData}
         nextStep={onboardingState.nextStep}
-        repositories={repositories}
-        onFilterChange={(filters) => {
-          setSearchQuery(filters.search);
-          setSelectedRepos(filters.selectedRepos || []);
-        }}
         isCloneDialogOpen={isCloneDialogOpen}
       />
 
@@ -304,7 +309,13 @@ export default function Home() {
           className="hidden lg:flex flex-col border-r border-border flex-shrink-0"
           style={{ width: leftPanelWidth }}
         >
-          <TaskListPanel tasks={filteredTasks} onOrderChange={handleOrderChange} />
+          <TaskListPanel
+            tasks={filteredTasks}
+            repositories={repositories}
+            filters={filterState}
+            onFilterChange={setFilterState}
+            onOrderChange={handleOrderChange}
+          />
         </div>
 
         {/* Resize handle (PC only) */}
