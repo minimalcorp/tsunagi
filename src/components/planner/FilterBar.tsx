@@ -100,17 +100,20 @@ export function SearchAndFilterBar({
           <SlidersHorizontal className="size-3.5" />
         </Button>
 
-        {/* Add task button */}
+        {/* Divider + Add task button */}
         {onAddTask && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onAddTask}
-            className="size-8 flex-shrink-0"
-            title="Add task"
-          >
-            <Plus className="size-3.5" />
-          </Button>
+          <>
+            <div className="h-5 w-px bg-border flex-shrink-0" />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onAddTask}
+              className="size-8 flex-shrink-0"
+              title="Add task"
+            >
+              <Plus className="size-3.5" />
+            </Button>
+          </>
         )}
       </div>
 
