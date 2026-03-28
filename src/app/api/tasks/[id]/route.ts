@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
-import * as tabRepo from '@/lib/repositories/tab';
 import * as worktreeManager from '@/lib/worktree-manager';
 
 type Params = {
@@ -17,26 +16,9 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    // タブにpromptCountを追加
-    const tabsWithCounts = await Promise.all(
-      task.tabs.map(async (tab) => {
-        const sessionData = await tabRepo.getSessionData(tab.tab_id);
-        return {
-          ...tab,
-          promptCount: sessionData?.prompts?.length ?? 0,
-        };
-      })
-    );
-
     const worktreePath = worktreeManager.getWorktreePath(task.owner, task.repo, task.branch);
 
-    const taskWithCounts = {
-      ...task,
-      tabs: tabsWithCounts,
-      worktreePath,
-    };
-
-    return NextResponse.json({ data: { task: taskWithCounts } });
+    return NextResponse.json({ data: { task: { ...task, worktreePath } } });
   } catch (error) {
     console.error('GET /api/tasks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });

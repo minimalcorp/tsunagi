@@ -62,28 +62,12 @@ interface Task {
   tabs?: Tab[];
 }
 
-interface SessionData {
-  sdkMessages?: unknown[];
-  prompts?: unknown[];
-  rawMessages?: unknown[]; // 後方互換性のため
-  userPrompts?: unknown[]; // 後方互換性のため
-  nextSequence?: number;
-}
-
 interface EnvironmentVariable {
   key: string;
   value: string;
   scope: string;
   owner?: string;
   repo?: string;
-  enabled: boolean;
-}
-
-interface ClaudeSetting {
-  scope: string;
-  owner?: string;
-  repo?: string;
-  sources: string[];
   enabled: boolean;
 }
 
@@ -179,25 +163,8 @@ async function main() {
       });
     }
 
-    // 3. sessions.json → SessionData
-    console.log('📝 [3/5] sessions.json → SessionData');
-    const sessionsData = (await readJSON('sessions.json')) as Record<string, SessionData>;
-    const sessionKeys = Object.keys(sessionsData);
-    console.log(`   ${sessionKeys.length}件のセッションデータを移行`);
-    for (const [tabId, sessionData] of Object.entries(sessionsData)) {
-      await prisma.sessionData.create({
-        data: {
-          tabId,
-          sdkMessages: JSON.stringify(sessionData.sdkMessages || sessionData.rawMessages || []),
-          prompts: JSON.stringify(sessionData.prompts || sessionData.userPrompts || []),
-          nextSequence: sessionData.nextSequence || 1,
-          // createdAtはデフォルト値が設定される
-        },
-      });
-    }
-
-    // 4. env.json → EnvironmentVariable
-    console.log('📝 [4/5] env.json → EnvironmentVariable');
+    // 3. env.json → EnvironmentVariable
+    console.log('📝 [3/3] env.json → EnvironmentVariable');
     const envData = (await readJSON('env.json')) as EnvironmentVariable[];
     console.log(`   ${envData.length}件の環境変数を移行`);
     for (const env of envData) {
@@ -209,23 +176,6 @@ async function main() {
           owner: env.owner,
           repo: env.repo,
           enabled: env.enabled,
-          // createdAt, updatedAtはデフォルト値が設定される
-        },
-      });
-    }
-
-    // 5. claude-settings.json → ClaudeSetting
-    console.log('📝 [5/5] claude-settings.json → ClaudeSetting');
-    const settingsData = (await readJSON('claude-settings.json')) as ClaudeSetting[];
-    console.log(`   ${settingsData.length}件のClaude設定を移行`);
-    for (const setting of settingsData) {
-      await prisma.claudeSetting.create({
-        data: {
-          scope: setting.scope,
-          owner: setting.owner,
-          repo: setting.repo,
-          sources: JSON.stringify(setting.sources),
-          enabled: setting.enabled,
           // createdAt, updatedAtはデフォルト値が設定される
         },
       });
