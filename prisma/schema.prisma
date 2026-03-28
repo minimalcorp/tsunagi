@@ -32,7 +32,6 @@ model Task {
   repo           String
   branch             String
   baseBranch         String  @map("base_branch") // rebase/merge判定用のベースブランチ
-  baseBranchCommit   String? @map("base_branch_commit") // worktree作成時のbaseBranchのコミットハッシュ
   repoId             String  @map("repo_id")
   worktreeStatus     String  @map("worktree_status") // 'pending' | 'created' | 'error'
 

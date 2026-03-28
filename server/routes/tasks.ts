@@ -119,13 +119,8 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     // worktreeを自動作成
     try {
       await worktreeManager.fetchRemote(owner, repo);
-      const { baseBranchCommit } = await worktreeManager.createWorktree(
-        owner,
-        repo,
-        branch,
-        baseBranch ?? 'main'
-      );
-      await taskRepo.updateTask(newTask.id, { worktreeStatus: 'created', baseBranchCommit });
+      await worktreeManager.createWorktree(owner, repo, branch, baseBranch ?? 'main');
+      await taskRepo.updateTask(newTask.id, { worktreeStatus: 'created' });
     } catch (error) {
       fastify.log.error(error, 'Failed to create worktree');
       await taskRepo.updateTask(newTask.id, { worktreeStatus: 'error' });

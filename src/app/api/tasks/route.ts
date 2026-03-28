@@ -103,16 +103,8 @@ export async function POST(request: NextRequest) {
     try {
       // 最新のremote情報を取得
       await worktreeManager.fetchRemote(owner, repo);
-      const { baseBranchCommit } = await worktreeManager.createWorktree(
-        owner,
-        repo,
-        branch,
-        baseBranch
-      );
-      await taskRepo.updateTask(newTask.id, {
-        worktreeStatus: 'created',
-        baseBranchCommit,
-      });
+      await worktreeManager.createWorktree(owner, repo, branch, baseBranch);
+      await taskRepo.updateTask(newTask.id, { worktreeStatus: 'created' });
     } catch (error) {
       console.error('Failed to create worktree:', error);
       await taskRepo.updateTask(newTask.id, { worktreeStatus: 'error' });
