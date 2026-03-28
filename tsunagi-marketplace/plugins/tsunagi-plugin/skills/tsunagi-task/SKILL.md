@@ -39,28 +39,10 @@ backlog → planning → coding → reviewing → done
 
 ## 実装計画の管理
 
-実装計画はタスクの `description` にmarkdown形式で記載・管理する。
+実装計画はタスクの `description` にPRD（Product Requirements Document）形式のmarkdownで記載・管理する。
 ファイルシステム上に計画ファイルを作成しない。
 
 ### ステータス運用
 
 - `planning`: 計画の対話中〜計画完了まで。この時点で `description` は完成している
 - `coding`: ユーザーが実装を指示した時点で変更。実装中も計画変更があれば `description` を随時更新
-
-### description フォーマット
-
-```markdown
-## 概要
-
-（変更の目的・背景を簡潔に）
-
-## ユーザーの要求
-
-- 要求1
-- 要求2
-
-## 修正計画
-
-- [ ] ファイルA: 変更内容
-- [ ] ファイルB: 変更内容
-```
