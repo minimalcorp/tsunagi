@@ -9,7 +9,7 @@ interface TaskListPanelProps {
   repositories: Repository[];
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
-  onOrderChange: (taskId: string, newOrder: number) => void;
+  onReorder: (reorderedTasks: Task[]) => void;
   onAddTask?: () => void;
 }
 
@@ -18,7 +18,7 @@ export function TaskListPanel({
   repositories,
   filters,
   onFilterChange,
-  onOrderChange,
+  onReorder,
   onAddTask,
 }: TaskListPanelProps) {
   return (
@@ -36,7 +36,7 @@ export function TaskListPanel({
       {/* Scrollable task list */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {tasks.length > 0 ? (
-          <TaskList tasks={tasks} onOrderChange={onOrderChange} />
+          <TaskList tasks={tasks} onReorder={onReorder} />
         ) : (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
             No tasks found

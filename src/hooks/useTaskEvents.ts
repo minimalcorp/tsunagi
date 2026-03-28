@@ -6,12 +6,17 @@ import type { Task } from '@/lib/types';
 
 const FASTIFY_API_BASE = 'http://localhost:2792';
 
-export function useTaskEvents(onTaskCreated: (task: Task) => void) {
+interface TaskEventCallbacks {
+  onTaskCreated: (task: Task) => void;
+  onTaskDeleted: (taskId: string) => void;
+}
+
+export function useTaskEvents(callbacks: TaskEventCallbacks) {
   const socketRef = useRef<Socket | null>(null);
-  const callbackRef = useRef(onTaskCreated);
+  const callbacksRef = useRef(callbacks);
 
   useLayoutEffect(() => {
-    callbackRef.current = onTaskCreated;
+    callbacksRef.current = callbacks;
   });
 
   useEffect(() => {
@@ -19,7 +24,11 @@ export function useTaskEvents(onTaskCreated: (task: Task) => void) {
     socketRef.current = socket;
 
     socket.on('task:created', ({ task }: { task: Task }) => {
-      callbackRef.current(task);
+      callbacksRef.current.onTaskCreated(task);
+    });
+
+    socket.on('task:deleted', ({ taskId }: { taskId: string }) => {
+      callbacksRef.current.onTaskDeleted(taskId);
     });
 
     return () => {

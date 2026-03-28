@@ -158,30 +158,46 @@ export default function Home() {
     );
   });
 
-  useTaskEvents((newTask) => {
-    setTasks((prev) => {
-      // 重複チェック（UIから作成した場合は既にリストに追加済みの可能性がある）
-      if (prev.some((t) => t.id === newTask.id)) return prev;
-      return [...prev, newTask];
-    });
+  useTaskEvents({
+    onTaskCreated: (newTask) => {
+      setTasks((prev) => {
+        if (prev.some((t) => t.id === newTask.id)) return prev;
+        return [...prev, newTask];
+      });
 
-    toaster.create({
-      type: 'success',
-      title: 'Task created',
-      description: createElement(
-        'a',
-        {
-          href: `/tasks/${newTask.id}`,
-          className: 'underline hover:text-foreground',
-          onClick: (e: React.MouseEvent) => {
-            e.preventDefault();
-            router.push(`/tasks/${newTask.id}`);
+      toaster.create({
+        type: 'success',
+        title: 'Task created',
+        description: createElement(
+          'a',
+          {
+            href: `/tasks/${newTask.id}`,
+            className: 'underline hover:text-foreground',
+            onClick: (e: React.MouseEvent) => {
+              e.preventDefault();
+              router.push(`/tasks/${newTask.id}`);
+            },
           },
-        },
-        newTask.title
-      ),
-      duration: 5000,
-    });
+          newTask.title
+        ),
+        duration: 5000,
+      });
+    },
+    onTaskDeleted: (taskId) => {
+      setTasks((prev) => {
+        const task = prev.find((t) => t.id === taskId);
+        if (!task) return prev;
+
+        toaster.create({
+          type: 'info',
+          title: 'Task deleted',
+          description: task.title,
+          duration: 5000,
+        });
+
+        return prev.filter((t) => t.id !== taskId);
+      });
+    },
   });
 
   // Batch delete
@@ -228,15 +244,25 @@ export default function Home() {
   }, [isDeleting, isCompleted, deletedCount, errorCount, totalCount, reset]);
 
   // Handlers
-  const handleOrderChange = useCallback(async (taskId: string, newOrder: number) => {
-    try {
-      await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: newOrder }),
-      });
+  const handleReorder = useCallback(async (reorderedTasks: Task[]) => {
+    // Optimistic UI update
+    setTasks((prev) => {
+      const reorderedIds = new Set(reorderedTasks.map((t) => t.id));
+      const unchanged = prev.filter((t) => !reorderedIds.has(t.id));
+      return [...reorderedTasks, ...unchanged];
+    });
 
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, order: newOrder } : t)));
+    // Persist order to server
+    try {
+      await Promise.all(
+        reorderedTasks.map((task, index) =>
+          fetch(`/api/tasks/${task.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: index }),
+          })
+        )
+      );
     } catch (error) {
       console.error('Failed to update task order:', error);
     }
@@ -350,7 +376,7 @@ export default function Home() {
             repositories={repositories}
             filters={filterState}
             onFilterChange={setFilterState}
-            onOrderChange={handleOrderChange}
+            onReorder={handleReorder}
             onAddTask={() => setIsAddTaskDialogOpen(true)}
           />
         </div>
