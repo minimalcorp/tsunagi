@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, createElement } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task, Repository } from '@/lib/types';
 import { Header } from '@/components/Header';
@@ -28,12 +28,26 @@ export default function Home() {
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
 
-  // Filter state (driven by TaskListPanel's SearchAndFilterBar)
-  const [filterState, setFilterState] = useState<FilterState>({
-    statuses: [],
-    repos: [],
-    search: '',
+  // Filter state (driven by TaskListPanel's SearchAndFilterBar, persisted in sessionStorage)
+  const [filterState, setFilterState] = useState<FilterState>(() => {
+    if (typeof window === 'undefined') return { statuses: [], repos: [], search: '' };
+    try {
+      const saved = sessionStorage.getItem('tsunagi:task-filters');
+      if (saved) return JSON.parse(saved) as FilterState;
+    } catch {
+      // ignore
+    }
+    return { statuses: [], repos: [], search: '' };
   });
+
+  // Persist filter state to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('tsunagi:task-filters', JSON.stringify(filterState));
+    } catch {
+      // ignore
+    }
+  }, [filterState]);
 
   // Resizable panel
   const [leftPanelWidth, setLeftPanelWidth] = useState(380);
@@ -145,7 +159,29 @@ export default function Home() {
   });
 
   useTaskEvents((newTask) => {
-    setTasks((prev) => [...prev, newTask]);
+    setTasks((prev) => {
+      // 重複チェック（UIから作成した場合は既にリストに追加済みの可能性がある）
+      if (prev.some((t) => t.id === newTask.id)) return prev;
+      return [...prev, newTask];
+    });
+
+    toaster.create({
+      type: 'success',
+      title: 'Task created',
+      description: createElement(
+        'a',
+        {
+          href: `/tasks/${newTask.id}`,
+          className: 'underline hover:text-foreground',
+          onClick: (e: React.MouseEvent) => {
+            e.preventDefault();
+            router.push(`/tasks/${newTask.id}`);
+          },
+        },
+        newTask.title
+      ),
+      duration: 5000,
+    });
   });
 
   // Batch delete

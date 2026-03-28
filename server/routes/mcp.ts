@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { Server as SocketIOServer } from 'socket.io';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -78,8 +79,12 @@ const taskIdentifierProperties = {
   cwd: { type: 'string' as const, description: '作業ディレクトリパス' },
 };
 
+interface FastifyWithIO extends FastifyInstance {
+  io: SocketIOServer;
+}
+
 /** MCPサーバーインスタンスを作成して全toolsを登録する */
-function createMcpServer(): Server {
+function createMcpServer(io?: SocketIOServer): Server {
   const server = new Server({ name: 'tsunagi', version: '1.0.0' }, { capabilities: { tools: {} } });
 
   // tools一覧
@@ -257,16 +262,19 @@ function createMcpServer(): Server {
         };
 
         try {
-          const result = await createTask({
-            owner,
-            repo,
-            title,
-            description,
-            effort,
-            status: status as import('../../src/lib/types.js').Task['status'] | undefined,
-            branch,
-            baseBranch,
-          });
+          const result = await createTask(
+            {
+              owner,
+              repo,
+              title,
+              description,
+              effort,
+              status: status as import('../../src/lib/types.js').Task['status'] | undefined,
+              branch,
+              baseBranch,
+            },
+            { io }
+          );
           return {
             content: [{ type: 'text', text: JSON.stringify(result.task, null, 2) }],
           };
@@ -410,6 +418,8 @@ function createMcpServer(): Server {
 }
 
 export async function mcpRoutes(fastify: FastifyInstance) {
+  const io = (fastify as FastifyWithIO).io;
+
   // GET /mcp - SSE接続エンドポイント（MCP over SSE）
   fastify.get('/mcp', async (request: FastifyRequest, reply: FastifyReply) => {
     // MCP SSEはNode.js ServerResponseを直接使う
@@ -425,7 +435,7 @@ export async function mcpRoutes(fastify: FastifyInstance) {
     // Fastifyのデフォルトレスポンス処理をスキップ
     await reply.hijack();
 
-    const server = createMcpServer();
+    const server = createMcpServer(io);
     // server.connect() が内部で transport.start() を呼ぶため、明示的な start() は不要
     await server.connect(transport);
   });
