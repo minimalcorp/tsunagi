@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsx scripts/auto-migrate.ts && concurrently --kill-others --names \"next,fastify\" --prefix-colors \"blue,green\" \"next dev -p 2791\" \"tsx watch server/index.ts\"",
+    "dev": "tsx scripts/auto-migrate.ts && tsx scripts/with-plugin.ts dev",
     "server:dev": "tsx watch server/index.ts",
     "build": "prisma generate && next build",
-    "start": "tsx scripts/auto-migrate.ts && concurrently --kill-others --names \"next,fastify\" --prefix-colors \"blue,green\" \"next start -p 2791\" \"tsx server/index.ts\"",
+    "start": "tsx scripts/auto-migrate.ts && tsx scripts/with-plugin.ts start",
     "postinstall": "prisma generate && chmod +x node_modules/node-pty/prebuilds/*/spawn-helper 2>/dev/null || true",
     "lint": "eslint",
     "format": "prettier --write .",

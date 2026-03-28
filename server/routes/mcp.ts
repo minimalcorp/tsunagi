@@ -2,11 +2,76 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import * as os from 'os';
+import * as path from 'path';
 import { prisma } from '../../src/lib/db.js';
 import { todoStore } from '../todo-store.js';
 
 /** SSEセッションIDをキーにしたtransportのMap */
 const transports = new Map<string, SSEServerTransport>();
+
+const WORKSPACES_ROOT = path.join(os.homedir(), '.tsunagi', 'workspaces');
+
+/** CWDからowner/repo/branchを抽出する */
+function parseWorktreePath(cwd: string): { owner: string; repo: string; branch: string } | null {
+  // ~/.tsunagi/workspaces/{owner}/{repo}/{normalized-branch}
+  const relative = path.relative(WORKSPACES_ROOT, cwd);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+
+  const parts = relative.split(path.sep);
+  if (parts.length < 3) return null;
+
+  return { owner: parts[0], repo: parts[1], branch: parts[2] };
+}
+
+/** id / session_id / cwd からタスクを解決する共通ヘルパー */
+async function resolveTask(args: { id?: string; session_id?: string; cwd?: string }) {
+  // 1. id指定: 直接タスクを取得
+  if (args.id) {
+    return prisma.task.findUnique({
+      where: { id: args.id },
+      include: { tabs: true },
+    });
+  }
+  // 2. session_id指定: session_id = tabId → Tab.taskId → Task
+  if (args.session_id) {
+    const tab = await prisma.tab.findUnique({ where: { tabId: args.session_id } });
+    if (!tab) return null;
+    return prisma.task.findUnique({
+      where: { id: tab.taskId },
+      include: { tabs: true },
+    });
+  }
+  // 3. cwd指定: パスからowner/repo/branchを抽出してタスクを検索
+  if (args.cwd) {
+    const parsed = parseWorktreePath(args.cwd);
+    if (!parsed) return null;
+    // normalized branch名でマッチするタスクを探す
+    // branch名はDB上では "feat/xxx" 形式、worktreeパスでは "feat-xxx" 形式
+    // そのため全タスクから正規化後のbranch名で比較する
+    const tasks = await prisma.task.findMany({
+      where: { owner: parsed.owner, repo: parsed.repo, deletedAt: null },
+      include: { tabs: true },
+    });
+    return (
+      tasks.find((t) => {
+        const normalized = t.branch.replace(/\//g, '-');
+        return normalized === parsed.branch;
+      }) ?? null
+    );
+  }
+  return null;
+}
+
+/** タスク指定パラメータの共通inputSchema */
+const taskIdentifierProperties = {
+  id: { type: 'string' as const, description: 'タスクID' },
+  session_id: {
+    type: 'string' as const,
+    description: 'セッションID（環境変数 TSUNAGI_SESSION_ID の値）',
+  },
+  cwd: { type: 'string' as const, description: '作業ディレクトリパス' },
+};
 
 /** MCPサーバーインスタンスを作成して全toolsを登録する */
 function createMcpServer(): Server {
@@ -33,12 +98,12 @@ function createMcpServer(): Server {
       },
       {
         name: 'tsunagi_get_task',
-        description: 'タスク詳細を取得する（tabs含む）',
+        description:
+          'タスク詳細を取得する（tabs含む）。id, session_id, cwd のいずれかでタスクを指定する。',
         inputSchema: {
           type: 'object',
-          required: ['id'],
           properties: {
-            id: { type: 'string', description: 'タスクID' },
+            ...taskIdentifierProperties,
           },
         },
       },
@@ -64,12 +129,11 @@ function createMcpServer(): Server {
       },
       {
         name: 'tsunagi_update_task',
-        description: 'タスクを更新する（status/effort等）',
+        description: 'タスクを更新する。id, session_id, cwd のいずれかでタスクを指定する。',
         inputSchema: {
           type: 'object',
-          required: ['id'],
           properties: {
-            id: { type: 'string', description: 'タスクID' },
+            ...taskIdentifierProperties,
             title: { type: 'string', description: 'タスクタイトル' },
             description: { type: 'string', description: 'タスク詳細説明' },
             status: {
@@ -78,17 +142,19 @@ function createMcpServer(): Server {
               description: 'ステータス',
             },
             effort: { type: 'number', description: '工数（時間）' },
+            baseBranch: { type: 'string', description: 'ベースブランチ名' },
+            pullRequestUrl: { type: 'string', description: 'Pull Request URL' },
           },
         },
       },
       {
         name: 'tsunagi_delete_task',
-        description: 'タスクを削除する（soft delete）',
+        description:
+          'タスクを削除する（soft delete）。id, session_id, cwd のいずれかでタスクを指定する。',
         inputSchema: {
           type: 'object',
-          required: ['id'],
           properties: {
-            id: { type: 'string', description: 'タスクID' },
+            ...taskIdentifierProperties,
           },
         },
       },
@@ -141,14 +207,10 @@ function createMcpServer(): Server {
       }
 
       case 'tsunagi_get_task': {
-        const { id } = (args ?? {}) as { id: string };
-        const task = await prisma.task.findUnique({
-          where: { id },
-          include: { tabs: true },
-        });
+        const task = await resolveTask(args as { id?: string; session_id?: string; cwd?: string });
         if (!task) {
           return {
-            content: [{ type: 'text', text: `Task not found: ${id}` }],
+            content: [{ type: 'text', text: 'Task not found' }],
             isError: true,
           };
         }
@@ -198,29 +260,45 @@ function createMcpServer(): Server {
       }
 
       case 'tsunagi_update_task': {
-        const { id, title, description, status, effort } = (args ?? {}) as {
-          id: string;
+        const {
+          id,
+          session_id,
+          cwd,
+          title,
+          description,
+          status,
+          effort,
+          baseBranch,
+          pullRequestUrl,
+        } = (args ?? {}) as {
+          id?: string;
+          session_id?: string;
+          cwd?: string;
           title?: string;
           description?: string;
           status?: string;
           effort?: number;
+          baseBranch?: string;
+          pullRequestUrl?: string;
         };
 
-        const existing = await prisma.task.findUnique({ where: { id } });
+        const existing = await resolveTask({ id, session_id, cwd });
         if (!existing) {
           return {
-            content: [{ type: 'text', text: `Task not found: ${id}` }],
+            content: [{ type: 'text', text: 'Task not found' }],
             isError: true,
           };
         }
 
         const updated = await prisma.task.update({
-          where: { id },
+          where: { id: existing.id },
           data: {
             ...(title !== undefined ? { title } : {}),
             ...(description !== undefined ? { description } : {}),
             ...(status !== undefined ? { status } : {}),
             ...(effort !== undefined ? { effort } : {}),
+            ...(baseBranch !== undefined ? { baseBranch } : {}),
+            ...(pullRequestUrl !== undefined ? { pullRequestUrl } : {}),
           },
           include: { tabs: true },
         });
@@ -230,20 +308,19 @@ function createMcpServer(): Server {
       }
 
       case 'tsunagi_delete_task': {
-        const { id } = (args ?? {}) as { id: string };
-        const existing = await prisma.task.findUnique({ where: { id } });
-        if (!existing) {
+        const task = await resolveTask(args as { id?: string; session_id?: string; cwd?: string });
+        if (!task) {
           return {
-            content: [{ type: 'text', text: `Task not found: ${id}` }],
+            content: [{ type: 'text', text: 'Task not found' }],
             isError: true,
           };
         }
         await prisma.task.update({
-          where: { id },
+          where: { id: task.id },
           data: { deletedAt: new Date() },
         });
         return {
-          content: [{ type: 'text', text: `Task deleted: ${id}` }],
+          content: [{ type: 'text', text: `Task deleted: ${task.id}` }],
         };
       }
 
