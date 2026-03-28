@@ -1,8 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import * as taskRepo from '../../src/lib/repositories/task.js';
-import * as repoRepo from '../../src/lib/repositories/repository.js';
-import * as worktreeManager from '../../src/lib/worktree-manager.js';
+import { createTask, TaskServiceError } from '../../src/lib/services/task-service.js';
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
@@ -74,71 +73,23 @@ export async function tasksRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // ブランチ名重複チェック
-    const existingTasks = await taskRepo.getTasks({ includeDeleted: false });
-    const duplicateTask = existingTasks.find(
-      (task) => task.owner === owner && task.repo === repo && task.branch === branch
-    );
-
-    if (duplicateTask) {
-      return reply.status(409).send({
-        errors: [
-          {
-            field: 'branch',
-            message: `Branch "${branch}" already exists. Task "${duplicateTask.title}" (ID: ${duplicateTask.id}) is already using this branch.`,
-          },
-        ],
-      });
-    }
-
-    // リポジトリIDを取得
-    const repository = await repoRepo.getRepo(owner, repo);
-    if (!repository) {
-      return reply.status(404).send({
-        errors: [
-          { field: 'global', message: 'Repository not found. Please clone the repository first.' },
-        ],
-      });
-    }
-
-    // タスクを作成
-    const newTask = await taskRepo.createTask({
-      title,
-      description: description ?? '',
-      status: 'backlog',
-      owner,
-      repo,
-      branch,
-      baseBranch: baseBranch ?? 'main',
-      repoId: repository.id,
-      worktreeStatus: 'pending',
-      effort,
-      order,
-    });
-
-    // worktreeを自動作成
     try {
-      await worktreeManager.fetchRemote(owner, repo);
-      await worktreeManager.createWorktree(owner, repo, branch, baseBranch ?? 'main');
-      await taskRepo.updateTask(newTask.id, { worktreeStatus: 'created' });
+      const result = await createTask(
+        { title, description, owner, repo, branch, baseBranch, effort, order },
+        { io }
+      );
+
+      return reply.status(201).send({ data: { task: result.task } });
     } catch (error) {
-      fastify.log.error(error, 'Failed to create worktree');
-      await taskRepo.updateTask(newTask.id, { worktreeStatus: 'error' });
+      if (error instanceof TaskServiceError) {
+        const statusCode =
+          error.code === 'REPO_NOT_FOUND' ? 404 : error.code === 'BRANCH_DUPLICATE' ? 409 : 500;
+        return reply.status(statusCode).send({
+          errors: [{ field: 'global', message: error.message }],
+        });
+      }
+      fastify.log.error(error, 'Failed to create task');
+      return reply.status(500).send({ error: 'Failed to create task' });
     }
-
-    // 最初のタブを自動作成
-    try {
-      await taskRepo.createTab(newTask.id);
-    } catch (error) {
-      fastify.log.error(error, 'Failed to create initial tab');
-    }
-
-    // 更新後のタスクを取得
-    const updatedTask = await taskRepo.getTask(newTask.id);
-
-    // task:created イベントを全クライアントにbroadcast
-    io.emit('task:created', { task: updatedTask });
-
-    return reply.status(201).send({ data: { task: updatedTask } });
   });
 }
