@@ -1,8 +1,18 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
-import { Copy, Check, GitBranch, Clock } from 'lucide-react';
+import {
+  Copy,
+  Check,
+  GitBranch,
+  Clock,
+  Loader2,
+  MessageSquare,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react';
 import type { Task } from '@/lib/types';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
@@ -20,7 +30,47 @@ const STATUS_STYLES: Record<Task['status'], string> = {
   done: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
 };
 
+function ClaudeStatusIndicator({ tabs }: { tabs: Task['tabs'] }) {
+  if (!tabs || tabs.length === 0) return null;
+
+  const running = tabs.some((t) => t.status === 'running');
+  const waiting = tabs.some((t) => t.status === 'waiting');
+  const hasError = tabs.some((t) => t.status === 'error');
+  const allSuccess = tabs.length > 0 && tabs.every((t) => t.status === 'success');
+
+  if (running) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-primary">
+        <Loader2 className="size-3 animate-spin" />
+      </span>
+    );
+  }
+  if (waiting) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-warning">
+        <MessageSquare className="size-3" />
+      </span>
+    );
+  }
+  if (hasError) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-destructive">
+        <XCircle className="size-3" />
+      </span>
+    );
+  }
+  if (allSuccess) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-success">
+        <CheckCircle2 className="size-3" />
+      </span>
+    );
+  }
+  return null;
+}
+
 export function TaskCard({ task, dragHandleProps }: TaskCardProps) {
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const repoColor = getRepoColor(task.owner, task.repo);
   const shortId = task.id.slice(0, 5) + '\u2026';
@@ -39,12 +89,14 @@ export function TaskCard({ task, dragHandleProps }: TaskCardProps) {
   return (
     <div
       {...dragHandleProps}
-      className="rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md cursor-grab active:cursor-grabbing"
+      onClick={() => router.push(`/tasks/${task.id}`)}
+      className="rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md cursor-pointer"
     >
       <div className="space-y-2">
         {/* ID + Status */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1">
+            <ClaudeStatusIndicator tabs={task.tabs} />
             <span className="font-mono text-xs text-muted-foreground">{shortId}</span>
             <button
               onClick={handleCopyId}

@@ -12,8 +12,6 @@ import {
 import { Button } from '@/components/ui/button';
 import type { TabStatusEntry } from '@/components/TerminalPanel';
 
-const TSUNAGI_CWD = `${process.env.HOME ?? '~'}/.tsunagi`;
-
 /** Tab creation mode */
 type TabCreateMode = 'terminal' | 'claude';
 
@@ -24,29 +22,37 @@ export function PlannerPanel() {
   const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(new Map());
   const [tabModeMap, setTabModeMap] = useState<Map<string, TabCreateMode>>(new Map());
   const [isLoaded, setIsLoaded] = useState(false);
+  const [plannerCwd, setPlannerCwd] = useState<string | undefined>();
   const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
 
-  // Load tabs from API on mount
+  // Load config and tabs from API on mount
   useEffect(() => {
-    const loadTabs = async () => {
+    const load = async () => {
       try {
-        const res = await fetch('/api/planner/tabs');
-        const data = await res.json();
-        if (data.data?.tabs) {
-          setTabs(data.data.tabs);
-          if (data.data.tabs.length > 0) {
-            const firstTabId = data.data.tabs[0].tab_id;
+        const [configRes, tabsRes] = await Promise.all([
+          fetch('/api/planner/config').then((r) => r.json()),
+          fetch('/api/planner/tabs').then((r) => r.json()),
+        ]);
+
+        if (configRes.data?.cwd) {
+          setPlannerCwd(configRes.data.cwd);
+        }
+
+        if (tabsRes.data?.tabs) {
+          setTabs(tabsRes.data.tabs);
+          if (tabsRes.data.tabs.length > 0) {
+            const firstTabId = tabsRes.data.tabs[0].tab_id;
             setActiveTabId(firstTabId);
             setMountedTabIds(new Set([firstTabId]));
           }
         }
       } catch (error) {
-        console.error('Failed to load planner tabs:', error);
+        console.error('Failed to load planner config/tabs:', error);
       } finally {
         setIsLoaded(true);
       }
     };
-    loadTabs();
+    load();
   }, []);
 
   // Focus active terminal on tab switch
@@ -214,7 +220,7 @@ export function PlannerPanel() {
                 }}
                 tabId={tab.tab_id}
                 isActive={isActive}
-                cwd={TSUNAGI_CWD}
+                cwd={plannerCwd}
                 command={
                   tabModeMap.get(tab.tab_id) !== 'terminal'
                     ? `claude --dangerously-skip-permissions --resume ${tab.tab_id} 2>/dev/null || claude --dangerously-skip-permissions --session-id ${tab.tab_id}`
