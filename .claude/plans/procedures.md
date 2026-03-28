@@ -303,51 +303,75 @@ PlannerPanel
 
 ---
 
-## 7. タスク作成フローの統合
+## 7. MCP/API のサービスレイヤー統合
 
 ### 現状の問題（調査結果）
 
-タスク作成ロジックが3箇所に重複:
+MCPハンドラがPrismaを直接呼び出しており、API（リポジトリ層）と重複・不整合が発生している。
 
-1. **Fastify `POST /tasks`** (`server/routes/tasks.ts`) — フル機能
-2. **Next.js `POST /api/tasks`** (`src/app/api/tasks/route.ts`) — ほぼ同じ
-3. **MCP `tsunagi_create_task`** (`server/routes/mcp.ts`) — DB insertのみ（worktree作成なし、branch空文字、tab作成なし、通知なし）
+| MCP ツール                        | MCP実装                       | API実装                     | 共有コード | 問題                         |
+| --------------------------------- | ----------------------------- | --------------------------- | ---------- | ---------------------------- |
+| `tsunagi_create_task`             | サービス経由                  | サービス経由                | **あり**   | ✓ 統合済み                   |
+| `tsunagi_list_tasks`              | Prisma直接                    | リポジトリ層                | なし       | 重複                         |
+| `tsunagi_get_task`                | Prisma直接 + resolveTask      | リポジトリ層                | なし       | 重複                         |
+| `tsunagi_update_task`             | Prisma直接 + resolveTask      | リポジトリ層                | なし       | 重複                         |
+| `tsunagi_delete_task`             | Prisma直接（soft deleteのみ） | リポジトリ層 + worktree削除 | なし       | **不完全**（worktree未削除） |
+| `tsunagi_list_repos`              | Prisma直接                    | リポジトリ層                | なし       | 重複                         |
+| `tsunagi_get_tab_todos`           | todoStore直接                 | API相当なし                 | —          | MCP固有（問題なし）          |
+| `tsunagi_ensure_default_worktree` | サービス経由                  | API相当なし                 | **あり**   | ✓ 統合済み                   |
 
-### 方針: 共通サービス関数に統合
+### 方針: サービスレイヤーに統合
+
+`src/lib/services/task-service.ts` を拡充し、全操作をサービス関数として提供。MCP・Fastify・Next.js APIすべてがサービス関数を呼び出す形に統一する。
+
+```
+呼び出し元               サービス層                    データ層
+─────────────────      ────────────────────────      ──────────────
+MCP handler      ─┐
+Fastify route    ─┼──→  task-service.ts           ──→  repositories/task.ts
+Next.js API      ─┘     (ビジネスロジック)              (DB操作)
+                         + worktree-manager.ts
+                         + Socket.IO通知
+```
+
+### 追加するサービス関数
+
+| サービス関数                         | 対応MCP                           | 内容                                                                         |
+| ------------------------------------ | --------------------------------- | ---------------------------------------------------------------------------- |
+| `listTasks(filter)`                  | `tsunagi_list_tasks`              | リポジトリ層の `taskRepo.getTasks()` を呼ぶ                                  |
+| `getTask(identifier)`                | `tsunagi_get_task`                | id / session_id / cwd でタスク解決（`resolveTask` ロジックをサービスに移動） |
+| `updateTask(identifier, updates)`    | `tsunagi_update_task`             | タスク解決 + リポジトリ層の `taskRepo.updateTask()`                          |
+| `deleteTask(identifier)`             | `tsunagi_delete_task`             | タスク解決 + soft delete + worktree削除 + Socket.IO通知                      |
+| `listRepos()`                        | `tsunagi_list_repos`              | リポジトリ層の `repoRepo.getRepos()` を呼ぶ                                  |
+| `createTask(params)`                 | `tsunagi_create_task`             | **既存**（統合済み）                                                         |
+| `ensureDefaultWorktree(owner, repo)` | `tsunagi_ensure_default_worktree` | **既存**（統合済み）                                                         |
+
+### resolveTask の統合
+
+MCPの `resolveTask(args)` ヘルパー（id / session_id / cwd でタスクを解決）をサービス層に移動。
 
 ```typescript
-// src/lib/services/task-service.ts (新規)
-async function createTask(params: CreateTaskParams): Promise<Task> {
-  // 1. バリデーション（branch重複チェック）
-  // 2. DB タスク登録（status: backlog, worktreeStatus: pending）
-  // 3. git fetch --prune（remote追従）
-  // 4. remoteのbase branchからworktree作成
-  // 5. DB更新（worktreeStatus: created）
-  // 6. 初期Tab作成
-  // 7. Socket.IO通知（task:created）
-  // 8. return task
+// task-service.ts に追加
+type TaskIdentifier = { id?: string; session_id?: string; cwd?: string };
+
+async function resolveTask(identifier: TaskIdentifier): Promise<Task | null> {
+  // 1. id → taskRepo.getTask(id)
+  // 2. session_id → Tab検索 → taskRepo.getTask(taskId)
+  // 3. cwd → パスパース → owner/repo/branch でタスク検索
 }
 ```
 
-### タスク作成の全ステップ
+### MCP側の変更
 
-| #   | ステップ                            | 備考                                                      |
-| --- | ----------------------------------- | --------------------------------------------------------- |
-| 1   | バリデーション                      | branch重複チェック、必須フィールド確認                    |
-| 2   | DBにタスク登録                      | `worktreeStatus: 'pending'`                               |
-| 3   | `git fetch --prune`                 | bare repoでremote追従                                     |
-| 4   | remoteのbase branchからworktree作成 | `git worktree add -b {branch} {path} origin/{baseBranch}` |
-| 5   | DB更新                              | `worktreeStatus: 'created'`                               |
-| 6   | 初期Tab作成                         | Claudeセッション用                                        |
-| 7   | Socket.IO通知                       | `task:created` イベント broadcast                         |
+MCPハンドラからPrisma直接呼び出しを削除し、サービス関数を呼ぶだけのthin wrapperにする。
 
-※ `baseBranchCommit` 保存（旧ステップ5）とClaude MCP登録（旧ステップ6）は廃止
-
-### 呼び出し元の統一
-
-- **UI（ダイアログ）**: `createTask()` を呼ぶ
-- **MCP（`tsunagi_create_task`）**: 同じ `createTask()` を呼ぶ
-- **プランナーClaude**: MCP経由で `tsunagi_create_task` → `createTask()`
+```typescript
+// 修正後のMCPハンドラ（例）
+case 'tsunagi_list_tasks': {
+  const tasks = await listTasks({ owner, repo, status });
+  return { content: [{ type: 'text', text: JSON.stringify(tasks, null, 2) }] };
+}
+```
 
 ### Claudeによるタスク作成フロー
 
@@ -415,47 +439,18 @@ UI更新（リポジトリ一覧・タスクリストから除去）
 
 ## 9. 実装ステップ
 
-### Phase 0: クリーンアップ（不要リソース削除）
+### Phase 0〜5: 完了済み
 
-1. `baseBranchCommit` 関連リソースをすべて削除（セクション2参照）
-2. Prismaマイグレーション実行
-3. worktree作成時の `claude mcp add --scope local` 削除（セクション3参照）
+Phase 0〜5は実装済み。詳細は変更履歴を参照。
 
-### Phase 1: タスク作成フロー統合（基盤整備）
+### Phase 6: サービスレイヤー統合（次に実施）
 
-4. `src/lib/services/task-service.ts` に共通 `createTask()` を作成
-5. Fastify `POST /tasks` をリファクタ（共通関数呼び出し）
-6. Next.js `POST /api/tasks` をリファクタ（共通関数呼び出し）
-7. MCP `tsunagi_create_task` をリファクタ（共通関数呼び出し、branch自動生成追加）
-8. `tsunagi_ensure_default_worktree` MCPツール追加
-
-### Phase 2: UI構成変更
-
-9. TaskCard コンポーネント作成（id, title, description, status, repo色分け, branch, effort）
-10. TaskList コンポーネント作成（D&D優先度変更）
-11. TaskListPanel コンポーネント作成（FilterBar + TaskList）
-12. PlannerPanel コンポーネント作成（SessionTabs + TerminalView流用）
-13. ダッシュボードを2カラムレイアウトに変更（リサイズ可能）
-14. SP/Tablet縦対応: Bottom Tab切り替え（<1024px）
-15. KanbanBoard, KanbanColumn 廃止
-
-### Phase 3: プランナーClaude統合
-
-16. プランナー用Tabモデル設計（or 既存Tab拡張）
-17. プランナーPTYセッション管理（cwd: `~/.tsunagi`）
-18. プランナー用system prompt作成
-19. タブの追加・削除・切り替えUI
-
-### Phase 4: フィルタ・ソート
-
-20. FilterBar（status, repo, 検索テキスト）
-21. ソートオプション（優先度, 作成日, effort）
-22. リポジトリ色分けロジック
-
-### Phase 5: リポジトリ管理
-
-23. `DELETE /api/repos/[owner]/[repo]` にファイルシステム削除を追加
-24. 設定画面にリポジトリ管理セクション追加（一覧 + 削除ボタン + 確認ダイアログ）
+1. `task-service.ts` に `resolveTask()` を移動（mcp.tsの `resolveTask` + `parseWorktreePath` をサービスへ）
+2. `task-service.ts` に `listTasks()`, `getTask()`, `updateTask()`, `deleteTask()`, `listRepos()` を追加
+3. `deleteTask()` にworktree削除ロジックを統合（MCP経由でもworktreeが削除されるように）
+4. MCPハンドラをthin wrapperにリファクタ（Prisma直接呼び出しを全削除）
+5. Fastify/Next.js APIルートも同じサービス関数を使うように統一
+6. mcp.tsからPrisma importを削除
 
 ---
 
@@ -466,3 +461,4 @@ UI更新（リポジトリ一覧・タスクリストから除去）
 - 2026-03-29: v3 更新。`baseBranchCommit` 廃止計画追加（merge-base方式に統一）、worktree作成時のMCP登録廃止、プランナーClaudeはリポジトリ横断に決定、タスク作成ステップから不要ステップを削除
 - 2026-03-29: v4 更新。リポジトリ削除機能追加（設定画面UI + ファイルシステム削除 + DB cascade削除）
 - 2026-03-29: v5 更新。SP/Tablet縦対応をPhase 2に追加（Bottom Tab切り替え）、ブレークポイントを1024px一本に簡略化
+- 2026-03-29: v6 更新。MCP/APIサービスレイヤー統合計画追加。MCPのPrisma直接呼び出しを排除し、全操作をサービス関数経由に統一

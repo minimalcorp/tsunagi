@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/repositories/task';
 import type { Task } from '@/lib/types';
-import { createTask, TaskServiceError } from '@/lib/services/task-service';
+import { listTasks, createTask, TaskServiceError } from '@/lib/services/task-service';
 
 // GET /api/tasks?status=...&owner=...&repo=...&includeDeleted=false
 export async function GET(request: NextRequest) {
@@ -12,7 +11,7 @@ export async function GET(request: NextRequest) {
     const repo = searchParams.get('repo');
     const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
-    const tasks = await taskRepo.getTasks({
+    const tasks = await listTasks({
       status: status || undefined,
       owner: owner || undefined,
       repo: repo || undefined,

@@ -1,9 +1,27 @@
 import simpleGit from 'simple-git';
 import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 import * as taskRepo from '../repositories/task';
 import * as repoRepo from '../repositories/repository';
 import * as worktreeManager from '../worktree-manager';
-import type { Task } from '../types';
+import { normalizeBranchName } from '../branch-utils';
+import type { Task, Repository } from '../types';
+import { prisma } from '../db';
+
+// ============================================
+// Types
+// ============================================
+
+export interface IOEmitter {
+  emit: (event: string, data: unknown) => void;
+}
+
+export interface ServiceOptions {
+  io?: IOEmitter;
+}
+
+export type TaskIdentifier = { id?: string; session_id?: string; cwd?: string };
 
 export interface CreateTaskParams {
   title: string;
@@ -17,18 +35,113 @@ export interface CreateTaskParams {
   status?: Task['status'];
 }
 
-export interface CreateTaskResult {
-  task: Task;
+export class TaskServiceError extends Error {
+  constructor(
+    message: string,
+    public code: 'REPO_NOT_FOUND' | 'BRANCH_DUPLICATE' | 'TASK_NOT_FOUND' | 'INTERNAL_ERROR'
+  ) {
+    super(message);
+    this.name = 'TaskServiceError';
+  }
+}
+
+// ============================================
+// Task Resolution
+// ============================================
+
+const WORKSPACES_ROOT = path.join(os.homedir(), '.tsunagi', 'workspaces');
+
+/** CWDからowner/repo/branchを抽出する */
+function parseWorktreePath(cwd: string): { owner: string; repo: string; branch: string } | null {
+  const relative = path.relative(WORKSPACES_ROOT, cwd);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+
+  const parts = relative.split(path.sep);
+  if (parts.length < 3) return null;
+
+  return { owner: parts[0], repo: parts[1], branch: parts[2] };
 }
 
 /**
- * タスク作成の共通サービス関数
- * UI/MCP/プランナーClaude すべてこの関数を経由してタスクを作成する
+ * id / session_id / cwd からタスクを解決する
+ */
+export async function resolveTask(identifier: TaskIdentifier): Promise<Task | null> {
+  // 1. id指定
+  if (identifier.id) {
+    return taskRepo.getTask(identifier.id);
+  }
+
+  // 2. session_id指定: tabId → taskId → Task
+  if (identifier.session_id) {
+    const tab = await prisma.tab.findUnique({ where: { tabId: identifier.session_id } });
+    if (!tab) return null;
+    return taskRepo.getTask(tab.taskId);
+  }
+
+  // 3. cwd指定: パスからowner/repo/branchを抽出してタスクを検索
+  if (identifier.cwd) {
+    const parsed = parseWorktreePath(identifier.cwd);
+    if (!parsed) return null;
+
+    const tasks = await taskRepo.getTasks({
+      owner: parsed.owner,
+      repo: parsed.repo,
+      includeDeleted: false,
+    });
+
+    return (
+      tasks.find((t) => {
+        const normalized = normalizeBranchName(t.branch);
+        return normalized === parsed.branch;
+      }) ?? null
+    );
+  }
+
+  return null;
+}
+
+// ============================================
+// Task CRUD
+// ============================================
+
+/**
+ * タスク一覧を取得
+ */
+export async function listTasks(filter?: {
+  owner?: string;
+  repo?: string;
+  status?: Task['status'];
+  includeDeleted?: boolean;
+}): Promise<Task[]> {
+  return taskRepo.getTasks({
+    owner: filter?.owner,
+    repo: filter?.repo,
+    status: filter?.status,
+    includeDeleted: filter?.includeDeleted ?? false,
+  });
+}
+
+/**
+ * タスクを取得（identifier で解決）
+ */
+export async function getTask(identifier: TaskIdentifier): Promise<Task> {
+  const task = await resolveTask(identifier);
+  if (!task) {
+    throw new TaskServiceError('Task not found', 'TASK_NOT_FOUND');
+  }
+
+  // worktreePathを付与
+  const worktreePath = worktreeManager.getWorktreePath(task.owner, task.repo, task.branch);
+  return { ...task, worktreePath };
+}
+
+/**
+ * タスクを作成
  */
 export async function createTask(
   params: CreateTaskParams,
-  options?: { io?: { emit: (event: string, data: unknown) => void } }
-): Promise<CreateTaskResult> {
+  options?: ServiceOptions
+): Promise<{ task: Task }> {
   const {
     title,
     description = '',
@@ -82,7 +195,7 @@ export async function createTask(
     order,
   });
 
-  // 2. worktree作成（非同期、失敗してもタスク作成は成功扱い）
+  // 2. worktree作成
   try {
     await worktreeManager.fetchRemote(owner, repo);
     await worktreeManager.createWorktree(owner, repo, branch, baseBranch);
@@ -106,38 +219,81 @@ export async function createTask(
   }
 
   // 5. Socket.IO通知
-  if (options?.io) {
-    options.io.emit('task:created', { task: updatedTask });
-  }
+  options?.io?.emit('task:created', { task: updatedTask });
 
   return { task: updatedTask };
 }
 
 /**
- * タイトルからbranch名を自動生成
+ * タスクを更新（identifier で解決）
  */
-function generateBranchName(title: string): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 50);
-
-  const suffix = Date.now().toString(36).slice(-4);
-  return `feat/${slug}-${suffix}`;
-}
-
-export class TaskServiceError extends Error {
-  constructor(
-    message: string,
-    public code: 'REPO_NOT_FOUND' | 'BRANCH_DUPLICATE' | 'INTERNAL_ERROR'
-  ) {
-    super(message);
-    this.name = 'TaskServiceError';
+export async function updateTask(
+  identifier: TaskIdentifier,
+  updates: Partial<
+    Pick<
+      Task,
+      'title' | 'description' | 'status' | 'effort' | 'order' | 'baseBranch' | 'pullRequestUrl'
+    >
+  >
+): Promise<Task> {
+  const task = await resolveTask(identifier);
+  if (!task) {
+    throw new TaskServiceError('Task not found', 'TASK_NOT_FOUND');
   }
+
+  const updatedTask = await taskRepo.updateTask(task.id, updates);
+  if (!updatedTask) {
+    throw new TaskServiceError('Failed to update task', 'INTERNAL_ERROR');
+  }
+
+  return updatedTask;
 }
+
+/**
+ * タスクを削除（soft delete + worktree削除）
+ */
+export async function deleteTask(
+  identifier: TaskIdentifier,
+  options?: ServiceOptions
+): Promise<void> {
+  const task = await resolveTask(identifier);
+  if (!task) {
+    throw new TaskServiceError('Task not found', 'TASK_NOT_FOUND');
+  }
+
+  // 1. soft delete
+  const success = await taskRepo.deleteTask(task.id);
+  if (!success) {
+    throw new TaskServiceError('Failed to delete task', 'INTERNAL_ERROR');
+  }
+
+  // 2. worktree削除（失敗してもタスク削除は成功扱い）
+  if (task.branch) {
+    try {
+      await worktreeManager.removeWorktree(task.owner, task.repo, task.branch, true);
+    } catch (error) {
+      console.error('Failed to remove worktree:', error);
+    }
+  }
+
+  // 3. Socket.IO通知
+  options?.io?.emit('task:deleted', { taskId: task.id });
+}
+
+// ============================================
+// Repository
+// ============================================
+
+/**
+ * リポジトリ一覧を取得
+ */
+export async function listRepos(): Promise<Repository[]> {
+  return repoRepo.getRepos();
+}
+
+// ============================================
+// Default Worktree
+// ============================================
 
 /**
  * default branch worktreeを確保する（なければ作成、あれば最新化）
@@ -150,7 +306,6 @@ export async function ensureDefaultWorktree(
   const worktreePath = worktreeManager.getWorktreePath(owner, repo, '.default');
   const bareRepoPath = await worktreeManager.ensureBareRepository(owner, repo);
 
-  // fetchして最新化
   await worktreeManager.fetchRemote(owner, repo);
 
   let exists = false;
@@ -162,14 +317,29 @@ export async function ensureDefaultWorktree(
   }
 
   if (exists) {
-    // 既に存在する場合は最新化
     const git = simpleGit(worktreePath);
     await git.raw(['reset', '--hard', `origin/${defaultBranch}`]);
   } else {
-    // 新規作成（detached HEADで作成し、branch名の衝突を避ける）
     const bareGit = simpleGit(bareRepoPath);
     await bareGit.raw(['worktree', 'add', '--detach', worktreePath, `origin/${defaultBranch}`]);
   }
 
   return { worktreePath, defaultBranch };
+}
+
+// ============================================
+// Internal Helpers
+// ============================================
+
+function generateBranchName(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 50);
+
+  const suffix = Date.now().toString(36).slice(-4);
+  return `feat/${slug}-${suffix}`;
 }
