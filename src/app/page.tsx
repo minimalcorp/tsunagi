@@ -167,7 +167,18 @@ export default function Home() {
       });
     },
     onTaskDeleted: (taskId) => {
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      setTasks((prev) => {
+        const task = prev.find((t) => t.id === taskId);
+        if (task) {
+          toaster.create({
+            type: 'info',
+            title: 'Task deleted',
+            description: task.title,
+            duration: 5000,
+          });
+        }
+        return prev.filter((t) => t.id !== taskId);
+      });
     },
   });
 
