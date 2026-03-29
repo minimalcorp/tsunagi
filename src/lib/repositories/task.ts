@@ -102,6 +102,18 @@ export async function updateTask(
   return mapTask(updatedTask);
 }
 
+// 指定order以上のタスクを+1ずらす（玉突き）
+export async function bumpOrder(targetOrder: number, excludeTaskId?: string): Promise<void> {
+  await prisma.task.updateMany({
+    where: {
+      order: { gte: targetOrder },
+      deletedAt: null,
+      ...(excludeTaskId ? { id: { not: excludeTaskId } } : {}),
+    },
+    data: { order: { increment: 1 } },
+  });
+}
+
 // タスク論理削除
 export async function deleteTask(id: string): Promise<boolean> {
   try {
