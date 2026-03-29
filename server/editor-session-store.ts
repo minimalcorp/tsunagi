@@ -7,11 +7,11 @@ interface EditorSession {
 
 export const editorSessionStore = new Map<string, EditorSession>();
 
-// 10分以上経過したセッションを定期クリーンアップ
+// 完了済みセッションを10分後にクリーンアップ（編集中のセッションは保持）
 setInterval(() => {
   const threshold = Date.now() - 10 * 60 * 1000;
   for (const [id, session] of editorSessionStore) {
-    if (session.createdAt < threshold) {
+    if (session.status === 'done' && session.createdAt < threshold) {
       editorSessionStore.delete(id);
     }
   }

@@ -32,17 +32,12 @@ fi
 
 echo "Opening Monaco Editor in browser... (session: $SESSION_ID)" >&2
 
-# 完了までポーリング（最大10分、1秒間隔）
+# 完了までポーリング（無制限、1秒間隔。Ctrl+C で中断可能）
 # レスポンスはプレーンテキスト "done" or "pending"（JSON パース不要）
-i=0
-while [ $i -lt 600 ]; do
+while true; do
   STATUS=$(curl -sf "$API_BASE/api/editor/session/$SESSION_ID" 2>/dev/null || echo "pending")
   if [ "$STATUS" = "done" ]; then
     exit 0
   fi
   sleep 1
-  i=$((i + 1))
 done
-
-echo "Error: Timed out waiting for editor (10 min)" >&2
-exit 1
