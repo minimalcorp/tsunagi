@@ -14,17 +14,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'status is required' }, { status: 400 });
   }
 
-  try {
-    const tab = await prisma.tab.update({
-      where: { tabId: tab_id },
-      data: {
-        status,
-        ...(todos !== undefined && { todos: JSON.stringify(todos) }),
-      },
-    });
-    return NextResponse.json({ data: { tab } });
-  } catch (error) {
-    console.error('Failed to update tab status:', error);
-    return NextResponse.json({ error: 'Tab not found or update failed' }, { status: 404 });
+  const result = await prisma.tab.updateMany({
+    where: { tabId: tab_id },
+    data: {
+      status,
+      ...(todos !== undefined && { todos: JSON.stringify(todos) }),
+    },
+  });
+
+  if (result.count === 0) {
+    return NextResponse.json({ error: 'Tab not found' }, { status: 404 });
   }
+
+  return NextResponse.json({ data: { tabId: tab_id, status } });
 }
