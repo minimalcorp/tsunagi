@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, createElement } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Task, Repository } from '@/lib/types';
 import { Header } from '@/components/Header';
@@ -158,45 +158,16 @@ export default function Home() {
     );
   });
 
+  // Socket.IOイベントでUI更新のみ行う（通知は操作元のUI側で表示するため、ここでは出さない）
   useTaskEvents({
     onTaskCreated: (newTask) => {
       setTasks((prev) => {
         if (prev.some((t) => t.id === newTask.id)) return prev;
         return [...prev, newTask];
       });
-
-      toaster.create({
-        type: 'success',
-        title: 'Task created',
-        description: createElement(
-          'a',
-          {
-            href: `/tasks/${newTask.id}`,
-            className: 'underline hover:text-foreground',
-            onClick: (e: React.MouseEvent) => {
-              e.preventDefault();
-              router.push(`/tasks/${newTask.id}`);
-            },
-          },
-          newTask.title
-        ),
-        duration: 5000,
-      });
     },
     onTaskDeleted: (taskId) => {
-      setTasks((prev) => {
-        const task = prev.find((t) => t.id === taskId);
-        if (!task) return prev;
-
-        toaster.create({
-          type: 'info',
-          title: 'Task deleted',
-          description: task.title,
-          duration: 5000,
-        });
-
-        return prev.filter((t) => t.id !== taskId);
-      });
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
     },
   });
 
