@@ -165,8 +165,9 @@ export default function Home() {
         // 既にリストにある場合はUI操作で追加済み（TaskDialogが通知済み）
         if (prev.some((t) => t.id === newTask.id)) return prev;
 
-        // MCP/Claude経由の新規追加 → 通知を表示
+        // 通知を表示（idでdedup: 同一タスクのイベントが複数回来ても1つだけ表示）
         toaster.create({
+          id: `task-created-${newTask.id}`,
           type: 'success',
           title: 'Task created',
           description: newTask.title,
@@ -181,6 +182,7 @@ export default function Home() {
         const task = prev.find((t) => t.id === taskId);
         if (task) {
           toaster.create({
+            id: `task-deleted-${taskId}`,
             type: 'info',
             title: 'Task deleted',
             description: task.title,
