@@ -74,6 +74,7 @@ export function TaskCard({ task, dragHandleProps }: TaskCardProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const repoColor = getRepoColor(task.owner, task.repo);
+  const isClaudeRunning = (task.tabs ?? []).some((t) => t.status === 'running');
 
   // タブのtodosからプログレスを計算（DB永続化済み）
   const allTodos = (task.tabs ?? []).flatMap((tab) => tab.todos ?? []);
@@ -96,7 +97,10 @@ export function TaskCard({ task, dragHandleProps }: TaskCardProps) {
     <div
       {...dragHandleProps}
       onClick={() => router.push(`/tasks/${task.id}`)}
-      className="rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md cursor-pointer"
+      className={cn(
+        'rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md cursor-pointer',
+        isClaudeRunning && 'opacity-50'
+      )}
     >
       <div className="space-y-2">
         {/* ID + Status */}
