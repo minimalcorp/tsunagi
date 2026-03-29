@@ -85,10 +85,11 @@ export function useTabStatusEvents(
   }, [tabIds, ensureConnected]);
 
   useEffect(() => {
+    const joinedRooms = joinedRoomsRef.current;
     return () => {
       socketRef.current?.disconnect();
       socketRef.current = null;
-      joinedRoomsRef.current.clear();
+      joinedRooms.clear();
     };
   }, []);
 }

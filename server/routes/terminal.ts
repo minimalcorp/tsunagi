@@ -137,7 +137,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
 
   // POST /api/terminal/sessions - セッション作成（または既存セッション再利用）
   fastify.post<{ Body: CreateSessionBody }>('/api/terminal/sessions', async (request, reply) => {
-    const { cwd, env, sessionId: requestedSessionId, worktreePath, command } = request.body ?? {};
+    const { cwd, env, sessionId: requestedSessionId, command } = request.body ?? {};
 
     const sessionId = requestedSessionId ?? crypto.randomUUID();
     const defaultDir = path.join(os.homedir(), '.tsunagi', 'workspaces');

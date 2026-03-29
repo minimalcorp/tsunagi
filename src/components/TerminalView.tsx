@@ -83,7 +83,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const sessionIdRef = useRef<string | null>(tabId);
-  const unmountedRef = useRef(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
   // EditorSessionProvider 経由（Ctrl+G）でエディタが開いているかを追跡するref。
   // xterm の customKeyEventHandler（_keyUp内のfocus再取得）から参照する。
