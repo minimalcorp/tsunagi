@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as taskRepo from '@/lib/repositories/task';
-import * as worktreeManager from '@/lib/worktree-manager';
+import { getTask, updateTask, deleteTask, TaskServiceError } from '@/lib/services/task-service';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -10,16 +9,12 @@ type Params = {
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const task = await taskRepo.getTask(id);
-
-    if (!task) {
+    const task = await getTask({ id });
+    return NextResponse.json({ data: { task } });
+  } catch (error) {
+    if (error instanceof TaskServiceError && error.code === 'TASK_NOT_FOUND') {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
-
-    const worktreePath = worktreeManager.getWorktreePath(task.owner, task.repo, task.branch);
-
-    return NextResponse.json({ data: { task: { ...task, worktreePath } } });
-  } catch (error) {
     console.error('GET /api/tasks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
   }
@@ -30,15 +25,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
     const body = await request.json();
-
-    const updatedTask = await taskRepo.updateTask(id, body);
-
-    if (!updatedTask) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-    }
-
+    const updatedTask = await updateTask({ id }, body);
     return NextResponse.json({ data: { task: updatedTask } });
   } catch (error) {
+    if (error instanceof TaskServiceError && error.code === 'TASK_NOT_FOUND') {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
     console.error('PUT /api/tasks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
   }
@@ -48,30 +40,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-
-    // タスク情報を取得
-    const task = await taskRepo.getTask(id);
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-    }
-
-    // タスクを削除（論理削除）
-    const success = await taskRepo.deleteTask(id);
-
-    if (!success) {
-      return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
-    }
-
-    // worktreeとブランチを削除（強制削除）
-    try {
-      await worktreeManager.removeWorktree(task.owner, task.repo, task.branch, true);
-    } catch (error) {
-      console.error('Failed to remove worktree:', error);
-      // worktree削除に失敗してもタスク削除は成功とする
-    }
-
+    await deleteTask({ id });
     return NextResponse.json({ data: { success: true } });
   } catch (error) {
+    if (error instanceof TaskServiceError && error.code === 'TASK_NOT_FOUND') {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
     console.error('DELETE /api/tasks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
   }

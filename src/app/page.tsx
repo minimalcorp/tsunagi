@@ -28,12 +28,26 @@ export default function Home() {
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
 
-  // Filter state (driven by TaskListPanel's SearchAndFilterBar)
-  const [filterState, setFilterState] = useState<FilterState>({
-    statuses: [],
-    repos: [],
-    search: '',
+  // Filter state (driven by TaskListPanel's SearchAndFilterBar, persisted in sessionStorage)
+  const [filterState, setFilterState] = useState<FilterState>(() => {
+    if (typeof window === 'undefined') return { statuses: [], repos: [], search: '' };
+    try {
+      const saved = sessionStorage.getItem('tsunagi:task-filters');
+      if (saved) return JSON.parse(saved) as FilterState;
+    } catch {
+      // ignore
+    }
+    return { statuses: [], repos: [], search: '' };
   });
+
+  // Persist filter state to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('tsunagi:task-filters', JSON.stringify(filterState));
+    } catch {
+      // ignore
+    }
+  }, [filterState]);
 
   // Resizable panel
   const [leftPanelWidth, setLeftPanelWidth] = useState(380);
@@ -144,8 +158,36 @@ export default function Home() {
     );
   });
 
-  useTaskEvents((newTask) => {
-    setTasks((prev) => [...prev, newTask]);
+  // Socket.IOイベントでUI更新のみ行う（通知は操作元のUI側で表示するため、ここでは出さない）
+  useTaskEvents({
+    onTaskCreated: (newTask) => {
+      setTasks((prev) => {
+        if (prev.some((t) => t.id === newTask.id)) return prev;
+        return [...prev, newTask];
+      });
+
+      toaster.create({
+        type: 'success',
+        title: 'Task created',
+        description: newTask.title,
+        duration: 5000,
+      });
+    },
+    onTaskDeleted: (taskId) => {
+      // updater外でタスク名を取得（Strict Modeでupdaterが2回呼ばれても影響なし）
+      const taskTitle = tasks.find((t) => t.id === taskId)?.title;
+
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+
+      if (taskTitle) {
+        toaster.create({
+          type: 'info',
+          title: 'Task deleted',
+          description: taskTitle,
+          duration: 5000,
+        });
+      }
+    },
   });
 
   // Batch delete
@@ -192,15 +234,25 @@ export default function Home() {
   }, [isDeleting, isCompleted, deletedCount, errorCount, totalCount, reset]);
 
   // Handlers
-  const handleOrderChange = useCallback(async (taskId: string, newOrder: number) => {
-    try {
-      await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: newOrder }),
-      });
+  const handleReorder = useCallback(async (reorderedTasks: Task[]) => {
+    // Optimistic UI update
+    setTasks((prev) => {
+      const reorderedIds = new Set(reorderedTasks.map((t) => t.id));
+      const unchanged = prev.filter((t) => !reorderedIds.has(t.id));
+      return [...reorderedTasks, ...unchanged];
+    });
 
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, order: newOrder } : t)));
+    // Persist order to server
+    try {
+      await Promise.all(
+        reorderedTasks.map((task, index) =>
+          fetch(`/api/tasks/${task.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: index }),
+          })
+        )
+      );
     } catch (error) {
       console.error('Failed to update task order:', error);
     }
@@ -314,7 +366,8 @@ export default function Home() {
             repositories={repositories}
             filters={filterState}
             onFilterChange={setFilterState}
-            onOrderChange={handleOrderChange}
+            onReorder={handleReorder}
+            onAddTask={() => setIsAddTaskDialogOpen(true)}
           />
         </div>
 

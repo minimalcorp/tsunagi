@@ -7,20 +7,26 @@ import { TaskCard } from '@/components/planner/TaskCard';
 
 interface TaskListProps {
   tasks: Task[];
-  onOrderChange: (taskId: string, newOrder: number) => void;
+  onReorder: (reorderedTasks: Task[]) => void;
 }
 
-export function TaskList({ tasks, onOrderChange }: TaskListProps) {
+export function TaskList({ tasks, onReorder }: TaskListProps) {
   const handleDragEnd = useCallback(
     (result: DropResult) => {
       if (!result.destination) return;
       const { source, destination } = result;
       if (source.index === destination.index) return;
 
-      const taskId = tasks[source.index].id;
-      onOrderChange(taskId, destination.index);
+      // Reorder array
+      const reordered = [...tasks];
+      const [moved] = reordered.splice(source.index, 1);
+      reordered.splice(destination.index, 0, moved);
+
+      // Update order values
+      const withNewOrder = reordered.map((task, index) => ({ ...task, order: index }));
+      onReorder(withNewOrder);
     },
-    [tasks, onOrderChange]
+    [tasks, onReorder]
   );
 
   return (
