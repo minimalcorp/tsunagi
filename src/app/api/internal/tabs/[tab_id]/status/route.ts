@@ -7,8 +7,8 @@ interface RouteParams {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { tab_id } = await params;
-  const body = (await request.json()) as { status: string };
-  const { status } = body;
+  const body = (await request.json()) as { status: string; todos?: unknown[] };
+  const { status, todos } = body;
 
   if (!status) {
     return NextResponse.json({ error: 'status is required' }, { status: 400 });
@@ -17,7 +17,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const tab = await prisma.tab.update({
       where: { tabId: tab_id },
-      data: { status },
+      data: {
+        status,
+        ...(todos !== undefined && { todos: JSON.stringify(todos) }),
+      },
     });
     return NextResponse.json({ data: { tab } });
   } catch (error) {

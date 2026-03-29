@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
-import { todoStore } from '../todo-store.js';
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
@@ -37,13 +36,34 @@ export interface HookEvent {
 
 export const hookEvents: HookEvent[] = [];
 
-/** Next.js内部APIでタブのステータスをDB更新する */
-async function updateTabStatus(sessionId: string, status: string): Promise<void> {
+/** セッションごとのタスクリスト（TaskCreate/TaskUpdateから組み立て） */
+interface TaskEntry {
+  id: string;
+  subject: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+const sessionTasks = new Map<string, Map<string, TaskEntry>>();
+
+/** TaskEntryリストをTodo形式に変換 */
+function tasksToTodos(tasks: Map<string, TaskEntry>) {
+  return Array.from(tasks.values()).map((t) => ({
+    content: t.subject,
+    status: t.status === 'in_progress' ? ('in_progress' as const) : t.status,
+  }));
+}
+
+/** Next.js内部APIでタブのステータス（+ todos）をDB更新する */
+async function updateTabStatus(
+  sessionId: string,
+  status: string,
+  todos?: unknown[]
+): Promise<void> {
   try {
     const response = await fetch(`http://localhost:2791/api/internal/tabs/${sessionId}/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...(todos !== undefined && { todos }) }),
     });
     if (!response.ok) {
       console.warn(`[hooks] Failed to update tab status: ${response.status}`);
@@ -95,21 +115,64 @@ export async function hooksRoutes(fastify: FastifyInstance) {
           io.to(room).emit('status-changed', { sessionId, status: 'waiting' });
           break;
 
-        case 'PostToolUse':
+        case 'PostToolUse': {
           // ツール実行完了（PermissionRequest後のAllow含む）→ runningに戻す
+          let todosUpdated = false;
+
           if (body.tool_name === 'TodoWrite' && body.tool_input) {
             const todos = body.tool_input.todos as Array<{
               content: string;
               status: 'pending' | 'in_progress' | 'completed';
             }>;
             if (Array.isArray(todos)) {
-              todoStore.set(sessionId, todos);
+              await updateTabStatus(sessionId, 'running', todos);
               io.to(room).emit('todos-updated', { sessionId, todos });
+              todosUpdated = true;
             }
           }
-          await updateTabStatus(sessionId, 'running');
+
+          // TaskCreate: タスクリストに追加
+          if (body.tool_name === 'TaskCreate' && body.tool_response) {
+            const task = body.tool_response.task as { id: string; subject: string } | undefined;
+            if (task?.id) {
+              if (!sessionTasks.has(sessionId)) {
+                sessionTasks.set(sessionId, new Map());
+              }
+              sessionTasks.get(sessionId)!.set(task.id, {
+                id: task.id,
+                subject: task.subject,
+                status: 'pending',
+              });
+              const todos = tasksToTodos(sessionTasks.get(sessionId)!);
+              await updateTabStatus(sessionId, 'running', todos);
+              io.to(room).emit('todos-updated', { sessionId, todos });
+              todosUpdated = true;
+            }
+          }
+
+          // TaskUpdate: タスクのステータスを更新
+          if (body.tool_name === 'TaskUpdate' && body.tool_response && body.tool_input) {
+            const taskId = body.tool_input.taskId as string | undefined;
+            const statusChange = body.tool_response.statusChange as { to: string } | undefined;
+            const tasks = sessionTasks.get(sessionId);
+            if (tasks && taskId && statusChange?.to) {
+              const entry = tasks.get(taskId);
+              if (entry) {
+                entry.status = statusChange.to as TaskEntry['status'];
+                const todos = tasksToTodos(tasks);
+                await updateTabStatus(sessionId, 'running', todos);
+                io.to(room).emit('todos-updated', { sessionId, todos });
+                todosUpdated = true;
+              }
+            }
+          }
+
+          if (!todosUpdated) {
+            await updateTabStatus(sessionId, 'running');
+          }
           io.to(room).emit('status-changed', { sessionId, status: 'running' });
           break;
+        }
 
         case 'PreToolUse':
           // ログ記録のみ

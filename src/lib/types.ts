@@ -24,11 +24,18 @@ export interface Task {
   worktreePath?: string; // worktreeのフルパス（APIから返される）
 }
 
+// Todo型（Claude TodoWrite hook由来）
+export interface Todo {
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
 // Tab型（タブとメッセージ履歴を分離）
 export interface Tab {
   tab_id: string; // UUID（タブ作成時に生成）
   order: number; // タブ表示用の連番
   status: 'idle' | 'running' | 'waiting' | 'success' | 'error';
+  todos?: Todo[];
   startedAt: string;
   completedAt?: string;
   updatedAt: string;

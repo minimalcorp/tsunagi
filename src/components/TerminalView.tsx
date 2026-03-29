@@ -17,6 +17,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Loader2, Copy, Play, Check, SquarePen } from 'lucide-react';
 import { MonacoEditorModal } from '@/components/MonacoEditorModal';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 
 const FASTIFY_API_BASE = 'http://localhost:2792';
 
@@ -44,6 +45,8 @@ interface TerminalViewProps {
    */
   command?: string;
   className?: string;
+  /** DBから読み込んだ初期Todoリスト */
+  initialTodos?: Todo[];
   /** Todoリスト更新時のコールバック（KanbanカードのProgress Bar用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
   /** タブがアクティブかどうか（フォーカス制御用） */
@@ -72,6 +75,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     worktreePath,
     command,
     className = '',
+    initialTodos,
     isActive,
     onTodosUpdated,
     onStatusChange,
@@ -92,7 +96,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const suppressResizeRef = useRef(false);
   const [status, setStatus] = useState<TerminalStatus>('idle');
   const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>('idle');
-  const [todos, setTodos] = useState<Todo[]>([]);
+  const [todos, setTodos] = useState<Todo[]>(initialTodos ?? []);
   const [copied, setCopied] = useState(false);
   const { effectiveTheme } = useTheme();
   // onStatusChange をrefで保持（useEffectの依存配列に入れず常に最新を参照）
@@ -452,7 +456,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
   const completedTodos = todos.filter((t) => t.status === 'completed').length;
   const totalTodos = todos.length;
-  const showTodoProgress = claudeStatus === 'running' && totalTodos > 0;
 
   // 短縮表示用UUID（先頭8文字 + …）
   const shortTabId = tabId.length > 8 ? `${tabId.slice(0, 8)}…` : tabId;
@@ -489,6 +492,21 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
             <SquarePen className="w-3 h-3" />
             Open Editor
           </Button>
+          {totalTodos > 0 && (
+            <div
+              className="ml-auto flex items-center gap-1.5 shrink-0"
+              title={todos.find((t) => t.status === 'in_progress')?.content ?? ''}
+            >
+              <Progress
+                value={completedTodos}
+                max={totalTodos}
+                className="w-16 gap-0 [&_[data-slot=progress-track]]:h-[3px]"
+              />
+              <span className="text-[10px] text-muted-foreground tabular-nums">
+                {completedTodos}/{totalTodos}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
@@ -520,31 +538,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
                   Reconnect
                 </Button>
               </div>
-            </div>
-          )}
-
-          {/* Todo進捗（running時かつtodosがある場合のみ表示） */}
-          {showTodoProgress && (
-            <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-card/90 border-t border-border">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-accent rounded-full h-1 overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-[width]"
-                    style={{
-                      width: `${totalTodos > 0 ? (completedTodos / totalTodos) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-                <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                  {completedTodos}/{totalTodos}
-                </span>
-              </div>
-              {/* 現在in_progressのtodo */}
-              {todos.find((t) => t.status === 'in_progress') && (
-                <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                  {todos.find((t) => t.status === 'in_progress')?.content}
-                </p>
-              )}
             </div>
           )}
         </div>

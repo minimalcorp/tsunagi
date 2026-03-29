@@ -3,7 +3,6 @@ import type { Server as SocketIOServer } from 'socket.io';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { todoStore } from '../todo-store.js';
 import {
   listTasks,
   getTask,
@@ -137,7 +136,7 @@ function createMcpServer(io?: SocketIOServer): Server {
       },
       {
         name: 'tsunagi_get_tab_todos',
-        description: '指定タブのTodo進捗を取得する（メモリ上のtodo-storeから）',
+        description: '指定タブのTodo進捗を取得する（DBから）',
         inputSchema: {
           type: 'object',
           required: ['tabId'],
@@ -266,10 +265,27 @@ function createMcpServer(io?: SocketIOServer): Server {
 
         case 'tsunagi_get_tab_todos': {
           const { tabId } = (args ?? {}) as { tabId: string };
-          const todos = todoStore.get(tabId);
-          return {
-            content: [{ type: 'text', text: JSON.stringify({ tabId, todos }, null, 2) }],
-          };
+          try {
+            const res = await fetch(`http://localhost:2791/api/internal/tabs/${tabId}/todos`);
+            if (!res.ok) {
+              return {
+                content: [{ type: 'text', text: JSON.stringify({ tabId, todos: [] }, null, 2) }],
+              };
+            }
+            const data = (await res.json()) as { data: { todos: unknown[] } };
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({ tabId, todos: data.data.todos }, null, 2),
+                },
+              ],
+            };
+          } catch {
+            return {
+              content: [{ type: 'text', text: JSON.stringify({ tabId, todos: [] }, null, 2) }],
+            };
+          }
         }
 
         case 'tsunagi_ensure_default_worktree': {
