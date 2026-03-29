@@ -162,35 +162,31 @@ export default function Home() {
   useTaskEvents({
     onTaskCreated: (newTask) => {
       setTasks((prev) => {
-        // 既にリストにある場合はUI操作で追加済み（TaskDialogが通知済み）
         if (prev.some((t) => t.id === newTask.id)) return prev;
-
-        // 通知を表示（idでdedup: 同一タスクのイベントが複数回来ても1つだけ表示）
-        toaster.create({
-          id: `task-created-${newTask.id}`,
-          type: 'success',
-          title: 'Task created',
-          description: newTask.title,
-          duration: 5000,
-        });
-
         return [...prev, newTask];
+      });
+
+      toaster.create({
+        type: 'success',
+        title: 'Task created',
+        description: newTask.title,
+        duration: 5000,
       });
     },
     onTaskDeleted: (taskId) => {
-      setTasks((prev) => {
-        const task = prev.find((t) => t.id === taskId);
-        if (task) {
-          toaster.create({
-            id: `task-deleted-${taskId}`,
-            type: 'info',
-            title: 'Task deleted',
-            description: task.title,
-            duration: 5000,
-          });
-        }
-        return prev.filter((t) => t.id !== taskId);
-      });
+      // updater外でタスク名を取得（Strict Modeでupdaterが2回呼ばれても影響なし）
+      const taskTitle = tasks.find((t) => t.id === taskId)?.title;
+
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+
+      if (taskTitle) {
+        toaster.create({
+          type: 'info',
+          title: 'Task deleted',
+          description: taskTitle,
+          duration: 5000,
+        });
+      }
     },
   });
 
