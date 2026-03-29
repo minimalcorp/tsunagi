@@ -87,6 +87,10 @@ function createMcpServer(io?: SocketIOServer): Server {
               description: 'ベースブランチ名（省略時はdefault branch）',
             },
             effort: { type: 'number', description: '工数（時間）' },
+            order: {
+              type: 'number',
+              description: '順序（指定位置に挿入、既存タスクは玉突きでずれる）',
+            },
             status: {
               type: 'string',
               enum: ['backlog', 'planning', 'coding', 'reviewing', 'done'],
@@ -110,6 +114,10 @@ function createMcpServer(io?: SocketIOServer): Server {
               description: 'ステータス',
             },
             effort: { type: 'number', description: '工数（時間）' },
+            order: {
+              type: 'number',
+              description: '順序（指定位置に移動、既存タスクは玉突きでずれる）',
+            },
             baseBranch: { type: 'string', description: 'ベースブランチ名' },
             pullRequestUrl: { type: 'string', description: 'Pull Request URL' },
           },
@@ -187,17 +195,18 @@ function createMcpServer(io?: SocketIOServer): Server {
         }
 
         case 'tsunagi_create_task': {
-          const { owner, repo, title, description, effort, status, branch, baseBranch } = (args ??
-            {}) as {
-            owner: string;
-            repo: string;
-            title: string;
-            description?: string;
-            effort?: number;
-            status?: string;
-            branch?: string;
-            baseBranch?: string;
-          };
+          const { owner, repo, title, description, effort, order, status, branch, baseBranch } =
+            (args ?? {}) as {
+              owner: string;
+              repo: string;
+              title: string;
+              description?: string;
+              effort?: number;
+              order?: number;
+              status?: string;
+              branch?: string;
+              baseBranch?: string;
+            };
           const result = await createTask(
             {
               owner,
@@ -205,6 +214,7 @@ function createMcpServer(io?: SocketIOServer): Server {
               title,
               description,
               effort,
+              order,
               status: status as import('../../src/lib/types.js').Task['status'] | undefined,
               branch,
               baseBranch,
@@ -223,6 +233,7 @@ function createMcpServer(io?: SocketIOServer): Server {
             description,
             status,
             effort,
+            order,
             baseBranch,
             pullRequestUrl,
           } = (args ?? {}) as {
@@ -233,6 +244,7 @@ function createMcpServer(io?: SocketIOServer): Server {
             description?: string;
             status?: string;
             effort?: number;
+            order?: number;
             baseBranch?: string;
             pullRequestUrl?: string;
           };
@@ -245,6 +257,7 @@ function createMcpServer(io?: SocketIOServer): Server {
                 ? { status: status as import('../../src/lib/types.js').Task['status'] }
                 : {}),
               ...(effort !== undefined ? { effort } : {}),
+              ...(order !== undefined ? { order } : {}),
               ...(baseBranch !== undefined ? { baseBranch } : {}),
               ...(pullRequestUrl !== undefined ? { pullRequestUrl } : {}),
             },
