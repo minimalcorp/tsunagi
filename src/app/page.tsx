@@ -162,7 +162,17 @@ export default function Home() {
   useTaskEvents({
     onTaskCreated: (newTask) => {
       setTasks((prev) => {
+        // 既にリストにある場合はUI操作で追加済み（TaskDialogが通知済み）
         if (prev.some((t) => t.id === newTask.id)) return prev;
+
+        // MCP/Claude経由の新規追加 → 通知を表示
+        toaster.create({
+          type: 'success',
+          title: 'Task created',
+          description: newTask.title,
+          duration: 5000,
+        });
+
         return [...prev, newTask];
       });
     },
