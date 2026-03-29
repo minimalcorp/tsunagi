@@ -261,6 +261,7 @@ type PrismaTab = {
   tabId: string;
   order: number;
   status: string;
+  todos: string | null;
   startedAt: Date;
   completedAt: Date | null;
   updatedAt: Date;
@@ -293,6 +294,7 @@ function mapTab(tab: PrismaTab): Tab {
     tab_id: tab.tabId,
     order: tab.order,
     status: tab.status as Tab['status'],
+    todos: tab.todos ? JSON.parse(tab.todos) : [],
     startedAt: tab.startedAt.toISOString(),
     completedAt: tab.completedAt?.toISOString(),
     updatedAt: tab.updatedAt.toISOString(),

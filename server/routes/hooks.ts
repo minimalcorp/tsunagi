@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
-import { todoStore } from '../todo-store.js';
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
@@ -37,13 +36,17 @@ export interface HookEvent {
 
 export const hookEvents: HookEvent[] = [];
 
-/** Next.js内部APIでタブのステータスをDB更新する */
-async function updateTabStatus(sessionId: string, status: string): Promise<void> {
+/** Next.js内部APIでタブのステータス（+ todos）をDB更新する */
+async function updateTabStatus(
+  sessionId: string,
+  status: string,
+  todos?: unknown[]
+): Promise<void> {
   try {
     const response = await fetch(`http://localhost:2791/api/internal/tabs/${sessionId}/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...(todos !== undefined && { todos }) }),
     });
     if (!response.ok) {
       console.warn(`[hooks] Failed to update tab status: ${response.status}`);
@@ -103,8 +106,10 @@ export async function hooksRoutes(fastify: FastifyInstance) {
               status: 'pending' | 'in_progress' | 'completed';
             }>;
             if (Array.isArray(todos)) {
-              todoStore.set(sessionId, todos);
+              await updateTabStatus(sessionId, 'running', todos);
               io.to(room).emit('todos-updated', { sessionId, todos });
+              io.to(room).emit('status-changed', { sessionId, status: 'running' });
+              break;
             }
           }
           await updateTabStatus(sessionId, 'running');

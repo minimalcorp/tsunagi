@@ -224,6 +224,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                       : undefined
                   }
                   className="h-full"
+                  initialTodos={tab.todos}
                   onTodosUpdated={onTodosUpdated}
                   onStatusChange={handleStatusChange}
                 />

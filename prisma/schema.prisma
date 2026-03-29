@@ -62,6 +62,7 @@ model Tab {
   createdAt    DateTime  @default(now()) @map("created_at")
   startedAt    DateTime  @map("started_at")
   completedAt  DateTime? @map("completed_at")
+  todos        String?   @default("[]") // JSON: Todo[]
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
