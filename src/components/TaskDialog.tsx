@@ -225,7 +225,7 @@ export function TaskDialog({
         });
         setIsLoading(false);
 
-        // 3. Create task async with notification
+        // 3. Create task async (notification is handled by useTaskEvents via Socket.IO)
         const notificationId = toast.loading('Creating task...', taskData.title);
 
         try {
@@ -239,7 +239,7 @@ export function TaskDialog({
             throw new Error('Failed to create task');
           }
 
-          toast.success(notificationId, 'Successfully created task', taskData.title);
+          toast.dismiss(notificationId);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           toast.error(notificationId, 'Failed to create task', errorMessage);
