@@ -500,7 +500,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
               <Progress
                 value={completedTodos}
                 max={totalTodos}
-                className="w-16 gap-0 [&_[data-slot=progress-track]]:h-1.5"
+                className="w-16 gap-0 [&_[data-slot=progress-track]]:h-[3px]"
               />
               <span className="text-[10px] text-muted-foreground tabular-nums">
                 {completedTodos}/{totalTodos}

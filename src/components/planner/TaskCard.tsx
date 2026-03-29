@@ -16,6 +16,7 @@ import {
 import type { Task } from '@/lib/types';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
 
 interface TaskCardProps {
   task: Task;
@@ -73,6 +74,11 @@ export function TaskCard({ task, dragHandleProps }: TaskCardProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const repoColor = getRepoColor(task.owner, task.repo);
+
+  // タブのtodosからプログレスを計算（DB永続化済み）
+  const allTodos = (task.tabs ?? []).flatMap((tab) => tab.todos ?? []);
+  const completedTodos = allTodos.filter((t) => t.status === 'completed').length;
+  const totalTodos = allTodos.length;
   const shortId = task.id.slice(0, 5) + '\u2026';
 
   const handleCopyId = useCallback(
@@ -126,6 +132,20 @@ export function TaskCard({ task, dragHandleProps }: TaskCardProps) {
         {/* Description */}
         {task.description && (
           <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
+        )}
+
+        {/* Progress Bar（todosがある場合） */}
+        {totalTodos > 0 && (
+          <div className="flex items-center gap-1.5">
+            <Progress
+              value={completedTodos}
+              max={totalTodos}
+              className="flex-1 gap-0 [&_[data-slot=progress-track]]:h-[3px]"
+            />
+            <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+              {completedTodos}/{totalTodos}
+            </span>
+          </div>
         )}
 
         {/* Metadata row */}
