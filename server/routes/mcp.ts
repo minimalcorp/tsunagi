@@ -248,7 +248,8 @@ function createMcpServer(io?: SocketIOServer): Server {
               ...(effort !== undefined ? { effort } : {}),
               ...(baseBranch !== undefined ? { baseBranch } : {}),
               ...(pullRequestUrl !== undefined ? { pullRequestUrl } : {}),
-            }
+            },
+            { io }
           );
           return { content: [{ type: 'text', text: JSON.stringify(updated, null, 2) }] };
         }

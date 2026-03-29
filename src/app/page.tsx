@@ -173,6 +173,16 @@ export default function Home() {
         duration: 5000,
       });
     },
+    onTaskUpdated: (updatedTask) => {
+      setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+
+      toaster.create({
+        type: 'info',
+        title: 'Task updated',
+        description: updatedTask.title,
+        duration: 5000,
+      });
+    },
     onTaskDeleted: (taskId) => {
       // updater外でタスク名を取得（Strict Modeでupdaterが2回呼ばれても影響なし）
       const taskTitle = tasks.find((t) => t.id === taskId)?.title;

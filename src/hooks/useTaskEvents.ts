@@ -8,6 +8,7 @@ const FASTIFY_API_BASE = 'http://localhost:2792';
 
 interface TaskEventCallbacks {
   onTaskCreated: (task: Task) => void;
+  onTaskUpdated: (task: Task) => void;
   onTaskDeleted: (taskId: string) => void;
 }
 
@@ -25,6 +26,10 @@ export function useTaskEvents(callbacks: TaskEventCallbacks) {
 
     socket.on('task:created', ({ task }: { task: Task }) => {
       callbacksRef.current.onTaskCreated(task);
+    });
+
+    socket.on('task:updated', ({ task }: { task: Task }) => {
+      callbacksRef.current.onTaskUpdated(task);
     });
 
     socket.on('task:deleted', ({ taskId }: { taskId: string }) => {

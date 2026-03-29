@@ -234,7 +234,8 @@ export async function updateTask(
       Task,
       'title' | 'description' | 'status' | 'effort' | 'order' | 'baseBranch' | 'pullRequestUrl'
     >
-  >
+  >,
+  options?: ServiceOptions
 ): Promise<Task> {
   const task = await resolveTask(identifier);
   if (!task) {
@@ -245,6 +246,9 @@ export async function updateTask(
   if (!updatedTask) {
     throw new TaskServiceError('Failed to update task', 'INTERNAL_ERROR');
   }
+
+  // Socket.IO通知
+  options?.io?.emit('task:updated', { task: updatedTask });
 
   return updatedTask;
 }
