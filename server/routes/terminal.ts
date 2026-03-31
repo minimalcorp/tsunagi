@@ -120,6 +120,11 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       });
     });
 
+    // health-check: クライアントからの接続生死確認に即応答
+    socket.on('health-check', () => {
+      socket.emit('health-check-ack');
+    });
+
     // disconnect → ハンドラ解除・GCタイマーセット
     socket.on('disconnect', () => {
       dataHandlerDispose?.();

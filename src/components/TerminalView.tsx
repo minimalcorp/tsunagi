@@ -92,6 +92,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   // xterm の customKeyEventHandler（_keyUp内のfocus再取得）から参照する。
   const isExternalEditorOpenRef = useRef(false);
   const isActiveRef = useRef(isActive);
+  // 初回接続かどうかを追跡（再接続時のフォーカス復帰判定用）
+  const hasConnectedOnceRef = useRef(false);
   // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
   const suppressResizeRef = useRef(false);
   const [status, setStatus] = useState<TerminalStatus>('idle');
@@ -264,6 +266,41 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     };
   }, []);
 
+  // フォアグラウンド復帰時にWebSocket接続の生死を検証し、死んでいれば即座に再接続する
+  useEffect(() => {
+    const HEALTH_CHECK_TIMEOUT_MS = 3000;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState !== 'visible') return;
+
+      const socket = socketRef.current;
+      if (!socket || !socket.connected) return;
+
+      // ヘルスチェック: サーバーにpingを送り、応答がなければ強制切断→自動再接続
+      const timer = setTimeout(() => {
+        // タイムアウト: 接続が死んでいる → 強制切断してSocket.IOの自動再接続に委ねる
+        socket.off('health-check-ack', onAck);
+        socket.disconnect();
+      }, HEALTH_CHECK_TIMEOUT_MS);
+
+      function onAck() {
+        clearTimeout(timer);
+        // 接続は生きている → フォーカスのみ復帰
+        if (isActiveRef.current) {
+          termRef.current?.focus();
+        }
+      }
+
+      socket.once('health-check-ack', onAck);
+      socket.emit('health-check');
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   function sendResize() {
     const socket = socketRef.current;
     const term = termRef.current;
@@ -344,18 +381,29 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     let firstMessageHandled = false;
 
     socket.on('connect', () => {
-      if (reused) {
-        // reused: status→connected によるuseEffectのsendResizeを抑制し、
-        // リングバッファ受信後（firstMessageHandled）にのみsendResizeする
+      const isReconnect = hasConnectedOnceRef.current;
+      hasConnectedOnceRef.current = true;
+
+      if (isReconnect) {
+        // 再接続時: reusedフラグに関係なくroom再参加のみ行う
+        term.writeln('\x1b[90mReconnected.\x1b[0m');
+      } else if (reused) {
+        // 初回接続 + reused: リングバッファ受信後にリサイズする
         suppressResizeRef.current = true;
         clearTerminalDisplay(term);
       } else {
+        // 初回接続 + 新規
         term.writeln('\x1b[90mConnected.\x1b[0m');
       }
       setStatus('connected');
 
-      // roomに参加
+      // roomに参加（再接続時も必ず再参加する）
       socket.emit('join', { room: `tab:${sessionId}` });
+
+      // 再接続時: アクティブタブならフォーカスを復帰
+      if (isReconnect && isActiveRef.current) {
+        term.focus();
+      }
     });
 
     socket.on('output', ({ data }: { data: string }) => {
