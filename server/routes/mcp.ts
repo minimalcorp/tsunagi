@@ -213,8 +213,8 @@ function createMcpServer(io?: SocketIOServer): Server {
               repo,
               title,
               description,
-              effort,
-              order,
+              effort: effort !== undefined ? Number(effort) : undefined,
+              order: order !== undefined ? Number(order) : undefined,
               status: status as import('../../src/lib/types.js').Task['status'] | undefined,
               branch,
               baseBranch,
@@ -256,8 +256,8 @@ function createMcpServer(io?: SocketIOServer): Server {
               ...(status !== undefined
                 ? { status: status as import('../../src/lib/types.js').Task['status'] }
                 : {}),
-              ...(effort !== undefined ? { effort } : {}),
-              ...(order !== undefined ? { order } : {}),
+              ...(effort !== undefined ? { effort: Number(effort) } : {}),
+              ...(order !== undefined ? { order: Number(order) } : {}),
               ...(baseBranch !== undefined ? { baseBranch } : {}),
               ...(pullRequestUrl !== undefined ? { pullRequestUrl } : {}),
             },
