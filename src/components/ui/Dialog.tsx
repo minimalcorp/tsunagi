@@ -24,6 +24,8 @@ interface DialogProps {
   trapFocus?: boolean;
   /** ダイアログを閉じた時にフォーカスを元の要素に戻すか（デフォルト: true） */
   restoreFocus?: boolean;
+  /** Escキーでダイアログを閉じるか（デフォルト: true） */
+  dismissOnEsc?: boolean;
 }
 
 const maxWidthClasses = {
@@ -44,6 +46,7 @@ export function Dialog({
   maxWidth = '2xl',
   showCloseButton = true,
   initialFocusEl,
+  dismissOnEsc = true,
 }: DialogProps) {
   // Handle initialFocusEl by focusing the element after dialog opens
   useEffect(() => {
@@ -58,7 +61,8 @@ export function Dialog({
     }
   }, [open, initialFocusEl]);
 
-  const handleOpenChange = (openState: boolean) => {
+  const handleOpenChange = (openState: boolean, eventDetails: { reason?: string }) => {
+    if (!openState && !dismissOnEsc && eventDetails.reason === 'escape-key') return;
     onOpenChange({ open: openState });
   };
 
