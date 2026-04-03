@@ -91,6 +91,7 @@ export function MonacoEditorModal({
       showCloseButton={true}
       trapFocus={false}
       restoreFocus={false}
+      dismissOnEsc={false}
     >
       <div className="space-y-4">
         <div
@@ -123,11 +124,6 @@ export function MonacoEditorModal({
                   e.stopPropagation();
                   handleSubmitRef.current();
                 }
-                if (e.keyCode === monacoInstance.KeyCode.Escape) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleCancelRef.current();
-                }
               });
             }}
             options={{
@@ -141,7 +137,7 @@ export function MonacoEditorModal({
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          {isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} で{submitLabel}、Esc でキャンセル
+          {isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} で{submitLabel}
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="outline" size="lg" onClick={handleCancel}>
