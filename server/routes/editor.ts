@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import { randomUUID } from 'crypto';
 import { editorSessionStore } from '../editor-session-store.js';
+import { ptyManager } from '../pty-manager.js';
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
@@ -35,9 +36,15 @@ export async function editorRoutes(fastify: FastifyInstance) {
         createdAt: Date.now(),
       });
 
-      // tabIdが指定されていればそのタブのルームにのみ送信、なければ全体ブロードキャスト（後方互換）
+      // tabIdが指定されていれば、最後にinputを送信したソケットにのみ送信
+      // （同じtabルームに複数ブラウザタブのソケットが参加している場合の隔離）
       if (tabId) {
-        f.io.to(`tab:${tabId}`).emit('editor:open', { sessionId, content });
+        const activeSocketId = ptyManager.getActiveSocket(tabId);
+        if (activeSocketId) {
+          f.io.to(activeSocketId).emit('editor:open', { sessionId, content });
+        } else {
+          f.io.to(`tab:${tabId}`).emit('editor:open', { sessionId, content });
+        }
       } else {
         f.io.emit('editor:open', { sessionId, content });
       }
