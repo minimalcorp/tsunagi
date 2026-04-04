@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { markdownComponents } from './MarkdownComponents';
 import { Dialog, DialogContent, DialogTitle, DialogClose } from './ui/dialog-primitives';
 import { Button } from './ui/button';
 import { X } from 'lucide-react';
@@ -47,7 +48,9 @@ export function MarkdownViewerDialog({
         </div>
 
         <div className="flex-1 overflow-y-auto prose prose-slate dark:prose-invert max-w-none">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {content}
+          </ReactMarkdown>
         </div>
 
         <div className="mt-6 flex justify-end">

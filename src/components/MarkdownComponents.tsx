@@ -1,6 +1,57 @@
+'use client';
+
+import { useEffect, useRef, useState, useId } from 'react';
 import type { Components } from 'react-markdown';
 import { ExternalLink } from 'lucide-react';
 import { CodeBlock } from '@/components/CodeBlock';
+import mermaid from 'mermaid';
+
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'default',
+  securityLevel: 'loose',
+});
+
+function MermaidBlock({ code }: { code: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const uniqueId = useId().replace(/:/g, '-');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function render() {
+      if (!containerRef.current) return;
+      try {
+        const { svg } = await mermaid.render(`mermaid-${uniqueId}`, code);
+        if (!cancelled && containerRef.current) {
+          containerRef.current.innerHTML = svg;
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Mermaid rendering failed');
+        }
+      }
+    }
+
+    render();
+    return () => {
+      cancelled = true;
+    };
+  }, [code, uniqueId]);
+
+  if (error) {
+    return (
+      <div className="p-3 border border-destructive/50 rounded-md bg-destructive/10 text-destructive text-xs">
+        <p className="font-medium mb-1">Mermaid Error</p>
+        <pre className="whitespace-pre-wrap">{error}</pre>
+      </div>
+    );
+  }
+
+  return <div ref={containerRef} className="my-2 overflow-x-auto" />;
+}
 
 // ReactMarkdown用の共通カスタムコンポーネント
 export const markdownComponents: Components = {
@@ -12,6 +63,10 @@ export const markdownComponents: Components = {
 
     // inline属性がない場合はコードブロック（複数行）とみなす
     const isCodeBlock = className && className.startsWith('language-');
+
+    if (language === 'mermaid' && codeString) {
+      return <MermaidBlock code={codeString} />;
+    }
 
     if (isCodeBlock && codeString) {
       return (

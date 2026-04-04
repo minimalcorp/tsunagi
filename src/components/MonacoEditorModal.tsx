@@ -16,6 +16,8 @@ export interface MonacoEditorModalProps {
   title?: string;
   /** 確定ボタンのラベル（デフォルト: "Submit"） */
   submitLabel?: string;
+  /** Monaco editorの言語（デフォルト: "plaintext"） */
+  language?: string;
 }
 
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
@@ -35,6 +37,7 @@ export function MonacoEditorModal({
   initialValue = '',
   title = 'Editor',
   submitLabel = 'Submit',
+  language = 'plaintext',
 }: MonacoEditorModalProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const handleSubmitRef = useRef<() => void>(() => {});
@@ -100,7 +103,7 @@ export function MonacoEditorModal({
         >
           <Editor
             height="100%"
-            defaultLanguage="plaintext"
+            defaultLanguage={language}
             defaultValue=""
             onMount={(editorInstance, monacoInstance) => {
               editorRef.current = editorInstance;
