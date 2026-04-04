@@ -21,6 +21,22 @@ export interface PtySession {
 
 class PtyManager {
   private sessions = new Map<string, PtySession>();
+  /** sessionId → 最後に input を送信した socket.id */
+  private activeSocketIds = new Map<string, string>();
+
+  setActiveSocket(sessionId: string, socketId: string): void {
+    this.activeSocketIds.set(sessionId, socketId);
+  }
+
+  getActiveSocket(sessionId: string): string | undefined {
+    return this.activeSocketIds.get(sessionId);
+  }
+
+  clearActiveSocket(sessionId: string, socketId: string): void {
+    if (this.activeSocketIds.get(sessionId) === socketId) {
+      this.activeSocketIds.delete(sessionId);
+    }
+  }
 
   createSession(sessionId: string, cwd: string, env?: Record<string, string>): PtySession {
     if (this.sessions.has(sessionId)) {

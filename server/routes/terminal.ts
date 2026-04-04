@@ -113,9 +113,10 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         }
       );
 
-      // input イベント: PTYへ書き込み
+      // input イベント: PTYへ書き込み + アクティブソケット追跡
       socket.on('input', ({ sessionId: sid, data }: { sessionId: string; data: string }) => {
         if (sid !== sessionId) return;
+        ptyManager.setActiveSocket(sessionId, socket.id);
         ptyProcess.write(data);
       });
     });
@@ -125,11 +126,12 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       socket.emit('health-check-ack');
     });
 
-    // disconnect → ハンドラ解除・GCタイマーセット
+    // disconnect → ハンドラ解除・アクティブソケットクリア・GCタイマーセット
     socket.on('disconnect', () => {
       dataHandlerDispose?.();
       exitHandlerDispose?.();
       if (boundSessionId) {
+        ptyManager.clearActiveSocket(boundSessionId, socket.id);
         ptyManager.scheduleGc(boundSessionId);
       }
     });
