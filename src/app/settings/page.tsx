@@ -7,6 +7,7 @@ import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNa
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
 import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
 import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
+import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
 import { Button } from '@/components/ui/button';
 
 export default function SettingsPage() {
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   };
 
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
+  const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   const [onboardingStatus, setOnboardingStatus] = useState({
     completed: true,
     hasGlobalToken: true,
@@ -71,6 +73,11 @@ export default function SettingsPage() {
     setSelectedNode({ scope: 'global', label: 'Global' });
   };
 
+  const handleRepoDeleted = () => {
+    setSelectedNode({ scope: 'global', label: 'Global' });
+    setTreeRefreshKey((prev) => prev + 1);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
@@ -95,7 +102,11 @@ export default function SettingsPage() {
       <div className="flex-1 flex min-h-0">
         {/* Left Panel: Tree Navigation */}
         <div className="w-64 border-r border-border bg-card">
-          <EnvTreeNavigation selectedNode={selectedNode} onNodeSelect={handleNodeSelect} />
+          <EnvTreeNavigation
+            selectedNode={selectedNode}
+            onNodeSelect={handleNodeSelect}
+            refreshKey={treeRefreshKey}
+          />
         </div>
 
         {/* Right Panel: Editor */}
@@ -118,6 +129,15 @@ export default function SettingsPage() {
                   <h2 className="text-sm font-semibold text-foreground">Repositories</h2>
                   <RepositoryManagement />
                 </div>
+              )}
+
+              {/* Remove Repository (Repo scope only) */}
+              {selectedNode.scope === 'repo' && selectedNode.owner && selectedNode.repo && (
+                <RemoveRepositorySection
+                  owner={selectedNode.owner}
+                  repo={selectedNode.repo}
+                  onDeleted={handleRepoDeleted}
+                />
               )}
             </div>
           ) : (
