@@ -13,6 +13,7 @@ export interface SelectedNode {
 interface EnvTreeNavigationProps {
   selectedNode: SelectedNode | null;
   onNodeSelect: (node: SelectedNode) => void;
+  refreshKey?: number;
 }
 
 interface Owner {
@@ -20,7 +21,11 @@ interface Owner {
   repositories: Array<{ owner: string; repo: string }>;
 }
 
-export function EnvTreeNavigation({ selectedNode, onNodeSelect }: EnvTreeNavigationProps) {
+export function EnvTreeNavigation({
+  selectedNode,
+  onNodeSelect,
+  refreshKey,
+}: EnvTreeNavigationProps) {
   const [treeData, setTreeData] = useState<TreeNode[]>([]);
   const [expandedOwners, setExpandedOwners] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -87,7 +92,7 @@ export function EnvTreeNavigation({ selectedNode, onNodeSelect }: EnvTreeNavigat
     };
 
     loadTree();
-  }, []);
+  }, [refreshKey]);
 
   const handleToggle = (nodeId: string) => {
     setExpandedOwners((prev) => {
