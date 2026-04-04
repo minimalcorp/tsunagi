@@ -104,6 +104,8 @@ export async function fetchRemote(owner: string, repo: string): Promise<void> {
   const git: SimpleGit = simpleGit(bareRepoPath);
   // Git configに設定されたfetch refspecを使用
   await git.fetch('origin', { '--prune': null });
+  // origin/HEADをリモートの最新デフォルトブランチに自動更新
+  await git.remote(['set-head', 'origin', '--auto']);
 }
 
 // リモートブランチの一覧を取得
