@@ -2,15 +2,21 @@
 
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft, Ellipsis, Pencil, Trash2 } from 'lucide-react';
 import type { Task, Tab } from '@/lib/types';
 import { TaskDialog } from '@/components/TaskDialog';
-import { CollapsibleTaskInfo } from '@/components/CollapsibleTaskInfo';
-import { TaskActions } from '@/components/TaskActions';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/Dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface TaskDetailPageProps {
   params: Promise<{
@@ -27,6 +33,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const terminalPanelRef = useRef<TerminalPanelHandle | null>(null);
@@ -159,15 +166,21 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   };
 
   // タスク削除
-  const handleTaskDelete = async (taskId: string) => {
-    // 削除API呼び出し（非同期）
-    fetch(`/api/tasks/${taskId}`, {
-      method: 'DELETE',
-    }).catch((error) => {
-      console.error('Failed to delete task:', error);
-    });
+  const handleTaskDelete = () => {
+    if (!task) return;
+    const notificationId = toast.loading('Deleting task...', task.title);
 
-    // 即座に一覧に戻る
+    fetch(`/api/tasks/${task.id}`, {
+      method: 'DELETE',
+    })
+      .then(() => {
+        toast.success(notificationId, 'Successfully deleted task', task.title);
+      })
+      .catch((error) => {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        toast.error(notificationId, 'Failed to delete task', errorMessage);
+      });
+
     router.push('/');
   };
 
@@ -207,25 +220,39 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             {task.title}
           </h1>
 
-          <Button
-            variant="ghost"
-            size="icon-lg"
-            onClick={() => setIsEditDialogOpen(true)}
-            className="text-primary hover:bg-primary/10 hover:text-foreground"
-            title="Edit task"
-          >
-            <Edit className="w-5 h-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  className="text-primary hover:bg-primary/10 hover:text-foreground"
+                  title="Task menu"
+                />
+              }
+            >
+              <Ellipsis className="w-5 h-5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
+                <Pencil className="w-4 h-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => setIsDeleteConfirmOpen(true)}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {/* Scrollable content */}
       <div className="flex-1 flex flex-col min-h-0">
-        {/* Task Info Detail Section */}
-        <div className="px-4 bg-card flex-shrink-0">
-          <CollapsibleTaskInfo task={task} defaultExpanded={false} />
-        </div>
-
         {/* TerminalPanel */}
         <div className="bg-card flex flex-col flex-1 min-h-0">
           <TerminalPanel
@@ -238,11 +265,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             onTabDelete={handleTabDelete}
           />
         </div>
-
-        {/* Quick Actions */}
-        <div className="px-4 py-4 pr-[72px] border-t border-border bg-card flex-shrink-0">
-          <TaskActions task={task} onDelete={handleTaskDelete} />
-        </div>
       </div>
 
       {/* Edit Task Dialog */}
@@ -252,6 +274,18 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         onClose={() => setIsEditDialogOpen(false)}
         task={task}
         onUpdate={handleTaskUpdate}
+      />
+
+      {/* Delete Confirm Dialog */}
+      <ConfirmDialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={(details) => setIsDeleteConfirmOpen(details.open)}
+        title="Delete Task"
+        message={`Delete task "${task.title}"?\n\nThis will also delete the worktree and branch.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleTaskDelete}
+        variant="danger"
       />
     </div>
   );

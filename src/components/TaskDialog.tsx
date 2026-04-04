@@ -1,7 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, type FormEvent } from 'react';
 import type { Repository, Task } from '@/lib/types';
+import { Editor } from '@monaco-editor/react';
+import type { editor } from 'monaco-editor';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { markdownComponents } from './MarkdownComponents';
+import { useTheme } from '@/contexts/ThemeContext';
 import { LoadingSpinner } from './LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { Dialog } from './ui/Dialog';
@@ -9,6 +15,7 @@ import { Combobox } from './ui/Combobox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Code, Eye } from 'lucide-react';
 
 interface FieldError {
   field: string;
@@ -48,6 +55,106 @@ interface TaskDialogProps {
   ) => Promise<{ success: boolean; errors?: FieldError[] }>;
 }
 
+interface DescriptionEditorViewerProps {
+  value: string;
+  onChange: (text: string) => void;
+  editorRef: React.MutableRefObject<editor.IStandaloneCodeEditor | null>;
+  theme: string;
+  activeTab: 'editor' | 'preview';
+  onTabChange: (tab: 'editor' | 'preview') => void;
+  disabled?: boolean;
+}
+
+function DescriptionEditorViewer({
+  value,
+  onChange,
+  editorRef,
+  theme,
+  activeTab,
+  onTabChange,
+  disabled,
+}: DescriptionEditorViewerProps) {
+  const handleEditorChange = useCallback(
+    (text: string | undefined) => {
+      onChange(text ?? '');
+    },
+    [onChange]
+  );
+
+  const editorElement = (
+    <div className="border border-border rounded overflow-hidden h-full">
+      <Editor
+        height="100%"
+        defaultLanguage="markdown"
+        value={value}
+        onChange={handleEditorChange}
+        onMount={(editorInstance) => {
+          editorRef.current = editorInstance;
+          editorInstance.layout();
+        }}
+        options={{
+          minimap: { enabled: false },
+          lineNumbers: 'on',
+          wordWrap: 'on',
+          fontSize: 13,
+          scrollBeyondLastLine: false,
+          readOnly: disabled,
+        }}
+        theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
+      />
+    </div>
+  );
+
+  const previewElement = (
+    <div className="border border-border rounded overflow-y-auto h-full p-4 prose prose-sm prose-slate dark:prose-invert max-w-none">
+      {value ? (
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          {value}
+        </ReactMarkdown>
+      ) : (
+        <p className="text-muted-foreground italic">No content</p>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* SP: tab switcher */}
+      <div className="flex gap-1 mb-2 md:hidden flex-shrink-0">
+        <Button
+          type="button"
+          variant={activeTab === 'editor' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => onTabChange('editor')}
+        >
+          <Code className="w-4 h-4 mr-1" />
+          Editor
+        </Button>
+        <Button
+          type="button"
+          variant={activeTab === 'preview' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => onTabChange('preview')}
+        >
+          <Eye className="w-4 h-4 mr-1" />
+          Preview
+        </Button>
+      </div>
+
+      {/* PC: side-by-side */}
+      <div className="hidden md:grid md:grid-cols-2 md:gap-4 flex-1 min-h-0">
+        {editorElement}
+        {previewElement}
+      </div>
+
+      {/* SP: single panel */}
+      <div className="md:hidden flex-1 min-h-0">
+        {activeTab === 'editor' ? editorElement : previewElement}
+      </div>
+    </div>
+  );
+}
+
 export function TaskDialog({
   mode,
   isOpen,
@@ -79,6 +186,9 @@ export function TaskDialog({
   });
   const [isLoading, setIsLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [descriptionTab, setDescriptionTab] = useState<'editor' | 'preview'>('editor');
+  const descriptionEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const { effectiveTheme } = useTheme();
 
   // Edit modeの初期化
   useEffect(() => {
@@ -296,6 +406,8 @@ export function TaskDialog({
         }
       }}
       title={dialogTitle}
+      maxWidth={isCreateMode ? '2xl' : '6xl'}
+      fullScreen={!isCreateMode}
       showCloseButton={!isLoading}
     >
       {isLoading && (
@@ -313,7 +425,12 @@ export function TaskDialog({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className={
+          isCreateMode ? 'space-y-4' : 'flex flex-col gap-4 flex-1 min-h-0 overflow-hidden'
+        }
+      >
         {/* Create mode: Repository選択 */}
         {isCreateMode && (
           <div>
@@ -342,75 +459,107 @@ export function TaskDialog({
           />
         </div>
 
-        {/* 共通: Description */}
-        <div>
-          <label className="block text-sm font-medium mb-1 text-foreground">Description</label>
-          <Textarea
-            maxLength={5000}
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="min-h-24 w-full"
-            disabled={isLoading}
-          />
+        {/* Edit mode: Read-only info */}
+        {!isCreateMode && task && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-3 bg-muted/50 rounded-md text-sm">
+            <div>
+              <span className="font-medium text-foreground">Repository</span>
+              <p className="text-muted-foreground">
+                {task.owner}/{task.repo}
+              </p>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Branch</span>
+              <p className="text-muted-foreground">{task.branch}</p>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Base Branch</span>
+              <p className="text-muted-foreground">{task.baseBranch || 'N/A'}</p>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Worktree</span>
+              <p className="text-muted-foreground capitalize">{task.worktreeStatus}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Description */}
+        <div className={!isCreateMode ? 'flex flex-col flex-1 min-h-0' : ''}>
+          <label className="block text-sm font-medium mb-1 text-foreground flex-shrink-0">
+            Description
+          </label>
+          {!isCreateMode ? (
+            <DescriptionEditorViewer
+              value={formData.description}
+              onChange={(text) => setFormData((prev) => ({ ...prev, description: text }))}
+              editorRef={descriptionEditorRef}
+              theme={effectiveTheme}
+              activeTab={descriptionTab}
+              onTabChange={setDescriptionTab}
+              disabled={isLoading}
+            />
+          ) : (
+            <Textarea
+              maxLength={5000}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="min-h-24 w-full"
+              disabled={isLoading}
+            />
+          )}
         </div>
 
-        {/* Edit mode: Status */}
+        {/* Edit mode: Status, Effort, Order */}
         {!isCreateMode && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-foreground">Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({ ...formData, status: e.target.value as Task['status'] })
-              }
-              className="w-full h-9 pl-3 pr-10 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
-              disabled={isLoading}
-            >
-              <option value="backlog">Backlog</option>
-              <option value="planning">Planning</option>
-              <option value="tasking">Tasking</option>
-              <option value="coding">Coding</option>
-              <option value="reviewing">Reviewing</option>
-              <option value="done">Done</option>
-            </select>
-          </div>
-        )}
-
-        {/* Edit mode: Effort */}
-        {!isCreateMode && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-foreground">Effort (hours)</label>
-            <Input
-              type="number"
-              step="0.5"
-              min="0.5"
-              max="40"
-              value={formData.effort ?? ''}
-              onChange={(e) =>
-                setFormData({ ...formData, effort: parseFloat(e.target.value) || undefined })
-              }
-              className="w-full"
-              placeholder="e.g. 2.5"
-              disabled={isLoading}
-            />
-          </div>
-        )}
-
-        {/* Edit mode: Order */}
-        {!isCreateMode && (
-          <div>
-            <label className="block text-sm font-medium mb-1 text-foreground">Order</label>
-            <Input
-              type="number"
-              min="0"
-              value={formData.order ?? ''}
-              onChange={(e) =>
-                setFormData({ ...formData, order: parseInt(e.target.value) || undefined })
-              }
-              className="w-full"
-              placeholder="e.g. 0 (highest priority)"
-              disabled={isLoading}
-            />
+          <div className="grid grid-cols-3 gap-4 flex-shrink-0">
+            <div>
+              <label className="block text-sm font-medium mb-1 text-foreground">Status</label>
+              <select
+                value={formData.status}
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value as Task['status'] })
+                }
+                className="w-full h-9 pl-3 pr-10 py-1 rounded-md border border-input bg-transparent text-sm shadow-xs text-foreground"
+                disabled={isLoading}
+              >
+                <option value="backlog">Backlog</option>
+                <option value="planning">Planning</option>
+                <option value="tasking">Tasking</option>
+                <option value="coding">Coding</option>
+                <option value="reviewing">Reviewing</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-foreground">Effort (h)</label>
+              <Input
+                type="number"
+                step="0.5"
+                min="0.5"
+                max="40"
+                value={formData.effort ?? ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, effort: parseFloat(e.target.value) || undefined })
+                }
+                className="w-full"
+                placeholder="2.5"
+                disabled={isLoading}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-foreground">Order</label>
+              <Input
+                type="number"
+                min="0"
+                value={formData.order ?? ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, order: parseInt(e.target.value) || undefined })
+                }
+                className="w-full"
+                placeholder="0"
+                disabled={isLoading}
+              />
+            </div>
           </div>
         )}
 

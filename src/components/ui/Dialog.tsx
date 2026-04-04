@@ -26,6 +26,8 @@ interface DialogProps {
   restoreFocus?: boolean;
   /** Escキーでダイアログを閉じるか（デフォルト: true） */
   dismissOnEsc?: boolean;
+  /** ほぼ全画面表示（padding 16px） */
+  fullScreen?: boolean;
 }
 
 const maxWidthClasses = {
@@ -47,6 +49,7 @@ export function Dialog({
   showCloseButton = true,
   initialFocusEl,
   dismissOnEsc = true,
+  fullScreen = false,
 }: DialogProps) {
   // Handle initialFocusEl by focusing the element after dialog opens
   useEffect(() => {
@@ -71,13 +74,20 @@ export function Dialog({
       <BaseDialogContent
         showCloseButton={false}
         className={cn(
-          'bg-background rounded-lg border border-border shadow-lg max-h-[90vh] overflow-y-auto',
+          'bg-background rounded-lg border border-border shadow-lg',
           'gap-0 p-0',
-          maxWidthClasses[maxWidth]
+          fullScreen
+            ? 'w-[calc(100%-32px)] !max-w-[calc(100%-32px)] h-[calc(100vh-32px)] max-h-[calc(100vh-32px)] flex flex-col overflow-hidden'
+            : cn('max-h-[90vh] overflow-y-auto', maxWidthClasses[maxWidth])
         )}
       >
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-6 pt-6 pb-2">
+          <div
+            className={cn(
+              'flex items-center justify-between',
+              fullScreen ? 'px-4 pt-4 pb-2' : 'px-6 pt-6 pb-2'
+            )}
+          >
             {title && (
               <BaseDialogTitle className="text-lg font-semibold leading-none text-foreground">
                 {title}
@@ -98,7 +108,17 @@ export function Dialog({
             )}
           </div>
         )}
-        <div className={title || showCloseButton ? 'px-6 pb-6 pt-2' : 'p-6'}>{children}</div>
+        <div
+          className={cn(
+            fullScreen
+              ? 'px-4 pb-4 pt-2 flex-1 min-h-0 flex flex-col'
+              : title || showCloseButton
+                ? 'px-6 pb-6 pt-2'
+                : 'p-6'
+          )}
+        >
+          {children}
+        </div>
       </BaseDialogContent>
     </BaseDialog>
   );
