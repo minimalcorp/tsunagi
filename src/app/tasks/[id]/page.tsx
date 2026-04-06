@@ -236,7 +236,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
                 <Pencil className="w-4 h-4" />
-                Edit
+                Detail / Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
