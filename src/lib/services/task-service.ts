@@ -110,7 +110,7 @@ export async function resolveTask(identifier: TaskIdentifier): Promise<Task | nu
 export async function listTasks(filter?: {
   owner?: string;
   repo?: string;
-  status?: Task['status'];
+  status?: Task['status'] | Task['status'][];
   includeDeleted?: boolean;
 }): Promise<Task[]> {
   return taskRepo.getTasks({

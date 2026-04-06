@@ -4,7 +4,7 @@ import type { Task, Tab } from '../types';
 // タスク一覧取得（deleted: false のみデフォルト）
 export async function getTasks(filter?: {
   includeDeleted?: boolean;
-  status?: Task['status'];
+  status?: Task['status'] | Task['status'][];
   owner?: string;
   repo?: string;
   updatedBefore?: Date;
@@ -12,7 +12,9 @@ export async function getTasks(filter?: {
   const tasks = await prisma.task.findMany({
     where: {
       ...(filter?.includeDeleted ? {} : { deletedAt: null }),
-      ...(filter?.status && { status: filter.status }),
+      ...(filter?.status && {
+        status: Array.isArray(filter.status) ? { in: filter.status } : filter.status,
+      }),
       ...(filter?.owner && { owner: filter.owner }),
       ...(filter?.repo && { repo: filter.repo }),
       ...(filter?.updatedBefore && { updatedAt: { lt: filter.updatedBefore } }),

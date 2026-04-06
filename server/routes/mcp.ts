@@ -41,16 +41,29 @@ function createMcpServer(io?: SocketIOServer): Server {
     tools: [
       {
         name: 'tsunagi_list_tasks',
-        description: 'タスク一覧を取得する（owner/repo/statusでフィルタ可）',
+        description:
+          'タスク一覧を取得する（owner/repo/statusでフィルタ可）。statusは単一値または配列で指定可能。',
         inputSchema: {
           type: 'object',
           properties: {
             owner: { type: 'string', description: 'リポジトリオーナー' },
             repo: { type: 'string', description: 'リポジトリ名' },
             status: {
-              type: 'string',
-              enum: ['backlog', 'planning', 'coding', 'reviewing', 'done'],
-              description: 'ステータスフィルタ',
+              oneOf: [
+                {
+                  type: 'string',
+                  enum: ['backlog', 'planning', 'coding', 'reviewing', 'done'],
+                },
+                {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                    enum: ['backlog', 'planning', 'coding', 'reviewing', 'done'],
+                  },
+                },
+              ],
+              description:
+                'ステータスフィルタ。単一値（例: "backlog"）または配列（例: ["backlog", "planning"]）で指定。配列指定時はいずれかのステータスに一致するタスクを返す。',
             },
           },
         },
@@ -179,12 +192,13 @@ function createMcpServer(io?: SocketIOServer): Server {
           const { owner, repo, status } = (args ?? {}) as {
             owner?: string;
             repo?: string;
-            status?: string;
+            status?: string | string[];
           };
+          type TaskStatus = import('../../src/lib/types.js').Task['status'];
           const tasks = await listTasks({
             owner,
             repo,
-            status: status as import('../../src/lib/types.js').Task['status'] | undefined,
+            status: status as TaskStatus | TaskStatus[] | undefined,
           });
           return { content: [{ type: 'text', text: JSON.stringify(tasks, null, 2) }] };
         }
