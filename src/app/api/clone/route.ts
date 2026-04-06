@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createRepo } from '@/lib/repositories/repository';
 import { initBareRepository, authenticateGhCli } from '@/lib/worktree-manager';
 import { getEnv } from '@/lib/repositories/environment';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
@@ -63,7 +64,17 @@ export async function POST(request: Request) {
     const bareRepoPath = path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, '.bare');
 
     // Bare cloneを実行
-    await initBareRepository(owner, repo, gitUrl);
+    try {
+      await initBareRepository(owner, repo, gitUrl);
+    } catch (error) {
+      // clone失敗時は中途半端に作成された bare ディレクトリを削除してから再スロー
+      try {
+        await fs.rm(bareRepoPath, { recursive: true, force: true });
+      } catch (cleanupError) {
+        console.warn('Failed to cleanup bare repository after clone failure:', cleanupError);
+      }
+      throw error;
+    }
 
     // Repository登録
     const newRepo = await createRepo({
