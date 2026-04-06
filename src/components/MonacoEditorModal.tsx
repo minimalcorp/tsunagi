@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useLayoutEffect } from 'react';
+import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { Editor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -44,6 +44,8 @@ export function MonacoEditorModal({
   const handleCancelRef = useRef<() => void>(() => {});
   // open 状態を ref で保持: onDidLayoutChange ハンドラから参照するため
   const openRef = useRef(open);
+  // monaco editor にフォーカスがあるかどうか。フォーカス中は Esc でのダイアログ閉じを無効化する
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
   const { effectiveTheme } = useTheme();
 
   function handleSubmit() {
@@ -94,7 +96,7 @@ export function MonacoEditorModal({
       showCloseButton={true}
       trapFocus={false}
       restoreFocus={false}
-      dismissOnEsc={false}
+      dismissOnEsc={!isEditorFocused}
     >
       <div className="space-y-4">
         <div
@@ -116,6 +118,10 @@ export function MonacoEditorModal({
                   editorInstance.focus();
                 }
               });
+
+              // フォーカス状態を state に同期: Esc 無効化の判定に使用
+              editorInstance.onDidFocusEditorText(() => setIsEditorFocused(true));
+              editorInstance.onDidBlurEditorText(() => setIsEditorFocused(false));
 
               // 初回マウント時
               editorInstance.layout();

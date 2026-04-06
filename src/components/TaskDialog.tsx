@@ -63,6 +63,7 @@ interface DescriptionEditorViewerProps {
   activeTab: 'editor' | 'preview';
   onTabChange: (tab: 'editor' | 'preview') => void;
   disabled?: boolean;
+  onFocusChange?: (focused: boolean) => void;
 }
 
 function DescriptionEditorViewer({
@@ -73,6 +74,7 @@ function DescriptionEditorViewer({
   activeTab,
   onTabChange,
   disabled,
+  onFocusChange,
 }: DescriptionEditorViewerProps) {
   const handleEditorChange = useCallback(
     (text: string | undefined) => {
@@ -91,6 +93,9 @@ function DescriptionEditorViewer({
         onMount={(editorInstance) => {
           editorRef.current = editorInstance;
           editorInstance.layout();
+          // フォーカス状態を親に通知: ダイアログの Esc 閉じ制御に使用
+          editorInstance.onDidFocusEditorText(() => onFocusChange?.(true));
+          editorInstance.onDidBlurEditorText(() => onFocusChange?.(false));
         }}
         options={{
           minimap: { enabled: false },
@@ -187,6 +192,8 @@ export function TaskDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [descriptionTab, setDescriptionTab] = useState<'editor' | 'preview'>('editor');
+  // description の monaco editor にフォーカスがあるかどうか。フォーカス中は Esc 閉じを無効化する
+  const [isDescriptionEditorFocused, setIsDescriptionEditorFocused] = useState(false);
   const descriptionEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const { effectiveTheme } = useTheme();
 
@@ -409,6 +416,7 @@ export function TaskDialog({
       maxWidth={isCreateMode ? '2xl' : '6xl'}
       fullScreen={!isCreateMode}
       showCloseButton={!isLoading}
+      dismissOnEsc={!isDescriptionEditorFocused}
     >
       {isLoading && (
         <div className="absolute inset-0 bg-card bg-opacity-90 rounded-lg flex items-center justify-center z-10">
@@ -497,6 +505,7 @@ export function TaskDialog({
               activeTab={descriptionTab}
               onTabChange={setDescriptionTab}
               disabled={isLoading}
+              onFocusChange={setIsDescriptionEditorFocused}
             />
           ) : (
             <Textarea
