@@ -81,7 +81,13 @@ export async function initBareRepository(
   await bareGit.fetch();
 
   // origin/HEADを設定
-  await bareGit.raw(['remote', 'set-head', 'origin', '--auto']);
+  // 空リポジトリ（リモートにブランチが1つもない）の場合は set-head が失敗するが、
+  // clone自体は成功させる。getDefaultBranch() 側の fallback で対応される。
+  try {
+    await bareGit.raw(['remote', 'set-head', 'origin', '--auto']);
+  } catch (error) {
+    console.warn('Failed to set origin/HEAD (empty repository?):', error);
+  }
 
   return bareRepoPath;
 }
@@ -105,7 +111,12 @@ export async function fetchRemote(owner: string, repo: string): Promise<void> {
   // Git configに設定されたfetch refspecを使用
   await git.fetch('origin', { '--prune': null });
   // origin/HEADをリモートの最新デフォルトブランチに自動更新
-  await git.remote(['set-head', 'origin', '--auto']);
+  // 空リポジトリの場合は失敗するが、fetch自体は成功しているので無視する
+  try {
+    await git.remote(['set-head', 'origin', '--auto']);
+  } catch (error) {
+    console.warn('Failed to set origin/HEAD (empty repository?):', error);
+  }
 }
 
 // リモートブランチの一覧を取得
