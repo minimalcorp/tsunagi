@@ -130,6 +130,26 @@ export async function getRemoteBranches(owner: string, repo: string): Promise<st
     .map((b) => b.replace('origin/', ''));
 }
 
+// 空リポジトリ（local / remote tracking branch が1つも無い）かどうか判定
+// 呼び出し側は事前に fetchRemote() を呼ぶこと（ネットワーク呼び出しは行わない）
+export async function isEmptyRepo(owner: string, repo: string): Promise<boolean> {
+  const bareRepoPath = await ensureBareRepository(owner, repo);
+  const git: SimpleGit = simpleGit(bareRepoPath);
+  const branches = await git.branch(['-a']);
+  return branches.all.length === 0;
+}
+
+// 指定 worktree が unborn branch (HEAD 未確定) の状態かどうか判定
+// orphan worktree として作成された直後や、commit が1つも無い状態で使用される
+export async function isUnbornWorktree(worktreePath: string): Promise<boolean> {
+  try {
+    await simpleGit(worktreePath).revparse(['HEAD']);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 // デフォルトブランチを取得
 export async function getDefaultBranch(owner: string, repo: string): Promise<string> {
   const bareRepoPath = await ensureBareRepository(owner, repo);
@@ -184,6 +204,10 @@ export async function createWorktree(
   } else if (remoteBranchExists) {
     // Remote branchが存在する場合はlocal tracking branchを作成
     await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${branch}`]);
+  } else if (await isEmptyRepo(owner, repo)) {
+    // 空リポジトリ: origin/<base> が存在しないため orphan branch として worktree を作る
+    // 要 Git >= 2.42
+    await git.raw(['worktree', 'add', '--orphan', '-b', branch, worktreePath]);
   } else {
     // 新規ブランチを作成（常にorigin/baseBranchから）
     await git.raw(['worktree', 'add', '-b', branch, worktreePath, `origin/${effectiveBaseBranch}`]);

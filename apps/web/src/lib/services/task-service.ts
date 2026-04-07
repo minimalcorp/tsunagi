@@ -326,15 +326,28 @@ export async function listRepos(): Promise<Repository[]> {
 /**
  * default branch worktreeを確保する（なければ作成、あれば最新化）
  */
+// `.default` worktree を必ずリモートの default branch と同期させる。
+//
+// 状態:
+//   A. orphan  - リモートにまだ default branch commit が無い空リポジトリ状態
+//   B. detached - origin/<defaultBranch> を指す detached HEAD (通常状態)
+//
+// 状態遷移:
+//   初回 & empty       → A を作成
+//   初回 & non-empty   → B を作成
+//   既存 A & empty     → 何もしない
+//   既存 A & non-empty → A を破棄して B を作り直す (昇格)
+//   既存 B & non-empty → git reset --hard origin/<defaultBranch> で同期
 export async function ensureDefaultWorktree(
   owner: string,
   repo: string
 ): Promise<{ worktreePath: string; defaultBranch: string }> {
+  const bareRepoPath = await worktreeManager.ensureBareRepository(owner, repo);
+  await worktreeManager.fetchRemote(owner, repo);
+
+  const empty = await worktreeManager.isEmptyRepo(owner, repo);
   const defaultBranch = await worktreeManager.getDefaultBranch(owner, repo);
   const worktreePath = worktreeManager.getWorktreePath(owner, repo, '.default');
-  const bareRepoPath = await worktreeManager.ensureBareRepository(owner, repo);
-
-  await worktreeManager.fetchRemote(owner, repo);
 
   let exists = false;
   try {
@@ -344,12 +357,33 @@ export async function ensureDefaultWorktree(
     // not found
   }
 
-  if (exists) {
+  const bareGit = simpleGit(bareRepoPath);
+
+  if (!exists) {
+    if (empty) {
+      // 状態A を新規作成: orphan branch (Git >= 2.42)
+      await bareGit.raw(['worktree', 'add', '--orphan', '-b', defaultBranch, worktreePath]);
+    } else {
+      // 状態B を新規作成: detached HEAD on origin/<defaultBranch>
+      await bareGit.raw(['worktree', 'add', '--detach', worktreePath, `origin/${defaultBranch}`]);
+    }
+    return { worktreePath, defaultBranch };
+  }
+
+  if (empty) {
+    // まだリモート空 → 状態 A のまま放置
+    return { worktreePath, defaultBranch };
+  }
+
+  // empty === false: リモートに default branch が存在する
+  if (await worktreeManager.isUnbornWorktree(worktreePath)) {
+    // A → B 昇格: orphan worktree を破棄して detached で作り直す
+    await bareGit.raw(['worktree', 'remove', '--force', worktreePath]);
+    await bareGit.raw(['worktree', 'add', '--detach', worktreePath, `origin/${defaultBranch}`]);
+  } else {
+    // B → B: 通常の同期
     const git = simpleGit(worktreePath);
     await git.raw(['reset', '--hard', `origin/${defaultBranch}`]);
-  } else {
-    const bareGit = simpleGit(bareRepoPath);
-    await bareGit.raw(['worktree', 'add', '--detach', worktreePath, `origin/${defaultBranch}`]);
   }
 
   return { worktreePath, defaultBranch };

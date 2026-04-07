@@ -91,6 +91,12 @@ tsunagi/
 - Linux
 - Windows は**非サポート**（WSL2 経由で動作する可能性はありますが保証されません）
 
+## 必須ランタイム
+
+- **Node.js ≥ 20**
+- **Git ≥ 2.42**（空リポジトリを扱うため `git worktree add --orphan` を使用）
+- **Claude Code CLI**（`claude` コマンドが PATH 上に必要）
+
 ## ライセンス
 
 本リポジトリは [PolyForm Shield License 1.0.0](./LICENSE) のもとで公開されています。
