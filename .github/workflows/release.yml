@@ -3,8 +3,16 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: 'Release target'
+        required: true
+        type: choice
+        options:
+          - all
+          - tsunagi
+          - docs
       version:
-        description: 'Version bump (patch / minor / major)'
+        description: 'Version bump (tsunagi 用 / docs には無視される)'
         required: true
         type: choice
         options:
@@ -13,15 +21,13 @@ on:
           - major
 
 jobs:
-  release:
-    name: Publish to npm
+  publish-tsunagi:
+    name: Publish @minimalcorp/tsunagi to npm
+    if: ${{ inputs.target == 'all' || inputs.target == 'tsunagi' }}
     runs-on: ubuntu-latest
     permissions:
-      # Needed to push the version bump commit and tag back to the repository.
       contents: write
-      # Needed for npm provenance (sigstore OIDC).
       id-token: write
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,17 +50,21 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump version
+      - name: Bump version (workspace)
         id: bump
         run: |
-          npm version "${{ inputs.version }}" -m "chore: release v%s"
-          echo "new_version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          npm version "${{ inputs.version }}" --workspace=@minimalcorp/tsunagi
+          NEW_VERSION=$(node -p "require('./apps/web/package.json').version")
+          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          git add apps/web/package.json package-lock.json
+          git commit -m "chore: release @minimalcorp/tsunagi v${NEW_VERSION}"
+          git tag "v${NEW_VERSION}"
 
       - name: Push commit and tag
         run: git push --follow-tags
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --workspace=@minimalcorp/tsunagi --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -65,3 +75,45 @@ jobs:
           gh release create "v${{ steps.bump.outputs.new_version }}" \
             --title "v${{ steps.bump.outputs.new_version }}" \
             --generate-notes
+
+  deploy-docs:
+    name: Deploy docs to GitHub Pages
+    if: ${{ inputs.target == 'all' || inputs.target == 'docs' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.12.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build docs (static export)
+        env:
+          NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: npm run build -w tsunagi-docs
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/docs/out
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
