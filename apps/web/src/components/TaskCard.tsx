@@ -16,7 +16,7 @@ interface TaskCardProps {
   task: Task;
   isDragging: boolean;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
-  /** タブIDをキーにしたTodosのMap（KanbanカードのProgress Bar表示用） */
+  /** タブIDをキーにしたTodosのMap（タスクカードの Progress Bar 表示用） */
   tabTodosMap?: Map<string, TabTodo[]>;
 }
 

@@ -15,7 +15,7 @@ const FASTIFY_API_BASE = 'http://localhost:2792';
 
 /**
  * Fastify socket.ioに接続してTodo更新を受信するhook。
- * KanbanページのProgress Bar表示に使用。
+ * タスクカードの Progress Bar 表示に使用。
  */
 export function useTerminalTodos(runningTabIds: string[]): TabTodosMap {
   const [todosMap, setTodosMap] = useState<TabTodosMap>(new Map());

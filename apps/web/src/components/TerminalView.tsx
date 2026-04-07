@@ -47,7 +47,7 @@ interface TerminalViewProps {
   className?: string;
   /** DBから読み込んだ初期Todoリスト */
   initialTodos?: Todo[];
-  /** Todoリスト更新時のコールバック（KanbanカードのProgress Bar用） */
+  /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
   /** タブがアクティブかどうか（フォーカス制御用） */
   isActive?: boolean;

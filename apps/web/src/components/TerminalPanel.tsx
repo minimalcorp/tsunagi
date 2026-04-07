@@ -24,7 +24,7 @@ interface TerminalPanelProps {
   onTabChange: (tabId: string) => void;
   onTabCreate: () => Promise<string | undefined>;
   onTabDelete: (tabId: string) => void;
-  /** Todoリスト更新時のコールバック（KanbanカードのProgress Bar用） */
+  /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
 }
 

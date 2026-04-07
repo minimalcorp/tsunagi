@@ -34,11 +34,7 @@
     "prettier": "^3.7.4"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
-      "prettier --write",
-      "eslint --fix"
-    ],
-    "*.{json,md,css}": [
+    "**/*.{js,jsx,ts,tsx,cjs,mjs,json,md,mdx,css,yml,yaml}": [
       "prettier --write"
     ]
   }

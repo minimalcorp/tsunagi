@@ -19,6 +19,13 @@ const nextConfig = {
   },
   // Trailing slashes simplify directory-style routing on static hosts.
   trailingSlash: true,
+  // i18n locales: Nextra 4 reads this field to populate NEXTRA_LOCALES env var
+  // (App Router 自体は next.config.i18n を使わないが、Nextra の内部処理が
+  // この値を読んで content/<locale>/ 配下のページを解決する)。
+  i18n: {
+    locales: ['en', 'ja'],
+    defaultLocale: 'en',
+  },
 };
 
 export default withNextra(nextConfig);

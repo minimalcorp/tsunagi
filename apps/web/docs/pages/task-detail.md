@@ -87,7 +87,7 @@ interface ChatMessage {
 
 タスク詳細画面では、ヘッダやサイドバーなどの共通レイアウトを非表示にし、タスクに集中できるようにします。
 
-画面左上に「← Back to Board」ボタンを配置し、Kanban Boardに戻れるようにします。
+画面左上に「← Back」ボタンを配置し、タスク一覧画面に戻れるようにします。
 
 ---
 
@@ -882,7 +882,7 @@ export default function TaskDetailPage({ taskId }: Props) {
 
 ### 開く
 
-- Kanban boardでタスクカードをクリック
+- タスク一覧でタスクカードをクリック
 - デスクトップ: タスク詳細が全画面で表示される
 - モバイル: タスク詳細が全画面で表示される
 

@@ -202,7 +202,7 @@ interface Task {
   - `50` - 51番目に優先
   - `200` - 201番目に優先
 - **用途**:
-  - Kanban board でのタスク表示順序
+  - タスク一覧での表示順序
   - ユーザーは order 0 から順に消化
   - タスク数に応じて柔軟に増減
 - **判定基準**:
@@ -265,7 +265,7 @@ interface Task {
 
 **UI表示**:
 
-- Kanban board: `deleted: false` のタスクのみ表示
+- タスク一覧: `deleted: false` のタスクのみ表示
 - 削除済みタスク: API経由で検索可能（`GET /api/tasks?includeDeleted=true`）
 
 この制約により、タスクごとに完全に独立した作業環境が保証されます。

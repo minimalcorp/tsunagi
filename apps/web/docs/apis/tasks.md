@@ -232,7 +232,7 @@ GET /api/tasks/550e8400-e29b-41d4-a716-446655440000
 
 - 未コミットの変更がある場合でも強制削除されます
 - 削除されたタスクは `GET /api/tasks?includeDeleted=true` で取得可能です
-- UI（Kanban board）には表示されません
+- UI（タスク一覧）には表示されません
 
 ---
 
@@ -316,7 +316,7 @@ GET /api/tasks/550e8400-e29b-41d4-a716-446655440000
 **注意**:
 
 - 削除されたタスクは `GET /api/tasks?includeDeleted=true` で取得可能
-- UI（Kanban board）には表示されない
+- UI（タスク一覧）には表示されない
 
 ---
 
@@ -368,7 +368,7 @@ GET /api/tasks/550e8400-e29b-41d4-a716-446655440000
 }
 ```
 
-**UI対応**: Kanban boardから該当タスクを除外表示します。
+**UI対応**: タスク一覧から該当タスクを除外表示します。
 
 ---
 

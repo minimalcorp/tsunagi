@@ -27,7 +27,7 @@ function toTabStatus(claudeStatus: string): Tab['status'] | null {
 
 /**
  * 指定したタブIDのSocket.IO roomを購読し、status-changedイベントを受信するhook。
- * KanbanBoardのリアルタイムステータス更新に使用。
+ * タスク一覧 / プランナーのリアルタイムステータス更新に使用。
  */
 export function useTabStatusEvents(
   tabIds: string[],
