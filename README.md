@@ -42,17 +42,17 @@ npm run docs:dev
 
 ## よく使うコマンド（ルートから実行）
 
-| コマンド               | 説明                                                       |
-| ---------------------- | ---------------------------------------------------------- |
-| `npm run dev`          | web + docs を並列起動（Ctrl+C で両方停止）                 |
-| `npm run web:dev`      | Tsunagi 本体のみ開発モードで起動                           |
-| `npm run docs:dev`     | ドキュメントサイトのみ開発モードで起動                     |
-| `npm run build`        | 全ワークスペースをビルド                                   |
-| `npm run build:dist`   | Tsunagi 本体の dist ビルド (`tsc -p tsconfig.dist.json`)   |
-| `npm run lint`         | 全ワークスペースで ESLint を実行                           |
-| `npm run type-check`   | 全ワークスペースで TypeScript 型チェック                   |
-| `npm run format`       | Prettier で全ファイルをフォーマット                        |
-| `npm run format:check` | Prettier でフォーマット差分チェック                        |
+| コマンド               | 説明                                                     |
+| ---------------------- | -------------------------------------------------------- |
+| `npm run dev`          | web + docs を並列起動（Ctrl+C で両方停止）               |
+| `npm run web:dev`      | Tsunagi 本体のみ開発モードで起動                         |
+| `npm run docs:dev`     | ドキュメントサイトのみ開発モードで起動                   |
+| `npm run build`        | 全ワークスペースをビルド                                 |
+| `npm run build:dist`   | Tsunagi 本体の dist ビルド (`tsc -p tsconfig.dist.json`) |
+| `npm run lint`         | 全ワークスペースで ESLint を実行                         |
+| `npm run type-check`   | 全ワークスペースで TypeScript 型チェック                 |
+| `npm run format`       | Prettier で全ファイルをフォーマット                      |
+| `npm run format:check` | Prettier でフォーマット差分チェック                      |
 
 ## リリース
 
