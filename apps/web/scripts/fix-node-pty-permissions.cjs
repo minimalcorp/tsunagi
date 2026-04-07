@@ -2,26 +2,52 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 // node-pty の prebuilt spawn-helper に実行権限を付与する。
 //
-// npm workspaces の hoisting により node-pty は root の node_modules/ に
-// 格納されることがあるため、require.resolve で実際のインストール先を
-// 動的に解決する。hoist されていない場合も apps/web/node_modules/ から
-// 解決できるので、単一のロジックで両方のケースをカバーできる。
+// 背景: node-pty v1.1.0 の npm tarball は spawn-helper を mode 0644 で
+// 出荷しているため、展開しただけでは実行できず、PTY 起動時に
+// `posix_spawnp failed` で失敗する。node-pty 自身の post-install.js は
+// chmod を行わない（undocumented な packaging bug）。
+//
+// 探索先は monorepo の2箇所に限定する:
+//   1. <project-root>/node_modules/node-pty          (npm workspaces で hoist された場合)
+//   2. <project-root>/apps/web/node_modules/node-pty (hoist されずに workspace local に置かれた場合)
+//
+// __dirname を起点にパスを決定するため、実行時の CWD が project root でも
+// apps/web でも同じ結果になる。require.resolve の lookup walk により
+// project root の外まで探索が漏れる事故を避けるため、手動パスで check している。
+//
+// TODO: node-pty >= 1.2.0 stable にアップグレード後は本スクリプトと
+// apps/web/package.json の postinstall 呼び出しを削除できる。v1.2.0 以降の
+// tarball は spawn-helper が mode 0755 で出荷されている (v1.2.0-beta.12 で確認済)。
 
 const fs = require('node:fs');
 const path = require('node:path');
 
+// __dirname = <project-root>/apps/web/scripts
+const WEB_PACKAGE_DIR = path.resolve(__dirname, '..'); // apps/web
+const PROJECT_ROOT = path.resolve(WEB_PACKAGE_DIR, '..', '..'); // project root
+
+function findNodePtyDir() {
+  const candidates = [
+    path.join(PROJECT_ROOT, 'node_modules', 'node-pty'),
+    path.join(WEB_PACKAGE_DIR, 'node_modules', 'node-pty'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, 'package.json'))) {
+      return dir;
+    }
+  }
+  return null;
+}
+
 function main() {
-  let nodePtyPackageJson;
-  try {
-    nodePtyPackageJson = require.resolve('node-pty/package.json');
-  } catch {
-    // node-pty が未インストール（配布後の consumer では postinstall が
-    // 走らない等）。警告のみ出して終了。
-    console.warn('[fix-node-pty-permissions] node-pty not found; skipping');
+  const nodePtyDir = findNodePtyDir();
+  if (!nodePtyDir) {
+    console.warn(
+      '[fix-node-pty-permissions] node-pty not found in project root or apps/web; skipping'
+    );
     return;
   }
 
-  const nodePtyDir = path.dirname(nodePtyPackageJson);
   const prebuildsDir = path.join(nodePtyDir, 'prebuilds');
   if (!fs.existsSync(prebuildsDir)) {
     return;
