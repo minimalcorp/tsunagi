@@ -49,7 +49,7 @@
     "build": "prisma generate && next build",
     "build:dist": "tsc -p tsconfig.dist.json && chmod +x dist/scripts/cli.js",
     "start": "tsx scripts/auto-migrate.ts && tsx scripts/with-plugin.ts start",
-    "postinstall": "prisma generate && chmod +x node_modules/node-pty/prebuilds/*/spawn-helper 2>/dev/null || true",
+    "postinstall": "prisma generate && node scripts/fix-node-pty-permissions.cjs",
     "prepack": "npm run build:dist && npm run build",
     "prepublishOnly": "npm run lint && npm run type-check",
     "lint": "eslint",
