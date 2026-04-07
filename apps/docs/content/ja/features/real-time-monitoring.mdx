@@ -1,0 +1,33 @@
+---
+title: リアルタイム監視
+description: 各 Claude セッションの動きをリアルタイムに見る。
+---
+
+import { Callout } from 'nextra/components';
+
+# リアルタイム監視
+
+Tsunagi は Claude Code の [hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) を読み取り、各セッションからリアルタイム信号を導出して UI に表示します。
+
+## 見えるもの
+
+- Claude の `TodoWrite` 呼び出しに基づく **タスク単位のプログレスバー**
+- 実際の作業に追従する **ステータスバッジ** (例: タブの "running" vs "idle")
+- タスク詳細画面の **ライブターミナル出力**
+- Claude がツールを呼び出すたびに更新される **アクティビティ時刻**
+
+<img
+  src="/screenshots/terminal-session.png"
+  alt="リアルタイム UI"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## 仕組み
+
+Claude Code は明確に定義されたタイミング (todo 更新、ツール呼び出し、セッション開始/終了) で hook イベントを発行します。バンドルされた Tsunagi plugin がこれらの hook のハンドラを登録し、各ハンドラが小さな JSON ペイロードを Tsunagi の Fastify バックエンドに POST します。
+
+バックエンドはその変更を Socket.IO 経由で接続中のすべてのブラウザタブにブロードキャストします——ページリロードもポーリングもなく更新が見えます。
+
+<Callout type="info">
+  **準備中**: Tsunagi が消費する hook イベントの正確な仕様と、その拡張方法のリファレンス。
+</Callout>

@@ -1,0 +1,45 @@
+---
+title: Task Management
+description: How tasks work in Tsunagi.
+---
+
+import { Callout } from 'nextra/components';
+
+# Task Management
+
+Tasks are Tsunagi's atomic unit of work. Each task owns a git worktree and
+can host one or more Claude sessions inside that worktree.
+
+<img
+  src="/screenshots/task-list.png"
+  alt="Task list panel"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## Lifecycle
+
+A task moves through these statuses:
+
+`backlog` → `planning` → `coding` → `reviewing` → `done`
+
+Status changes can be:
+
+- **Manual**, by dragging the task in the UI or editing it in the detail view
+- **Automatic**, by the Claude session itself via the Tsunagi MCP server
+  (the bundled plugin teaches Claude when to call `tsunagi_update_task`)
+
+Deleting a task is a separate action — it removes the worktree from disk
+and the task record from the database.
+
+## Filtering and ordering
+
+The task list panel supports:
+
+- Filtering by repository, status, or text
+- Reordering by priority within a status (drag and drop)
+- Batch deletion of `done` tasks
+
+<Callout type="info">
+  **Coming soon**: This page is a stub. Full coverage of all task management features (effort sizes,
+  descriptions in MDX, planner panel, etc.) will be added in a future update.
+</Callout>

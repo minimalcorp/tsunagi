@@ -1,0 +1,67 @@
+---
+title: インストール
+description: Tsunagi のインストールと起動方法。
+---
+
+# インストール
+
+## 前提条件
+
+以下が必要です:
+
+- **Node.js ≥ 20**
+- **Git ≥ 2.42** (Tsunagi は `git worktree add --orphan` を使うため Git 2.42 以降が必要です)
+- **[Claude Code CLI](https://docs.claude.com/en/docs/claude-code/overview)** — `claude` コマンドが `PATH` 上にあること。Tsunagi は Claude Code を既に使っている前提のツールなので、Claude Code 自体の説明はここでは行いません。
+- **macOS または Linux**。Windows は非サポート (WSL2 経由で動作する可能性はありますが保証されません)
+- **Anthropic API キー** または **Claude Code OAuth トークン** — Claude Code 自身が使っているのと同じ認証情報
+
+## `npx` で起動 (推奨)
+
+```bash
+npx @minimalcorp/tsunagi
+```
+
+ブラウザで [http://localhost:2791](http://localhost:2791) を開きます。
+
+## またはグローバルインストール
+
+```bash
+npm install -g @minimalcorp/tsunagi
+tsunagi
+```
+
+挙動は同じです。Web UI はポート `2791`、Fastify バックエンドはポート `2792` で起動します。
+
+## 初回起動時に起こること
+
+Tsunagi は起動時に以下を実行します:
+
+1. SQLite データベースを `~/.tsunagi/state/tsunagi.db` に作成 (存在しない場合)
+2. Prisma マイグレーションを適用してスキーマを最新化
+3. `~/.tsunagi/state/tsunagi.lock` に PID を書き込んで単一インスタンスを保証
+4. `claude` CLI 経由で Tsunagi の Claude Code marketplace と plugin をクリーンインストール。既存の Tsunagi plugin がある場合は一旦 uninstall してから再 install します。Tsunagi は `~/.claude/settings.json` を直接編集することはありません
+5. ポート `2792` で Fastify バックエンドを、ポート `2791` で Next.js Web UI を起動
+6. 終了時に plugin 登録と PID lock を後始末
+
+## データ保存場所
+
+```
+~/.tsunagi/
+├── state/
+│   ├── tsunagi.db            # SQLite データベース
+│   └── tsunagi.lock          # 単一インスタンス PID lock
+├── backups/                  # データベースバックアップ
+└── workspaces/               # git worktrees
+```
+
+`TSUNAGI_DATA_DIR` 環境変数で保存先を変更できます。
+
+## 単一インスタンス制約
+
+Tsunagi は同時に1プロセスしか起動できません。2つ目を起動しようとすると `Another tsunagi is running (PID xxx)` というエラーで終了します。これは意図的な仕様で、Claude Code plugin のライフサイクルと worktree の状態が race condition を起こすのを防ぐためです。
+
+## 次のステップ
+
+- [初回セットアップ](/ja/getting-started/initial-setup/) — リポジトリを登録して Tsunagi と作業を接続する
+- [基本概念](/ja/getting-started/concepts/) — 残りのドキュメントを読むのに必要な小さな用語集
+- [チュートリアル: 最初の開発サイクル](/ja/tutorial/create-task/) — 5 分以内で Claude を通じて Hello World プログラムを作る

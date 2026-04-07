@@ -1,0 +1,75 @@
+---
+title: 1. タスクを作成する
+description: 最初の Tsunagi タスクを作成し、worktree を準備させる。
+---
+
+import { Callout } from 'nextra/components';
+
+# 1. タスクを作成する
+
+このチュートリアルは Tsunagi の完全なタスクライフサイクルを、小さな例を使って体験します: **マシンに既にインストールされているプログラミング言語で "Hello, world!" を表示するプログラムを作成する**。所要時間は数分、消費する Claude のトークンも最小限です。
+
+## 前提条件
+
+事前に以下を済ませておいてください:
+
+- [Tsunagi をインストール](/ja/getting-started/installation/)
+- [リポジトリを登録](/ja/getting-started/initial-setup/)
+- Tsunagi UI を [http://localhost:2791](http://localhost:2791) で開いている状態
+
+このチュートリアルでは、実際のプロジェクトに hello world ファイルを作らないように **使い捨ての練習用リポジトリ** を使うことを推奨します。
+
+## 作成ダイアログを開く
+
+タスク一覧パネルで **+ Add Task** をクリックします。
+
+<img
+  src="/screenshots/task-list.png"
+  alt="Add task ボタン"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## フォームに入力する
+
+以下の値を使ってください:
+
+| フィールド  | 値                                            |
+| ----------- | --------------------------------------------- |
+| Title       | `Print hello world in any installed language` |
+| Repository  | (練習用リポジトリ)                            |
+| Branch      | `feat/hello-world` (空欄で自動生成も可)       |
+| Description | (任意、今は空欄で OK)                         |
+| Effort      | `S`                                           |
+
+<Callout type="info">
+  ブランチ名は Tsunagi が worktree を作成する実際の git
+  ブランチ名になります。意味のある名前を付けてください——Tsunagi は後から自動でリネームしません。
+</Callout>
+
+**Create** をクリックします。すぐに以下が起こります:
+
+1. 新しいタスクが **Backlog** カラムの一番上に `backlog` ステータスで表示される
+2. Tsunagi が `~/.tsunagi/workspaces/<owner>/<repo>/feat-hello-world/` にデフォルトブランチをベースとした git worktree を作成する
+
+別のターミナルで worktree が存在することを確認できます:
+
+```bash
+ls ~/.tsunagi/workspaces/<owner>/<repo>/
+```
+
+新しいブランチディレクトリが `.bare/` と `.default/` と並んで表示されているはずです。
+
+## 何が起こったか
+
+Tsunagi はいくつかのステップを自動で実行しました:
+
+- タスクの UUID を生成し SQLite データベースに行を挿入
+- bare repository から `git worktree add -b feat/hello-world ...` を実行して worktree を作成
+- タスクの worktreeStatus を `created` として記録
+- リアルタイムイベントを socket 経由で送信し、UI が即座に更新
+
+ターミナルを一切触る必要がありませんでした。これがあらゆる Tsunagi ワークフローの基礎です。
+
+## 次へ
+
+[2. Claude セッションを起動する →](/ja/tutorial/start-session/)

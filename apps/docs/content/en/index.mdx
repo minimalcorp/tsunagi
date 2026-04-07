@@ -1,25 +1,136 @@
 ---
 title: Tsunagi
+description: 1 task, 1 worktree, 1 Claude session — managed in one place.
 ---
+
+import { Cards } from 'nextra/components';
+
+{/* ----------------------------------------------------------------- */}
+{/* Hero */}
+{/* ----------------------------------------------------------------- */}
+
+<div style={{ textAlign: 'center', padding: '3rem 1rem 2rem' }}>
 
 # Tsunagi
 
-**Tsunagi (繋ぎ)** は、複数 GitHub 組織のプロジェクトをローカルで統合管理し、
-Claude AI による開発タスクを効率化する Web UI ツールです。
+### 1 task, 1 worktree, 1 Claude session — managed in one place.
 
-## 主な特徴
+Orchestrate parallel Claude Code development from a PM's perspective.
+Tsunagi gives you a single UI to launch, monitor, and control multiple
+Claude sessions running in isolated git worktrees.
 
-- **統合管理**: 複数 GitHub organization のプロジェクトを 1 つの UI で管理
-- **Git Worktree 活用**: タスクごとに独立した作業環境を自動構築
-- **Claude Agent 統合**: タブ型セッション管理でリアルタイムに AI 実行を可視化・制御
-- **ローカル完結**: 全てのデータと作業がローカル環境で完結
+[Get Started →](/en/getting-started/installation/) &nbsp;&nbsp;
+[GitHub ↗](https://github.com/minimalcorp/tsunagi)
 
-## ドキュメントの歩き方
+</div>
 
-- [Getting Started / Installation](/getting-started/installation) — インストールと初回起動
-- 機能ガイド、リファレンス、トラブルシューティングは順次追加予定です
+<img
+  src="/screenshots/hero.png"
+  alt="Tsunagi main view"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
 
----
+{/* ----------------------------------------------------------------- */}
+{/* The Problem */}
+{/* ----------------------------------------------------------------- */}
 
-このドキュメントは現在整備中です。最新情報は
-[GitHub リポジトリ](https://github.com/minimalcorp/tsunagi) をご確認ください。
+## The problem
+
+Running Claude Code seriously means running it in **parallel**. Multiple
+git worktrees, multiple terminals, multiple AI sessions — each working on a
+different task at the same time. It's the same shape as managing a team of
+human engineers as a PM.
+
+But the moment you spawn five Claude sessions across five terminals, you
+hit a wall:
+
+- **You can't tell what's running where.** Which terminal owns which task?
+  Who's coding what?
+- **Claude's work is invisible.** You don't know what each session is
+  thinking, what it's doing right now, or how far along it is.
+- **Task management bleeds into your day.** Creating, updating, prioritizing
+  tasks across multiple repos pulls you out of the work.
+
+The benefit of parallelization is capped by your own cognitive load.
+
+{/* ----------------------------------------------------------------- */}
+{/* Solution */}
+{/* ----------------------------------------------------------------- */}
+
+## How Tsunagi solves it
+
+Tsunagi treats every task as **its own git worktree, its own Claude
+session, its own tab in one Web UI**. Claude's hooks stream the work into
+that UI in real time, so you can see what every session is doing at a
+glance.
+
+You operate from the seat of a PM, not a stack of terminals.
+
+<img
+  src="/screenshots/task-detail.png"
+  alt="Task detail with multiple Claude sessions"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+And because Tsunagi exposes its own MCP server, **Claude itself can manage
+your tasks** — create, update, reprioritize, sweep stale ones — so even the
+PM work itself can be delegated to AI.
+
+{/* ----------------------------------------------------------------- */}
+{/* Features grid */}
+{/* ----------------------------------------------------------------- */}
+
+## At a glance
+
+<Cards>
+  <Cards.Card title="Task management" href="/en/features/task-management/" arrow>
+    <></>
+  </Cards.Card>
+  <Cards.Card title="Git worktree integration" href="/en/features/git-worktree/" arrow>
+    <></>
+  </Cards.Card>
+  <Cards.Card title="Claude agent + tab sessions" href="/en/features/claude-agent/" arrow>
+    <></>
+  </Cards.Card>
+  <Cards.Card title="Real-time monitoring" href="/en/features/real-time-monitoring/" arrow>
+    <></>
+  </Cards.Card>
+  <Cards.Card title="MCP server" href="/en/features/mcp-server/" arrow>
+    <></>
+  </Cards.Card>
+  <Cards.Card title="Environment variables" href="/en/features/environment-variables/" arrow>
+    <></>
+  </Cards.Card>
+</Cards>
+
+{/* ----------------------------------------------------------------- */}
+{/* Quick start */}
+{/* ----------------------------------------------------------------- */}
+
+## Quick start
+
+```bash
+npx @minimalcorp/tsunagi
+```
+
+That's it. Tsunagi will boot the local web UI on
+[http://localhost:2791](http://localhost:2791) and walk you through the
+initial setup.
+
+See [Installation](/en/getting-started/installation/) for prerequisites and
+the [First Development Cycle tutorial](/en/tutorial/create-task/) for a
+walkthrough of a complete task lifecycle.
+
+{/* ----------------------------------------------------------------- */}
+{/* Footer CTA */}
+{/* ----------------------------------------------------------------- */}
+
+## Built for the PM era of AI development
+
+The role of "developer" is shifting. As AI coding agents take over more of
+the actual code-writing, your job becomes orchestrating multiple AI workers
+and maintaining a clear line of sight on the whole effort.
+
+Tsunagi is the cockpit for that shift.
+
+[Read the docs →](/en/getting-started/installation/)

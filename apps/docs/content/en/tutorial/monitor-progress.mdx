@@ -1,0 +1,54 @@
+---
+title: 3. Monitor Progress
+description: Watch Claude work in real time from the task list view.
+---
+
+# 3. Monitor Progress
+
+Go back to the main task list (top-left **Tsunagi** logo). You should see
+your task card with several pieces of live information.
+
+## What you can see at a glance
+
+- **Status** — the colored badge showing `coding` (or `reviewing` once
+  Claude is done)
+- **Progress bar** — derived from Claude's todo list. As Claude completes
+  each todo, the bar fills up.
+- **Branch** — the worktree branch this task lives on
+- **Effort** — the size you set when creating the task
+- **Last updated time** — refreshed in real time from Claude's hook
+  events
+
+<img
+  src="/screenshots/worktree-tabs.png"
+  alt="Task list with active progress"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## Why this works
+
+When Claude calls `TodoWrite` (one of its built-in tools), the Claude Code
+hook fires. The hook posts the new todos to Tsunagi's Fastify backend,
+which broadcasts them via Socket.IO to the connected web UI. Your browser
+re-renders the progress bar without a page reload.
+
+The same mechanism handles:
+
+- Status changes (`backlog` → `coding` → `reviewing` → `done`)
+- Tab activity indicators
+- New tool invocations (file writes, bash commands)
+
+## You can run multiple tasks in parallel
+
+This is the whole point of Tsunagi. Open a second task in a second tab and
+prompt a different Claude session — both will run their progress bars side
+by side. The single task list view stays your "PM cockpit."
+
+For this tutorial, one task is enough.
+
+## Next
+
+Wait for Claude to finish (it should take well under a minute), then
+continue.
+
+[4. Review and Auto-Update Status →](/en/tutorial/review-status/)

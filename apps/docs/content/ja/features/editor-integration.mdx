@@ -1,0 +1,25 @@
+---
+title: エディタ統合
+description: Tsunagi の中から Monaco でファイルを開く。
+---
+
+import { Callout } from 'nextra/components';
+
+# エディタ統合
+
+Tsunagi は組み込みの **Monaco エディタ** モーダルを持っていて、UI を離れずにファイルを開いて編集できます。これは以下に便利です:
+
+- プロンプトを Markdown としてシンタックスハイライト付きで編集する
+- worktree 内のファイルを素早く調整する
+- Claude に作業を続行させる前に diff をレビューする
+
+## Claude から Monaco を起動する
+
+Tsunagi は各 Claude セッションのシェル環境で `EDITOR` を小さなヘルパースクリプトに設定します。Claude (またはあなた) がエディタを開くコマンド (`git commit` 等) を実行すると、ヘルパーがターミナルベースのエディタの代わりに Tsunagi UI で Monaco モーダルを開きます。
+
+ターミナルビューからキーボードショートカットで任意のファイルパスを Monaco で開くこともできます。
+
+<Callout type="info">
+  **準備中**: エディタヘルパースクリプト、Ctrl+G
+  バインディング、ターミナルエディタを優先したい場合の Monaco 統合の無効化方法のリファレンス。
+</Callout>

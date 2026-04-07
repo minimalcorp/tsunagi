@@ -1,0 +1,82 @@
+---
+title: Initial Setup
+description: Register your first repository and connect Tsunagi to your work.
+---
+
+# Initial Setup
+
+After [installing Tsunagi](/en/getting-started/installation/) and opening
+[http://localhost:2791](http://localhost:2791), the UI walks you through the
+initial setup. This page explains what each step is doing under the hood
+and what to choose.
+
+## 1. Provide a Claude credential
+
+Tsunagi reuses whatever credential Claude Code itself uses. Set one of the
+following environment variables in the shell where you launch Tsunagi:
+
+```bash
+# Either:
+export ANTHROPIC_API_KEY="sk-ant-..."
+# Or:
+export CLAUDE_CODE_OAUTH_TOKEN="..."
+```
+
+These are the same credentials documented in
+[Claude Code's official docs](https://docs.claude.com/en/docs/claude-code/overview).
+Tsunagi does not store or modify them.
+
+## 2. Register a repository
+
+In the UI, click **Add Repository** and paste a clone URL (for example
+`git@github.com:your-org/your-repo.git`). Tsunagi will:
+
+1. Clone the repository as a **bare repository** under
+   `~/.tsunagi/workspaces/<owner>/<repo>/.bare/`.
+2. Detect the default branch (`main`, `master`, etc.) by reading
+   `origin/HEAD`.
+3. Create a `.default` worktree pointing at the latest default branch
+   commit. This is the "reference checkout" used for read-only inspection
+   and as the base for new task branches.
+
+If the repository is brand new and has no commits yet, Tsunagi creates an
+**orphan worktree** so you can still start tasks against it. As soon as a
+real commit shows up on the remote default branch, Tsunagi automatically
+upgrades the worktree to point at it.
+
+<img
+  src="/screenshots/settings-repos.png"
+  alt="Repository registration"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## 3. (Optional) Set environment variables
+
+Some projects need extra environment variables (database URLs, API tokens,
+local feature flags). Tsunagi exposes a settings page where you can define:
+
+- **Global** variables — applied to every Claude session
+- **Per-owner** variables — applied to all repos under one GitHub org
+- **Per-repo** variables — applied to one specific repo
+
+These are merged into the environment of the shell that runs Claude inside
+each worktree.
+
+<img
+  src="/screenshots/settings-env.png"
+  alt="Environment variables settings"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+See [Environment Variables](/en/features/environment-variables/) for the
+merge order and precedence.
+
+## 4. Verify your setup
+
+Open the main page. You should see:
+
+- The repository you registered, listed in the task panel.
+- An empty task list (you have not created any tasks yet).
+- The **Add Task** button enabled.
+
+You're now ready to follow the [First Development Cycle tutorial](/en/tutorial/create-task/).

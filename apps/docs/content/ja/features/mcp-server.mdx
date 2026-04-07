@@ -1,0 +1,51 @@
+---
+title: MCP サーバー
+description: Model Context Protocol で Claude に Tsunagi のタスクを管理させる。
+---
+
+import { Callout } from 'nextra/components';
+
+# MCP サーバー
+
+Tsunagi はタスク管理を [MCP server](https://docs.claude.com/en/docs/claude-code/mcp) として公開しています。これにより **Claude 自身が Tsunagi を呼び出して** タスクの作成・更新・並び替え・削除ができます。
+
+これが Tsunagi の「PM 業務を AI に委譲する」というストーリーの中核です。
+
+<img
+  src="/screenshots/mcp-task-create.png"
+  alt="Claude が Tsunagi MCP を呼び出す"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## バンドルされるツール
+
+Tsunagi plugin は以下の MCP ツールを登録します (今後変更の可能性あり):
+
+| ツール                            | 用途                                              |
+| --------------------------------- | ------------------------------------------------- |
+| `tsunagi_create_task`             | 新しいタスクを作成                                |
+| `tsunagi_update_task`             | タイトル・説明・ステータス・order 等を更新        |
+| `tsunagi_delete_task`             | タスクと worktree を削除                          |
+| `tsunagi_get_task`                | id / session_id / cwd でタスクを取得              |
+| `tsunagi_list_tasks`              | タスクを一覧 (ステータス・リポジトリ等で絞り込み) |
+| `tsunagi_list_repos`              | 登録済みリポジトリを一覧                          |
+| `tsunagi_ensure_default_worktree` | `.default` worktree が同期されていることを保証    |
+
+## バンドルされる skill と curator agent
+
+raw のツールに加えて、plugin には Claude にツールを正しく使う方法を教える **skill** (ステータス遷移、ブランチ命名、いつ description を更新するか) と、「優先度で backlog を並び替え」「stale なタスクを棚卸し」のような triage workflow 用の **curator agent** がバンドルされています。
+
+## どうやって install されるか
+
+Tsunagi が起動するときに以下を実行します:
+
+```bash
+claude plugin marketplace add <bundled marketplace dir>
+claude plugin install tsunagi-plugin@tsunagi-marketplace --scope user
+```
+
+Tsunagi が終了するときに逆の uninstall を実行します。これにより、plugin の状態が動作中の Tsunagi プロセスと同期している状態が保たれます。Tsunagi は `~/.claude/settings.json` を直接編集することはありません——公式の `claude` CLI のみを使います。
+
+<Callout type="info">
+  **準備中**: 各 MCP ツールのパラメータとレスポンス形状の完全リファレンス。
+</Callout>

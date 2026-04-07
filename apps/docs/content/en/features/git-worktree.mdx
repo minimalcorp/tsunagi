@@ -1,0 +1,42 @@
+---
+title: Git Worktree Integration
+description: One worktree per task, automatically managed.
+---
+
+import { Callout } from 'nextra/components';
+
+# Git Worktree Integration
+
+Tsunagi creates and manages [git worktrees](https://git-scm.com/docs/git-worktree)
+on your behalf so each task lives in its own isolated checkout, sharing the
+same underlying object database.
+
+## Layout
+
+```
+~/.tsunagi/workspaces/<owner>/<repo>/
+├── .bare/                    # bare clone
+├── .default/                 # reference checkout of the default branch
+└── <branch-dir>/             # one directory per task branch
+```
+
+## What Tsunagi automates
+
+- **`git clone --bare`** when you register a repository
+- **`git worktree add`** when you create a task (with the right base branch)
+- **`git worktree remove`** when you delete a task
+- **Empty repository handling** via `git worktree add --orphan` (requires Git ≥ 2.42)
+- **Default branch detection** from `origin/HEAD`, with fallbacks for `main` and `master`
+- **Automatic upgrade** of orphan default worktrees to detached HEAD once
+  the remote receives its first commit
+
+## Why per-task worktrees
+
+Multiple Claude sessions run completely in parallel without colliding on
+the file system. Each one has its own working directory, its own
+`.git/index`, and its own branch.
+
+<Callout type="info">
+  **Coming soon**: Detailed coverage of rebase support, base branch selection, and worktree
+  lifecycle hooks.
+</Callout>

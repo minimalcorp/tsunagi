@@ -18,7 +18,8 @@
 | &nbsp;&nbsp;2-4 | `main` ブランチ保護 + GitHub Actions bypass        | 必須   | 5分      |
 | &nbsp;&nbsp;2-5 | `cla-signatures` ブランチ保護                      | 推奨   | 3分      |
 | 3               | 初回リリース実行と動作検証                         | 必須   | 15分     |
-| 4               | 任意の追加設定（カスタムドメイン等）               | 任意   | -        |
+| 4               | docs 用スクリーンショットの差し替え                | 必須   | 15分     |
+| 5               | 任意の追加設定（カスタムドメイン等）               | 任意   | -        |
 
 ---
 
@@ -156,9 +157,69 @@ CLA bot は署名データを `cla-signatures` という独立 branch に commit
 
 ---
 
-## 4. 任意: 追加の拡張
+## 4. ドキュメント用スクリーンショットの差し替え（必須）
 
-### 4-1. カスタムドメイン（docs）
+`apps/docs/` には現在 1×1 の透過 PNG プレースホルダーが配置されています。
+公開前に実際の Tsunagi UI のスクリーンショットに差し替える必要があります。
+
+### 撮影と配置
+
+以下 8 枚を撮影して `apps/docs/public/screenshots/` に**同じファイル名で**
+上書き配置してください。
+
+| #   | ファイル名             | 撮影内容                                                    | 主な掲載先               |
+| --- | ---------------------- | ----------------------------------------------------------- | ------------------------ |
+| 1   | `hero.png`             | メイン画面全体（タスク一覧 + プランナーの両方が見える状態） | LP の Hero               |
+| 2   | `task-list.png`        | 左側のタスクリストのアップ（複数タスクが並んでいる状態）    | Tutorial / Features      |
+| 3   | `task-detail.png`      | タスク詳細画面（worktree、ターミナルタブが見える状態）      | LP / Tutorial            |
+| 4   | `terminal-session.png` | Claude が動作中のターミナルセッション                       | Tutorial / Features      |
+| 5   | `worktree-tabs.png`    | 複数タブで並列セッションが走っている様子                    | Tutorial / Features      |
+| 6   | `mcp-task-create.png`  | Claude が MCP 経由でタスクを作成している様子                | Features (MCP)           |
+| 7   | `settings-env.png`     | 環境変数設定画面                                            | Initial Setup / Features |
+| 8   | `settings-repos.png`   | リポジトリ管理画面                                          | Initial Setup            |
+
+### 撮影サイズ・フォーマット
+
+- **横幅**: 1600〜2000px (Retina 対応)
+- **フォーマット**: PNG (テキストが綺麗に出る)
+- **圧縮**: ファイルサイズが大きい場合は `pngquant` 等で軽量化推奨
+- **テーマ**: light / dark どちらか統一すること（混在は避ける）
+
+### 撮影方法（macOS）
+
+- `Cmd + Shift + 4` → スペースキー → ウィンドウクリック でウィンドウ単位の撮影
+- `Cmd + Shift + 5` で範囲指定撮影
+- 撮影後、ファイル名を上記表のとおりリネームして配置
+
+### 配置先
+
+```
+apps/docs/public/screenshots/
+├── hero.png
+├── task-list.png
+├── task-detail.png
+├── terminal-session.png
+├── worktree-tabs.png
+├── mcp-task-create.png
+├── settings-env.png
+└── settings-repos.png
+```
+
+### 確認
+
+- [ ] 8 枚すべてを差し替えた
+- [ ] `npm run build -w tsunagi-docs` で再ビルドしてエラーが出ない
+- [ ] `apps/docs/out/en/` 配下の各ページをブラウザで開き、画像が正しく表示されることを確認
+
+> **Note**: 現在のプレースホルダー (1×1 透過 PNG) でもビルドは通りますが、
+> 公開時に空白の箇所として表示されます。**docs を公開する前に必ず差し替えて
+> ください。**
+
+---
+
+## 5. 任意: 追加の拡張
+
+### 5-1. カスタムドメイン（docs）
 
 `docs.tsunagi.dev` のようなドメインを当てたい場合:
 
@@ -167,7 +228,7 @@ CLA bot は署名データを `cla-signatures` という独立 branch に commit
 - [ ] `apps/docs/public/CNAME` ファイルを作成してドメイン名だけ記載（永続化のため）
 - [ ] `apps/docs/next.config.mjs` の `metadataBase` を新ドメインに更新し、再度 `docs` を release
 
-### 4-2. 通知連携
+### 5-2. 通知連携
 
 release workflow 完了時に Slack 等に通知したい場合、`release.yml` に追加 job を書く。本チェックリストの範囲外。
 
@@ -183,11 +244,12 @@ release workflow 完了時に Slack 等に通知したい場合、`release.yml` 
 4. **手順 2-3** (`production-release` Environment 作成 + 承認者設定)
 5. **手順 2-4** (`main` 保護 + bypass ← 保護ルールを設定する場合のみ)
 6. **手順 3** (初回リリース実行と動作検証)
+7. **手順 4** (docs 用スクリーンショットの差し替え)
 
 **推奨だが後回しでも可**:
 
 - 手順 2-5 (`cla-signatures` 保護) ← 外部コントリビューターが出る前に済ませておく
-- 手順 4 (カスタムドメイン等)
+- 手順 5 (カスタムドメイン等)
 
 ---
 

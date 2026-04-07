@@ -1,0 +1,74 @@
+---
+title: 6. Delete the Task
+description: Clean up the task and its worktree by asking Claude to delete it via MCP.
+---
+
+import { Callout } from 'nextra/components';
+
+# 6. Delete the Task
+
+Now that the task is `done` and verified, the last step is to delete it.
+Deleting a task in Tsunagi removes:
+
+- The task record from the database
+- The git worktree from disk (`~/.tsunagi/workspaces/.../feat-hello-world/`)
+- Any associated tab sessions
+
+The bare repository is **not** affected — only the worktree directory.
+
+## Ask Claude to delete it via MCP
+
+In the still-open Claude tab, type:
+
+```text
+Please delete this task using the MCP tool.
+```
+
+Claude will call `tsunagi_delete_task` with the current task's ID. You'll
+see:
+
+1. The task disappear from the task list immediately
+2. The worktree directory removed from the file system
+3. The Claude tab closes (or shows a "task no longer exists" message)
+
+This is one of the demonstrations of Tsunagi's MCP server: **Claude can
+manage Tsunagi's own state on your behalf**.
+
+<Callout type="info">
+  You can also delete a task manually from the UI's task list (right-click or the task detail menu),
+  but the MCP path is what makes Tsunagi's "delegate PM work to Claude" story real.
+</Callout>
+
+## Confirm cleanup
+
+In another terminal:
+
+```bash
+ls ~/.tsunagi/workspaces/<owner>/<repo>/
+```
+
+The `feat-hello-world` directory should be gone. Only `.bare/` and
+`.default/` remain.
+
+## You did it
+
+You just ran a complete Tsunagi development cycle:
+
+1. Created a task → Tsunagi created the worktree
+2. Started a Claude session → Claude planned and implemented
+3. Watched real-time progress in the UI
+4. Status moved automatically through `coding` → `reviewing`
+5. Verified the result yourself
+6. Marked the task done and asked Claude to delete it
+
+This loop scales to dozens of tasks running in parallel — that's what
+Tsunagi is built for. From here:
+
+- Read the [Features](/en/features/task-management/) section to learn what
+  else Tsunagi can do.
+- Try running **two tasks at once** in different worktrees to feel the
+  parallelization for real.
+- Skim the [Concepts](/en/getting-started/concepts/) page if any of the
+  vocabulary still feels fuzzy.
+
+Welcome aboard.

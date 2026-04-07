@@ -7,4 +7,10 @@ export default {
   'getting-started': {
     title: 'Getting Started',
   },
+  tutorial: {
+    title: 'Tutorial',
+  },
+  features: {
+    title: 'Features',
+  },
 };

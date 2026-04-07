@@ -1,0 +1,52 @@
+---
+title: Environment Variables
+description: Configure environment variables per global / owner / repository scope.
+---
+
+import { Callout } from 'nextra/components';
+
+# Environment Variables
+
+Many projects need extra environment variables (database URLs, API tokens,
+local feature flags) to run correctly. Tsunagi lets you define them at
+three scopes and merges them automatically into every Claude session.
+
+<img
+  src="/screenshots/settings-env.png"
+  alt="Environment variables UI"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## Scopes
+
+| Scope          | Applies to                             | Use case                                    |
+| -------------- | -------------------------------------- | ------------------------------------------- |
+| **Global**     | Every Claude session                   | Things you want everywhere (`EDITOR`, etc.) |
+| **Owner**      | Every repo under a GitHub organization | Org-wide secrets (`AWS_PROFILE`)            |
+| **Repository** | One specific repo                      | Project-specific config (`DATABASE_URL`)    |
+
+## Merge order
+
+Variables are merged in order of increasing specificity:
+
+```
+global → owner → repository → (request-time overrides)
+```
+
+Later sources override earlier ones, so a repository-scoped value beats
+the global value with the same name.
+
+## Where they're stored
+
+In Tsunagi's local SQLite database, scoped by `(scope, owner, repo, key)`.
+You can manage them via the settings page or via the future REST API.
+
+<Callout type="warning">
+  Environment variables are stored in plain SQLite. Treat `~/.tsunagi/state/tsunagi.db` like any
+  other secret-bearing file — back it up carefully and don't check it into git.
+</Callout>
+
+<Callout type="info">
+  **Coming soon**: Reference for the merge algorithm, the disable / enable flag per variable, and
+  import / export workflows.
+</Callout>

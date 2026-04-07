@@ -1,0 +1,40 @@
+---
+title: Real-time Monitoring
+description: See what every Claude session is doing, in real time.
+---
+
+import { Callout } from 'nextra/components';
+
+# Real-time Monitoring
+
+Tsunagi reads Claude Code's
+[hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) to derive
+real-time signals from each session and surface them in the UI.
+
+## What you see
+
+- **Per-task progress bars** driven by Claude's `TodoWrite` calls
+- **Status badges** that move with the actual work (e.g., a tab in
+  "running" vs "idle")
+- **Live terminal output** in the task detail view
+- **Activity timestamps** updated as Claude invokes tools
+
+<img
+  src="/screenshots/terminal-session.png"
+  alt="Realtime UI"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## How it works
+
+Claude Code emits hook events at well-defined points (todo updates, tool
+calls, session start/end). The bundled Tsunagi plugin registers handlers
+for those hooks; each handler posts a small JSON payload to Tsunagi's
+Fastify backend.
+
+The backend then broadcasts the change over Socket.IO to every connected
+browser tab — so updates appear without page reloads or polling.
+
+<Callout type="info">
+  **Coming soon**: Reference for the exact hook events Tsunagi consumes and how to extend them.
+</Callout>

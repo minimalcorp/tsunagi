@@ -1,0 +1,84 @@
+---
+title: 1. Create a Task
+description: Create your first Tsunagi task and let Tsunagi prepare a worktree.
+---
+
+import { Callout } from 'nextra/components';
+
+# 1. Create a Task
+
+This tutorial walks you through a complete task lifecycle in Tsunagi using
+a tiny example: **printing "Hello, world!" in whatever programming language
+your machine already has installed**. The whole tutorial takes a few
+minutes and uses minimal Claude tokens.
+
+## Prerequisites
+
+You should have already:
+
+- [Installed Tsunagi](/en/getting-started/installation/)
+- [Registered a repository](/en/getting-started/initial-setup/)
+- The Tsunagi UI open at [http://localhost:2791](http://localhost:2791)
+
+For this tutorial we recommend using a **disposable scratch repository** so
+you don't pollute a real project with hello-world files.
+
+## Open the create dialog
+
+Click **+ Add Task** in the task list panel.
+
+<img
+  src="/screenshots/task-list.png"
+  alt="Add task button"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## Fill in the form
+
+Use these values:
+
+| Field       | Value                                                |
+| ----------- | ---------------------------------------------------- |
+| Title       | `Print hello world in any installed language`        |
+| Repository  | (your scratch repository)                            |
+| Branch      | `feat/hello-world` (or leave blank to auto-generate) |
+| Description | (optional, leave blank for now)                      |
+| Effort      | `S`                                                  |
+
+<Callout type="info">
+  The branch name is the actual git branch Tsunagi will create the worktree on. Pick something
+  meaningful — Tsunagi does not auto-rename it later.
+</Callout>
+
+Click **Create**. Two things happen immediately:
+
+1. A new task appears at the top of the **Backlog** column with status
+   `backlog`.
+2. Tsunagi creates a git worktree at
+   `~/.tsunagi/workspaces/<owner>/<repo>/feat-hello-world/` based on the
+   default branch.
+
+You can confirm the worktree exists by running this in another terminal:
+
+```bash
+ls ~/.tsunagi/workspaces/<owner>/<repo>/
+```
+
+You should see your new branch directory alongside `.bare/` and `.default/`.
+
+## What just happened
+
+Tsunagi just performed several steps for you:
+
+- Generated a UUID for the task and inserted a row into its SQLite database
+- Created the worktree by running `git worktree add -b feat/hello-world ...`
+  from the bare repository
+- Recorded the worktree status as `created` in the task record
+- Sent a real-time event over its socket so the UI updated instantly
+
+You did not have to touch a terminal. This is the foundation of every
+Tsunagi workflow.
+
+## Next
+
+[2. Start a Claude Session →](/en/tutorial/start-session/)

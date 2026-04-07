@@ -1,0 +1,103 @@
+---
+title: Concepts
+description: The small vocabulary you need to read the rest of the Tsunagi docs.
+---
+
+# Concepts
+
+Tsunagi has a small vocabulary. Knowing these terms will make the rest of
+the docs much faster to read.
+
+## Task
+
+A unit of work. Each task has:
+
+- A **title** and (optional) **description** (Markdown)
+- An **owner / repo / branch** triple identifying the git context
+- A **status**: `backlog` → `planning` → `coding` → `reviewing` → `done`
+- Zero or more **tabs** (Claude sessions) attached to it
+- An **order** for sorting within its status column
+
+A task is the atomic unit Tsunagi cares about. When you create a task,
+Tsunagi automatically creates the worktree for it. When you delete a task,
+the worktree is removed too.
+
+## Worktree
+
+A [git worktree](https://git-scm.com/docs/git-worktree) is a checkout of
+a branch in its own directory, sharing the underlying object database with
+the original repository. Tsunagi uses one worktree per task so that
+multiple Claude sessions never collide on the file system.
+
+Tsunagi worktrees live under:
+
+```
+~/.tsunagi/workspaces/<owner>/<repo>/<branch-dir>/
+```
+
+The reference worktree (read-only baseline tracking the default branch) is
+named `.default`.
+
+## Tab
+
+A **tab** is one Claude Code session attached to a task. A task can have
+multiple tabs — useful when you want to run several conversations in
+parallel within the same worktree (for example: one tab implementing the
+feature, another debugging tests).
+
+Each tab maps 1-to-1 to a PTY-backed terminal session that Tsunagi launches
+inside the task's worktree.
+
+## Hooks
+
+Tsunagi listens to Claude Code's
+[hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) to extract
+real-time information from each session: which todos Claude is tracking,
+when it starts and stops working, what tools it invokes, etc. This is what
+makes the progress bars and status indicators in the UI possible.
+
+## MCP Server
+
+Tsunagi exposes its task management as an
+[MCP (Model Context Protocol) server](https://docs.claude.com/en/docs/claude-code/mcp).
+That means **Claude itself can call into Tsunagi** to create, update,
+reorder, and delete tasks. The Tsunagi MCP server is bundled as a Claude
+Code plugin (the marketplace and plugin install you see during startup).
+
+The MCP tools include:
+
+- `tsunagi_create_task`
+- `tsunagi_update_task`
+- `tsunagi_delete_task`
+- `tsunagi_list_tasks`
+- `tsunagi_get_task`
+- ...and a few more
+
+Together they let you (or Claude) treat Tsunagi as the source of truth for
+"what work is in flight."
+
+## The Claude Code plugin
+
+When Tsunagi starts, it installs a Claude Code plugin called
+`tsunagi-plugin` from a bundled marketplace. This plugin registers:
+
+- The MCP server above
+- A set of skills (helpers Claude can read to behave correctly inside
+  Tsunagi)
+- An agent definition (`tsunagi-task-curator`) for task triage workflows
+
+Tsunagi performs install / uninstall via the official `claude` CLI only —
+it never edits `~/.claude/settings.json` directly.
+
+## Single instance
+
+Only one Tsunagi process can run at a time, enforced by a PID lock file at
+`~/.tsunagi/state/tsunagi.lock`. This is required because the plugin
+lifecycle (install on start, uninstall on stop) and the worktree state
+would race otherwise.
+
+## What's next
+
+Now you have the vocabulary. Try the
+[First Development Cycle tutorial](/en/tutorial/create-task/) to see all of
+these concepts in action through a real (tiny) task.

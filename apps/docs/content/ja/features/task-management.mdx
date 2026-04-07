@@ -1,0 +1,42 @@
+---
+title: タスク管理
+description: Tsunagi のタスクの仕組み。
+---
+
+import { Callout } from 'nextra/components';
+
+# タスク管理
+
+タスクは Tsunagi の作業の最小単位です。各タスクは独自の git worktree を所有し、その worktree 内で 1 つ以上の Claude セッションをホストできます。
+
+<img
+  src="/screenshots/task-list.png"
+  alt="タスク一覧パネル"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+## ライフサイクル
+
+タスクは以下のステータスを通過します:
+
+`backlog` → `planning` → `coding` → `reviewing` → `done`
+
+ステータスの変更方法:
+
+- **手動**: UI でタスクをドラッグするか、詳細画面で編集する
+- **自動**: Claude セッション自身が Tsunagi の MCP server 経由で更新する (バンドルされた plugin が、いつ `tsunagi_update_task` を呼ぶべきかを Claude に教える)
+
+タスクの削除は別の操作です——worktree をディスクから削除し、タスクレコードをデータベースから削除します。
+
+## フィルタリングと並び替え
+
+タスク一覧パネルでサポートされる操作:
+
+- リポジトリ・ステータス・テキストでフィルタリング
+- ステータス内での優先度並び替え (drag and drop)
+- `done` タスクの一括削除
+
+<Callout type="info">
+  **準備中**: このページは骨格のみです。タスク管理機能の完全なカバレッジ (effort サイズ、MDX
+  description、プランナーパネル等) は将来のアップデートで追加されます。
+</Callout>

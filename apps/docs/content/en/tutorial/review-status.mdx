@@ -1,0 +1,54 @@
+---
+title: 4. Review and Auto-Update Status
+description: How task status moves automatically based on Claude's work.
+---
+
+# 4. Review and Auto-Update Status
+
+By the time Claude has finished implementing the hello-world program, the
+task should have moved through these statuses:
+
+```
+backlog → coding → reviewing
+```
+
+You did not drag the task or click any status buttons. Tsunagi's plugin
+includes a small skill that teaches Claude **when to update task status**,
+and Claude calls Tsunagi's MCP server to update it.
+
+## What the status transitions mean
+
+| Status      | When                                                          |
+| ----------- | ------------------------------------------------------------- |
+| `backlog`   | The task exists but no one is working on it yet               |
+| `planning`  | A human-Claude conversation about the approach is in progress |
+| `coding`    | Claude is actively implementing                               |
+| `reviewing` | Implementation is done; ready for human review                |
+| `done`      | The task is complete and the human has confirmed              |
+
+For our hello-world tutorial, the task should now be sitting in
+**`reviewing`**, waiting for you.
+
+## Confirm in the task list
+
+Find your task in the task list. Its badge should read `reviewing`. The
+progress bar should be at 100%.
+
+If it's still in `coding`, Claude is probably still working — wait a moment
+and check again.
+
+If something went wrong, click the task to open the detail view and read
+the terminal output. Common causes:
+
+- No suitable language was found on the machine (rare)
+- Claude could not run the program (sandboxing or permission issues)
+
+You can prompt Claude to retry by typing `please retry` or with more
+specific guidance.
+
+## Next
+
+Now that the task is in `reviewing`, you (the human) need to verify the
+result and tell Claude to wrap up.
+
+[5. Verify and Complete →](/en/tutorial/verify-and-complete/)
