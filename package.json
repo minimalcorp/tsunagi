@@ -16,7 +16,8 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w @minimalcorp/tsunagi",
+    "dev": "concurrently --kill-others --names web,docs --prefix-colors blue,magenta \"npm run dev -w @minimalcorp/tsunagi\" \"npm run dev -w tsunagi-docs\"",
+    "web:dev": "npm run dev -w @minimalcorp/tsunagi",
     "docs:dev": "npm run dev -w tsunagi-docs",
     "build": "npm run build --workspaces --if-present",
     "build:dist": "npm run build:dist -w @minimalcorp/tsunagi",
@@ -27,6 +28,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4"

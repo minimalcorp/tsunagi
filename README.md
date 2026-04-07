@@ -44,8 +44,9 @@ npm run docs:dev
 
 | コマンド               | 説明                                                       |
 | ---------------------- | ---------------------------------------------------------- |
-| `npm run dev`          | Tsunagi 本体を開発モードで起動 (`-w @minimalcorp/tsunagi`) |
-| `npm run docs:dev`     | ドキュメントサイトを開発モードで起動                       |
+| `npm run dev`          | web + docs を並列起動（Ctrl+C で両方停止）                 |
+| `npm run web:dev`      | Tsunagi 本体のみ開発モードで起動                           |
+| `npm run docs:dev`     | ドキュメントサイトのみ開発モードで起動                     |
 | `npm run build`        | 全ワークスペースをビルド                                   |
 | `npm run build:dist`   | Tsunagi 本体の dist ビルド (`tsc -p tsconfig.dist.json`)   |
 | `npm run lint`         | 全ワークスペースで ESLint を実行                           |
