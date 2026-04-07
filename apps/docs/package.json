@@ -4,9 +4,9 @@
   "private": true,
   "description": "Tsunagi documentation site.",
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev --port 2793",
     "build": "next build",
-    "start": "next start --port 3001",
+    "start": "next start --port 2793",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
