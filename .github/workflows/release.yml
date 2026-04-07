@@ -20,11 +20,22 @@ on:
           - minor
           - major
 
+# 同時に2つ以上の Release workflow が走らないようにする。
+# 2つ目以降は1つ目の完了を待つ (cancel はしない)。
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   publish-tsunagi:
     name: Publish @minimalcorp/tsunagi to npm
     if: ${{ inputs.target == 'all' || inputs.target == 'tsunagi' }}
     runs-on: ubuntu-latest
+    # production-release Environment には Required reviewers を設定する想定。
+    # workflow 実行時に人間の承認が必要となり、承認時に main の最新状態
+    # (他 PR の merge 状況等) を目視確認する時間を強制的に確保できる。
+    # Environment の作成手順は README のリリース設定セクションを参照。
+    environment: production-release
     permissions:
       contents: write
       id-token: write
@@ -62,8 +73,40 @@ jobs:
           # push されないため必ず -a -m を付けること)。
           git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
 
-      - name: Push commit and tag
-        run: git push --follow-tags
+      # Push に失敗した場合は rebase してから retry する。他 PR が merge
+      # されて main が進んでいた場合、rebase によって merge 済み commit を
+      # 取り込んだ上で version bump commit を再適用するため、後続の
+      # npm publish は merge 済みの内容を含む最新 state から行われる。
+      #
+      # annotated tag は rebase で自動的には移動しないので、削除 → rebase →
+      # 再作成する必要がある。
+      - name: Push commit and tag (with rebase retry)
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            if git push --atomic --follow-tags; then
+              echo "Push succeeded on attempt ${attempt}"
+              exit 0
+            fi
+            echo "::warning::Push failed on attempt ${attempt}. Attempting rebase..."
+            # rebase 前に tag を削除する (rebase 後に再作成する)
+            git tag -d "v${NEW_VERSION}" || true
+            git fetch origin main
+            if ! git rebase origin/main; then
+              echo "::error::Rebase conflict with origin/main. Aborting."
+              git rebase --abort || true
+              exit 1
+            fi
+            # rebase 後の新しい HEAD で annotated tag を再作成
+            git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+            # 依存関係が変わっている可能性があるので再 install
+            npm ci
+            sleep 2
+          done
+          echo "::error::Push failed after 3 attempts"
+          exit 1
 
       - name: Publish to npm
         run: npm publish --workspace=@minimalcorp/tsunagi --provenance --access public

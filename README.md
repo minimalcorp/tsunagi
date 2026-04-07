@@ -77,7 +77,15 @@ GitHub Actions の `Release` workflow を手動実行することで、`@minimal
 2. **GitHub Pages を Actions ソースに設定**
    - Settings → Pages → Source: `GitHub Actions` を選択（`Deploy from a branch` ではない）
 
-3. **`main` ブランチ保護の bypass 設定**（保護ルールを設定している場合）
+3. **`production-release` Environment の作成と承認者設定**（必須）
+   - Settings → Environments → `New environment` → 名前を `production-release` として作成
+   - **Required reviewers** を有効化し、リリース承認権限を持つメンバー（自分自身でも可）を追加
+   - Release workflow の `publish-tsunagi` job はこの Environment 配下で実行されるため、
+     workflow 実行時に GitHub UI で明示的な承認操作が必要になる
+   - 承認画面で main の最新状態（他 PR の merge 状況等）を目視確認してから承認する
+     ことで、意図しない内容のリリースを防ぐ
+
+4. **`main` ブランチ保護の bypass 設定**（保護ルールを設定している場合）
    - `Release` workflow は `npm version` で bump した commit と tag を `main` に直接 push する
    - main に `Require a pull request before merging` 等の保護ルールがある場合、push がブロックされる
    - 対応: Settings → Rules → Rulesets で main 保護 ruleset を作成し、**Bypass list に `Repository admin` role または `Deploy key` を追加**する
@@ -85,6 +93,14 @@ GitHub Actions の `Release` workflow を手動実行することで、`@minimal
    - 保護ルールを main に設定していない場合は不要
 
 これらを設定せずに workflow を実行すると、途中で失敗してバージョン番号だけが bump された中途半端な状態になる可能性があるので、**必ず事前に設定してください**。
+
+### リリース中の concurrent push について
+
+Release workflow には以下の保護機構が組み込まれています:
+
+- **同時実行の排他制御**: `concurrency: release` group により、2つ目の Release workflow は1つ目の完了を待機します
+- **Push retry with rebase**: workflow の checkout から push までの間に別の PR が main に merge された場合でも、自動で rebase してから retry します（最大3回）。rebase により merge 済みの内容を取り込んだ上で version bump commit を再適用するため、npm publish は最新の main 状態で行われます
+- **Environment 承認ゲート**: 人間が承認するタイミングで main の状態を目視確認できるため、意図しない内容のリリースを事前に察知できます
 
 ## リポジトリ構成
 
