@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
+    // Compiled output of `tsc -p tsconfig.dist.json`. Not source code.
+    'dist/**',
+    // Prisma client output. Auto-generated.
+    'generated/**',
   ]),
 ]);
 

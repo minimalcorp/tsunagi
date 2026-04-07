@@ -1,9 +1,10 @@
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 function getTsunagiDataDir(): string {
-  return process.env.TSUNAGI_DATA_DIR || path.join(process.env.HOME || '~', '.tsunagi');
+  return process.env.TSUNAGI_DATA_DIR || path.join(os.homedir(), '.tsunagi');
 }
 
 function getDatabasePath(): string {

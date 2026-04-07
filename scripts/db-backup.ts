@@ -1,11 +1,12 @@
 import { createClient } from '@libsql/client';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 const RETENTION_COUNT = 5;
 
 function getTsunagiDataDir(): string {
-  return process.env.TSUNAGI_DATA_DIR || path.join(process.env.HOME || '~', '.tsunagi');
+  return process.env.TSUNAGI_DATA_DIR || path.join(os.homedir(), '.tsunagi');
 }
 
 function getDatabasePath(): string {

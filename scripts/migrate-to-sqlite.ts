@@ -1,12 +1,12 @@
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import { PrismaClient } from '../generated/prisma/client';
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 
 // data-path.tsをスクリプトから参照できるようにパス解決
-// 注意: tsxで実行するため、相対パスで参照
 function getTsunagiDataDir(): string {
-  return process.env.TSUNAGI_DATA_DIR || path.join(process.env.HOME || '~', '.tsunagi');
+  return process.env.TSUNAGI_DATA_DIR || path.join(os.homedir(), '.tsunagi');
 }
 
 function getDatabasePath(): string {

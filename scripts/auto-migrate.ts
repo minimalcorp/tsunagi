@@ -1,5 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
@@ -7,7 +8,7 @@ const execAsync = promisify(exec);
 
 // data-path.tsと同じロジックでパス解決
 function getTsunagiDataDir(): string {
-  return process.env.TSUNAGI_DATA_DIR || path.join(process.env.HOME || '~', '.tsunagi');
+  return process.env.TSUNAGI_DATA_DIR || path.join(os.homedir(), '.tsunagi');
 }
 
 function getDatabasePath(): string {
