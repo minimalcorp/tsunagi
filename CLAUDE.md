@@ -87,6 +87,24 @@ shadcn/ui preset `b2W68tmsa` 準拠。
 
 - `h-9 rounded-md border border-input bg-transparent shadow-xs`
 
+## データベースマイグレーション前の必須手順
+
+`prisma migrate`, `prisma db push`, `prisma migrate reset` 等のDB変更コマンドを実行する前に、**必ず** `npm run db:backup` を先に実行すること。
+
+これは複数Claudeプロセスが単一DBを共有する開発環境で、マイグレーション失敗時の復旧手段を確保するため。
+
+バックアップは `~/.tsunagi/backups/yyyyMMddHHmmss.db` として保存され、直近5件が保持される。
+
+### 復元手順
+
+migrationやデータ破壊が発生した場合、最新バックアップから復元できる:
+
+1. tsunagi サーバーを停止（Ctrl+C）
+2. `npm run db:restore` を実行
+3. `npm run dev` で再起動
+
+`db:restore` は最新のバックアップを自動選択し、現在のDBを `tsunagi.db.broken-<timestamp>` に退避した上で復元する。
+
 ## Git操作のルール
 
 - **作業完了後に勝手にcommitしない**
