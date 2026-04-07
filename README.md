@@ -66,6 +66,26 @@ GitHub Actions の `Release` workflow を手動実行することで、`@minimal
 
 詳細は [.github/workflows/release.yml](./.github/workflows/release.yml) を参照。
 
+### 初回実行前の必須セットアップ
+
+初めて `Release` workflow を実行する前に、以下を手動で設定しておく必要があります。
+
+1. **npm Automation Token の登録**
+   - npmjs.com で `@minimalcorp` organization を作成し、Automation タイプの Access Token を発行
+   - GitHub リポジトリの Settings → Secrets and variables → Actions で `NPM_TOKEN` という名前の secret として登録
+
+2. **GitHub Pages を Actions ソースに設定**
+   - Settings → Pages → Source: `GitHub Actions` を選択（`Deploy from a branch` ではない）
+
+3. **`main` ブランチ保護の bypass 設定**（保護ルールを設定している場合）
+   - `Release` workflow は `npm version` で bump した commit と tag を `main` に直接 push する
+   - main に `Require a pull request before merging` 等の保護ルールがある場合、push がブロックされる
+   - 対応: Settings → Rules → Rulesets で main 保護 ruleset を作成し、**Bypass list に `Repository admin` role または `Deploy key` を追加**する
+     - `github-actions[bot]` が該当権限として扱われるため、これで workflow からの push が許可される
+   - 保護ルールを main に設定していない場合は不要
+
+これらを設定せずに workflow を実行すると、途中で失敗してバージョン番号だけが bump された中途半端な状態になる可能性があるので、**必ず事前に設定してください**。
+
 ## リポジトリ構成
 
 ```
