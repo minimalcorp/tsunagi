@@ -38,7 +38,12 @@ export interface CreateTaskParams {
 export class TaskServiceError extends Error {
   constructor(
     message: string,
-    public code: 'REPO_NOT_FOUND' | 'BRANCH_DUPLICATE' | 'TASK_NOT_FOUND' | 'INTERNAL_ERROR'
+    public code:
+      | 'REPO_NOT_FOUND'
+      | 'BRANCH_DUPLICATE'
+      | 'TASK_NOT_FOUND'
+      | 'IDENTIFIER_REQUIRED'
+      | 'INTERNAL_ERROR'
   ) {
     super(message);
     this.name = 'TaskServiceError';
@@ -66,6 +71,15 @@ function parseWorktreePath(cwd: string): { owner: string; repo: string; branch: 
  * id / session_id / cwd からタスクを解決する
  */
 export async function resolveTask(identifier: TaskIdentifier): Promise<Task | null> {
+  // identifier が全て未指定の場合は明確にエラー（`Task not found` と区別するため）
+  if (!identifier.id && !identifier.session_id && !identifier.cwd) {
+    throw new TaskServiceError(
+      'Identifier required: provide one of `id`, `session_id`, or `cwd`. ' +
+        'Note: the parameter name is `id` (not `taskId`), and `session_id` / `cwd` use snake_case.',
+      'IDENTIFIER_REQUIRED'
+    );
+  }
+
   // 1. id指定
   if (identifier.id) {
     return taskRepo.getTask(identifier.id);

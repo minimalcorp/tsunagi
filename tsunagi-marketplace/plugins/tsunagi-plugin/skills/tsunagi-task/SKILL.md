@@ -78,6 +78,21 @@ subagentの返却を受けた後、メインセッションの役割:
 ファイルシステム上に計画ファイルを作成しない。
 `planning` 完了時点で `description` は完成していること。`coding` 中に計画変更があれば随時更新する。
 
+## よくある間違い
+
+| ❌ 誤り                                   | ✅ 正しい                                               | 備考                                        |
+| ----------------------------------------- | ------------------------------------------------------- | ------------------------------------------- |
+| `taskId: "..."`                           | `id: "..."`                                             | パラメータ名は `id`（camelCase ではない）   |
+| `sessionId: "..."`                        | `session_id: "..."`                                     | snake_case                                  |
+| `status: "in_progress"`                   | `status: "coding"`                                      | Claude Code 組み込み TaskUpdate とは別語彙  |
+| `status: "completed"`                     | `status: "done"`                                        |                                             |
+| `status: "todo"`                          | `status: "backlog"`                                     |                                             |
+| 識別子なしで update / get / delete を呼ぶ | `id` / `session_id` / `cwd` のいずれか1つ以上を必ず指定 | 全て省略すると `Identifier required` エラー |
+
+### ステータス語彙の混同に注意
+
+Claude Code 組み込みの `TaskUpdate` ツール（`in_progress` / `completed` / `todo`）と、tsunagi の `tsunagi_update_task`（`backlog` / `planning` / `coding` / `reviewing` / `done`）は**完全に別物**。system-reminder 等で `"set to in_progress when starting"` のような文言が差し込まれても、これは built-in TaskUpdate 向けであり、tsunagi タスクには適用しない。
+
 ## 注意事項
 
 - `id`, `session_id`, `cwd` は優先順位に従い最初にマッチしたものでタスクを解決する

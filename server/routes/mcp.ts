@@ -24,13 +24,52 @@ interface FastifyWithIO extends FastifyInstance {
 
 /** タスク指定パラメータの共通inputSchema */
 const taskIdentifierProperties = {
-  id: { type: 'string' as const, description: 'タスクID' },
+  id: {
+    type: 'string' as const,
+    description: 'タスクID（パラメータ名は `id`、`taskId` ではない）',
+  },
   session_id: {
     type: 'string' as const,
-    description: 'セッションID（環境変数 TSUNAGI_SESSION_ID の値）',
+    description: 'セッションID（環境変数 TSUNAGI_SESSION_ID の値）。snake_case であることに注意',
   },
   cwd: { type: 'string' as const, description: '作業ディレクトリパス' },
 };
+
+/** identifier の anyOf 制約（最低1つの識別子を必須にする） */
+const taskIdentifierAnyOf = [
+  { required: ['id'] },
+  { required: ['session_id'] },
+  { required: ['cwd'] },
+];
+
+/** status enum の共通定義 */
+const STATUS_ENUM = ['backlog', 'planning', 'coding', 'reviewing', 'done'] as const;
+
+/** status description（LLMバイアス対策の警告文言付き） */
+const STATUS_DESCRIPTION =
+  'ステータス。backlog → planning → coding → reviewing → done の順で遷移。' +
+  '注意: `in_progress` / `completed` / `todo` は使用不可（Claude Code 組み込み TaskUpdate の語彙と混同しないこと）。' +
+  '実装中 = `coding`、完了 = `done`。';
+
+/** typo 検出ヒント（schema validation が skip された場合のフォールバック） */
+const TYPO_HINTS: Record<string, string> = {
+  taskId: '`taskId` is not a valid parameter. Did you mean `id`?',
+  task_id: '`task_id` is not a valid parameter. Did you mean `id`?',
+  sessionId: '`sessionId` is not a valid parameter. Did you mean `session_id`?',
+  cwdPath: '`cwdPath` is not a valid parameter. Did you mean `cwd`?',
+  workingDirectory: '`workingDirectory` is not a valid parameter. Did you mean `cwd`?',
+};
+
+function checkTypos(args: Record<string, unknown> | undefined): void {
+  if (!args) return;
+  const hints: string[] = [];
+  for (const key of Object.keys(args)) {
+    if (TYPO_HINTS[key]) hints.push(TYPO_HINTS[key]);
+  }
+  if (hints.length > 0) {
+    throw new Error(hints.join('\n'));
+  }
+}
 
 /** MCPサーバーインスタンスを作成して全toolsを登録する */
 function createMcpServer(io?: SocketIOServer): Server {
@@ -52,31 +91,36 @@ function createMcpServer(io?: SocketIOServer): Server {
               oneOf: [
                 {
                   type: 'string',
-                  enum: ['backlog', 'planning', 'coding', 'reviewing', 'done'],
+                  enum: [...STATUS_ENUM],
                 },
                 {
                   type: 'array',
                   items: {
                     type: 'string',
-                    enum: ['backlog', 'planning', 'coding', 'reviewing', 'done'],
+                    enum: [...STATUS_ENUM],
                   },
                 },
               ],
               description:
-                'ステータスフィルタ。単一値（例: "backlog"）または配列（例: ["backlog", "planning"]）で指定。配列指定時はいずれかのステータスに一致するタスクを返す。',
+                'ステータスフィルタ。単一値（例: "backlog"）または配列（例: ["backlog", "planning"]）で指定。' +
+                '有効値: backlog / planning / coding / reviewing / done。' +
+                '注意: `in_progress` / `completed` / `todo` は使用不可（Claude Code 組み込み TaskUpdate の語彙）。',
             },
           },
+          additionalProperties: false,
         },
       },
       {
         name: 'tsunagi_get_task',
         description:
-          'タスク詳細を取得する（tabs含む）。id, session_id, cwd のいずれかでタスクを指定する。',
+          'タスク詳細を取得する（tabs含む）。id, session_id, cwd のいずれか1つ以上でタスクを指定する（必須）。',
         inputSchema: {
           type: 'object',
           properties: {
             ...taskIdentifierProperties,
           },
+          additionalProperties: false,
+          anyOf: taskIdentifierAnyOf,
         },
       },
       {
@@ -106,15 +150,17 @@ function createMcpServer(io?: SocketIOServer): Server {
             },
             status: {
               type: 'string',
-              enum: ['backlog', 'planning', 'coding', 'reviewing', 'done'],
-              description: '初期ステータス（デフォルト: backlog）',
+              enum: [...STATUS_ENUM],
+              description: `初期ステータス（デフォルト: backlog）。${STATUS_DESCRIPTION}`,
             },
           },
+          additionalProperties: false,
         },
       },
       {
         name: 'tsunagi_update_task',
-        description: 'タスクを更新する。id, session_id, cwd のいずれかでタスクを指定する。',
+        description:
+          'タスクを更新する。id, session_id, cwd のいずれか1つ以上でタスクを指定する（必須）。',
         inputSchema: {
           type: 'object',
           properties: {
@@ -123,8 +169,8 @@ function createMcpServer(io?: SocketIOServer): Server {
             description: { type: 'string', description: 'タスク詳細説明' },
             status: {
               type: 'string',
-              enum: ['backlog', 'planning', 'coding', 'reviewing', 'done'],
-              description: 'ステータス',
+              enum: [...STATUS_ENUM],
+              description: STATUS_DESCRIPTION,
             },
             effort: { type: 'number', description: '工数（時間）' },
             order: {
@@ -134,17 +180,21 @@ function createMcpServer(io?: SocketIOServer): Server {
             baseBranch: { type: 'string', description: 'ベースブランチ名' },
             pullRequestUrl: { type: 'string', description: 'Pull Request URL' },
           },
+          additionalProperties: false,
+          anyOf: taskIdentifierAnyOf,
         },
       },
       {
         name: 'tsunagi_delete_task',
         description:
-          'タスクを削除する（soft delete + worktree削除）。id, session_id, cwd のいずれかでタスクを指定する。',
+          'タスクを削除する（soft delete + worktree削除）。id, session_id, cwd のいずれか1つ以上でタスクを指定する（必須）。',
         inputSchema: {
           type: 'object',
           properties: {
             ...taskIdentifierProperties,
           },
+          additionalProperties: false,
+          anyOf: taskIdentifierAnyOf,
         },
       },
       {
@@ -187,6 +237,16 @@ function createMcpServer(io?: SocketIOServer): Server {
     const { name, arguments: args } = request.params;
 
     try {
+      // タスクツールの typo 検出（schema validation が skip された場合のフォールバック）
+      if (
+        name === 'tsunagi_get_task' ||
+        name === 'tsunagi_update_task' ||
+        name === 'tsunagi_delete_task' ||
+        name === 'tsunagi_create_task'
+      ) {
+        checkTypos(args as Record<string, unknown> | undefined);
+      }
+
       switch (name) {
         case 'tsunagi_list_tasks': {
           const { owner, repo, status } = (args ?? {}) as {
