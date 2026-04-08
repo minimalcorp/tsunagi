@@ -35,13 +35,6 @@ const taskIdentifierProperties = {
   cwd: { type: 'string' as const, description: '作業ディレクトリパス' },
 };
 
-/** identifier の anyOf 制約（最低1つの識別子を必須にする） */
-const taskIdentifierAnyOf = [
-  { required: ['id'] },
-  { required: ['session_id'] },
-  { required: ['cwd'] },
-];
-
 /** status enum の共通定義 */
 const STATUS_ENUM = ['backlog', 'planning', 'coding', 'reviewing', 'done'] as const;
 
@@ -120,7 +113,6 @@ function createMcpServer(io?: SocketIOServer): Server {
             ...taskIdentifierProperties,
           },
           additionalProperties: false,
-          anyOf: taskIdentifierAnyOf,
         },
       },
       {
@@ -181,7 +173,6 @@ function createMcpServer(io?: SocketIOServer): Server {
             pullRequestUrl: { type: 'string', description: 'Pull Request URL' },
           },
           additionalProperties: false,
-          anyOf: taskIdentifierAnyOf,
         },
       },
       {
@@ -194,7 +185,6 @@ function createMcpServer(io?: SocketIOServer): Server {
             ...taskIdentifierProperties,
           },
           additionalProperties: false,
-          anyOf: taskIdentifierAnyOf,
         },
       },
       {
