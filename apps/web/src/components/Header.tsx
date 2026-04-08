@@ -32,7 +32,7 @@ export function Header({
     <header className="h-14 border-b border-border flex items-center gap-3 px-4 bg-card">
       {/* Logo */}
       <h1 className="flex-shrink-0 flex items-center">
-        <Image src={logoIcon} alt="Tsunagi" width={28} height={28} priority />
+        <Image src={logoIcon} alt="Tsunagi" width={32} height={32} priority />
       </h1>
 
       {/* Spacer */}

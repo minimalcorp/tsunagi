@@ -51,7 +51,7 @@ export default async function LangLayout({ children, params }: LayoutProps) {
 
   const navbar = (
     <Navbar
-      logo={<Image src={logoIcon} alt="Tsunagi" width={28} height={28} />}
+      logo={<Image src={logoIcon} alt="Tsunagi" width={32} height={32} />}
       projectLink="https://github.com/minimalcorp/tsunagi"
     />
   );
