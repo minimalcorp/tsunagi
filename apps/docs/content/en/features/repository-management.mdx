@@ -1,16 +1,19 @@
 ---
 title: Repository Management
-description: Register and manage GitHub repositories that Tsunagi will operate on.
+description: Register and remove GitHub repositories that Tsunagi operates on.
 ---
 
 import { Callout } from 'nextra/components';
 
 # Repository Management
 
-Tsunagi can manage multiple repositories across multiple GitHub
-organizations from a single UI. Each registered repository is cloned as a
-bare repository under `~/.tsunagi/workspaces/<owner>/<repo>/.bare/` and
-serves as the base from which task worktrees are spawned.
+Tsunagi operates on GitHub repositories that you **register** from the
+settings page. Each registered repository is cloned as a **bare
+repository** under `~/.tsunagi/workspaces/<owner>/<repo>/.bare/` and
+serves as the base from which task-specific worktrees are spawned.
+
+You can register as many repositories as you like, across any number of
+GitHub organizations, and switch between them freely when creating tasks.
 
 <img
   src="/screenshots/settings-repos.png"
@@ -18,7 +21,66 @@ serves as the base from which task worktrees are spawned.
   style={{ maxWidth: '100%', height: 'auto' }}
 />
 
-<Callout type="info">
-  **Coming soon**: Full coverage of repository registration via clone URL, multiple-organization
-  support, private repository authentication, repository removal, and empty repository handling.
+## Cloning a repository
+
+1. Open **Settings** in the Tsunagi UI.
+2. Click **Add Repository**.
+3. Paste the repository's **clone URL** (either SSH like
+   `git@github.com:owner/repo.git` or HTTPS like
+   `https://github.com/owner/repo.git`).
+4. Click **Add**.
+
+Tsunagi performs the clone using your local `git` configuration, so
+authentication (SSH keys, HTTPS credentials, GitHub CLI tokens, etc.) is
+handled by whatever is already set up on your machine. Tsunagi does not
+store or manage repository credentials.
+
+### What happens under the hood
+
+When you add a repository, Tsunagi:
+
+1. Parses the clone URL and derives the `owner` / `repo` pair.
+2. Runs `git clone --bare <url>` into
+   `~/.tsunagi/workspaces/<owner>/<repo>/.bare/`.
+3. Reads `origin/HEAD` to detect the default branch (e.g., `main`,
+   `master`).
+4. Creates a `.default` worktree pointing at the tip of the default
+   branch. This worktree is used internally as a reference checkout and
+   as the base for new task branches.
+5. Registers the repository in its local SQLite database so it shows up
+   in the task creation dialog.
+
+From that point on, creating a task against this repository is a single
+click away.
+
+## Removing a repository
+
+If you no longer need a repository in Tsunagi, you can remove it from the
+settings page.
+
+1. Open **Settings**.
+2. Select the repository you want to remove.
+3. Click **Remove Repository** and confirm.
+
+Tsunagi will:
+
+- Delete the repository record from its database
+- Remove all associated tasks (soft-delete) and close their tabs
+- Remove the entire
+  `~/.tsunagi/workspaces/<owner>/<repo>/` directory from disk, including
+  the bare clone and every worktree under it
+
+<Callout type="warning">
+  Removing a repository is **irreversible** from the Tsunagi UI. Any uncommitted work in worktrees
+  under this repository will be deleted. Make sure you have pushed anything you want to keep before
+  confirming.
 </Callout>
+
+The underlying GitHub repository is **not** touched — Tsunagi only deletes
+its own local copy.
+
+## Registering the same repository multiple times
+
+Tsunagi keys repositories by `(owner, repo)`, so you can't register the
+same GitHub repository twice. If you need a fresh clone, remove the
+existing registration first and then re-add it.

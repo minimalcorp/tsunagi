@@ -1,13 +1,15 @@
 ---
 title: リポジトリ管理
-description: Tsunagi が操作する GitHub リポジトリの登録と管理。
+description: Tsunagi が操作する GitHub リポジトリの登録と削除。
 ---
 
 import { Callout } from 'nextra/components';
 
 # リポジトリ管理
 
-Tsunagi は複数の GitHub organization にまたがる複数のリポジトリを 1 つの UI から管理できます。登録されたリポジトリは `~/.tsunagi/workspaces/<owner>/<repo>/.bare/` に bare repository としてクローンされ、タスク用 worktree を派生させるベースとして機能します。
+Tsunagi は **設定画面から登録** した GitHub リポジトリに対して動作します。登録されたリポジトリは `~/.tsunagi/workspaces/<owner>/<repo>/.bare/` に **bare repository** としてクローンされ、タスクごとの worktree を派生させるベースとして機能します。
+
+複数の GitHub organization にまたがっていくつでもリポジトリを登録でき、タスク作成時に自由に切り替えられます。
 
 <img
   src="/screenshots/settings-repos.png"
@@ -15,7 +17,49 @@ Tsunagi は複数の GitHub organization にまたがる複数のリポジトリ
   style={{ maxWidth: '100%', height: 'auto' }}
 />
 
-<Callout type="info">
-  **準備中**: clone URL によるリポジトリ登録、複数 organization 対応、private
-  リポジトリ認証、リポジトリ削除、空リポジトリ対応の詳細解説。
+## リポジトリのクローン
+
+1. Tsunagi UI で **Settings** を開きます。
+2. **Add Repository** をクリックします。
+3. リポジトリの **clone URL** をペーストします (SSH 形式の `git@github.com:owner/repo.git` または HTTPS 形式の `https://github.com/owner/repo.git` のどちらでも可)。
+4. **Add** をクリックします。
+
+Tsunagi はローカルの `git` 設定を使ってクローンを実行するので、認証 (SSH キー、HTTPS 認証情報、GitHub CLI トークン等) は既にマシンにセットアップされているものがそのまま使われます。Tsunagi 自身がリポジトリの認証情報を保存・管理することはありません。
+
+### 内部で起こること
+
+リポジトリを追加すると、Tsunagi は以下を実行します:
+
+1. clone URL を解析して `owner` / `repo` ペアを導出
+2. `~/.tsunagi/workspaces/<owner>/<repo>/.bare/` に `git clone --bare <url>` を実行
+3. `origin/HEAD` を読んでデフォルトブランチ (`main`、`master` 等) を検出
+4. デフォルトブランチの tip を指す `.default` worktree を作成。この worktree は内部的なリファレンスチェックアウトとして、また新しいタスクブランチのベースとして使われます
+5. リポジトリレコードをローカル SQLite データベースに登録 (タスク作成ダイアログに表示されるようになる)
+
+これ以降、このリポジトリに対するタスク作成はワンクリックで可能になります。
+
+## リポジトリの削除
+
+Tsunagi でリポジトリが不要になったら、設定画面から削除できます。
+
+1. **Settings** を開きます。
+2. 削除したいリポジトリを選択します。
+3. **Remove Repository** をクリックして確認します。
+
+Tsunagi は以下を実行します:
+
+- データベースからリポジトリレコードを削除
+- 関連するすべてのタスクを論理削除し、それらのタブを閉じる
+- `~/.tsunagi/workspaces/<owner>/<repo>/` ディレクトリ全体をディスクから削除 (bare clone と配下のすべての worktree を含む)
+
+<Callout type="warning">
+  リポジトリ削除は Tsunagi UI から **取り消せません**。このリポジトリ配下の worktree
+  に未コミットの変更がある場合、それらも削除されます。確認前に、残したい変更が push
+  されていることを確認してください。
 </Callout>
+
+GitHub 上の実リポジトリは **操作されません** — Tsunagi はローカルのコピーだけを削除します。
+
+## 同じリポジトリを複数回登録する
+
+Tsunagi はリポジトリを `(owner, repo)` で識別するので、同じ GitHub リポジトリを 2 回登録することはできません。新しいクローンが必要な場合は、既存の登録を一度削除してから再度追加してください。

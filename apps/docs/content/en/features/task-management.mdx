@@ -1,14 +1,16 @@
 ---
 title: Task Management
-description: How tasks work in Tsunagi.
+description: Everything Tsunagi offers around tasks — creation, sessions, progress tracking, and on-disk layout.
 ---
 
 import { Callout } from 'nextra/components';
 
 # Task Management
 
-Tasks are Tsunagi's atomic unit of work. Each task owns a git worktree and
-can host one or more Claude sessions inside that worktree.
+Tasks are the atomic unit of work in Tsunagi. Every feature — Claude
+sessions, git worktrees, progress tracking, the editor integration —
+hangs off a task. If you understand what a task is and what it owns,
+you understand most of Tsunagi.
 
 <img
   src="/screenshots/task-list.png"
@@ -16,30 +18,243 @@ can host one or more Claude sessions inside that worktree.
   style={{ maxWidth: '100%', height: 'auto' }}
 />
 
-## Lifecycle
+## What a task is
 
-A task moves through these statuses:
+A task in Tsunagi is a record that binds together:
+
+| Field                       | Purpose                                                                |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `title`                     | A short, human-readable name                                           |
+| `description`               | Markdown-formatted details, plan, PRD, etc.                            |
+| `owner` / `repo` / `branch` | The git context — which repository and which branch this task lives on |
+| `status`                    | Where the task is in its lifecycle (see below)                         |
+| `order`                     | Priority within a status column (drag to reorder)                      |
+| `effort`                    | Rough size estimate (`S` / `M` / `L` / `XL`)                           |
+| `tabs`                      | Zero or more Claude sessions attached to this task                     |
+| `worktreeStatus`            | Internal state of the git worktree Tsunagi manages for this task       |
+
+Every task **owns exactly one git worktree** on disk, and you do all the
+real work in that worktree — either through the Claude sessions Tsunagi
+launches inside it, or directly with your own tools.
+
+## Creating a task
+
+Click **+ Add Task** in the task list panel. Fill in:
+
+- **Title** — what you want done
+- **Repository** — pick one of the registered repositories
+- **Branch** — the branch Tsunagi will create the worktree on. Choose a
+  meaningful name; Tsunagi will not auto-rename it later
+- **Description** — optional; great for writing a plan or PRD that
+  Claude can read
+- **Effort** — optional sizing hint
+
+Click **Create**. Tsunagi will:
+
+1. Insert a new task row into its database with status `backlog`
+2. Create the git worktree at
+   `~/.tsunagi/workspaces/<owner>/<repo>/<branch-dir>/` based on the
+   default branch
+3. Broadcast a real-time event so the task appears immediately in every
+   connected browser tab
+
+That's it — no manual `git` commands, no shell. The worktree is ready
+for Claude (or you) to start working in.
+
+## Editing a task
+
+Click a task card to open the **task detail** view. From there you can
+edit:
+
+- Title and description (Markdown editor with live preview)
+- Status (drag between columns or use the status selector)
+- Effort
+- Order within a status (drag to reorder)
+
+Most edits happen in place without a separate "save" step. The task list
+in the main view updates in real time.
+
+Note that `owner`, `repo`, and `branch` are **not editable** after a
+task is created — they determine the worktree, and changing them would
+require recreating the worktree from scratch. If you need to move a task
+to a different branch, create a new task instead.
+
+## Deleting a task
+
+Deleting a task removes:
+
+- The task record from the database (soft delete — the row is marked
+  `deleted: true` and hidden from the UI)
+- All attached tab sessions (PTY processes are killed)
+- The git worktree on disk, including any uncommitted changes
+
+You can delete a task from three places:
+
+- **The task list** — right-click or use the card menu
+- **The task detail view** — use the overflow menu
+- **From Claude via MCP** — Claude can call `tsunagi_delete_task` if you
+  ask it to (see [Tsunagi Plugin](/en/features/plugin/))
+
+<Callout type="warning">
+  Uncommitted changes in the worktree are **lost** when you delete a task. Push or stash anything
+  you want to keep first.
+</Callout>
+
+The bare repository and the `.default` worktree are **never** affected
+by task deletion — only the task's own branch directory is removed.
+
+## Status auto-update
+
+Tasks move through these statuses:
 
 `backlog` → `planning` → `coding` → `reviewing` → `done`
 
-Status changes can be:
+You can change status manually at any time, but Tsunagi also **updates
+status automatically** based on what Claude is doing. The bundled
+Tsunagi plugin includes a small skill that teaches Claude when to call
+`tsunagi_update_task` to advance the status.
 
-- **Manual**, by dragging the task in the UI or editing it in the detail view
-- **Automatic**, by the Claude session itself via the Tsunagi MCP server
-  (the bundled plugin teaches Claude when to call `tsunagi_update_task`)
+| Status      | When                                                       |
+| ----------- | ---------------------------------------------------------- |
+| `backlog`   | Task exists, no one is working on it yet                   |
+| `planning`  | A human-Claude conversation about the approach is underway |
+| `coding`    | Claude is actively implementing                            |
+| `reviewing` | Implementation is done; ready for human review             |
+| `done`      | Task is complete and the human has confirmed               |
 
-Deleting a task is a separate action — it removes the worktree from disk
-and the task record from the database.
+This means you can watch tasks flow across the board in real time, just
+like a physical kanban board — except no one has to physically move the
+cards.
 
-## Filtering and ordering
+## Tabs — multiple Claude sessions per task
+
+A **tab** is a single Claude Code session attached to a task. A task can
+have any number of tabs, each running independently inside the same
+worktree.
+
+<img
+  src="/screenshots/worktree-tabs.png"
+  alt="Multiple tabs in a task"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+Why multiple tabs?
+
+- Run one tab implementing a feature while another debugs the test suite
+- Start a throwaway exploratory session without losing the main thread
+- Compare two different approaches side by side
+
+All tabs share the same worktree, so a file written in one tab is
+immediately visible to the others. Each tab is a full Claude Code
+session — the same one you'd get running `claude` in a terminal — so you
+can use any Claude Code feature inside a tab.
+
+### How a tab is launched
+
+When you click **+ New Tab** in the task detail view, Tsunagi:
+
+1. Spawns a PTY-backed shell inside the task's worktree using `node-pty`
+2. Injects the environment variables defined in the Tsunagi settings
+   page (see [Environment Variables](/en/features/environment-variables/))
+3. Launches Claude Code in that shell with the same credentials Claude
+   Code itself uses (`ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`)
+4. Wires Claude's hooks to the Tsunagi backend so the UI can read what
+   the session is doing in real time
+
+### Persistence across reloads
+
+Tab sessions are persisted on the server side. If you refresh the
+browser or lose your network connection, the PTY process keeps running
+on the Tsunagi backend, and reconnecting will restore the terminal
+output including whatever happened while you were away.
+
+If you want to close a tab permanently, use the tab's close button —
+this kills the PTY process and removes the tab record from the task.
+
+## Progress bar — real-time todo tracking
+
+Each task card in the task list shows a **progress bar** that reflects
+what Claude is doing in real time.
+
+How it works: when Claude calls `TodoWrite` (one of its built-in tools)
+to record or update a todo list, the Claude Code hook fires. The bundled
+Tsunagi plugin posts the new todos to the Tsunagi backend, which
+broadcasts them via Socket.IO to every connected browser. The progress
+bar is rendered from the completed vs. pending count.
+
+This is why the [tutorial](/en/tutorial/start-session/) asks you to
+prompt Claude with "create a todo list, then..." — it's not just good
+prompting hygiene, it's what makes the progress bar work.
+
+You don't need to do anything to set this up. As long as Claude uses
+`TodoWrite`, the progress bar appears automatically.
+
+## Monaco editor integration
+
+Tsunagi includes a built-in **Monaco editor** modal that can open files
+from inside the UI. This is useful when Claude (or you) needs to edit
+something longer than a single-line terminal prompt — writing a commit
+message, editing a prompt in Markdown, or tweaking a config file.
+
+### How it's triggered
+
+Tsunagi sets `EDITOR` in every Claude session's shell environment to
+point at a small helper script. Whenever a tool opens its default
+editor (`git commit`, `git rebase -i`, `npx prompt` in various CLIs,
+etc.), the helper opens a **Monaco modal** in the Tsunagi UI instead of
+launching a terminal-mode editor like `vi`.
+
+You can also trigger Monaco directly from the terminal view with a
+keyboard shortcut (typically `Ctrl+G`) to open the current file at the
+cursor.
+
+### Why Monaco
+
+- **Syntax highlighting** and Markdown preview out of the box
+- **Multi-line editing** without fighting terminal line wrapping
+- **Stays inside the Tsunagi UI** — you never have to switch apps
+
+Inside the modal you edit normally, save (`Cmd+S` or `Ctrl+S`), and
+dismiss. Control returns to the Claude session, which sees the edited
+file and continues.
+
+## Filtering and reordering
 
 The task list panel supports:
 
-- Filtering by repository, status, or text
-- Reordering by priority within a status (drag and drop)
-- Batch deletion of `done` tasks
+- **Filtering** by repository, status, or free-text search
+- **Reordering** tasks within a status column by drag and drop
+- **Batch deletion** of `done` tasks via the column header menu
 
-<Callout type="info">
-  **Coming soon**: This page is a stub. Full coverage of all task management features (effort sizes,
-  descriptions in MDX, planner panel, etc.) will be added in a future update.
-</Callout>
+Reordering persists across reloads — the `order` field is saved to the
+database. This is the mechanism the MCP server uses when you (or
+Claude via `tsunagi-task-curator`) bulk-reprioritize the backlog.
+
+## Tasks on disk
+
+Under the hood, every task is backed by a **git worktree** in the
+Tsunagi workspace directory:
+
+```
+~/.tsunagi/workspaces/<owner>/<repo>/
+├── .bare/                    # bare clone shared by all worktrees
+├── .default/                 # read-only reference checkout of the default branch
+├── feat-some-task/           # one directory per task branch
+└── fix-another-task/
+```
+
+Some useful consequences:
+
+- **You can open a task's worktree directly** in your own editor
+  (`code ~/.tsunagi/workspaces/owner/repo/feat-xxx/`) and work outside
+  of Tsunagi. The Tsunagi UI keeps tracking file changes through its
+  Claude sessions.
+- **Multiple Claude sessions per task share one worktree**, so they can
+  see each other's edits.
+- **Different tasks live in completely separate directories**, so
+  parallel tasks never collide on the file system even though they
+  share the same bare clone.
+
+Tsunagi manages these worktrees automatically — `git worktree add` on
+task creation, `git worktree remove` on task deletion — so you
+typically never need to run `git worktree` commands yourself.
