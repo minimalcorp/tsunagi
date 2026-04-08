@@ -8,18 +8,18 @@
 
 ## 0. 作業全体像
 
-| #               | 作業                                               | 必須度 | 所要時間 |
-| --------------- | -------------------------------------------------- | ------ | -------- |
-| 1               | npm 側のアカウント・Token 準備                     | 必須   | 10分     |
-| 2               | GitHub リポジトリ設定                              | 必須   | 15分     |
-| &nbsp;&nbsp;2-1 | GitHub Pages を Actions ソースに設定               | 必須   | 1分      |
-| &nbsp;&nbsp;2-2 | `NPM_TOKEN` を Secrets に登録                      | 必須   | 2分      |
-| &nbsp;&nbsp;2-3 | `production-release` Environment 作成 + 承認者設定 | 必須   | 3分      |
-| &nbsp;&nbsp;2-4 | `main` ブランチ保護 + GitHub Actions bypass        | 必須   | 5分      |
-| &nbsp;&nbsp;2-5 | `cla-signatures` ブランチ保護                      | 推奨   | 3分      |
-| 3               | 初回リリース実行と動作検証                         | 必須   | 15分     |
-| 4               | docs 用スクリーンショットの差し替え                | 必須   | 15分     |
-| 5               | 任意の追加設定（カスタムドメイン等）               | 任意   | -        |
+| #               | 作業                                                | 必須度 | 所要時間 |
+| --------------- | --------------------------------------------------- | ------ | -------- |
+| 1               | npm 側のアカウント・Token 準備                      | 必須   | 10分     |
+| 2               | GitHub リポジトリ設定                               | 必須   | 15分     |
+| &nbsp;&nbsp;2-1 | GitHub Pages を Actions ソースに設定                | 必須   | 1分      |
+| &nbsp;&nbsp;2-2 | `NPM_TOKEN` を Secrets に登録                       | 必須   | 2分      |
+| &nbsp;&nbsp;2-3 | `production-release` Environment 作成 + 承認者設定  | 必須   | 3分      |
+| &nbsp;&nbsp;2-4 | `main` ブランチ保護 + GitHub Actions bypass         | 必須   | 5分      |
+| &nbsp;&nbsp;2-5 | `cla-signatures` ブランチ保護                       | 推奨   | 3分      |
+| 3               | 初回リリース実行と動作検証                          | 必須   | 15分     |
+| 4               | docs 用スクリーンショット (配置済み / リファレンス) | -      | -        |
+| 5               | 任意の追加設定（カスタムドメイン等）                | 任意   | -        |
 
 ---
 
@@ -157,61 +157,64 @@ CLA bot は署名データを `cla-signatures` という独立 branch に commit
 
 ---
 
-## 4. ドキュメント用スクリーンショットの差し替え（必須）
+## 4. ドキュメント用スクリーンショット (リファレンス)
 
-`apps/docs/` には現在 1×1 の透過 PNG プレースホルダーが配置されています。
-公開前に実際の Tsunagi UI のスクリーンショットに差し替える必要があります。
+本ブランチで実スクリーンショットを **WebP lossless 形式** で
+`apps/docs/public/screenshots/` に配置済みなので、公開前の追加作業は
+**原則不要** です。
 
-### 撮影と配置
+UI に変更があった場合にスクリーンショットを更新する手順を記載します。
 
-以下 8 枚を撮影して `apps/docs/public/screenshots/` に**同じファイル名で**
-上書き配置してください。
+### 管理対象の 7 枚
 
-| #   | ファイル名            | 撮影内容                                                    | 主な掲載先               |
-| --- | --------------------- | ----------------------------------------------------------- | ------------------------ |
-| 1   | `hero.png`            | メイン画面全体（タスク一覧 + プランナーの両方が見える状態） | LP の Hero               |
-| 2   | `task-list.png`       | 左側のタスクリストのアップ（複数タスクが並んでいる状態）    | Tutorial / Features      |
-| 3   | `task-detail.png`     | タスク詳細画面（worktree、ターミナルタブが見える状態）      | LP / Tutorial            |
-| 4   | `worktree-tabs.png`   | 複数タブで並列セッションが走っている様子                    | Tutorial / Features      |
-| 5   | `mcp-task-create.png` | Claude が MCP 経由でタスクを作成している様子                | Features (MCP)           |
-| 6   | `settings-env.png`    | 環境変数設定画面                                            | Initial Setup / Features |
-| 7   | `settings-repos.png`  | リポジトリ管理画面                                          | Initial Setup            |
+| #   | ファイル名             | 撮影内容                                                    | 主な掲載先               |
+| --- | ---------------------- | ----------------------------------------------------------- | ------------------------ |
+| 1   | `hero.webp`            | メイン画面全体（タスク一覧 + プランナーの両方が見える状態） | LP の Hero               |
+| 2   | `task-list.webp`       | 左側のタスクリストのアップ（複数タスクが並んでいる状態）    | Tutorial / Features      |
+| 3   | `task-detail.webp`     | タスク詳細画面（worktree、ターミナルタブが見える状態）      | LP / Tutorial            |
+| 4   | `worktree-tabs.webp`   | 複数タブで並列セッションが走っている様子                    | Tutorial / Features      |
+| 5   | `mcp-task-create.webp` | Claude が MCP 経由でタスクを作成している様子                | Features (MCP)           |
+| 6   | `settings-env.webp`    | 環境変数設定画面                                            | Initial Setup / Features |
+| 7   | `settings-repos.webp`  | リポジトリ管理画面                                          | Initial Setup            |
 
-### 撮影サイズ・フォーマット
+### フォーマット方針
 
+- **WebP lossless** (`cwebp -lossless -q 100 -m 6 -mt`)
 - **横幅**: 1600〜2000px (Retina 対応)
-- **フォーマット**: PNG (テキストが綺麗に出る)
-- **圧縮**: ファイルサイズが大きい場合は `pngquant` 等で軽量化推奨
 - **テーマ**: light / dark どちらか統一すること（混在は避ける）
+- lossless モードなので PNG とピクセル単位で同じ画質、ファイルサイズのみ
+  20〜30% に圧縮される
 
-### 撮影方法（macOS）
+### 撮影・更新手順 (macOS)
 
-- `Cmd + Shift + 4` → スペースキー → ウィンドウクリック でウィンドウ単位の撮影
-- `Cmd + Shift + 5` で範囲指定撮影
-- 撮影後、ファイル名を上記表のとおりリネームして配置
+1. 撮影:
+   - `Cmd + Shift + 4` → スペースキー → ウィンドウクリック (ウィンドウ単位)
+   - または `Cmd + Shift + 5` で範囲指定
+2. PNG として `~/Desktop/<name>.png` に一時保存
+3. WebP lossless に変換して配置:
+   ```bash
+   cwebp -lossless -q 100 -m 6 -mt ~/Desktop/<name>.png \
+     -o apps/docs/public/screenshots/<name>.webp
+   ```
+4. ビルドで確認:
+   ```bash
+   npm run build -w tsunagi-docs
+   ```
+
+`cwebp` は `brew install webp` でインストールできます。
 
 ### 配置先
 
 ```
 apps/docs/public/screenshots/
-├── hero.png
-├── task-list.png
-├── task-detail.png
-├── worktree-tabs.png
-├── mcp-task-create.png
-├── settings-env.png
-└── settings-repos.png
+├── hero.webp
+├── task-list.webp
+├── task-detail.webp
+├── worktree-tabs.webp
+├── mcp-task-create.webp
+├── settings-env.webp
+└── settings-repos.webp
 ```
-
-### 確認
-
-- [ ] 7 枚すべてを差し替えた
-- [ ] `npm run build -w tsunagi-docs` で再ビルドしてエラーが出ない
-- [ ] `apps/docs/out/en/` 配下の各ページをブラウザで開き、画像が正しく表示されることを確認
-
-> **Note**: 現在のプレースホルダー (1×1 透過 PNG) でもビルドは通りますが、
-> 公開時に空白の箇所として表示されます。**docs を公開する前に必ず差し替えて
-> ください。**
 
 ---
 
@@ -242,7 +245,6 @@ release workflow 完了時に Slack 等に通知したい場合、`release.yml` 
 4. **手順 2-3** (`production-release` Environment 作成 + 承認者設定)
 5. **手順 2-4** (`main` 保護 + bypass ← 保護ルールを設定する場合のみ)
 6. **手順 3** (初回リリース実行と動作検証)
-7. **手順 4** (docs 用スクリーンショットの差し替え)
 
 **推奨だが後回しでも可**:
 
