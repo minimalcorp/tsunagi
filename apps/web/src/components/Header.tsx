@@ -1,8 +1,10 @@
 'use client';
 
 import { Settings, RefreshCw, FolderDown } from 'lucide-react';
+import Image from 'next/image';
 import { ThemeToggle } from './ThemeToggle';
 import { Button } from '@/components/ui/button';
+import logoIcon from '@/app/icon.png';
 
 interface HeaderProps {
   onCloneClick: () => void;
@@ -29,7 +31,9 @@ export function Header({
   return (
     <header className="h-14 border-b border-border flex items-center gap-3 px-4 bg-card">
       {/* Logo */}
-      <h1 className="text-base font-semibold text-foreground flex-shrink-0">繋</h1>
+      <h1 className="flex-shrink-0 flex items-center">
+        <Image src={logoIcon} alt="Tsunagi" width={28} height={28} priority />
+      </h1>
 
       {/* Spacer */}
       <div className="flex-1" />
