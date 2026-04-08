@@ -244,12 +244,35 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     }
     function handleEditorSessionDone() {
       isExternalEditorOpenRef.current = false;
-      // Ctrl+L で Claude Code に再描画させる
-      const socket = socketRef.current;
-      const sid = sessionIdRef.current;
-      if (socket?.connected && sid) {
-        socket.emit('input', { sessionId: sid, data: '\x0c' });
-      }
+      // claude 2.1.94 は $EDITOR 終了後に Ink の内部状態と実画面の position がズレて
+      // 余白が発生する。実ブラウザリサイズでは直ることを確認済みなので、
+      // プログラム側から疑似的な dimension 変化 (bump-then-restore) を注入して
+      // Node.js の 'resize' event → Ink の full re-layout を強制発火させる。
+      //
+      // 注意点:
+      // - Node.js の 'resize' event は process.stdout の cols/rows が実際に
+      //   変化した時のみ発火するため、同サイズ resize では効かない。
+      // - 200ms 遅延: monaco-editor.sh が polling から exit して foreground PG が
+      //   claude に戻るのを待つ。sh が前景にいる間に resize すると SIGWINCH が
+      //   sh に届いてしまう。
+      // - rows+1: 一瞬増やす方向にすることで、入力欄が画面外に押し出される
+      //   flicker を避ける (rows-1 だと入力欄が 1 行上に動くのが見える)。
+      // - 30ms の間隔: 2 回の resize を別 tick で処理させて、Node 側で集約され
+      //   てしまうのを防ぐ。
+      setTimeout(() => {
+        const socket = socketRef.current;
+        const sid = sessionIdRef.current;
+        const term = termRef.current;
+        if (!socket?.connected || !sid || !term) return;
+        socket.emit('resize', { sessionId: sid, cols: term.cols, rows: term.rows + 1 });
+        setTimeout(() => {
+          const t = termRef.current;
+          const s = socketRef.current;
+          if (s?.connected && sid && t) {
+            s.emit('resize', { sessionId: sid, cols: t.cols, rows: t.rows });
+          }
+        }, 30);
+      }, 200);
       // アクティブタブのみフォーカスを復帰する
       if (!isActiveRef.current) return;
       // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない）
