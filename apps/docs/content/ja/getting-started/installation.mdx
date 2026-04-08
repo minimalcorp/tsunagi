@@ -54,8 +54,6 @@ Tsunagi は起動時に以下を実行します:
 └── workspaces/               # git worktrees
 ```
 
-`TSUNAGI_DATA_DIR` 環境変数で保存先を変更できます。
-
 ## 単一インスタンス制約
 
 Tsunagi は同時に1プロセスしか起動できません。2つ目を起動しようとすると `Another tsunagi is running (PID xxx)` というエラーで終了します。これは意図的な仕様で、Claude Code plugin のライフサイクルと worktree の状態が race condition を起こすのを防ぐためです。

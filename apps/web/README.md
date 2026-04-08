@@ -138,8 +138,6 @@ Tsunagi のローカルデータは `~/.tsunagi/` 以下に保存されます:
 - `~/.tsunagi/backups/` - DBバックアップ
 - `~/.tsunagi/workspaces/` - Git worktree
 
-環境変数 `TSUNAGI_DATA_DIR` で保存先を変更できます。
-
 ---
 
 ## 📂 ドキュメント
