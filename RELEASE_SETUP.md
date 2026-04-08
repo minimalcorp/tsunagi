@@ -167,16 +167,15 @@ CLA bot は署名データを `cla-signatures` という独立 branch に commit
 以下 8 枚を撮影して `apps/docs/public/screenshots/` に**同じファイル名で**
 上書き配置してください。
 
-| #   | ファイル名             | 撮影内容                                                    | 主な掲載先               |
-| --- | ---------------------- | ----------------------------------------------------------- | ------------------------ |
-| 1   | `hero.png`             | メイン画面全体（タスク一覧 + プランナーの両方が見える状態） | LP の Hero               |
-| 2   | `task-list.png`        | 左側のタスクリストのアップ（複数タスクが並んでいる状態）    | Tutorial / Features      |
-| 3   | `task-detail.png`      | タスク詳細画面（worktree、ターミナルタブが見える状態）      | LP / Tutorial            |
-| 4   | `terminal-session.png` | Claude が動作中のターミナルセッション                       | Tutorial / Features      |
-| 5   | `worktree-tabs.png`    | 複数タブで並列セッションが走っている様子                    | Tutorial / Features      |
-| 6   | `mcp-task-create.png`  | Claude が MCP 経由でタスクを作成している様子                | Features (MCP)           |
-| 7   | `settings-env.png`     | 環境変数設定画面                                            | Initial Setup / Features |
-| 8   | `settings-repos.png`   | リポジトリ管理画面                                          | Initial Setup            |
+| #   | ファイル名            | 撮影内容                                                    | 主な掲載先               |
+| --- | --------------------- | ----------------------------------------------------------- | ------------------------ |
+| 1   | `hero.png`            | メイン画面全体（タスク一覧 + プランナーの両方が見える状態） | LP の Hero               |
+| 2   | `task-list.png`       | 左側のタスクリストのアップ（複数タスクが並んでいる状態）    | Tutorial / Features      |
+| 3   | `task-detail.png`     | タスク詳細画面（worktree、ターミナルタブが見える状態）      | LP / Tutorial            |
+| 4   | `worktree-tabs.png`   | 複数タブで並列セッションが走っている様子                    | Tutorial / Features      |
+| 5   | `mcp-task-create.png` | Claude が MCP 経由でタスクを作成している様子                | Features (MCP)           |
+| 6   | `settings-env.png`    | 環境変数設定画面                                            | Initial Setup / Features |
+| 7   | `settings-repos.png`  | リポジトリ管理画面                                          | Initial Setup            |
 
 ### 撮影サイズ・フォーマット
 
@@ -198,7 +197,6 @@ apps/docs/public/screenshots/
 ├── hero.png
 ├── task-list.png
 ├── task-detail.png
-├── terminal-session.png
 ├── worktree-tabs.png
 ├── mcp-task-create.png
 ├── settings-env.png
@@ -207,7 +205,7 @@ apps/docs/public/screenshots/
 
 ### 確認
 
-- [ ] 8 枚すべてを差し替えた
+- [ ] 7 枚すべてを差し替えた
 - [ ] `npm run build -w tsunagi-docs` で再ビルドしてエラーが出ない
 - [ ] `apps/docs/out/en/` 配下の各ページをブラウザで開き、画像が正しく表示されることを確認
 
