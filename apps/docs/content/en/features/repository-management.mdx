@@ -1,0 +1,24 @@
+---
+title: Repository Management
+description: Register and manage GitHub repositories that Tsunagi will operate on.
+---
+
+import { Callout } from 'nextra/components';
+
+# Repository Management
+
+Tsunagi can manage multiple repositories across multiple GitHub
+organizations from a single UI. Each registered repository is cloned as a
+bare repository under `~/.tsunagi/workspaces/<owner>/<repo>/.bare/` and
+serves as the base from which task worktrees are spawned.
+
+<img
+  src="/screenshots/settings-repos.png"
+  alt="Repository management settings"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+<Callout type="info">
+  **Coming soon**: Full coverage of repository registration via clone URL, multiple-organization
+  support, private repository authentication, repository removal, and empty repository handling.
+</Callout>

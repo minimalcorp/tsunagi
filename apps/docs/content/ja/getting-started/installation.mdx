@@ -60,6 +60,8 @@ Tsunagi は起動時に以下を実行します:
 
 Tsunagi は同時に1プロセスしか起動できません。2つ目を起動しようとすると `Another tsunagi is running (PID xxx)` というエラーで終了します。これは意図的な仕様で、Claude Code plugin のライフサイクルと worktree の状態が race condition を起こすのを防ぐためです。
 
+前回 crash して終了処理が走らなかった場合、ロックファイルに古い PID が残ることがあります。次回起動時に Tsunagi が PID の生存確認を行って stale ロックを自動的にクリーンアップするので、ユーザー側の手動リカバリは不要です。
+
 ## 次のステップ
 
 - [初回セットアップ](/ja/getting-started/initial-setup/) — リポジトリを登録して Tsunagi と作業を接続する

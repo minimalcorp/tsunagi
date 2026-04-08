@@ -70,6 +70,11 @@ instance, it exits with `Another tsunagi is running (PID xxx)`. This is
 deliberate — the Claude Code plugin lifecycle and the worktree state would
 race otherwise.
 
+If Tsunagi crashed previously and could not run its cleanup, the lock file
+may still hold the dead process's PID. The next launch detects this stale
+lock automatically (by checking whether the PID is alive), removes it, and
+proceeds normally — no manual recovery needed.
+
 ## Next steps
 
 - [Initial Setup](/en/getting-started/initial-setup/) — register your first

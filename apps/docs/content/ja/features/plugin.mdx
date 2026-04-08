@@ -1,0 +1,22 @@
+---
+title: Tsunagi プラグイン
+description: Tsunagi の AI 統合を支えるバンドル済み Claude Code プラグイン。
+---
+
+import { Callout } from 'nextra/components';
+
+# Tsunagi プラグイン
+
+Tsunagi は Claude Code プラグイン (`tsunagi-plugin`) をバンドルしており、Tsunagi の起動時に自動 install され、終了時に自動 uninstall されます。このプラグインこそが Tsunagi と Claude の深い統合を実現している中核です: **MCP server**、**skill**、**curator agent**、そして Claude の活動を Tsunagi UI にリアルタイムで流し込む **hook handler** をバンドルしています。
+
+<img
+  src="/screenshots/mcp-task-create.png"
+  alt="Claude が Tsunagi MCP を呼び出す"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+<Callout type="info">
+  **準備中**: プラグインの構成要素 (MCP server とツール一覧、`tsunagi-task`
+  skill、`tsunagi-task-curator` agent、hook handler) と、ライフサイクル
+  (起動時クリーンインストール、終了時 uninstall、crash 後の孤児自動回復) の詳細解説。
+</Callout>

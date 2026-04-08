@@ -1,0 +1,21 @@
+---
+title: リポジトリ管理
+description: Tsunagi が操作する GitHub リポジトリの登録と管理。
+---
+
+import { Callout } from 'nextra/components';
+
+# リポジトリ管理
+
+Tsunagi は複数の GitHub organization にまたがる複数のリポジトリを 1 つの UI から管理できます。登録されたリポジトリは `~/.tsunagi/workspaces/<owner>/<repo>/.bare/` に bare repository としてクローンされ、タスク用 worktree を派生させるベースとして機能します。
+
+<img
+  src="/screenshots/settings-repos.png"
+  alt="リポジトリ管理設定画面"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+<Callout type="info">
+  **準備中**: clone URL によるリポジトリ登録、複数 organization 対応、private
+  リポジトリ認証、リポジトリ削除、空リポジトリ対応の詳細解説。
+</Callout>

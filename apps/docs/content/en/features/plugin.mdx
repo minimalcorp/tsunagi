@@ -1,0 +1,26 @@
+---
+title: Tsunagi Plugin
+description: The bundled Claude Code plugin that powers Tsunagi's AI integration.
+---
+
+import { Callout } from 'nextra/components';
+
+# Tsunagi Plugin
+
+Tsunagi ships a Claude Code plugin (`tsunagi-plugin`) that is automatically
+installed when Tsunagi starts and uninstalled when it stops. This plugin is
+what makes Tsunagi's deep integration with Claude possible: it bundles an
+**MCP server**, a **skill**, a **curator agent**, and the **hook handlers**
+that stream Claude's activity into the Tsunagi UI in real time.
+
+<img
+  src="/screenshots/mcp-task-create.png"
+  alt="Claude calling Tsunagi MCP"
+  style={{ maxWidth: '100%', height: 'auto' }}
+/>
+
+<Callout type="info">
+  **Coming soon**: Full coverage of the plugin's components (MCP server and tool list, the
+  `tsunagi-task` skill, the `tsunagi-task-curator` agent, hook handlers) and its lifecycle (clean
+  install on startup, uninstall on shutdown, orphan auto-recovery after a crash).
+</Callout>
