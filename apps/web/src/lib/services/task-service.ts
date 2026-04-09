@@ -6,7 +6,7 @@ import * as taskRepo from '../repositories/task';
 import * as repoRepo from '../repositories/repository';
 import * as worktreeManager from '../worktree-manager';
 import { normalizeBranchName } from '../branch-utils';
-import type { Task, Repository } from '../types';
+import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
 import { prisma } from '../db';
 
 // ============================================

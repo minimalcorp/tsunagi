@@ -244,7 +244,7 @@ function createMcpServer(io?: SocketIOServer): Server {
             repo?: string;
             status?: string | string[];
           };
-          type TaskStatus = import('../../src/lib/types.js').Task['status'];
+          type TaskStatus = import('@minimalcorp/tsunagi-shared').Task['status'];
           const tasks = await listTasks({
             owner,
             repo,
@@ -279,7 +279,7 @@ function createMcpServer(io?: SocketIOServer): Server {
               description,
               effort: effort !== undefined ? Number(effort) : undefined,
               order: order !== undefined ? Number(order) : undefined,
-              status: status as import('../../src/lib/types.js').Task['status'] | undefined,
+              status: status as import('@minimalcorp/tsunagi-shared').Task['status'] | undefined,
               branch,
               baseBranch,
             },
@@ -318,7 +318,7 @@ function createMcpServer(io?: SocketIOServer): Server {
               ...(title !== undefined ? { title } : {}),
               ...(description !== undefined ? { description } : {}),
               ...(status !== undefined
-                ? { status: status as import('../../src/lib/types.js').Task['status'] }
+                ? { status: status as import('@minimalcorp/tsunagi-shared').Task['status'] }
                 : {}),
               ...(effort !== undefined ? { effort: Number(effort) } : {}),
               ...(order !== undefined ? { order: Number(order) } : {}),

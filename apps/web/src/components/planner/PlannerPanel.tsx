@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Tab } from '@/lib/types';
+import type { Tab } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
 import {
   TerminalView,

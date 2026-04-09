@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback, type FormEvent } from 'react';
-import type { Repository, Task } from '@/lib/types';
+import type { Repository, Task } from '@minimalcorp/tsunagi-shared';
 import { Editor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import ReactMarkdown from 'react-markdown';

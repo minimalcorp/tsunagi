@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import type { Repository } from '../types';
+import type { Repository } from '@minimalcorp/tsunagi-shared';
 
 // リポジトリ一覧取得
 export async function getRepos(): Promise<Repository[]> {

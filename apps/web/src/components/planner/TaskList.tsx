@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import type { Task } from '@/lib/types';
+import type { Task } from '@minimalcorp/tsunagi-shared';
 import { TaskCard } from '@/components/planner/TaskCard';
 
 interface TaskListProps {

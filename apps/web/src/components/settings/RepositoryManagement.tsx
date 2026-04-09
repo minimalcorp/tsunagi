@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
-import type { Repository } from '@/lib/types';
+import type { Repository } from '@minimalcorp/tsunagi-shared';
 import { getRepoColor } from '@/lib/repo-colors';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/Dialog';

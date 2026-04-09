@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Ellipsis, Pencil, Trash2 } from 'lucide-react';
-import type { Task, Tab } from '@/lib/types';
+import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
 import { TaskDialog } from '@/components/TaskDialog';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';

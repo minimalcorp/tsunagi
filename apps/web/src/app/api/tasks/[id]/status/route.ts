@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as taskRepo from '@/lib/repositories/task';
-import type { Task } from '@/lib/types';
+import type { Task } from '@minimalcorp/tsunagi-shared';
 
 // PUT /api/tasks/:id/status - Transition task status
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

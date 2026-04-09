@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import type { Task, Tab } from '../types';
+import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
 
 // タスク一覧取得（deleted: false のみデフォルト）
 export async function getTasks(filter?: {

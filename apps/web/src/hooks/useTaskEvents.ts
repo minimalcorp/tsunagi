@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { Task } from '@/lib/types';
+import type { Task } from '@minimalcorp/tsunagi-shared';
 
 const FASTIFY_API_BASE = 'http://localhost:2792';
 

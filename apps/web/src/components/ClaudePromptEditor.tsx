@@ -11,7 +11,7 @@ import {
   memo,
 } from 'react';
 import type { editor } from 'monaco-editor';
-import type { Tab } from '@/lib/types';
+import type { Tab } from '@minimalcorp/tsunagi-shared';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getClaudeStatus } from '@/lib/claude-status';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';

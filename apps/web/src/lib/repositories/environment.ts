@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import type { EnvironmentVariable } from '../types';
+import type { EnvironmentVariable } from '@minimalcorp/tsunagi-shared';
 
 // 全環境変数を取得（UIで表示する用）
 export async function getAllEnv(

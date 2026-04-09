@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Task } from '@/lib/types';
+import type { Task } from '@minimalcorp/tsunagi-shared';
 import { listTasks, createTask, TaskServiceError } from '@/lib/services/task-service';
 
 // GET /api/tasks?status=...&owner=...&repo=...&includeDeleted=false

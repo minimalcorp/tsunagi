@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Search, SlidersHorizontal, X, Trash2, Plus } from 'lucide-react';
-import type { Repository } from '@/lib/types';
+import type { Repository } from '@minimalcorp/tsunagi-shared';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';

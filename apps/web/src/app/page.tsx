@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Task, Repository } from '@/lib/types';
+import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
 import { Header } from '@/components/Header';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
 import { TaskDialog } from '@/components/TaskDialog';

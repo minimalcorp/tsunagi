@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Task } from '@/lib/types';
+import type { Task } from '@minimalcorp/tsunagi-shared';
 import { normalizeBranchName } from '@/lib/branch-utils';
 import { Code2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
