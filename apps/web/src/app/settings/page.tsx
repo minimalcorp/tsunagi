@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
+import { apiUrl } from '@/lib/api-url';
 import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNavigation';
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
 import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
@@ -40,7 +41,7 @@ export default function SettingsPage() {
 
   // Initialize on mount (one-time initialization from localStorage)
   useEffect(() => {
-    fetch('/api/onboarding/status')
+    fetch(apiUrl('/api/onboarding/status'))
       .then((r) => r.json())
       .then((data) => {
         const status = data.data;

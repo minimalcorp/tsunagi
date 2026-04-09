@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
+import { apiUrl } from '@/lib/api-url';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -32,7 +33,7 @@ export function RemoveRepositorySection({ owner, repo, onDeleted }: RemoveReposi
 
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/repos/${owner}/${repo}`, { method: 'DELETE' });
+      const res = await fetch(apiUrl(`/api/repos/${owner}/${repo}`), { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete repository');
       onDeleted();
     } catch (error) {

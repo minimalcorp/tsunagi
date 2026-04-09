@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Code, Eye } from 'lucide-react';
+import { apiUrl } from '@/lib/api-url';
 
 interface FieldError {
   field: string;
@@ -264,7 +265,7 @@ export function TaskDialog({
       setBranchError('');
       try {
         const [owner, repo] = combinedRepo.split('/');
-        const response = await fetch(`/api/repos/${owner}/${repo}/branches`);
+        const response = await fetch(apiUrl(`/api/repos/${owner}/${repo}/branches`));
         if (!response.ok) throw new Error('Failed to fetch branches');
 
         const data = await response.json();
@@ -294,7 +295,7 @@ export function TaskDialog({
 
       try {
         // 1. Validation API (blocking)
-        const validateRes = await fetch('http://localhost:2792/tasks/validate', {
+        const validateRes = await fetch(apiUrl('/api/tasks/validate'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -346,7 +347,7 @@ export function TaskDialog({
         const notificationId = toast.loading('Creating task...', taskData.title);
 
         try {
-          const response = await fetch('http://localhost:2792/tasks', {
+          const response = await fetch(apiUrl('/api/tasks'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(taskData),

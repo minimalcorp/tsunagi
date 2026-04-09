@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { apiUrl } from '@/lib/api-url';
 
 interface BatchDeleteState {
   batchId: string | null;
@@ -23,7 +24,7 @@ export function useBatchDelete() {
   // バッチ削除APIを呼び出す
   const startBatchDelete = useCallback(async (daysAgo: number = 7) => {
     try {
-      const response = await fetch('/api/tasks/batch-delete', {
+      const response = await fetch(apiUrl('/api/tasks/batch-delete'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ daysAgo }),

@@ -3,6 +3,7 @@
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Ellipsis, Pencil, Trash2 } from 'lucide-react';
+import { apiUrl } from '@/lib/api-url';
 import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
 import { TaskDialog } from '@/components/TaskDialog';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -53,7 +54,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     setIsLoading(true);
     try {
       // タスク取得
-      const taskResponse = await fetch(`/api/tasks/${id}`);
+      const taskResponse = await fetch(apiUrl(`/api/tasks/${id}`));
       if (!taskResponse.ok) throw new Error('Failed to fetch task');
       const taskData = await taskResponse.json();
       const loadedTask = taskData.data.task;
@@ -63,7 +64,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       // タブが0個の場合、自動的に1個作成
       if (loadedTabs.length === 0) {
-        const createResponse = await fetch(`/api/tasks/${id}/tabs`, {
+        const createResponse = await fetch(apiUrl(`/api/tasks/${id}/tabs`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
@@ -99,7 +100,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     const notificationId = toast.loading('Updating task...');
 
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(apiUrl(`/api/tasks/${taskId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -121,7 +122,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // タブ作成（新規tab_idを返す）
   const handleTabCreate = async (): Promise<string | undefined> => {
     try {
-      const response = await fetch(`/api/tasks/${id}/tabs`, {
+      const response = await fetch(apiUrl(`/api/tasks/${id}/tabs`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -147,7 +148,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   // タブ削除
   const handleTabDelete = async (tab_id: string) => {
     try {
-      const response = await fetch(`/api/tasks/${id}/tabs/${tab_id}`, {
+      const response = await fetch(apiUrl(`/api/tasks/${id}/tabs/${tab_id}`), {
         method: 'DELETE',
       });
 
@@ -170,7 +171,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     if (!task) return;
     const notificationId = toast.loading('Deleting task...', task.title);
 
-    fetch(`/api/tasks/${task.id}`, {
+    fetch(apiUrl(`/api/tasks/${task.id}`), {
       method: 'DELETE',
     })
       .then(() => {

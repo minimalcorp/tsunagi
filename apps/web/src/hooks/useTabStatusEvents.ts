@@ -3,8 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import type { Tab } from '@minimalcorp/tsunagi-shared';
-
-const FASTIFY_API_BASE = 'http://localhost:2792';
+import { getServerUrl } from '@/lib/api-url';
 
 // Socket.IOのClaudeStatusをTab.statusにマッピング
 function toTabStatus(claudeStatus: string): Tab['status'] | null {
@@ -43,7 +42,7 @@ export function useTabStatusEvents(
 
   const ensureConnected = useCallback(() => {
     if (!socketRef.current) {
-      const socket = io(FASTIFY_API_BASE, { transports: ['websocket'] });
+      const socket = io(getServerUrl(), { transports: ['websocket'] });
       socketRef.current = socket;
 
       socket.on(

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Eye, EyeOff, Pencil, Plus, X, Check, AlertCircle, Trash2 } from 'lucide-react';
+import { apiUrl } from '@/lib/api-url';
 import { LoadingSpinner } from '../LoadingSpinner';
 import type { SelectedNode } from './EnvTreeNavigation';
 import { Input } from '@/components/ui/input';
@@ -63,7 +64,7 @@ export function ClaudeTokenSection({
       if (selectedNode.owner) params.set('owner', selectedNode.owner);
       if (selectedNode.repo) params.set('repo', selectedNode.repo);
 
-      const response = await fetch(`/api/env/list?${params}`);
+      const response = await fetch(apiUrl(`/api/env/list?${params}`));
       if (!response.ok) throw new Error('Failed to fetch tokens');
 
       const data = await response.json();
@@ -137,12 +138,12 @@ export function ClaudeTokenSection({
         if (selectedNode.owner) deleteParams.set('owner', selectedNode.owner);
         if (selectedNode.repo) deleteParams.set('repo', selectedNode.repo);
 
-        await fetch(`/api/env?${deleteParams}`, {
+        await fetch(apiUrl(`/api/env?${deleteParams}`), {
           method: 'DELETE',
         });
 
         // Create new
-        await fetch('/api/env', {
+        await fetch(apiUrl('/api/env'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -155,7 +156,7 @@ export function ClaudeTokenSection({
         });
       } else {
         // Same key type, just update
-        const response = await fetch('/api/env', {
+        const response = await fetch(apiUrl('/api/env'), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -213,7 +214,7 @@ export function ClaudeTokenSection({
     }
 
     try {
-      const response = await fetch('/api/env', {
+      const response = await fetch(apiUrl('/api/env'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -257,7 +258,7 @@ export function ClaudeTokenSection({
       if (selectedNode.owner) deleteParams.set('owner', selectedNode.owner);
       if (selectedNode.repo) deleteParams.set('repo', selectedNode.repo);
 
-      const response = await fetch(`/api/env?${deleteParams}`, {
+      const response = await fetch(apiUrl(`/api/env?${deleteParams}`), {
         method: 'DELETE',
       });
 

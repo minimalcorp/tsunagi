@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
+import { apiUrl } from '@/lib/api-url';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -31,8 +32,8 @@ export function EnvironmentSettingsDialog({
     if (isOpen) {
       // 現在の環境変数とenable状態をロード
       Promise.all([
-        fetch('/api/env').then((r) => r.json()),
-        fetch('/api/env/list').then((r) => r.json()),
+        fetch(apiUrl('/api/env')).then((r) => r.json()),
+        fetch(apiUrl('/api/env/list')).then((r) => r.json()),
       ])
         .then(([envData, listData]) => {
           // 値を設定
@@ -74,7 +75,7 @@ export function EnvironmentSettingsDialog({
       if (anthropicApiKey) {
         await onSave('ANTHROPIC_API_KEY', anthropicApiKey);
         // enabled状態を更新
-        await fetch('/api/env/toggle', {
+        await fetch(apiUrl('/api/env/toggle'), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -87,7 +88,7 @@ export function EnvironmentSettingsDialog({
       if (claudeCodeToken) {
         await onSave('CLAUDE_CODE_OAUTH_TOKEN', claudeCodeToken);
         // enabled状態を更新
-        await fetch('/api/env/toggle', {
+        await fetch(apiUrl('/api/env/toggle'), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -100,7 +101,7 @@ export function EnvironmentSettingsDialog({
       if (githubPat) {
         await onSave('GITHUB_PAT', githubPat);
         // enabled状態を更新
-        await fetch('/api/env/toggle', {
+        await fetch(apiUrl('/api/env/toggle'), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
