@@ -55,7 +55,7 @@
     "prepack": "npm run build",
     "prepublishOnly": "npm run lint && npm run type-check",
     "lint": "eslint",
-    "type-check": "tsc --noEmit && tsc --noEmit -p server/tsconfig.json",
+    "type-check": "tsc --noEmit",
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
     "db:studio": "npx prisma studio",
