@@ -14,7 +14,7 @@ export async function editorRoutes(fastify: FastifyInstance) {
 
   // セッション作成: CLIスクリプトが filePath を送信、サーバーがファイルを読む
   f.post<{ Body: { filePath: string; tabId?: string } }>(
-    '/api/editor/session',
+    '/editor/session',
     async (request, reply) => {
       const { filePath, tabId } = request.body;
       if (!filePath) {
@@ -56,7 +56,7 @@ export async function editorRoutes(fastify: FastifyInstance) {
 
   // セッション状態取得: CLIスクリプトがポーリングで使用
   // "done" or "pending" をプレーンテキストで返す（Shell script が JSON パース不要）
-  f.get<{ Params: { id: string } }>('/api/editor/session/:id', async (request, reply) => {
+  f.get<{ Params: { id: string } }>('/editor/session/:id', async (request, reply) => {
     const session = editorSessionStore.get(request.params.id);
     if (!session) {
       return reply.status(404).send('not found');
@@ -66,7 +66,7 @@ export async function editorRoutes(fastify: FastifyInstance) {
 
   // セッション完了: ブラウザが編集完了時に呼び出す。サーバーがファイルに書き戻す
   f.post<{ Params: { id: string }; Body: { content: string } }>(
-    '/api/editor/session/:id/complete',
+    '/editor/session/:id/complete',
     async (request, reply) => {
       const session = editorSessionStore.get(request.params.id);
       if (!session) {

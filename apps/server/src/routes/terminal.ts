@@ -138,13 +138,13 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     });
   });
 
-  // GET /api/terminal/sessions - セッション一覧（デバッグ用）
-  fastify.get('/api/terminal/sessions', async () => {
+  // GET /terminal/sessions - セッション一覧（デバッグ用）
+  fastify.get('/terminal/sessions', async () => {
     return { sessions: ptyManager.listSessions() };
   });
 
-  // POST /api/terminal/sessions - セッション作成（または既存セッション再利用）
-  fastify.post<{ Body: CreateSessionBody }>('/api/terminal/sessions', async (request, reply) => {
+  // POST /terminal/sessions - セッション作成（または既存セッション再利用）
+  fastify.post<{ Body: CreateSessionBody }>('/terminal/sessions', async (request, reply) => {
     const { cwd, env, sessionId: requestedSessionId, command } = request.body ?? {};
 
     const sessionId = requestedSessionId ?? crypto.randomUUID();
@@ -210,9 +210,9 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // DELETE /api/terminal/sessions/:sessionId - セッション明示削除（PTY kill）
+  // DELETE /terminal/sessions/:sessionId - セッション明示削除（PTY kill）
   fastify.delete<{ Params: { sessionId: string } }>(
-    '/api/terminal/sessions/:sessionId',
+    '/terminal/sessions/:sessionId',
     async (request, reply) => {
       const { sessionId } = request.params;
       ptyManager.deleteSession(sessionId);
@@ -220,9 +220,9 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET /api/terminal/sessions/:sessionId/scrollback - リングバッファ内容をdump（デバッグ用）
+  // GET /terminal/sessions/:sessionId/scrollback - リングバッファ内容をdump（デバッグ用）
   fastify.get<{ Params: { sessionId: string } }>(
-    '/api/terminal/sessions/:sessionId/scrollback',
+    '/terminal/sessions/:sessionId/scrollback',
     async (request, reply) => {
       const { sessionId } = request.params;
       const session = ptyManager.getSession(sessionId);
