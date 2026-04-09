@@ -17,7 +17,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
-const GENERATED_DIR = path.resolve(THIS_DIR, '..', 'generated', 'prisma');
+const GENERATED_DIR = path.resolve(THIS_DIR, '..', 'src', 'generated', 'prisma');
 
 // Matches `from '...'` / `from "..."` specifiers that are relative (start with
 // `./` or `../`) and do NOT already end with `.js` / `.mjs` / `.cjs` / `.json`.
