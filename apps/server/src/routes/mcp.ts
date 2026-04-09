@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
+import { prisma } from '../lib/db.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -343,18 +344,18 @@ function createMcpServer(io?: SocketIOServer): Server {
         case 'tsunagi_get_tab_todos': {
           const { tabId } = (args ?? {}) as { tabId: string };
           try {
-            const res = await fetch(`http://localhost:2791/api/internal/tabs/${tabId}/todos`);
-            if (!res.ok) {
+            const tab = await prisma.tab.findUnique({ where: { tabId } });
+            if (!tab) {
               return {
                 content: [{ type: 'text', text: JSON.stringify({ tabId, todos: [] }, null, 2) }],
               };
             }
-            const data = (await res.json()) as { data: { todos: unknown[] } };
+            const todos = JSON.parse(tab.todos ?? '[]') as unknown[];
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({ tabId, todos: data.data.todos }, null, 2),
+                  text: JSON.stringify({ tabId, todos }, null, 2),
                 },
               ],
             };

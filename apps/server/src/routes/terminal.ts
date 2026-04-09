@@ -83,13 +83,14 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         io.to(room).emit('exit', { exitCode });
         // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット
         io.to(room).emit('status-changed', { sessionId, status: 'idle' });
-        fetch(`http://localhost:2791/api/internal/tabs/${sessionId}/status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'idle' }),
-        }).catch(() => {
-          /* DB更新失敗は無視 */
-        });
+        prisma.tab
+          .updateMany({
+            where: { tabId: sessionId },
+            data: { status: 'idle' },
+          })
+          .catch(() => {
+            /* DB更新失敗は無視 */
+          });
         ptyManager.deleteSession(sessionId);
       });
       exitHandlerDispose = () => exitHandler.dispose();

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
+import { prisma } from '../lib/db.js';
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
@@ -53,23 +54,22 @@ function tasksToTodos(tasks: Map<string, TaskEntry>) {
   }));
 }
 
-/** Next.js内部APIでタブのステータス（+ todos）をDB更新する */
+/** DBでタブのステータス（+ todos）を直接更新する */
 async function updateTabStatus(
   sessionId: string,
   status: string,
   todos?: unknown[]
 ): Promise<void> {
   try {
-    const response = await fetch(`http://localhost:2791/api/internal/tabs/${sessionId}/status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, ...(todos !== undefined && { todos }) }),
+    await prisma.tab.updateMany({
+      where: { tabId: sessionId },
+      data: {
+        status,
+        ...(todos !== undefined && { todos: JSON.stringify(todos) }),
+      },
     });
-    if (!response.ok) {
-      console.warn(`[hooks] Failed to update tab status: ${response.status}`);
-    }
   } catch (err) {
-    console.warn(`[hooks] Failed to reach Next.js API for status update:`, err);
+    console.warn(`[hooks] Failed to update tab status in DB:`, err);
   }
 }
 
