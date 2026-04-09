@@ -1,0 +1,75 @@
+---
+title: 基本概念
+description: Tsunagi のドキュメントを読むのに必要な小さな用語集。
+---
+
+# 基本概念
+
+Tsunagi の用語はそれほど多くありません。以下を押さえておくと、残りのドキュメントが格段に読みやすくなります。
+
+## タスク (Task)
+
+作業の単位。各タスクは以下を持ちます:
+
+- **タイトル** と (任意) **説明** (Markdown)
+- **owner / repo / branch** の組 — git コンテキストを識別
+- **ステータス**: `backlog` → `planning` → `coding` → `reviewing` → `done`
+- 0個以上の **タブ** (Claude セッション)
+- ステータス内ソート用の **order**
+
+タスクは Tsunagi が扱う最小単位です。タスクを作成すると、Tsunagi は worktree を自動的に作成します。タスクを削除すると worktree も削除されます。
+
+## Worktree
+
+[git worktree](https://git-scm.com/docs/git-worktree) は、ブランチを独立したディレクトリにチェックアウトしながら、元のリポジトリと同じオブジェクトデータベースを共有する仕組みです。Tsunagi はタスクごとに1つの worktree を使うことで、複数の Claude セッションがファイルシステム上で衝突しないようにしています。
+
+Tsunagi の worktree は以下の場所に配置されます:
+
+```
+~/.tsunagi/workspaces/<owner>/<repo>/<branch-dir>/
+```
+
+リファレンス worktree (デフォルトブランチを追跡する読み取り専用ベースライン) は `.default` という名前です。
+
+## タブ (Tab)
+
+**タブ** は1つのタスクに紐付く Claude Code セッションです。1つのタスクは複数のタブを持てます——例えば「機能を実装するタブ」と「テストをデバッグするタブ」を同時に走らせることができます。
+
+各タブは Tsunagi がタスクの worktree 内で起動する PTY バックエンドのターミナルセッションと 1対1 でマップされます。
+
+## Hooks
+
+Tsunagi は Claude Code の [hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) を listen して、各セッションからリアルタイム情報を取得します: Claude が追跡している todo、いつ作業を始めたか・止めたか、どのツールを呼び出したか、等。これが UI のプログレスバーやステータス表示の元データです。
+
+## MCP サーバー
+
+Tsunagi はタスク管理を [MCP (Model Context Protocol) サーバー](https://docs.claude.com/en/docs/claude-code/mcp) として公開しています。これにより **Claude 自身が Tsunagi を呼び出して** タスクの作成・更新・並び替え・削除ができます。Tsunagi の MCP サーバーは Claude Code plugin としてバンドルされています (起動時に install される marketplace と plugin がそれです)。
+
+提供される MCP ツールには以下があります:
+
+- `tsunagi_create_task`
+- `tsunagi_update_task`
+- `tsunagi_delete_task`
+- `tsunagi_list_tasks`
+- `tsunagi_get_task`
+- ...他にもいくつか
+
+これらを組み合わせることで、Tsunagi を「いま進行中の作業の信頼できる情報源」として扱えるようになります (人間にとっても Claude にとっても)。
+
+## Claude Code plugin
+
+Tsunagi が起動すると、バンドルされた marketplace から `tsunagi-plugin` という Claude Code plugin を install します。この plugin が登録するもの:
+
+- 上記の MCP サーバー
+- skills (Claude が Tsunagi の中で正しく振る舞うためのヘルパー)
+- agent 定義 (`tsunagi-task-curator`) — タスク棚卸しワークフロー用
+
+Tsunagi の install / uninstall は公式の `claude` CLI のみを使います——`~/.claude/settings.json` を直接編集することはありません。
+
+## 単一インスタンス
+
+Tsunagi は同時に1プロセスしか起動できません。これは `~/.tsunagi/state/tsunagi.lock` の PID lock ファイルで保証されています。plugin のライフサイクル (起動時 install / 終了時 uninstall) と worktree の状態が race condition を起こすのを防ぐためです。
+
+## 次は
+
+これで用語が揃いました。[最初の開発サイクル チュートリアル](/ja/tutorial/create-task/) で、これらの概念がすべて実際のタスク (小さなものですが) の中でどう動くかを見てみてください。

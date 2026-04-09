@@ -1,0 +1,92 @@
+---
+title: Tsunagi プラグイン
+description: Tsunagi がバンドルして自動管理する Claude Code プラグイン。
+---
+
+import { Callout } from 'nextra/components';
+
+# Tsunagi プラグイン
+
+Tsunagi は独自の Claude Code プラグイン——**MCP server**、**skill**、**curator agent**、**hook handler** をまとめたバンドル——を同梱しており、Tsunagi 起動時に自動で install します。このプラグインが Tsunagi と Claude の緊密な統合を実現している中核です: Claude が Tsunagi のタスク状態を読み書きできるようにし、いつステータスを変更すべきかを Claude に教え、Claude の活動を Tsunagi UI にリアルタイムに流し込みます。
+
+<img
+  src="/screenshots/mcp-task-create.webp"
+  alt="Claude が Tsunagi MCP を呼び出す"
+  style={{ maxWidth: '100%', maxHeight: '80vh' }}
+/>
+
+## 中身
+
+プラグイン本体は Tsunagi リポジトリの
+[`tsunagi-marketplace/`](https://github.com/minimalcorp/tsunagi/tree/main/apps/web/tsunagi-marketplace)
+にあり、npm パッケージに同梱されて配布されます。主要な構成要素は 4 つです。
+
+### MCP server
+
+MCP server は Tsunagi のタスク管理を [Model Context Protocol](https://docs.claude.com/en/docs/claude-code/mcp) 経由で Claude が直接呼べるツール群として公開しています。
+
+| ツール                            | 用途                                                            |
+| --------------------------------- | --------------------------------------------------------------- |
+| `tsunagi_list_repos`              | 登録済みリポジトリを一覧                                        |
+| `tsunagi_list_tasks`              | タスクを一覧 (status / owner / repo 等でフィルタ可)             |
+| `tsunagi_get_task`                | `id` / `session_id` / `cwd` でタスクを取得                      |
+| `tsunagi_create_task`             | 新しいタスクと worktree を作成                                  |
+| `tsunagi_update_task`             | タスクの title / description / status / order / effort 等を更新 |
+| `tsunagi_delete_task`             | タスクと worktree を削除                                        |
+| `tsunagi_ensure_default_worktree` | `.default` worktree をリモートと同期                            |
+| `tsunagi_get_tab_todos`           | 指定タブセッションの todo リストを読む                          |
+
+すべてのツールは Tsunagi が起動する任意の Claude セッション内で追加設定なく使えます。「backlog を優先度順に並び替えて」「このタスクを削除して」といった依頼を Claude にするだけで、裏でこれらのツールが呼ばれます。
+
+### Skill: `tsunagi-task`
+
+プラグインには Claude に MCP ツールの正しい使い方を教える **skill** が含まれています——ステータス遷移ルール、現在のタスクの特定方法、ブランチ命名規則、いつ `description` を更新するか等。skill の全文は
+[`skills/tsunagi-task/SKILL.md`](https://github.com/minimalcorp/tsunagi/blob/main/apps/web/tsunagi-marketplace/plugins/tsunagi-plugin/skills/tsunagi-task/SKILL.md)
+にあります。
+
+あなた自身が skill を読む必要はありません——Claude は Tsunagi のツールを呼ぶ前に自動的にこれを読みます。
+
+### Curator agent: `tsunagi-task-curator`
+
+「backlog を優先度順に並び替えて」「stale なタスクを棚卸しして」のような triage workflow 専用の **サブエージェント** です。重いタスク description の読み込みをサブエージェント自身のコンテキストに閉じ込めることで、メインの会話がコンパクトに保たれます。
+
+完全な agent 定義は
+[`agents/tsunagi-task-curator.md`](https://github.com/minimalcorp/tsunagi/blob/main/apps/web/tsunagi-marketplace/plugins/tsunagi-plugin/agents/tsunagi-task-curator.md)
+を参照してください。
+
+### Hook handlers
+
+プラグインは Claude Code の [hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) を subscribe しています——特に `TodoWrite`、セッション開始/終了、ツール呼び出しのあたり——そしてそれらのイベントを Tsunagi バックエンドに POST します。これが Tsunagi UI のリアルタイムプログレスバー、ステータスインジケーター、ライブターミナル出力を駆動しています。
+
+## Lifecycle
+
+Tsunagi は起動・終了のシーケンスの一部としてプラグインを自動で install / uninstall します。`claude plugin install` を自分で実行する必要はありません。
+
+### 起動時
+
+1. 前回実行の残骸 (例: プロセスが crash した場合) があれば検出して削除
+2. `claude plugin marketplace add <bundled marketplace dir>` を実行
+3. `claude plugin install tsunagi-plugin@tsunagi-marketplace --scope user` を実行
+4. Fastify と Next.js サーバーの起動へ進む
+
+毎回の起動でクリーンインストールするので、プラグインのバージョンが実行中の Tsunagi プロセスと常に一致していることが保証されます。バージョンドリフトを心配する必要はありません。
+
+### 終了時
+
+1. `claude plugin uninstall tsunagi-plugin@tsunagi-marketplace`
+2. `claude plugin marketplace remove tsunagi-marketplace`
+3. Tsunagi が終了
+
+### Crash 後
+
+Tsunagi が終了シーケンスを実行できずに crash した場合、プラグインと marketplace のエントリが Claude Code 側に残ることがあります。次回 Tsunagi を起動したとき、上記のクリーンインストールシーケンスがそれらを検出してゼロから再 install するので、手動リカバリは不要です。
+
+<Callout type="info">
+  Tsunagi は公式の `claude` CLI (`claude plugin marketplace add/remove` と `claude plugin
+  install/uninstall`) **のみ** を使って install / uninstall を行います。 `~/.claude/settings.json`
+  や他の Claude Code の内部ファイルを直接編集することは一切ありません。
+</Callout>
+
+## なぜプラグインはバンドルされているのか
+
+「なぜプラグインを公開 marketplace に publish してユーザーに手動 install させないのか?」と思うかもしれません。答えはバージョン安全性です。Tsunagi のバックエンドとプラグインの MCP ツールスキーマは正確に一致している必要があります。プラグインを Tsunagi の npm パッケージに同梱し、起動時に install することで、古いプラグインによるスキーマの不整合が発生する心配がなくなります。

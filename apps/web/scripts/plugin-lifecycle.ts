@@ -1,0 +1,101 @@
+import { execSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+/**
+ * Claude Code plugin lifecycle management.
+ *
+ * Strategy: clean install on startup, unconditional uninstall on shutdown.
+ *
+ * - Uses only the `claude` CLI commands; no direct manipulation of
+ *   `~/.claude/settings.json` or other internal files.
+ * - On startup, any pre-existing tsunagi marketplace / plugin is considered
+ *   an orphan from a previous abnormal termination and is cleaned up before
+ *   installing a fresh copy. This is safe because tsunagi enforces single
+ *   instance via the PID lock.
+ * - On shutdown, uninstall is attempted unconditionally and failures are
+ *   ignored so that cleanup never blocks process exit.
+ * - Failures during the clean install (marketplace add / plugin install)
+ *   cause the process to exit with code 1.
+ */
+
+const MARKETPLACE_NAME = 'tsunagi-marketplace';
+const PLUGIN_REF = `tsunagi-plugin@${MARKETPLACE_NAME}`;
+
+function getMarketplaceDir(): string {
+  // Resolve relative to this file so the module works from both the
+  // `scripts/` source location and the compiled `dist/scripts/` location.
+  //
+  //   scripts/plugin-lifecycle.ts        → ../tsunagi-marketplace
+  //   dist/scripts/plugin-lifecycle.js   → ../../tsunagi-marketplace
+  const candidates = [
+    path.resolve(__dirname, '..', 'tsunagi-marketplace'),
+    path.resolve(__dirname, '..', '..', 'tsunagi-marketplace'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, '.claude-plugin'))) {
+      return candidate;
+    }
+  }
+  // Fallback to the first candidate; downstream errors will surface clearly.
+  return candidates[0];
+}
+
+function log(msg: string): void {
+  console.log(`[tsunagi:plugin] ${msg}`);
+}
+
+/**
+ * Run a claude CLI command. Returns true on success, false on failure.
+ * stderr/stdout are suppressed to keep the startup log clean.
+ */
+function runClaude(args: string): boolean {
+  try {
+    execSync(`claude ${args}`, { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ensure a clean plugin state by removing any pre-existing tsunagi plugin /
+ * marketplace registrations and then installing fresh copies.
+ *
+ * Exits the process with code 1 on install failure.
+ */
+export function ensureCleanPluginState(): void {
+  // Phase 1: best-effort cleanup of any orphaned state from a previous run.
+  // Failures are intentionally ignored — if nothing is registered, these are
+  // expected to be no-ops that fail silently.
+  runClaude(`plugin uninstall ${PLUGIN_REF}`);
+  runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`);
+
+  // Phase 2: clean install. Failures here are fatal.
+  const marketplaceDir = getMarketplaceDir();
+  if (!runClaude(`plugin marketplace add ${marketplaceDir}`)) {
+    console.error('[tsunagi:plugin] Failed to add Claude Code marketplace.');
+    console.error('[tsunagi:plugin] Ensure the `claude` CLI is installed and available on PATH.');
+    console.error(`[tsunagi:plugin] Marketplace path: ${marketplaceDir}`);
+    process.exit(1);
+  }
+  log('Marketplace added');
+
+  if (!runClaude(`plugin install ${PLUGIN_REF} --scope user`)) {
+    console.error('[tsunagi:plugin] Failed to install Claude Code plugin.');
+    // Attempt to roll back the marketplace registration so the user is not
+    // left with a half-configured state.
+    runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`);
+    process.exit(1);
+  }
+  log('Plugin installed');
+}
+
+/**
+ * Best-effort cleanup. Called on process shutdown. Never throws; failures are
+ * logged and ignored.
+ */
+export function cleanupPluginState(): void {
+  runClaude(`plugin uninstall ${PLUGIN_REF}`);
+  runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`);
+}

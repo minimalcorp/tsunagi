@@ -1,0 +1,65 @@
+---
+title: 初回セットアップ
+description: 最初のリポジトリを登録し、Tsunagi を作業に接続する。
+---
+
+# 初回セットアップ
+
+[Tsunagi をインストール](/ja/getting-started/installation/) して [http://localhost:2791](http://localhost:2791) を開いた後、UI が初回セットアップを案内します。このページでは各ステップが内部で何を行っているか、何を選ぶべきかを説明します。
+
+## 1. Claude の認証情報を提供する
+
+Tsunagi は Claude Code 自身が使う認証情報を再利用します。Tsunagi を起動するシェルで以下のいずれかの環境変数を設定してください:
+
+```bash
+# どちらか:
+export ANTHROPIC_API_KEY="sk-ant-..."
+# または:
+export CLAUDE_CODE_OAUTH_TOKEN="..."
+```
+
+これは [Claude Code 公式ドキュメント](https://docs.claude.com/en/docs/claude-code/overview) に記載されているのと同じ認証情報です。Tsunagi はこれらを保存・改変しません。
+
+## 2. リポジトリを登録する
+
+UI で **Add Repository** をクリックし、clone URL (例: `git@github.com:your-org/your-repo.git`) をペーストします。Tsunagi は以下を行います:
+
+1. **bare repository** として `~/.tsunagi/workspaces/<owner>/<repo>/.bare/` にクローン
+2. `origin/HEAD` を読んでデフォルトブランチ (`main`, `master` 等) を検出
+3. デフォルトブランチの最新 commit を指す `.default` worktree を作成。これは読み取り専用の "リファレンスチェックアウト" であり、新しいタスクブランチのベースとして使われます
+
+リポジトリが完全に新規で commit が1つもない場合、Tsunagi は **orphan worktree** を作成して、それでもタスクを始められるようにします。リモートのデフォルトブランチに最初の commit が現れた時点で、Tsunagi は自動的に worktree をその commit に upgrade します。
+
+<img
+  src="/screenshots/settings-repos.webp"
+  alt="リポジトリ登録画面"
+  style={{ maxWidth: '100%', maxHeight: '80vh' }}
+/>
+
+## 3. (任意) 環境変数の設定
+
+プロジェクトによっては追加の環境変数 (データベース URL、API トークン、ローカル feature flag 等) が必要です。Tsunagi では以下のスコープで環境変数を定義できる設定画面を提供しています:
+
+- **グローバル** — すべての Claude セッションに適用
+- **オーナー単位** — 1つの GitHub organization 配下のすべてのリポジトリに適用
+- **リポジトリ単位** — 特定の1つのリポジトリにのみ適用
+
+これらは各 worktree で起動するシェルの環境にマージされます。
+
+<img
+  src="/screenshots/settings-env.webp"
+  alt="環境変数設定画面"
+  style={{ maxWidth: '100%', maxHeight: '80vh' }}
+/>
+
+マージ順と優先度の詳細は [環境変数管理](/ja/features/environment-variables/) を参照してください。
+
+## 4. セットアップを確認する
+
+メインページを開いてください。以下が表示されているはずです:
+
+- 登録したリポジトリがタスクパネルに表示されている
+- 空のタスクリスト (まだタスクを作成していないので)
+- **Add Task** ボタンが有効になっている
+
+これで [最初の開発サイクル チュートリアル](/ja/tutorial/create-task/) に進む準備ができました。

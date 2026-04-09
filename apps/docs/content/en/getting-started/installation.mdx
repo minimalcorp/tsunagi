@@ -1,0 +1,82 @@
+---
+title: Installation
+description: How to install and start Tsunagi.
+---
+
+# Installation
+
+## Prerequisites
+
+You will need:
+
+- **Node.js ≥ 20**
+- **Git ≥ 2.42** (Tsunagi uses `git worktree add --orphan`, which requires Git 2.42 or later)
+- **[Claude Code CLI](https://docs.claude.com/en/docs/claude-code/overview)** — the `claude` command must be on your `PATH`. Tsunagi assumes you already use Claude Code; we do not document Claude Code itself here.
+- **macOS or Linux**. Windows is not supported (WSL2 may work but is unsupported).
+- **An Anthropic API key** or a **Claude Code OAuth token** — same credentials Claude Code itself uses.
+
+## Run with `npx` (recommended)
+
+```bash
+npx @minimalcorp/tsunagi
+```
+
+Then open [http://localhost:2791](http://localhost:2791) in your browser.
+
+## Or install globally
+
+```bash
+npm install -g @minimalcorp/tsunagi
+tsunagi
+```
+
+Same result — Tsunagi binds to port `2791` for the web UI and `2792` for the
+Fastify backend.
+
+## What happens on first launch
+
+Tsunagi performs the following on startup:
+
+1. Creates the SQLite database at `~/.tsunagi/state/tsunagi.db` (if missing).
+2. Applies Prisma migrations to bring the schema up to date.
+3. Writes a PID lock file at `~/.tsunagi/state/tsunagi.lock` to enforce
+   the single-instance constraint.
+4. Clean-installs the Tsunagi Claude Code marketplace and plugin via the
+   `claude` CLI. Any pre-existing Tsunagi plugin is uninstalled and
+   reinstalled to guarantee a fresh state. Tsunagi never edits
+   `~/.claude/settings.json` directly.
+5. Starts the Fastify backend on port `2792` and the Next.js web UI on
+   port `2791`.
+6. On shutdown, cleans up the plugin registration and the PID lock.
+
+## Where Tsunagi stores data
+
+```
+~/.tsunagi/
+├── state/
+│   ├── tsunagi.db            # SQLite database
+│   └── tsunagi.lock          # single-instance PID lock
+├── backups/                  # database backups
+└── workspaces/               # git worktrees
+```
+
+## Single-instance constraint
+
+Only one Tsunagi process can run at a time. If you try to launch a second
+instance, it exits with `Another tsunagi is running (PID xxx)`. This is
+deliberate — the Claude Code plugin lifecycle and the worktree state would
+race otherwise.
+
+If Tsunagi crashed previously and could not run its cleanup, the lock file
+may still hold the dead process's PID. The next launch detects this stale
+lock automatically (by checking whether the PID is alive), removes it, and
+proceeds normally — no manual recovery needed.
+
+## Next steps
+
+- [Initial Setup](/en/getting-started/initial-setup/) — register your first
+  repository and connect Tsunagi to your work.
+- [Concepts](/en/getting-started/concepts/) — the small vocabulary you need
+  to read the rest of the docs.
+- [Tutorial: First Development Cycle](/en/tutorial/create-task/) — build a
+  hello-world program through Claude in less than 5 minutes.

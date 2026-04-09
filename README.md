@@ -1,335 +1,155 @@
-# Tsunagi (繋ぎ)
+# Tsunagi Monorepo
 
-複数GitHub組織のプロジェクトをローカルで統合管理し、Claude Agent SDKを介してAI駆動開発を可視化・制御するWeb UIツール
+**Tsunagi (繋ぎ)** — 複数 GitHub 組織のプロジェクトをローカルで統合管理し、
+Claude AI による AI 駆動開発を可視化・制御する Web UI ツール。
 
----
+このリポジトリは npm workspaces ベースの monorepo です。
 
-## 🎯 ビジョン
+## パッケージ
 
-### 人間が人間にしかできないことにフォーカスする
+| パッケージ                           | 場所         | npm 公開 | 説明                                                             |
+| ------------------------------------ | ------------ | -------- | ---------------------------------------------------------------- |
+| [`@minimalcorp/tsunagi`](./apps/web) | `apps/web/`  | ✅       | Tsunagi 本体 (Next.js + Fastify + Prisma)                        |
+| [`tsunagi-docs`](./apps/docs)        | `apps/docs/` | ❌       | ユーザー向けドキュメントサイト (Nextra, GitHub Pages にデプロイ) |
 
-Tsunagiは、**人間が人間にしかできないことに集中できる環境**を提供します。
+## クイックスタート（エンドユーザー向け）
 
-- **AIに任せられることはAIに任せる**: コーディング、ドキュメント作成、テストなど、ルーチンワークはClaudeに委譲
-- **人間は創造的な活動に専念**: アーキテクチャ設計、要件定義、意思決定、レビューなど、判断が必要な部分に時間を使う
-- **AI実行の可視化と制御**: Claudeが何をしているかを把握し、必要な時に介入できる透明性を確保
-
----
-
-## 概要
-
-**Tsunagi**は、複数のGitHub organizationのプロジェクトを1つのUIで統合管理し、Claude AIによる開発タスクを効率化するローカルツールです。
-
-開発者が複数のリポジトリやブランチを横断してタスクを管理し、Claude AIによる自動化を効率的に活用できる環境を提供します。
-
-### コアコンセプト
-
-#### 1. 統合管理
-
-- **複数組織対応**: 複数のGitHub organizationのプロジェクトを1つのUIで管理
-- **ローカル完結**: 全てのデータと作業がローカル環境で完結
-- **Kanban可視化**: タスクの状態をKanban boardで直感的に把握
-
-#### 2. Git Worktree活用
-
-- **owner/repo/branch** ディレクトリモデル
-- Git worktreeによる効率的なブランチ管理
-- タスクごとに独立した作業環境を自動構築
-
-#### 3. Claude Agent統合
-
-- タブ型セッション管理による柔軟な会話コンテキスト
-- タスクごとに複数の独立した会話タブを作成可能
-- 実行状態のリアルタイム表示とログの可視化
-- Agent SDKによる高度な制御とインタラプト機能
-
-#### 4. リアルタイム性
-
-- Server-Sent Events（SSE）による状態の常時更新
-- タスクとClaudeセッションの自動同期
-- 複数タスクの並行実行を可視化
-
-### 主要機能
-
-- **Kanban Board** - タスクの視覚的管理、ドラッグ&ドロップ、フィルタリング（詳細: [docs/pages/kanban.md](./docs/pages/kanban.md)）
-- **タスク管理** - CRUD操作、タブ型セッション管理、優先度ソート（詳細: [docs/pages/task-detail.md](./docs/pages/task-detail.md)）
-- **Git Worktree管理** - 自動初期化、worktree作成・削除（詳細: [docs/git-worktree.md](./docs/git-worktree.md)）
-- **Claude Agent SDK統合** - タブ型セッション管理、リアルタイムストリーミング、実行状態追跡
-- **環境変数管理** - グローバル/Owner/Repo単位設定、自動読み込み（詳細: [docs/environment-variables.md](./docs/environment-variables.md)）
-- **リソース削除** - Owner/Repo/Branch単位の完全削除
-- **外部ツール統合** - Terminal/VSCode起動
-- **リアルタイム更新** - Server-Sent Events（SSE）によるリアルタイム状態同期
-
-各機能の詳細仕様は下記のドキュメントを参照してください。
-
----
-
-## クイックスタート
-
-### 前提条件
-
-- Docker & Docker Compose（推奨）
-- または Node.js 20+
-- Git
-- Claude API Key
-
-### Docker での起動（推奨）
+Tsunagi を使いたいだけの場合は、npm から直接起動できます:
 
 ```bash
-# コンテナの起動
-make up
-
-# ログの確認
-make logs
-
-# コンテナ内でシェルを開く
-make shell
+npx @minimalcorp/tsunagi
 ```
 
-ブラウザで `http://localhost:3000` を開きます。
+詳細は [apps/web/README.md](./apps/web/README.md) または
+[ドキュメントサイト](https://minimalcorp.github.io/tsunagi/) を参照してください。
 
-### ローカル環境での起動
+## 開発セットアップ
 
 ```bash
-# 依存関係のインストール
-npm ci
+# リポジトリをクローン
+git clone https://github.com/minimalcorp/tsunagi.git
+cd tsunagi
 
-# 環境変数の設定
-echo "ANTHROPIC_API_KEY=your-api-key" > .env.local
+# 依存関係インストール（全ワークスペース）
+npm install
 
-# 開発サーバーの起動
+# Tsunagi 本体を開発モードで起動
 npm run dev
+
+# ドキュメントサイトを開発モードで起動
+npm run docs:dev
 ```
 
-ブラウザで `http://localhost:3000` を開きます。
+## よく使うコマンド（ルートから実行）
 
----
+| コマンド               | 説明                                                     |
+| ---------------------- | -------------------------------------------------------- |
+| `npm run dev`          | web + docs を並列起動（Ctrl+C で両方停止）               |
+| `npm run web:dev`      | Tsunagi 本体のみ開発モードで起動                         |
+| `npm run docs:dev`     | ドキュメントサイトのみ開発モードで起動                   |
+| `npm run build`        | 全ワークスペースをビルド                                 |
+| `npm run build:dist`   | Tsunagi 本体の dist ビルド (`tsc -p tsconfig.dist.json`) |
+| `npm run lint`         | 全ワークスペースで ESLint を実行                         |
+| `npm run type-check`   | 全ワークスペースで TypeScript 型チェック                 |
+| `npm run format`       | Prettier で全ファイルをフォーマット                      |
+| `npm run format:check` | Prettier でフォーマット差分チェック                      |
 
-## 📂 ドキュメント
+## リリース
 
-詳細な仕様は `docs/` ディレクトリを参照してください：
+GitHub Actions の `Release` workflow を手動実行することで、`@minimalcorp/tsunagi`
+の npm 公開、および docs の GitHub Pages デプロイを統合的に行えます:
 
-- **[docs/design-principles.md](./docs/design-principles.md)** - UI/UX設計原則（全UI実装で必須参照）
-- **[docs/architecture.md](./docs/architecture.md)** - 技術スタック・アーキテクチャ詳細
-- **[docs/data-models.md](./docs/data-models.md)** - データモデル定義
-- **[docs/local-data.md](./docs/local-data.md)** - ローカルデータ管理方法
-- **[docs/git-worktree.md](./docs/git-worktree.md)** - Git Worktree管理詳細
-- **docs/apis/** - API仕様
-  - **[docs/apis/overview.md](./docs/apis/overview.md)** - API全体像（必読）
-  - **[docs/apis/common.md](./docs/apis/common.md)** - 共通仕様
-  - **[docs/apis/tasks.md](./docs/apis/tasks.md)** - Tasks API
-  - **[docs/apis/repositories.md](./docs/apis/repositories.md)** - Repositories API
-  - **[docs/apis/environments.md](./docs/apis/environments.md)** - Environment Variables API
-  - タブセッション管理（実装済み、ドキュメント整備中）
-- **docs/pages/** - UI仕様
-  - **[docs/pages/kanban.md](./docs/pages/kanban.md)** - Kanban UI仕様
-  - **[docs/pages/task-detail.md](./docs/pages/task-detail.md)** - タスク詳細UI仕様
-  - **[docs/pages/environment-settings.md](./docs/pages/environment-settings.md)** - 環境変数設定UI仕様
+1. GitHub の Actions タブから `Release` workflow を選択
+2. 以下を入力して Run:
+   - **target**: `all` / `tsunagi` / `docs` のいずれか
+   - **version**: `patch` / `minor` / `major` (tsunagi にのみ適用)
 
----
+詳細は [.github/workflows/release.yml](./.github/workflows/release.yml) を参照。
 
-## 📝 使い方
+### 初回実行前の必須セットアップ
 
-1. **リポジトリの登録**
-   - 設定からGitHubリポジトリを登録
+初めて `Release` workflow を実行する前に、以下を手動で設定しておく必要があります。**詳細な手順は [RELEASE_SETUP.md](./RELEASE_SETUP.md) を参照してください。**
 
-2. **タスクの作成**
-   - Kanban boardで「+ Add Task」をクリック
-   - タスク情報を入力（title、owner/repo/branch）
+1. **npm Organization 準備**
+   - npmjs.com で `@minimalcorp` organization を作成（未作成の場合）
+   - `@minimalcorp/tsunagi` パッケージ名が未取得であることを確認
 
-3. **Claudeの実行**
-   - タスクカードをクリックして詳細を表示
-   - 新しいタブを作成して会話を開始
-   - Claudeへの指示を入力して実行
-   - 複数のタブで異なるコンテキストの会話を並行管理
+2. **npm Trusted Publisher を事前登録** (npm 側)
+   - 本 workflow は **npm Trusted Publishing (OIDC)** を使用するため `NPM_TOKEN` は不要
+   - npmjs.com で Trusted Publisher を追加: organization=`minimalcorp`, repository=`tsunagi`, workflow=`release.yml`, environment=`production-release`
+   - パッケージがまだ存在しない段階でも "Pending Trusted Publisher" として事前登録可能
 
-4. **進捗管理**
-   - タスクをドラッグ&ドロップでステータス変更
-   - フィルターで特定のリポジトリのタスクに絞り込み
-   - リアルタイムで実行状態を確認
+3. **GitHub Pages を Actions ソースに設定**
+   - Settings → Pages → Source: `GitHub Actions` を選択（`Deploy from a branch` ではない）
 
----
+4. **`production-release` Environment の作成と承認者設定**（必須）
+   - Settings → Environments → `New environment` → 名前を `production-release` として作成
+   - **Required reviewers** を有効化し、リリース承認権限を持つメンバー（自分自身でも可）を追加
+   - Release workflow の `approve` job はこの Environment 配下で実行されるため、
+     workflow 実行時に GitHub UI で明示的な承認操作が必要になる
+   - `publish-tsunagi` / `deploy-docs` 両方がこの approval を通過した後でのみ実行される
+   - 承認画面で main の最新状態（他 PR の merge 状況等）を目視確認してから承認する
+     ことで、意図しない内容のリリースを防ぐ
 
-## ディレクトリ構造
+5. **`main` ブランチ保護の bypass 設定**（保護ルールを設定している場合）
+   - `Release` workflow は `npm version` で bump した commit と tag を `main` に直接 push する
+   - main に `Require a pull request before merging` 等の保護ルールがある場合、push がブロックされる
+   - `github-actions[bot]` は user role を持たないため、Bypass list に**明示的に**以下のいずれかを設定する必要がある:
+     - 独立した **Deploy key** を発行し Bypass に追加（推奨）
+     - 管理者ユーザーの **PAT** を `PAT_TOKEN` secret として登録し、workflow の `checkout` で使用
+     - 管理者ユーザー自身を Bypass に追加（workflow を本人が起動する運用）
+   - 保護ルールを main に設定していない場合は不要
 
-### プロジェクト
+これらを設定せずに workflow を実行すると、途中で失敗してバージョン番号だけが bump された中途半端な状態になる可能性があるので、**必ず事前に設定してください**。
+
+### リリース中の concurrent push について
+
+Release workflow には以下の保護機構が組み込まれています:
+
+- **同時実行の排他制御**: `concurrency: release` group により、2つ目の Release workflow は1つ目の完了を待機します
+- **Push retry with rebase**: workflow の checkout から push までの間に別の PR が main に merge された場合でも、自動で rebase してから retry します（最大3回）。rebase により merge 済みの内容を取り込んだ上で version bump commit を再適用するため、npm publish は最新の main 状態で行われます
+- **Environment 承認ゲート**: 人間が承認するタイミングで main の状態を目視確認できるため、意図しない内容のリリースを事前に察知できます
+
+## リポジトリ構成
 
 ```
 tsunagi/
-├── docs/              # ドキュメント
-├── src/
-│   ├── app/            # Next.js App Router
-│   │   ├── api/        # API Routes
-│   │   └── page.tsx    # メインページ
-│   ├── components/     # Reactコンポーネント
-│   └── lib/            # ビジネスロジック
-└── package.json
+├── apps/
+│   ├── web/                  # @minimalcorp/tsunagi (Tsunagi 本体)
+│   └── docs/                 # tsunagi-docs (Nextra ドキュメントサイト)
+├── .github/workflows/
+│   ├── ci.yml                # PR CI (format / lint / type-check / build)
+│   ├── release.yml           # 統合リリース (npm publish + Pages deploy)
+│   └── cla.yml               # CLA Assistant bot
+├── .husky/                   # Git hooks
+├── package.json              # monorepo root (workspaces)
+├── .prettierrc.json          # monorepo 共通 Prettier 設定
+├── LICENSE                   # PolyForm Shield 1.0.0
+├── CLA.md                    # Contributor License Agreement
+├── CONTRIBUTING.md           # コントリビューションガイド
+└── CLAUDE.md                 # Claude AI 向け作業ルール
 ```
 
-### ローカルデータ
+## 対応 OS
 
-```
-~/.tsunagi/                      # 設定・データ
-├── state/                       # 永続化データ
-│   ├── tasks.json               # タスクデータ
-│   ├── tabs.json                # Claude タブセッション
-│   ├── repos.json               # リポジトリ設定
-│   └── env-vars.json            # 環境変数設定
-└── workspaces/                  # Git Worktrees
-    └── {owner}/                 # GitHub organization/user
-        └── {repo}/              # リポジトリ名
-            ├── .git/            # bare repository
-            ├── main/            # mainブランチのworktree
-            └── {branch}/        # 各ブランチのworktree
-```
+- macOS
+- Linux
+- Windows は**非サポート**（WSL2 経由で動作する可能性はありますが保証されません）
 
----
+## 必須ランタイム
 
-## 開発
+- **Node.js ≥ 20**
+- **Git ≥ 2.42**（空リポジトリを扱うため `git worktree add --orphan` を使用）
+- **Claude Code CLI**（`claude` コマンドが PATH 上に必要）
 
-### Docker コマンド（推奨）
+## ライセンス
 
-```bash
-# コンテナ起動
-make up
+本リポジトリは [PolyForm Shield License 1.0.0](./LICENSE) のもとで公開されています。
+これは source-available ライセンスであり、**競合製品化は禁止**されていますが、
+個人利用・社内利用・通常の商用利用は自由です。詳細は [LICENSE](./LICENSE) を
+参照してください。
 
-# コンテナ停止
-make down
+## コントリビューション
 
-# ログ表示
-make logs
-
-# コンテナ一覧
-make ps
-
-# シェル起動
-make shell
-
-# イメージ再ビルド
-make rebuild
-
-# ボリューム含めて削除
-make clean
-```
-
-### npm スクリプト
-
-```bash
-# 開発サーバー
-make dev  # または npm run dev
-
-# ビルド
-make build  # または npm run build
-
-# 本番サーバー
-npm run start
-
-# Lint
-make lint  # または npm run lint
-
-# フォーマット
-make format  # または npm run format
-
-# 型チェック
-make type-check  # または npm run type-check
-```
-
-### コミット
-
-```bash
-# フォーマット + Lint実行（自動）
-git commit -m "message"
-```
-
----
-
-## 技術スタック
-
-- **Next.js 16** - フレームワーク
-- **React 19** - UI
-- **TypeScript** - 型安全性
-- **Tailwind CSS v4** - スタイリング
-- **Ark UI** - ヘッドレスUIコンポーネント
-- **Monaco Editor** - コードエディタ
-- **@hello-pangea/dnd** - ドラッグ&ドロップ
-- **simple-git** - Git操作
-- **@anthropic-ai/claude-agent-sdk** - Claude Agent SDK統合（v0.2.17）
-- **Socket.IO** - WebSocketリアルタイム通信
-- **@xyflow/react** - フロー図・ビジュアライゼーション
-- **react-markdown** - Markdown表示
-
----
-
-## 🚀 ロードマップ
-
-### MVP（v1.0）に含まれる機能
-
-✅ **Phase 1**: データモデル・基盤
-
-- タスク・リポジトリのデータモデル
-- JSON永続化
-- REST API
-
-✅ **Phase 2**: Kanban UI
-
-- Kanban board表示
-- ドラッグ&ドロップ
-- タスクフィルター・検索
-- タスク作成・編集UI
-
-✅ **Phase 3**: Git Worktree管理
-
-- bare repository初期化
-- worktree作成・削除
-- ディレクトリ構造管理
-
-✅ **Phase 4**: Claude Agent SDK統合
-
-- Claude Agent SDK統合（`@anthropic-ai/claude-agent-sdk` v0.2.17）
-- タブ型セッション管理（複数の会話コンテキスト）
-- リアルタイムストリーミングログ表示
-- 実行状態追跡とインタラプト機能
-
-✅ **Phase 4.5**: 環境変数・リソース削除
-
-- 環境変数管理（グローバル/Owner/Repo単位）
-- ツリー型ナビゲーション
-- リソース削除（Owner/Repo/Branch）
-- 外部ツール統合（Terminal/VSCode起動）
-
-🔄 **Phase 5**: リアルタイム更新（実装中）
-
-- Server-Sent Events（SSE）による状態同期
-- タスクとClaudeセッションのリアルタイム更新
-- Socket.IO統合準備（イベント駆動アーキテクチャへの移行）
-
-### 将来実装（v2.0以降）
-
-⏸️ **Phase 5.5**: WebSocketフル統合
-
-- Socket.IOによる双方向通信
-- **デュアルインターフェース実装**: REST APIとWebSocketの両方を実装
-- **フォールバック戦略**: WebSocket接続失敗時はSSEに自動切替
-- サーバー側controller層による統一的な状態管理
-
-🔮 実行計画の自動生成
-🔮 複数Claudeの並列実行
-🔮 タスク依存関係の管理
-🔮 GitHub PR自動作成
-🔮 通知機能
-
----
-
-## 🤝 コントリビューション
-
-詳細は実装フェーズで整備予定です。
-
----
-
-## 📄 ライセンス
-
-TBD
-
----
-
-**AI と人間の最適な協働で、開発をもっと速く、もっとスマートに。**
+Pull Request を送信する際は [CONTRIBUTING.md](./CONTRIBUTING.md) を参照し、
+CLA Assistant bot の指示に従って [CLA](./CLA.md) への同意をお願いします。

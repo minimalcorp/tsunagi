@@ -1,0 +1,131 @@
+---
+title: Tsunagi
+description: 1 task, 1 worktree, 1 Claude session — managed in one place.
+---
+
+import { Cards } from 'nextra/components';
+
+{/* ----------------------------------------------------------------- */}
+{/* Hero */}
+{/* ----------------------------------------------------------------- */}
+
+<div style={{ textAlign: 'center', padding: '3rem 1rem 2rem' }}>
+
+# Tsunagi
+
+### 1 task, 1 worktree, 1 Claude session — managed in one place.
+
+複数の Claude Code セッションを並列で動かす開発を、PM の視点で統制する。
+Tsunagi は、独立した git worktree で動く複数の Claude セッションを起動・
+監視・操作するための単一の Web UI を提供します。
+
+[はじめる →](/ja/getting-started/installation/) &nbsp;&nbsp;
+[GitHub](https://github.com/minimalcorp/tsunagi)
+
+</div>
+
+<img
+  src="/screenshots/hero.webp"
+  alt="Tsunagi のメイン画面"
+  style={{ maxWidth: '100%', maxHeight: '80vh' }}
+/>
+
+{/* ----------------------------------------------------------------- */}
+{/* The Problem */}
+{/* ----------------------------------------------------------------- */}
+
+## 課題
+
+Claude Code を本格的に活用するということは、**並列で動かす**ということです。
+複数の git worktree、複数のターミナル、複数の AI セッション——それぞれが
+別々のタスクを同時にこなす。これは「複数のエンジニアを雇って各自に
+タスクを任せ、PM がその全体を管理する」という構造と本質的に同じです。
+
+しかし、5つのターミナルで Claude セッションを並列起動した瞬間、壁に
+ぶつかります:
+
+- **どこで何が動いているのか把握できない。** どのターミナルがどのタスクで、
+  誰が何をコーディングしているのか。
+- **Claude の作業が見えない。** 各セッションが今何を考えていて、何を
+  実行していて、どこまで進んでいるのか分からない。
+- **タスク管理が日常を侵食する。** 複数のリポジトリにまたがるタスクの
+  作成・更新・優先順位付けが、本来の作業から人間を引き剥がす。
+
+並列化のメリットは、人間側の認知負荷で頭打ちになります。
+
+{/* ----------------------------------------------------------------- */}
+{/* Solution */}
+{/* ----------------------------------------------------------------- */}
+
+## Tsunagi の解決アプローチ
+
+Tsunagi は、各タスクを **「専用の git worktree、専用の Claude セッション、
+ひとつの Web UI のタブ」** として扱います。Claude の hooks がその UI に
+作業状況をリアルタイムに流し込むので、すべてのセッションの状況を一目で
+把握できます。
+
+ターミナルの山ではなく、PM の席から操作する感覚です。
+
+<img
+  src="/screenshots/task-detail.webp"
+  alt="複数の Claude セッションを持つタスク詳細"
+  style={{ maxWidth: '100%', maxHeight: '80vh' }}
+/>
+
+さらに、Tsunagi は自身の MCP server を公開しているので、**Claude 自身が
+タスクを管理できます**。作成・更新・並び替え・棚卸しなど、PM の業務そのものを
+AI に委譲できます。
+
+{/* ----------------------------------------------------------------- */}
+{/* Features grid */}
+{/* ----------------------------------------------------------------- */}
+
+## 主要機能
+
+<Cards>
+  <Cards.Card title="リポジトリ管理" href="/ja/features/repository-management/" arrow>
+    <></>
+  </Cards.Card>
+  <Cards.Card title="タスク管理" href="/ja/features/task-management/" arrow>
+    <></>
+  </Cards.Card>
+  <Cards.Card title="Tsunagi プラグイン" href="/ja/features/plugin/" arrow>
+    <></>
+  </Cards.Card>
+  <Cards.Card title="環境変数管理" href="/ja/features/environment-variables/" arrow>
+    <></>
+  </Cards.Card>
+</Cards>
+
+{/* ----------------------------------------------------------------- */}
+{/* Quick start */}
+{/* ----------------------------------------------------------------- */}
+
+## クイックスタート
+
+```bash
+npx @minimalcorp/tsunagi
+```
+
+これだけです。Tsunagi はローカルの Web UI を
+[http://localhost:2791](http://localhost:2791) で起動し、初期セットアップを
+案内します。
+
+前提条件は [インストール](/ja/getting-started/installation/) を、完全な
+タスクライフサイクルのウォークスルーは
+[最初の開発サイクル チュートリアル](/ja/tutorial/create-task/) を
+参照してください。
+
+{/* ----------------------------------------------------------------- */}
+{/* Footer CTA */}
+{/* ----------------------------------------------------------------- */}
+
+## AI 開発の "PM 時代" のために
+
+「開発者」の役割は変わりつつあります。AI コーディングエージェントが実際の
+コードを書く割合が増えるほど、あなたの仕事は「複数の AI ワーカーを統制し、
+全体の進捗を見渡す」ことに変わっていきます。
+
+Tsunagi は、そのシフトのための操縦席です。
+
+[ドキュメントを読む →](/ja/getting-started/installation/)

@@ -1,0 +1,25 @@
+{
+  "name": "tsunagi-docs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tsunagi documentation site.",
+  "scripts": {
+    "dev": "next dev --port 2793",
+    "build": "next build",
+    "start": "next start --port 2793",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^15.1.0",
+    "nextra": "^4.2.0",
+    "nextra-theme-docs": "^4.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.30",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.9.3"
+  }
+}

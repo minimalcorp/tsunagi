@@ -1,0 +1,112 @@
+---
+title: Environment Variables
+description: Configure environment variables per global / owner / repository scope.
+---
+
+import { Callout } from 'nextra/components';
+
+# Environment Variables
+
+Every Claude session Tsunagi launches runs inside a shell. Many projects
+need specific environment variables in that shell to work correctly —
+database URLs, API tokens, feature flags, profile names. Tsunagi lets
+you define those variables in one place and automatically injects them
+into every session, scoped appropriately.
+
+<img
+  src="/screenshots/settings-env.webp"
+  alt="Environment variables UI"
+  style={{ maxWidth: '100%', maxHeight: '80vh' }}
+/>
+
+## Three scopes
+
+Variables can be defined at three scopes, from broadest to most
+specific:
+
+| Scope          | Applies to                                          | Typical use                                                               |
+| -------------- | --------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Global**     | Every Claude session, regardless of repository      | Universal things like a default `EDITOR` or `PAGER`                       |
+| **Owner**      | Every repository under a single GitHub organization | Org-wide secrets (e.g., an `AWS_PROFILE` shared by all repos in `my-org`) |
+| **Repository** | One specific `owner/repo` pair                      | Project-specific config (`DATABASE_URL`, `STRIPE_SECRET_KEY`)             |
+
+You manage all three scopes from the same **Settings → Environment
+Variables** page.
+
+## Merge order
+
+When Tsunagi launches a Claude session, it merges variables in order of
+increasing specificity and passes the result into the shell:
+
+```
+global  →  owner (of the task's repo)  →  repository (the task's repo)  →  shell
+```
+
+Later sources **override** earlier ones. A repository-scoped
+`DATABASE_URL` wins over a global `DATABASE_URL` with the same key. This
+gives you a simple mental model: "set defaults globally, override per
+org or repo as needed."
+
+Variables you already have in your login shell's environment (e.g., set
+via `~/.zshrc`) are also inherited — Tsunagi does not replace the
+ambient shell environment, it augments it.
+
+## Automatic injection into terminals
+
+You don't need to do anything extra to use these variables. Every time
+you open a new tab in a task, Tsunagi computes the merged set for that
+task's `(owner, repo)` and sets them in the PTY's environment before
+launching Claude Code. From Claude's perspective, it's exactly as if you
+had exported those variables in your shell rc file.
+
+If you edit a variable while a tab is already open, the change applies
+to **new tabs only**. Running tabs keep the environment they started
+with — kill and reopen the tab to pick up changes.
+
+## Special variables Tsunagi cares about
+
+A handful of environment variables have special meaning either to
+Tsunagi or to Claude Code itself. You usually don't define these in
+Tsunagi's settings page — you set them in your login shell before
+starting Tsunagi — but knowing they exist helps.
+
+| Variable                  | Purpose                                                                                                                                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`       | Your Anthropic API credential. Read by Claude Code itself                                                                                                                                                                            |
+| `CLAUDE_CODE_OAUTH_TOKEN` | OAuth token alternative to `ANTHROPIC_API_KEY`. Read by Claude Code                                                                                                                                                                  |
+| `EDITOR`                  | Tsunagi pre-sets this to its bundled Monaco helper inside every Claude tab, so `git commit` and similar commands open the Monaco modal instead of `vi`. Defining `EDITOR` in Tsunagi settings at the global scope will override this |
+| `TSUNAGI_SESSION_ID`      | Injected automatically into each Claude tab's shell. Scripts and the plugin use this to identify the current task from inside the session                                                                                            |
+
+You should not define `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`
+in Tsunagi's settings page — export them in the shell where you launch
+Tsunagi so Claude Code picks them up directly, the same as if you ran
+`claude` by hand.
+
+## Where the data is stored
+
+All environment variables you define through the Tsunagi UI are stored
+in Tsunagi's local SQLite database at:
+
+```
+~/.tsunagi/state/tsunagi.db
+```
+
+Each variable is a row in the `environment_variables` table keyed by
+`(scope, owner, repo, key)`.
+
+<Callout type="warning">
+  This database holds whatever secrets you entered. Treat `~/.tsunagi/state/tsunagi.db` as a
+  sensitive file: back it up carefully, never check it into git, and restrict its file permissions
+  if you share the machine.
+</Callout>
+
+Tsunagi does not encrypt values at rest. If you need encryption, store
+secrets in a keychain / vault and reference them from the login shell
+that launches Tsunagi instead of storing them in Tsunagi's database.
+
+## Enabling and disabling individual variables
+
+Each variable has an **enabled** flag you can toggle from the settings
+page. Disabling a variable removes it from the merged set without
+deleting the row, which is handy for temporarily "turning off" a value
+(e.g., to test behavior without it) without losing the value itself.

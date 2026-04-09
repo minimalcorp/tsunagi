@@ -1,0 +1,69 @@
+---
+title: 2. Start a Claude Session
+description: Open the task detail view, create a tab, and prompt Claude to plan and execute the work.
+---
+
+# 2. Start a Claude Session
+
+With your task created, click on it in the task list to open the **task
+detail view**. This is where you actually work with Claude.
+
+<img
+  src="/screenshots/task-detail.webp"
+  alt="Task detail view"
+  style={{ maxWidth: '100%', maxHeight: '80vh' }}
+/>
+
+## Create a tab
+
+Click **+ New Tab** in the task detail. This:
+
+1. Spawns a PTY-backed shell session inside the task's worktree
+2. Boots Claude Code in that session, with the same credentials Claude
+   Code itself uses
+3. Connects Claude's hooks to Tsunagi so the UI can read what's happening
+4. Opens a terminal view in the tab
+
+You should see a working shell with Claude ready to receive a prompt.
+
+## Prompt Claude with a todo-driven task
+
+Paste the following prompt into the Claude session:
+
+```text
+Create a todo list, then implement a "Hello, world!" program using whichever
+programming language is already installed on this machine. Just verify the
+output is correct — no need to commit or push anything. When the
+implementation and verification are complete, please update the task status
+to `reviewing`.
+```
+
+Why ask Claude to **create a todo list first**? Because Tsunagi watches
+Claude's todo updates and renders them as a **progress bar on the task
+card**. As soon as Claude creates its todos, you'll see them appear in the
+UI in real time.
+
+## What Claude will do
+
+Typically Claude will:
+
+1. **Plan**: create a todo list with steps like "Detect available language",
+   "Write hello world program", "Run and verify output".
+2. **Detect environment**: run `which python3 / node / go / ruby / ...` to
+   pick a language that's actually installed.
+3. **Implement**: create a small file like `hello.py` containing the
+   program.
+4. **Verify**: run the program and check the output is `Hello, world!`.
+5. **Mark todos as completed** one by one.
+6. **Update the task status to `reviewing`** via Tsunagi's MCP server.
+
+That last step is the interesting one — you'll see the task move from the
+`coding` column (it gets there automatically when Claude starts working) to
+the `reviewing` column without you doing anything.
+
+## Next
+
+While Claude is working, switch back to the task list to watch the
+progress.
+
+[3. Monitor Progress →](/en/tutorial/monitor-progress/)

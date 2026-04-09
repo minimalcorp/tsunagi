@@ -1,0 +1,128 @@
+---
+title: Tsunagi Plugin
+description: The Claude Code plugin Tsunagi bundles and manages for you.
+---
+
+import { Callout } from 'nextra/components';
+
+# Tsunagi Plugin
+
+Tsunagi ships its own Claude Code plugin — a bundle that includes an
+**MCP server**, a **skill**, a **curator agent**, and **hook handlers** —
+and installs it automatically when Tsunagi starts. This plugin is what
+makes Tsunagi's tight integration with Claude possible: it lets Claude
+read and write Tsunagi's task state, teaches Claude when to change task
+status, and streams Claude's activity back into the Tsunagi UI in real
+time.
+
+<img
+  src="/screenshots/mcp-task-create.webp"
+  alt="Claude calling Tsunagi MCP"
+  style={{ maxWidth: '100%', maxHeight: '80vh' }}
+/>
+
+## What's inside
+
+The plugin lives at
+[`tsunagi-marketplace/`](https://github.com/minimalcorp/tsunagi/tree/main/apps/web/tsunagi-marketplace)
+in the Tsunagi repository and is shipped as-is inside the npm package.
+It contains four main components.
+
+### MCP server
+
+The MCP server exposes Tsunagi's task management as a set of tools that
+Claude can call directly through the
+[Model Context Protocol](https://docs.claude.com/en/docs/claude-code/mcp).
+
+| Tool                              | Purpose                                                         |
+| --------------------------------- | --------------------------------------------------------------- |
+| `tsunagi_list_repos`              | List registered repositories                                    |
+| `tsunagi_list_tasks`              | List tasks with optional status / owner / repo filters          |
+| `tsunagi_get_task`                | Fetch a task by `id`, `session_id`, or `cwd`                    |
+| `tsunagi_create_task`             | Create a new task and worktree                                  |
+| `tsunagi_update_task`             | Update a task's title, description, status, order, effort, etc. |
+| `tsunagi_delete_task`             | Delete a task and its worktree                                  |
+| `tsunagi_ensure_default_worktree` | Ensure the `.default` worktree is synced with the remote        |
+| `tsunagi_get_tab_todos`           | Read the todo list of a specific tab session                    |
+
+Every tool is available inside any Claude session Tsunagi launches, and
+Claude can invoke them without any extra configuration on your part.
+Asking Claude something like "reorder my backlog by priority" or "delete
+this task" is enough.
+
+### Skill: `tsunagi-task`
+
+The plugin bundles a **skill** that documents how Claude should use the
+MCP tools — status transition rules, how to identify the current task,
+branch naming conventions, when to update `description`, and so on. The
+full text of the skill is in
+[`skills/tsunagi-task/SKILL.md`](https://github.com/minimalcorp/tsunagi/blob/main/apps/web/tsunagi-marketplace/plugins/tsunagi-plugin/skills/tsunagi-task/SKILL.md).
+
+You don't need to read the skill yourself — Claude reads it before
+calling any Tsunagi tool.
+
+### Curator agent: `tsunagi-task-curator`
+
+A specialized **sub-agent** for triage workflows like "reorder this
+backlog by priority" or "sweep stale tasks." It reads task descriptions
+(which can be heavy) inside the sub-agent's own context so that the main
+conversation stays compact.
+
+See
+[`agents/tsunagi-task-curator.md`](https://github.com/minimalcorp/tsunagi/blob/main/apps/web/tsunagi-marketplace/plugins/tsunagi-plugin/agents/tsunagi-task-curator.md)
+for the full agent definition.
+
+### Hook handlers
+
+The plugin subscribes to Claude Code's
+[hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) —
+especially around `TodoWrite`, session start/stop, and tool
+invocations — and posts those events to the Tsunagi backend. This is
+what drives the real-time progress bars, status indicators, and live
+terminal output you see in the Tsunagi UI.
+
+## Lifecycle
+
+Tsunagi installs and uninstalls the plugin automatically as part of its
+startup and shutdown sequences. You never run `claude plugin install`
+yourself.
+
+### On startup
+
+1. Tsunagi detects any leftover Tsunagi plugin from a previous run
+   (e.g., if the previous process crashed) and removes it
+2. Runs `claude plugin marketplace add <bundled marketplace dir>`
+3. Runs `claude plugin install tsunagi-plugin@tsunagi-marketplace --scope user`
+4. Proceeds to start the Fastify and Next.js servers
+
+The clean-install on every startup guarantees the plugin's version
+always matches the running Tsunagi process. There's no version drift to
+worry about.
+
+### On shutdown
+
+1. `claude plugin uninstall tsunagi-plugin@tsunagi-marketplace`
+2. `claude plugin marketplace remove tsunagi-marketplace`
+3. Tsunagi exits
+
+### After a crash
+
+If Tsunagi crashes before it can run its shutdown sequence, the plugin
+and marketplace entries may remain in Claude Code. The next time you
+start Tsunagi, the clean-install sequence above will detect them and
+reinstall from scratch — no manual recovery needed.
+
+<Callout type="info">
+  Tsunagi performs install / uninstall **only** through the official `claude` CLI (`claude plugin
+  marketplace add/remove` and `claude plugin install/uninstall`). It never edits
+  `~/.claude/settings.json` or any other Claude Code internal file directly.
+</Callout>
+
+## Why the plugin is bundled
+
+You might wonder why the plugin isn't published to a public marketplace
+for users to install manually. The answer is version safety: Tsunagi's
+backend and the plugin's MCP tool schemas must match exactly. Bundling
+the plugin with the Tsunagi npm package and installing it at startup
+ensures you never run into schema mismatches from a stale plugin
+installation.

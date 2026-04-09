@@ -1,0 +1,67 @@
+---
+title: 5. Verify and Complete
+description: Verify Claude's output yourself and mark the task as done.
+---
+
+# 5. Verify and Complete
+
+This is the human's part of the loop. You verify the work, then move the
+task to `done`.
+
+## Inspect the worktree
+
+Open a terminal and look at what Claude actually created:
+
+```bash
+cd ~/.tsunagi/workspaces/<owner>/<repo>/feat-hello-world/
+ls
+```
+
+You should see something like `hello.py` (or `hello.js`, `hello.go`,
+depending on which language Claude picked).
+
+Run it yourself:
+
+```bash
+python3 hello.py
+# Hello, world!
+```
+
+Or whichever interpreter Claude used. The output should match what Claude
+reported in the terminal session.
+
+## (Optional) Inspect from the Tsunagi UI
+
+You can also open the task's tab in Tsunagi and scroll through the
+conversation log to see exactly what Claude did. The terminal session
+captures every command and response.
+
+## Mark the task as done
+
+You have two options.
+
+### Option A — ask Claude to mark it done
+
+In the still-open Claude tab, type:
+
+```text
+I've verified the program works. Please mark the task as done.
+```
+
+Claude will use the `tsunagi_update_task` MCP tool to set the status. This
+is the recommended way because it keeps the human-Claude conversation
+linear.
+
+### Option B — change the status manually in the UI
+
+Drag the task card from the `reviewing` column to the `done` column in
+the task list. The status updates instantly.
+
+Either way, the task badge should now read `done`.
+
+## Next
+
+The task is complete. The last step is to clean up — delete the task and
+its worktree.
+
+[6. Delete the Task →](/en/tutorial/delete-task/)

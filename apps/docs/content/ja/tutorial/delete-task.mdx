@@ -1,0 +1,66 @@
+---
+title: 6. タスクを削除する
+description: MCP 経由で Claude にタスク削除を依頼してクリーンアップする。
+---
+
+import { Callout } from 'nextra/components';
+
+# 6. タスクを削除する
+
+タスクが `done` になり検証も終わったので、最後のステップはタスクを削除することです。Tsunagi のタスク削除は以下を行います:
+
+- データベースからタスクレコードを削除
+- ディスクから git worktree を削除 (`~/.tsunagi/workspaces/.../feat-hello-world/`)
+- 関連するタブセッションを削除
+
+bare repository は **影響を受けません**——worktree ディレクトリだけが削除されます。
+
+## MCP 経由で Claude に削除を依頼する
+
+開いている Claude タブで以下のように入力します:
+
+```text
+このタスクを MCP ツールで削除してください。
+```
+
+Claude は現在のタスク ID で `tsunagi_delete_task` を呼び出します。以下が起こります:
+
+1. タスクが即座にタスク一覧から消える
+2. worktree ディレクトリがファイルシステムから削除される
+3. Claude のタブが閉じる (または「タスクが既に存在しない」というメッセージが出る)
+
+これは Tsunagi の MCP server のデモの1つです: **Claude があなたの代わりに Tsunagi 自身の状態を管理できる** ということ。
+
+<Callout type="info">
+  タスクは UI のタスク一覧から手動でも削除できます (右クリックまたはタスク詳細メニューから) が、MCP
+  経由のパスこそが Tsunagi の「PM 業務を Claude に委譲する」という物語を本物にする要素です。
+</Callout>
+
+## クリーンアップを確認する
+
+別のターミナルで:
+
+```bash
+ls ~/.tsunagi/workspaces/<owner>/<repo>/
+```
+
+`feat-hello-world` ディレクトリは消えているはずです。`.bare/` と `.default/` だけが残ります。
+
+## 完成です
+
+完全な Tsunagi 開発サイクルを走らせました:
+
+1. タスクを作成 → Tsunagi が worktree を作成
+2. Claude セッションを開始 → Claude が計画して実装
+3. UI でリアルタイムに進捗を観察
+4. ステータスが `coding` → `reviewing` に自動で移動
+5. 自分で結果を検証
+6. タスクを done にして Claude に削除を依頼
+
+このループは複数のタスクを並列で動かす場合にもそのままスケールします——それが Tsunagi が作られた理由です。ここからは:
+
+- [機能](/ja/features/task-management/) セクションで Tsunagi の他の機能を学ぶ
+- 異なる worktree で **2つのタスクを同時に** 走らせて、本物の並列化を体感する
+- 用語がまだ曖昧なら [基本概念](/ja/getting-started/concepts/) をざっと眺める
+
+ようこそ。
