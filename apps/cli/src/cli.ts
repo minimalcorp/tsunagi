@@ -2,23 +2,29 @@
 import { ChildProcess, spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle';
-import { acquireSingleInstanceLock } from './single-instance-lock';
+import { fileURLToPath } from 'node:url';
+import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle.js';
+import { acquireSingleInstanceLock } from './single-instance-lock.js';
 
 /**
- * Production CLI entrypoint shipped as `bin` in the npm package.
+ * Production CLI entrypoint shipped as `bin` in @minimalcorp/tsunagi.
  *
- * Startup sequence:
- *   1. Platform check (macOS / Linux only)
- *   2. Acquire single-instance PID lock
- *   3. Run database migrations (`auto-migrate`)
- *   4. Clean-install Claude Code marketplace + plugin
- *   5. Spawn Fastify server child process
- *   6. Spawn Next.js standalone server child process
- *   7. On shutdown: kill children + release plugin state + release lock
+ * Layout when installed via npm:
+ *
+ *   <pkg>/dist/cli.js                            ← this file
+ *   <pkg>/dist/auto-migrate.js
+ *   <pkg>/dist/plugin-lifecycle.js
+ *   <pkg>/dist/single-instance-lock.js
+ *   <pkg>/dist/server/index.js                   ← Fastify entry (bundled from apps/server/dist)
+ *   <pkg>/dist/server/lib/**
+ *   <pkg>/dist/server/generated/prisma/**
+ *   <pkg>/.next/standalone/apps/web/server.js    ← Next.js standalone entry (bundled from apps/web/.next/standalone)
+ *   <pkg>/.next/standalone/apps/web/.next/static/
+ *   <pkg>/.next/standalone/node_modules/
+ *   <pkg>/prisma/schema.prisma
+ *   <pkg>/prisma.config.ts
+ *   <pkg>/tsunagi-marketplace/plugins/tsunagi-plugin/.claude-plugin/plugin.json
  */
-
-// -- 1. Platform check ------------------------------------------------------
 
 if (process.platform !== 'darwin' && process.platform !== 'linux') {
   console.error(`[tsunagi] Unsupported platform: ${process.platform}`);
@@ -26,33 +32,12 @@ if (process.platform !== 'darwin' && process.platform !== 'linux') {
   process.exit(1);
 }
 
-// -- 2. Single instance lock ------------------------------------------------
-
 acquireSingleInstanceLock();
 
-// -- Resolve package layout -------------------------------------------------
-//
-// When installed via npm, files are laid out as:
-//
-//   <pkg>/dist/scripts/cli.js                       ← this file
-//   <pkg>/dist/scripts/auto-migrate.js
-//   <pkg>/dist/server/index.js
-//   <pkg>/.next/standalone/apps/web/server.js       ← Next.js standalone entry
-//   <pkg>/.next/standalone/apps/web/.next/static/   ← static assets (copied in build:next)
-//   <pkg>/.next/standalone/node_modules/            ← traced deps shared at standalone root
-//   <pkg>/prisma/schema.prisma
-//
-// The nested `apps/web/` layout under `.next/standalone/` is produced because
-// Next 16's Turbopack and the standalone tracer must share a single workspace
-// root, and the only viable choice is the monorepo root (where the hoisted
-// node_modules lives). See apps/web/next.config.ts for details.
-//
-// `__dirname` points at <pkg>/dist/scripts. Walk up to the package root.
-
-const DIST_SCRIPTS_DIR = __dirname;
-const PACKAGE_ROOT = path.resolve(DIST_SCRIPTS_DIR, '..', '..');
-const AUTO_MIGRATE_JS = path.join(DIST_SCRIPTS_DIR, 'auto-migrate.js');
-const FASTIFY_ENTRY_JS = path.join(PACKAGE_ROOT, 'dist', 'server', 'index.js');
+const DIST_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = path.resolve(DIST_DIR, '..');
+const AUTO_MIGRATE_JS = path.join(DIST_DIR, 'auto-migrate.js');
+const FASTIFY_ENTRY_JS = path.join(DIST_DIR, 'server', 'index.js');
 const NEXT_STANDALONE_ENTRY = path.join(
   PACKAGE_ROOT,
   '.next',
@@ -61,8 +46,6 @@ const NEXT_STANDALONE_ENTRY = path.join(
   'web',
   'server.js'
 );
-
-// -- 3. Database migration --------------------------------------------------
 
 function runAutoMigrate(): void {
   if (!fs.existsSync(AUTO_MIGRATE_JS)) {
@@ -80,12 +63,7 @@ function runAutoMigrate(): void {
 }
 
 runAutoMigrate();
-
-// -- 4. Claude Code plugin clean install ------------------------------------
-
 ensureCleanPluginState();
-
-// -- 5 & 6. Spawn server child processes ------------------------------------
 
 function verifyArtifact(p: string, label: string): void {
   if (!fs.existsSync(p)) {
@@ -110,8 +88,6 @@ const nextChild: ChildProcess = spawn(process.execPath, [NEXT_STANDALONE_ENTRY],
   env: { ...process.env, PORT: process.env.PORT ?? '2791' },
 });
 
-// -- 7. Shutdown orchestration ----------------------------------------------
-
 let shuttingDown = false;
 
 function shutdown(code: number): void {
@@ -129,7 +105,6 @@ function shutdown(code: number): void {
   }
 
   cleanupPluginState();
-  // single-instance-lock releases its lock via its own `exit` hook.
   process.exit(code);
 }
 

@@ -1,18 +1,20 @@
+#!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle';
+import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle.js';
 
 /**
- * Development wrapper: install the Claude Code plugin, then start next +
- * fastify concurrently. Used by `npm run dev` / `npm run start` during local
- * development.
+ * Development wrapper:
+ *   1. Install Claude Code plugin (clean install)
+ *   2. Spawn `npm run dev -w @minimalcorp/tsunagi-web` and
+ *      `npm run dev -w @minimalcorp/tsunagi-server` concurrently
  *
- * The production CLI (`dist/cli/index.js`) also composes plugin-lifecycle +
- * server startup, but without relying on the `concurrently` package.
+ * Used by `npm run dev` (root) → `npm run dev -w @minimalcorp/tsunagi`
+ * → `tsx src/with-plugin.ts dev`.
  */
 
 const mode = process.argv[2];
 if (mode !== 'dev' && mode !== 'start') {
-  console.error('Usage: tsx scripts/with-plugin.ts <dev|start>');
+  console.error('Usage: tsx src/with-plugin.ts <dev|start>');
   process.exit(1);
 }
 
@@ -42,8 +44,14 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-const nextCmd = mode === 'dev' ? 'next dev -p 2791' : 'next start -p 2791';
-const fastifyCmd = mode === 'dev' ? 'tsx watch server/index.ts' : 'tsx server/index.ts';
+const webCmd =
+  mode === 'dev'
+    ? 'npm run dev -w @minimalcorp/tsunagi-web'
+    : 'npm run start -w @minimalcorp/tsunagi-web';
+const serverCmd =
+  mode === 'dev'
+    ? 'npm run dev -w @minimalcorp/tsunagi-server'
+    : 'npm exec --workspace @minimalcorp/tsunagi-server tsx src/index.ts';
 
 const child = spawn(
   'npx',
@@ -51,11 +59,11 @@ const child = spawn(
     'concurrently',
     '--kill-others',
     '--names',
-    'next,fastify',
+    'web,server',
     '--prefix-colors',
     'blue,green',
-    `"${nextCmd}"`,
-    `"${fastifyCmd}"`,
+    `"${webCmd}"`,
+    `"${serverCmd}"`,
   ],
   {
     stdio: 'inherit',
