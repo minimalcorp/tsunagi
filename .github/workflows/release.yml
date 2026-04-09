@@ -56,11 +56,21 @@ jobs:
       # npm Trusted Publishing (OIDC) と provenance 自動生成のため必須。
       id-token: write
     steps:
+      # main 保護 ruleset を bypass するため、Deploy Key を使って checkout
+      # する。actions/checkout は `ssh-key` が指定されると ephemeral な SSH
+      # agent を起動して private key をロードし、git remote URL を SSH
+      # (git@github.com:owner/repo.git) に設定する。以降の `git push` は
+      # この deploy key で認証されて protected main に push できる。
+      #
+      # 事前準備 (詳細は RELEASE_SETUP.md §2-3 参照):
+      #   1. SSH key pair を生成し public key を Deploy keys に登録 (write access)
+      #   2. private key を RELEASE_DEPLOY_KEY secret に登録
+      #   3. main ruleset の Bypass list にこの Deploy key を追加
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
