@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -68,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -88,7 +88,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -98,7 +98,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -108,7 +108,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -118,7 +118,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -128,7 +128,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -138,7 +138,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -148,7 +148,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -158,7 +158,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -168,7 +168,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -178,7 +178,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -188,7 +188,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -198,7 +198,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -208,7 +208,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -218,7 +218,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -s -X POST http://localhost:2792/hooks/claude -H 'Content-Type: application/json' -d @-"
+            "command": "curl -s -X POST http://localhost:2792/api/hooks/claude -H 'Content-Type: application/json' -d @-"
           }
         ]
       }
@@ -227,7 +227,7 @@
   "mcpServers": {
     "tsunagi": {
       "type": "sse",
-      "url": "http://localhost:2792/mcp"
+      "url": "http://localhost:2792/api/mcp"
     }
   }
 }
