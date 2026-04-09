@@ -1,6 +1,6 @@
 {
   "name": "@minimalcorp/tsunagi",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Multi-repo GitHub project management with Claude AI integration, designed for visualizing and controlling AI-driven development locally.",
   "keywords": [
     "tsunagi",
