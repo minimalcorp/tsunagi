@@ -210,18 +210,4 @@ export async function hooksRoutes(fastify: FastifyInstance) {
   fastify.get('/hooks/events', async () => {
     return { events: hookEvents };
   });
-
-  // POST /internal/emit-status - Socket.IO status-changed を発火（Next.jsから呼び出し用）
-  fastify.post<{ Body: { sessionId: string; status: string } }>(
-    '/internal/emit-status',
-    async (request, reply) => {
-      const { sessionId, status } = request.body;
-      if (!sessionId || !status) {
-        return reply.status(400).send({ error: 'sessionId and status are required' });
-      }
-      const room = `tab:${sessionId}`;
-      io.to(room).emit('status-changed', { sessionId, status });
-      return reply.status(200).send({ ok: true });
-    }
-  );
 }
