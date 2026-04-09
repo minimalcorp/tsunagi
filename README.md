@@ -68,28 +68,36 @@ GitHub Actions の `Release` workflow を手動実行することで、`@minimal
 
 ### 初回実行前の必須セットアップ
 
-初めて `Release` workflow を実行する前に、以下を手動で設定しておく必要があります。
+初めて `Release` workflow を実行する前に、以下を手動で設定しておく必要があります。**詳細な手順は [RELEASE_SETUP.md](./RELEASE_SETUP.md) を参照してください。**
 
-1. **npm Automation Token の登録**
-   - npmjs.com で `@minimalcorp` organization を作成し、Automation タイプの Access Token を発行
-   - GitHub リポジトリの Settings → Secrets and variables → Actions で `NPM_TOKEN` という名前の secret として登録
+1. **npm Organization 準備**
+   - npmjs.com で `@minimalcorp` organization を作成（未作成の場合）
+   - `@minimalcorp/tsunagi` パッケージ名が未取得であることを確認
 
-2. **GitHub Pages を Actions ソースに設定**
+2. **npm Trusted Publisher を事前登録** (npm 側)
+   - 本 workflow は **npm Trusted Publishing (OIDC)** を使用するため `NPM_TOKEN` は不要
+   - npmjs.com で Trusted Publisher を追加: organization=`minimalcorp`, repository=`tsunagi`, workflow=`release.yml`, environment=`production-release`
+   - パッケージがまだ存在しない段階でも "Pending Trusted Publisher" として事前登録可能
+
+3. **GitHub Pages を Actions ソースに設定**
    - Settings → Pages → Source: `GitHub Actions` を選択（`Deploy from a branch` ではない）
 
-3. **`production-release` Environment の作成と承認者設定**（必須）
+4. **`production-release` Environment の作成と承認者設定**（必須）
    - Settings → Environments → `New environment` → 名前を `production-release` として作成
    - **Required reviewers** を有効化し、リリース承認権限を持つメンバー（自分自身でも可）を追加
-   - Release workflow の `publish-tsunagi` job はこの Environment 配下で実行されるため、
+   - Release workflow の `approve` job はこの Environment 配下で実行されるため、
      workflow 実行時に GitHub UI で明示的な承認操作が必要になる
+   - `publish-tsunagi` / `deploy-docs` 両方がこの approval を通過した後でのみ実行される
    - 承認画面で main の最新状態（他 PR の merge 状況等）を目視確認してから承認する
      ことで、意図しない内容のリリースを防ぐ
 
-4. **`main` ブランチ保護の bypass 設定**（保護ルールを設定している場合）
+5. **`main` ブランチ保護の bypass 設定**（保護ルールを設定している場合）
    - `Release` workflow は `npm version` で bump した commit と tag を `main` に直接 push する
    - main に `Require a pull request before merging` 等の保護ルールがある場合、push がブロックされる
-   - 対応: Settings → Rules → Rulesets で main 保護 ruleset を作成し、**Bypass list に `Repository admin` role または `Deploy key` を追加**する
-     - `github-actions[bot]` が該当権限として扱われるため、これで workflow からの push が許可される
+   - `github-actions[bot]` は user role を持たないため、Bypass list に**明示的に**以下のいずれかを設定する必要がある:
+     - 独立した **Deploy key** を発行し Bypass に追加（推奨）
+     - 管理者ユーザーの **PAT** を `PAT_TOKEN` secret として登録し、workflow の `checkout` で使用
+     - 管理者ユーザー自身を Bypass に追加（workflow を本人が起動する運用）
    - 保護ルールを main に設定していない場合は不要
 
 これらを設定せずに workflow を実行すると、途中で失敗してバージョン番号だけが bump された中途半端な状態になる可能性があるので、**必ず事前に設定してください**。

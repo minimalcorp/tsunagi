@@ -27,17 +27,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Unified approval gate。
+  # production-release Environment には Required reviewers を設定する想定で、
+  # この job が pending 状態になると GitHub UI 上で人間の承認操作が必要になる。
+  # publish-tsunagi / deploy-docs 両方の job がこの job を `needs` で待つため、
+  # target=all でも 1 回の承認で tsunagi + docs 両方をカバーできる。
+  # 承認画面で main の最新状態 (他 PR の merge 状況等) を目視確認することで、
+  # 意図しない内容のリリースを防ぐ。
+  # Environment の作成手順は README のリリース設定セクションを参照。
+  approve:
+    name: Approve release
+    runs-on: ubuntu-latest
+    environment: production-release
+    steps:
+      - name: Record approval
+        run: |
+          echo "Release approved"
+          echo "  target:  ${{ inputs.target }}"
+          echo "  version: ${{ inputs.version }}"
+
   publish-tsunagi:
     name: Publish @minimalcorp/tsunagi to npm
     if: ${{ inputs.target == 'all' || inputs.target == 'tsunagi' }}
+    needs: approve
     runs-on: ubuntu-latest
-    # production-release Environment には Required reviewers を設定する想定。
-    # workflow 実行時に人間の承認が必要となり、承認時に main の最新状態
-    # (他 PR の merge 状況等) を目視確認する時間を強制的に確保できる。
-    # Environment の作成手順は README のリリース設定セクションを参照。
-    environment: production-release
     permissions:
       contents: write
+      # npm Trusted Publishing (OIDC) と provenance 自動生成のため必須。
       id-token: write
     steps:
       - name: Checkout
@@ -52,6 +68,11 @@ jobs:
           node-version: '24.12.0'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
+
+      # npm Trusted Publishing は npm CLI v11.5.1 以降が必要 (2025-07 GA)。
+      # Node 24.12.0 同梱の npm が古い場合に備えて明示的に upgrade する。
+      - name: Ensure npm >= 11.5.1 (for Trusted Publishing)
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -108,10 +129,18 @@ jobs:
           echo "::error::Push failed after 3 attempts"
           exit 1
 
-      - name: Publish to npm
-        run: npm publish --workspace=@minimalcorp/tsunagi --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # npm Trusted Publishing 経由で publish する (long-lived token 不要)。
+      # 認証は GitHub Actions OIDC token で行われるため NODE_AUTH_TOKEN は
+      # 設定しない。provenance attestation も trusted publishing 経由だと
+      # 自動生成されるため `--provenance` flag は不要。
+      #
+      # npmjs.com 側で以下の Trusted Publisher 設定が必要:
+      #   Organization: minimalcorp
+      #   Repository:   tsunagi
+      #   Workflow:     release.yml
+      #   Environment:  production-release
+      - name: Publish to npm (via Trusted Publishing)
+        run: npm publish --workspace=@minimalcorp/tsunagi --access public
 
       - name: Create GitHub Release
         env:
@@ -124,6 +153,7 @@ jobs:
   deploy-docs:
     name: Deploy docs to GitHub Pages
     if: ${{ inputs.target == 'all' || inputs.target == 'docs' }}
+    needs: approve
     runs-on: ubuntu-latest
     permissions:
       contents: read
