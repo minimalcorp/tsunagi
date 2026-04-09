@@ -11,10 +11,6 @@ function getTsunagiDataDir(): string {
   return process.env.TSUNAGI_DATA_DIR || path.join(os.homedir(), '.tsunagi');
 }
 
-function getDatabasePath(): string {
-  return path.join(getTsunagiDataDir(), 'state', 'tsunagi.db');
-}
-
 function getStateDir(): string {
   return path.join(getTsunagiDataDir(), 'state');
 }
@@ -23,19 +19,14 @@ async function autoMigrate() {
   try {
     console.log('DB migration started');
 
-    const dbPath = getDatabasePath();
     const stateDir = getStateDir();
 
     // データベースディレクトリが存在しない場合は作成
+    // データベース URL 自体は prisma.config.ts の datasource.url で解決される
+    // (Prisma 7 では schema.prisma の env("DATABASE_URL") は非対応)
     await fs.mkdir(stateDir, { recursive: true });
 
-    // 環境変数を設定してprisma migrate deployを実行
-    const env = {
-      ...process.env,
-      DATABASE_URL: `file:${dbPath}`,
-    };
-
-    const { stdout } = await execAsync('npx prisma migrate deploy', { env });
+    const { stdout } = await execAsync('npx prisma migrate deploy');
 
     // Prismaの出力から重要な行を抽出して表示
     const lines = stdout
@@ -49,7 +40,7 @@ async function autoMigrate() {
 
     // Prisma Clientを生成
     console.log('Generating Prisma Client...');
-    const { stdout: generateOutput } = await execAsync('npx prisma generate', { env });
+    const { stdout: generateOutput } = await execAsync('npx prisma generate');
 
     const generateLines = generateOutput
       .split('\n')
