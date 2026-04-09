@@ -20,7 +20,6 @@
     "web:dev": "npm run dev -w @minimalcorp/tsunagi",
     "docs:dev": "npm run dev -w tsunagi-docs",
     "build": "npm run build --workspaces --if-present",
-    "build:dist": "npm run build:dist -w @minimalcorp/tsunagi",
     "lint": "npm run lint --workspaces --if-present",
     "type-check": "npm run type-check --workspaces --if-present",
     "format": "prettier --write .",

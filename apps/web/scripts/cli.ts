@@ -34,11 +34,18 @@ acquireSingleInstanceLock();
 //
 // When installed via npm, files are laid out as:
 //
-//   <pkg>/dist/scripts/cli.js              ← this file
+//   <pkg>/dist/scripts/cli.js                       ← this file
 //   <pkg>/dist/scripts/auto-migrate.js
 //   <pkg>/dist/server/index.js
-//   <pkg>/.next/standalone/server.js       ← Next.js standalone entry
+//   <pkg>/.next/standalone/apps/web/server.js       ← Next.js standalone entry
+//   <pkg>/.next/standalone/apps/web/.next/static/   ← static assets (copied in build:next)
+//   <pkg>/.next/standalone/node_modules/            ← traced deps shared at standalone root
 //   <pkg>/prisma/schema.prisma
+//
+// The nested `apps/web/` layout under `.next/standalone/` is produced because
+// Next 16's Turbopack and the standalone tracer must share a single workspace
+// root, and the only viable choice is the monorepo root (where the hoisted
+// node_modules lives). See apps/web/next.config.ts for details.
 //
 // `__dirname` points at <pkg>/dist/scripts. Walk up to the package root.
 
@@ -46,7 +53,14 @@ const DIST_SCRIPTS_DIR = __dirname;
 const PACKAGE_ROOT = path.resolve(DIST_SCRIPTS_DIR, '..', '..');
 const AUTO_MIGRATE_JS = path.join(DIST_SCRIPTS_DIR, 'auto-migrate.js');
 const FASTIFY_ENTRY_JS = path.join(PACKAGE_ROOT, 'dist', 'server', 'index.js');
-const NEXT_STANDALONE_ENTRY = path.join(PACKAGE_ROOT, '.next', 'standalone', 'server.js');
+const NEXT_STANDALONE_ENTRY = path.join(
+  PACKAGE_ROOT,
+  '.next',
+  'standalone',
+  'apps',
+  'web',
+  'server.js'
+);
 
 // -- 3. Database migration --------------------------------------------------
 

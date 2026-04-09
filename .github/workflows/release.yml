@@ -62,7 +62,7 @@ jobs:
       # (git@github.com:owner/repo.git) に設定する。以降の `git push` は
       # この deploy key で認証されて protected main に push できる。
       #
-      # 事前準備 (詳細は RELEASE_SETUP.md §2-3 参照):
+      # 事前準備:
       #   1. SSH key pair を生成し public key を Deploy keys に登録 (write access)
       #   2. private key を RELEASE_DEPLOY_KEY secret に登録
       #   3. main ruleset の Bypass list にこの Deploy key を追加
