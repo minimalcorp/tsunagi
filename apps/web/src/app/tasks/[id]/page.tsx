@@ -8,6 +8,7 @@ import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
 import { TaskDialog } from '@/components/TaskDialog';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
@@ -38,6 +39,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const terminalPanelRef = useRef<TerminalPanelHandle | null>(null);
+
+  useDocumentTitle(task?.title);
 
   // データロード（初回ロード時のみ、またはIDが変わった時）
   const prevIdRef = useRef<string | null>(null);

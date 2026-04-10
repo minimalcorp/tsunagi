@@ -15,8 +15,17 @@ import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { useTerminalTodos } from '@/hooks/useTerminalTodos';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { toaster } from '@/lib/toaster';
 import { apiUrl } from '@/lib/api-url';
+
+function buildFilterSummary(f: FilterState): string | undefined {
+  const parts: string[] = [];
+  if (f.search.trim()) parts.push(`"${f.search.trim()}"`);
+  if (f.statuses.length) parts.push(f.statuses.join(', '));
+  if (f.repos.length) parts.push(f.repos.map((r) => r.split('/').pop() ?? r).join(', '));
+  return parts.length ? parts.join(' / ') : undefined;
+}
 
 export default function Home() {
   const router = useRouter();
@@ -40,6 +49,8 @@ export default function Home() {
     }
     return { statuses: [], repos: [], search: '' };
   });
+
+  useDocumentTitle(buildFilterSummary(filterState));
 
   // Persist filter state to sessionStorage
   useEffect(() => {
