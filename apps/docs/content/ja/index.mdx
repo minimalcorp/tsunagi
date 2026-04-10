@@ -1,6 +1,6 @@
 ---
 title: Tsunagi
-description: 1 task, 1 worktree, 1 Claude session — managed in one place.
+description: 1:1:N — task, worktree, Claude sessions — managed in one place.
 ---
 
 import { Cards } from 'nextra/components';
@@ -13,7 +13,7 @@ import { Cards } from 'nextra/components';
 
 # Tsunagi
 
-### 1 task, 1 worktree, 1 Claude session — managed in one place.
+### 1:1:N — task, worktree, Claude sessions — managed in one place.
 
 複数の Claude Code セッションを並列で動かす開発を、PM の視点で統制する。
 Tsunagi は、独立した git worktree で動く複数の Claude セッションを起動・
@@ -55,10 +55,10 @@ Claude Code を本格的に活用するということは、**並列で動かす
 
 ## Tsunagi の解決アプローチ
 
-Tsunagi は、各タスクを **「専用の git worktree、専用の Claude セッション、
-ひとつの Web UI のタブ」** として扱います。Claude の hooks がその UI に
-作業状況をリアルタイムに流し込むので、すべてのセッションの状況を一目で
-把握できます。
+Tsunagi は、各タスクに **「専用の git worktree」** を割り当て、その中で
+N 個の Claude セッションをタブ形式で実行できます——**すべて 1 つの Web UI から**。
+Claude の hooks がその UI に作業状況をリアルタイムに流し込むので、
+すべてのセッションの状況を一目で把握できます。
 
 ターミナルの山ではなく、PM の席から操作する感覚です。
 
