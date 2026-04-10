@@ -24,10 +24,15 @@ export function TaskCard({ task, isDragging, dragHandleProps, tabTodosMap }: Tas
   const tabs = task.tabs || [];
   const isClaudeRunning = tabs.some((tab) => tab.status === 'running');
 
-  // リアルタイムのtabTodosMapがあればそちらを優先、なければDB todosにフォールバック
+  // running タブの todos（リアルタイム優先、なければDB）と非running タブの todos（DB）をマージ
+  // → Session1(7/7完了) の後に Session2(3件追加) を開始した場合に (7/10) → (10/10) と表示される
   const runningTab = tabs.find((tab) => tab.status === 'running');
   const realtimeTodos = runningTab && tabTodosMap ? tabTodosMap.get(runningTab.tab_id) : undefined;
-  const allTodos = realtimeTodos ?? tabs.flatMap((tab) => tab.todos ?? []);
+  const runningTodos: TabTodo[] = realtimeTodos ?? runningTab?.todos ?? [];
+  const nonRunningTodos = tabs
+    .filter((tab) => tab !== runningTab)
+    .flatMap((tab) => tab.todos ?? []);
+  const allTodos = [...nonRunningTodos, ...runningTodos];
   const completedTodos = allTodos.filter((t) => t.status === 'completed').length;
   const totalTodos = allTodos.length;
   const showProgressBar = totalTodos > 0;

@@ -81,12 +81,13 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       // PTYプロセス終了 → room全体に通知（全接続クライアントに終了を伝える）+ セッション削除
       const exitHandler = ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
         io.to(room).emit('exit', { exitCode });
-        // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット
+        // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット、todosをクリア
         io.to(room).emit('status-changed', { sessionId, status: 'idle' });
+        io.to(room).emit('todos-updated', { sessionId, todos: [] });
         prisma.tab
           .updateMany({
             where: { tabId: sessionId },
-            data: { status: 'idle' },
+            data: { status: 'idle', todos: '[]' },
           })
           .catch(() => {
             /* DB更新失敗は無視 */

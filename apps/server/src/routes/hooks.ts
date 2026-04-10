@@ -59,17 +59,19 @@ async function updateTabStatus(
   sessionId: string,
   status: string,
   todos?: unknown[]
-): Promise<void> {
+): Promise<{ count: number }> {
   try {
-    await prisma.tab.updateMany({
+    const result = await prisma.tab.updateMany({
       where: { tabId: sessionId },
       data: {
         status,
         ...(todos !== undefined && { todos: JSON.stringify(todos) }),
       },
     });
+    return { count: result.count };
   } catch (err) {
     console.warn(`[hooks] Failed to update tab status in DB:`, err);
+    return { count: 0 };
   }
 }
 
@@ -125,7 +127,15 @@ export async function hooksRoutes(fastify: FastifyInstance) {
               status: 'pending' | 'in_progress' | 'completed';
             }>;
             if (Array.isArray(todos)) {
-              await updateTabStatus(sessionId, 'running', todos);
+              fastify.log.info(
+                { sessionId, todosCount: todos.length },
+                '[hooks] TodoWrite received'
+              );
+              const { count } = await updateTabStatus(sessionId, 'running', todos);
+              fastify.log.info(
+                { sessionId, updatedTabCount: count },
+                '[hooks] TodoWrite tab updated'
+              );
               io.to(room).emit('todos-updated', { sessionId, todos });
               todosUpdated = true;
             }
@@ -185,17 +195,19 @@ export async function hooksRoutes(fastify: FastifyInstance) {
           break;
 
         case 'StopFailure':
-          // APIエラーでターン終了 → failure状態に更新
-          await updateTabStatus(sessionId, 'error');
+          // APIエラーでターン終了 → failure状態に更新、todosをクリア
+          await updateTabStatus(sessionId, 'error', []);
           io.to(room).emit('status-changed', { sessionId, status: 'failure' });
+          io.to(room).emit('todos-updated', { sessionId, todos: [] });
           break;
 
         case 'SessionEnd':
-          // セッション終了（Escキー中断・Ctrl+C・/exit等）→ idle状態に更新
+          // セッション終了（Escキー中断・Ctrl+C・/exit等）→ idle状態に更新、todosをクリア
           // reason: "prompt_input_exit" = ユーザー中断、"other" = プロセスkill等
           fastify.log.info({ sessionId, reason: body.reason }, 'SessionEnd received');
-          await updateTabStatus(sessionId, 'idle');
+          await updateTabStatus(sessionId, 'idle', []);
           io.to(room).emit('status-changed', { sessionId, status: 'idle' });
+          io.to(room).emit('todos-updated', { sessionId, todos: [] });
           break;
 
         default:
