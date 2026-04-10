@@ -3,6 +3,7 @@ interface EditorSession {
   content: string;
   status: 'pending' | 'done';
   createdAt: number;
+  tabId: string | null;
 }
 
 export const editorSessionStore = new Map<string, EditorSession>();
