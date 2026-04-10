@@ -87,6 +87,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build shared types
+        run: npm run build -w @minimalcorp/tsunagi-shared
+
+      - name: Generate Prisma client (server)
+        run: npm run db:generate -w @minimalcorp/tsunagi-server
+
       - name: Configure git author
         run: |
           git config user.name "github-actions[bot]"
@@ -134,6 +140,8 @@ jobs:
             git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
             # 依存関係が変わっている可能性があるので再 install
             npm ci
+            npm run build -w @minimalcorp/tsunagi-shared
+            npm run db:generate -w @minimalcorp/tsunagi-server
             sleep 2
           done
           echo "::error::Push failed after 3 attempts"
