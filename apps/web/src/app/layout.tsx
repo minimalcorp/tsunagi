@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Tsunagi (繋ぎ)',
+  title: '繋',
   description: 'AI時代の統合開発マネージャー - Claude と人間のシームレスな協働開発を実現',
 };
 
