@@ -4,13 +4,15 @@ import { useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import type { Task } from '@minimalcorp/tsunagi-shared';
 import { TaskCard } from '@/components/planner/TaskCard';
+import type { TabTodosMap } from '@/hooks/useTerminalTodos';
 
 interface TaskListProps {
   tasks: Task[];
   onReorder: (reorderedTasks: Task[]) => void;
+  tabTodosMap: TabTodosMap;
 }
 
-export function TaskList({ tasks, onReorder }: TaskListProps) {
+export function TaskList({ tasks, onReorder, tabTodosMap }: TaskListProps) {
   const handleDragEnd = useCallback(
     (result: DropResult) => {
       if (!result.destination) return;
@@ -42,7 +44,11 @@ export function TaskList({ tasks, onReorder }: TaskListProps) {
               <Draggable key={task.id} draggableId={task.id} index={index}>
                 {(draggableProvided) => (
                   <div ref={draggableProvided.innerRef} {...draggableProvided.draggableProps}>
-                    <TaskCard task={task} dragHandleProps={draggableProvided.dragHandleProps} />
+                    <TaskCard
+                      task={task}
+                      dragHandleProps={draggableProvided.dragHandleProps}
+                      tabTodosMap={tabTodosMap}
+                    />
                   </div>
                 )}
               </Draggable>

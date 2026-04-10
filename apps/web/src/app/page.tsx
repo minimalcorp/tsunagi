@@ -159,7 +159,7 @@ export default function Home() {
     [tasks]
   );
 
-  useTerminalTodos(runningTabIds);
+  const tabTodosMap = useTerminalTodos(runningTabIds);
 
   useTabStatusEvents(allTabIds, (tabId, status) => {
     setTasks((prev) =>
@@ -390,6 +390,7 @@ export default function Home() {
             onFilterChange={setFilterState}
             onReorder={handleReorder}
             onAddTask={() => setIsAddTaskDialogOpen(true)}
+            tabTodosMap={tabTodosMap}
           />
         </div>
 
