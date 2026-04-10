@@ -18,31 +18,7 @@ if (mode !== 'dev' && mode !== 'start') {
   process.exit(1);
 }
 
-let cleanedUp = false;
-function cleanup(): void {
-  if (cleanedUp) return;
-  cleanedUp = true;
-  cleanupPluginState();
-}
-
 ensureCleanPluginState();
-
-process.on('SIGINT', () => {
-  cleanup();
-  process.exit(0);
-});
-process.on('SIGTERM', () => {
-  cleanup();
-  process.exit(0);
-});
-process.on('exit', () => {
-  cleanup();
-});
-process.on('uncaughtException', (err) => {
-  console.error('[tsunagi] Uncaught exception:', err);
-  cleanup();
-  process.exit(1);
-});
 
 const webCmd =
   mode === 'dev'
@@ -71,7 +47,34 @@ const child = spawn(
   }
 );
 
+let shuttingDown = false;
+
+function shutdown(code: number): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  if (!child.killed && child.exitCode === null) {
+    try {
+      child.kill('SIGTERM');
+    } catch {
+      // ignore
+    }
+  }
+
+  cleanupPluginState();
+  process.exit(code);
+}
+
+process.on('SIGINT', () => shutdown(0));
+process.on('SIGTERM', () => shutdown(0));
+process.on('exit', () => {
+  if (!shuttingDown) cleanupPluginState();
+});
+process.on('uncaughtException', (err) => {
+  console.error('[tsunagi] Uncaught exception:', err);
+  shutdown(1);
+});
+
 child.on('exit', (code) => {
-  cleanup();
-  process.exit(code ?? 0);
+  shutdown(code ?? 0);
 });

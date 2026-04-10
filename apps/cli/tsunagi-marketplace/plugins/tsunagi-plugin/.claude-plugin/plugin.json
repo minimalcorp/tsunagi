@@ -226,7 +226,7 @@
   },
   "mcpServers": {
     "tsunagi": {
-      "type": "sse",
+      "type": "http",
       "url": "http://localhost:2792/api/mcp"
     }
   }

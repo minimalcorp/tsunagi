@@ -53,6 +53,15 @@ async function start() {
 
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
   console.log(`Fastify server running on port ${PORT}`);
+
+  const shutdown = async (signal: string) => {
+    console.log(`[server] Received ${signal}, shutting down...`);
+    await fastify.close();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
 }
 
 start().catch((err) => {

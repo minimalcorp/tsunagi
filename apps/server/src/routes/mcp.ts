@@ -1,8 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import { prisma } from '../lib/db.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import {
   listTasks,
@@ -16,8 +17,8 @@ import {
   type TaskIdentifier,
 } from '../lib/services/task-service.js';
 
-/** SSEセッションIDをキーにしたtransportのMap */
-const transports = new Map<string, SSEServerTransport>();
+/** セッションIDをキーにしたtransportのMap */
+const transports = new Map<string, StreamableHTTPServerTransport>();
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
@@ -412,37 +413,55 @@ function createMcpServer(io?: SocketIOServer): Server {
 export async function mcpRoutes(fastify: FastifyInstance) {
   const io = (fastify as FastifyWithIO).io;
 
-  // GET /mcp - SSE接続エンドポイント（MCP over SSE）
-  fastify.get('/mcp', async (request: FastifyRequest, reply: FastifyReply) => {
-    const res = reply.raw;
-    const transport = new SSEServerTransport('/mcp', res);
+  // POST /mcp - セッション初期化またはメッセージ処理
+  fastify.post('/mcp', async (request: FastifyRequest, reply: FastifyReply) => {
+    const sessionId = (request.headers as Record<string, string>)['mcp-session-id'];
 
-    transports.set(transport.sessionId, transport);
-
-    res.on('close', () => {
-      transports.delete(transport.sessionId);
-    });
-
-    await reply.hijack();
-
-    const server = createMcpServer(io);
-    await server.connect(transport);
+    if (sessionId) {
+      // 既存セッション: ルーティング
+      const transport = transports.get(sessionId);
+      if (!transport) {
+        return reply.status(404).send({ error: `Session not found: ${sessionId}` });
+      }
+      await reply.hijack();
+      await transport.handleRequest(request.raw, reply.raw, request.body);
+    } else {
+      // 新規セッション初期化
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (id) => {
+          transports.set(id, transport);
+        },
+        onsessionclosed: (id) => {
+          transports.delete(id);
+        },
+      });
+      const server = createMcpServer(io);
+      await server.connect(transport);
+      await reply.hijack();
+      await transport.handleRequest(request.raw, reply.raw, request.body);
+    }
   });
 
-  // POST /mcp - tool呼び出しエンドポイント
-  fastify.post('/mcp', async (request: FastifyRequest, reply: FastifyReply) => {
-    const sessionId = (request.query as Record<string, string>)['sessionId'];
-
-    if (!sessionId) {
-      return reply.status(400).send({ error: 'sessionId query parameter required' });
+  // GET /mcp - SSEストリーム（既存セッション用）
+  fastify.get('/mcp', async (request: FastifyRequest, reply: FastifyReply) => {
+    const sessionId = (request.headers as Record<string, string>)['mcp-session-id'];
+    if (!sessionId || !transports.has(sessionId)) {
+      return reply.status(400).send({ error: 'Invalid or missing mcp-session-id header' });
     }
-
-    const transport = transports.get(sessionId);
-    if (!transport) {
-      return reply.status(404).send({ error: `Session not found: ${sessionId}` });
-    }
-
-    await transport.handlePostMessage(request.raw, reply.raw, request.body);
+    const transport = transports.get(sessionId)!;
     await reply.hijack();
+    await transport.handleRequest(request.raw, reply.raw);
+  });
+
+  // DELETE /mcp - セッション終了
+  fastify.delete('/mcp', async (request: FastifyRequest, reply: FastifyReply) => {
+    const sessionId = (request.headers as Record<string, string>)['mcp-session-id'];
+    if (!sessionId || !transports.has(sessionId)) {
+      return reply.status(400).send({ error: 'Invalid or missing mcp-session-id header' });
+    }
+    const transport = transports.get(sessionId)!;
+    await reply.hijack();
+    await transport.handleRequest(request.raw, reply.raw);
   });
 }

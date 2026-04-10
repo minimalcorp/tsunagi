@@ -8,13 +8,14 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev:migrate": "mkdir -p \"$HOME/.tsunagi/state\" && npx prisma migrate deploy && npm run db:generate",
+    "dev": "npm run dev:migrate && tsx watch src/index.ts",
     "build": "npm run db:generate && tsc -p tsconfig.json",
     "clean": "rm -rf dist src/generated",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "db:migrate": "npx prisma migrate dev",
-    "db:generate": "npx prisma generate && tsx scripts/patch-prisma-generated.ts",
+    "db:generate": "npx prisma generate",
     "db:studio": "npx prisma studio",
     "db:migrate-from-json": "tsx scripts/migrate-to-sqlite.ts",
     "db:backup": "tsx scripts/db-backup.ts",

@@ -42,13 +42,16 @@ function log(msg: string): void {
 
 /**
  * Run a `claude` CLI command. Returns true on success, false on failure.
- * stderr/stdout are suppressed to keep the startup log clean.
+ * Logs stderr on failure to aid debugging.
  */
 function runClaude(args: string): boolean {
   try {
     execSync(`claude ${args}`, { stdio: 'pipe' });
     return true;
-  } catch {
+  } catch (e) {
+    const err = e as { stderr?: Buffer; stdout?: Buffer };
+    const detail = err.stderr?.toString().trim() || err.stdout?.toString().trim() || '';
+    if (detail) console.error(`[tsunagi:plugin] claude ${args}: ${detail}`);
     return false;
   }
 }
