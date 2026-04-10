@@ -102,13 +102,13 @@ jobs:
         id: bump
         run: |
           npm version "${{ inputs.version }}" --workspace=@minimalcorp/tsunagi
-          NEW_VERSION=$(node -p "require('./apps/web/package.json').version")
+          NEW_VERSION=$(node -p "require('./apps/cli/package.json').version")
           echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
-          git add apps/web/package.json package-lock.json
+          git add apps/cli/package.json package-lock.json
           git commit -m "chore: release @minimalcorp/tsunagi v${NEW_VERSION}"
           # annotated tag を作成する (軽量タグだと git push --follow-tags で
           # push されないため必ず -a -m を付けること)。
-          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+          git tag -a "tsunagi-v${NEW_VERSION}" -m "Release tsunagi-v${NEW_VERSION}"
 
       # Push に失敗した場合は rebase してから retry する。他 PR が merge
       # されて main が進んでいた場合、rebase によって merge 済み commit を
@@ -129,7 +129,7 @@ jobs:
             fi
             echo "::warning::Push failed on attempt ${attempt}. Attempting rebase..."
             # rebase 前に tag を削除する (rebase 後に再作成する)
-            git tag -d "v${NEW_VERSION}" || true
+            git tag -d "tsunagi-v${NEW_VERSION}" || true
             git fetch origin main
             if ! git rebase origin/main; then
               echo "::error::Rebase conflict with origin/main. Aborting."
@@ -137,7 +137,7 @@ jobs:
               exit 1
             fi
             # rebase 後の新しい HEAD で annotated tag を再作成
-            git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+            git tag -a "tsunagi-v${NEW_VERSION}" -m "Release tsunagi-v${NEW_VERSION}"
             # 依存関係が変わっている可能性があるので再 install
             npm ci
             npm run build -w @minimalcorp/tsunagi-shared
@@ -164,8 +164,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ steps.bump.outputs.new_version }}" \
-            --title "v${{ steps.bump.outputs.new_version }}" \
+          gh release create "tsunagi-v${{ steps.bump.outputs.new_version }}" \
+            --title "tsunagi-v${{ steps.bump.outputs.new_version }}" \
             --generate-notes
 
   deploy-docs:
