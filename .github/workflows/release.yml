@@ -174,7 +174,7 @@ jobs:
     needs: approve
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pages: write
       id-token: write
     environment:
@@ -183,6 +183,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -192,6 +195,46 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version (docs)
+        id: bump
+        run: |
+          npm version "${{ inputs.version }}" --workspace=tsunagi-docs
+          NEW_VERSION=$(node -p "require('./apps/docs/package.json').version")
+          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          git add apps/docs/package.json package-lock.json
+          git commit -m "chore: release tsunagi-docs v${NEW_VERSION}"
+          git tag -a "docs-v${NEW_VERSION}" -m "Release docs-v${NEW_VERSION}"
+
+      - name: Push commit and tag (with rebase retry)
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            if git push --atomic --follow-tags; then
+              echo "Push succeeded on attempt ${attempt}"
+              exit 0
+            fi
+            echo "::warning::Push failed on attempt ${attempt}. Attempting rebase..."
+            git tag -d "docs-v${NEW_VERSION}" || true
+            git fetch origin main
+            if ! git rebase origin/main; then
+              echo "::error::Rebase conflict with origin/main. Aborting."
+              git rebase --abort || true
+              exit 1
+            fi
+            git tag -a "docs-v${NEW_VERSION}" -m "Release docs-v${NEW_VERSION}"
+            npm ci
+            sleep 2
+          done
+          echo "::error::Push failed after 3 attempts"
+          exit 1
 
       - name: Configure GitHub Pages
         id: pages
