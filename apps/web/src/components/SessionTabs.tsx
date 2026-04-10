@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import type { Tab } from '@/lib/types';
+import type { Tab } from '@minimalcorp/tsunagi-shared';
 import {
   X,
   Loader2,

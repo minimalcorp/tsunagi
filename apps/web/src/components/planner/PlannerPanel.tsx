@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Tab } from '@/lib/types';
+import type { Tab } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
 import {
   TerminalView,
@@ -11,6 +11,7 @@ import {
 } from '@/components/TerminalView';
 import { Button } from '@/components/ui/button';
 import type { TabStatusEntry } from '@/components/TerminalPanel';
+import { apiUrl } from '@/lib/api-url';
 
 /** Tab creation mode */
 type TabCreateMode = 'terminal' | 'claude';
@@ -30,8 +31,8 @@ export function PlannerPanel() {
     const load = async () => {
       try {
         const [configRes, tabsRes] = await Promise.all([
-          fetch('/api/planner/config').then((r) => r.json()),
-          fetch('/api/planner/tabs').then((r) => r.json()),
+          fetch(apiUrl('/api/planner/config')).then((r) => r.json()),
+          fetch(apiUrl('/api/planner/tabs')).then((r) => r.json()),
         ]);
 
         if (configRes.data?.cwd) {
@@ -75,7 +76,7 @@ export function PlannerPanel() {
 
       // Persist to API
       try {
-        await fetch('/api/planner/tabs', {
+        await fetch(apiUrl('/api/planner/tabs'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tabId }),
@@ -116,7 +117,7 @@ export function PlannerPanel() {
     async (tabId: string) => {
       // Delete from API
       try {
-        await fetch(`/api/planner/tabs?tabId=${tabId}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/planner/tabs?tabId=${tabId}`), { method: 'DELETE' });
       } catch (error) {
         console.error('Failed to delete planner tab:', error);
       }

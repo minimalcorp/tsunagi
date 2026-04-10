@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
-import type { Repository } from '@/lib/types';
+import type { Repository } from '@minimalcorp/tsunagi-shared';
 import { getRepoColor } from '@/lib/repo-colors';
+import { apiUrl } from '@/lib/api-url';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 
@@ -16,8 +17,8 @@ export function RepositoryManagement() {
   const loadData = useCallback(async () => {
     try {
       const [reposRes, tasksRes] = await Promise.all([
-        fetch('/api/repos').then((r) => r.json()),
-        fetch('/api/tasks').then((r) => r.json()),
+        fetch(apiUrl('/api/repos')).then((r) => r.json()),
+        fetch(apiUrl('/api/tasks')).then((r) => r.json()),
       ]);
 
       setRepositories(reposRes.data?.repos ?? []);
@@ -43,7 +44,7 @@ export function RepositoryManagement() {
 
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/repos/${deleteTarget.owner}/${deleteTarget.repo}`, {
+      const res = await fetch(apiUrl(`/api/repos/${deleteTarget.owner}/${deleteTarget.repo}`), {
         method: 'DELETE',
       });
 
