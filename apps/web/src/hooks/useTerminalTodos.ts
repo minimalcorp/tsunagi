@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { io, type Socket } from 'socket.io-client';
+import { getServerUrl } from '@/lib/api-url';
 
 export interface Todo {
   content: string;
@@ -10,8 +11,6 @@ export interface Todo {
 
 /** タブIDをキーにしたTodosのMap */
 export type TabTodosMap = Map<string, Todo[]>;
-
-const FASTIFY_API_BASE = 'http://localhost:2792';
 
 /**
  * Fastify socket.ioに接続してTodo更新を受信するhook。
@@ -25,7 +24,7 @@ export function useTerminalTodos(runningTabIds: string[]): TabTodosMap {
   useEffect(() => {
     // 接続がなければ作成
     if (!socketRef.current) {
-      const socket = io(FASTIFY_API_BASE, { transports: ['websocket'] });
+      const socket = io(getServerUrl(), { transports: ['websocket'] });
       socketRef.current = socket;
 
       socket.on('todos-updated', ({ sessionId, todos }: { sessionId: string; todos: Todo[] }) => {

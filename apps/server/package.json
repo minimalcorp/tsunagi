@@ -1,0 +1,48 @@
+{
+  "name": "@minimalcorp/tsunagi-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fastify API server for tsunagi",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:migrate": "mkdir -p \"$HOME/.tsunagi/state\" && npx prisma migrate deploy && npm run db:generate",
+    "dev": "npm run dev:migrate && tsx watch src/index.ts",
+    "build": "npm run db:generate && tsc -p tsconfig.json",
+    "clean": "rm -rf dist src/generated",
+    "lint": "eslint",
+    "type-check": "tsc --noEmit",
+    "db:migrate": "npx prisma migrate dev",
+    "db:generate": "npx prisma generate",
+    "db:studio": "npx prisma studio",
+    "db:migrate-from-json": "tsx scripts/migrate-to-sqlite.ts",
+    "db:backup": "tsx scripts/db-backup.ts",
+    "db:restore": "tsx scripts/db-restore.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@libsql/client": "0.8.1",
+    "@minimalcorp/tsunagi-shared": "*",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@prisma/adapter-libsql": "^7.3.0",
+    "@prisma/client": "^7.3.0",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.8.2",
+    "fastify-socket.io": "^5.1.0",
+    "node-pty": "^1.1.0",
+    "prisma": "^7.3.0",
+    "simple-git": "^3.30.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.30",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^9",
+    "eslint-config-prettier": "^10.1.8",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.3"
+  }
+}

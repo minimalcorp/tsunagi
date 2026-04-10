@@ -2,9 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { Task } from '@/lib/types';
-
-const FASTIFY_API_BASE = 'http://localhost:2792';
+import type { Task } from '@minimalcorp/tsunagi-shared';
+import { getServerUrl } from '@/lib/api-url';
 
 interface TaskEventCallbacks {
   onTaskCreated: (task: Task) => void;
@@ -21,7 +20,7 @@ export function useTaskEvents(callbacks: TaskEventCallbacks) {
   });
 
   useEffect(() => {
-    const socket = io(FASTIFY_API_BASE, { transports: ['websocket'] });
+    const socket = io(getServerUrl(), { transports: ['websocket'] });
     socketRef.current = socket;
 
     socket.on('task:created', ({ task }: { task: Task }) => {

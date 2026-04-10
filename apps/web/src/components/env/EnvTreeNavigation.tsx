@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { EnvNodeItem, type TreeNode } from './EnvNodeItem';
+import { apiUrl } from '@/lib/api-url';
 
 export interface SelectedNode {
   scope: 'global' | 'owner' | 'repo';
@@ -53,7 +54,7 @@ export function EnvTreeNavigation({
     const loadTree = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/owners');
+        const response = await fetch(apiUrl('/api/owners'));
         if (!response.ok) throw new Error('Failed to fetch owners');
 
         const data = await response.json();

@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Repository
+model Repository {
+  id        String   @id @default(uuid())
+  owner     String
+  repo      String
+  cloneUrl  String   @map("clone_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tasks           Task[]
+  environmentVars EnvironmentVariable[]
+
+  @@unique([owner, repo])
+  @@map("repositories")
+}
+
+// Task
+model Task {
+  id             String    @id @default(uuid())
+  title          String
+  description    String
+  status         String    // 'backlog' | 'planning' | 'coding' | 'reviewing' | 'done'
+  owner          String
+  repo           String
+  branch             String
+  baseBranch         String  @map("base_branch") // rebase/merge判定用のベースブランチ
+  repoId             String  @map("repo_id")
+  worktreeStatus     String  @map("worktree_status") // 'pending' | 'created' | 'error'
+
+  // Pull Request情報
+  pullRequestUrl String?   @map("pull_request_url")
+
+  effort         Int?
+  order          Int?
+  deletedAt      DateTime? @map("deleted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  repository Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  tabs       Tab[]
+
+  @@index([owner, repo])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("tasks")
+}
+
+// Tab
+model Tab {
+  tabId        String    @id @map("tab_id")
+  taskId       String    @map("task_id")
+  order        Int       // タブ表示用の連番
+  status       String    // 'idle' | 'running' | 'success' | 'error'
+  createdAt    DateTime  @default(now()) @map("created_at")
+  startedAt    DateTime  @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  todos        String?   @default("[]") // JSON: Todo[]
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("tabs")
+}
+
+// PlannerTab - プランナーClaude用のタブ（タスクに紐づかない）
+model PlannerTab {
+  tabId        String    @id @map("tab_id")
+  order        Int
+  status       String    // 'idle' | 'running' | 'success' | 'error'
+  createdAt    DateTime  @default(now()) @map("created_at")
+  startedAt    DateTime  @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("planner_tabs")
+}
+
+// EnvironmentVariable
+model EnvironmentVariable {
+  id        String   @id @default(uuid())
+  key       String
+  value     String
+  scope     String   // 'global' | 'owner' | 'repo' - 階層構造の優先順位制御
+  owner     String?
+  repo      String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  repository Repository? @relation(fields: [owner, repo], references: [owner, repo], onDelete: Cascade)
+
+  @@unique([key, scope, owner, repo])
+  @@index([scope, owner, repo])
+  @@map("environment_variables")
+}
+

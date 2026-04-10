@@ -1,0 +1,80 @@
+{
+  "name": "@minimalcorp/tsunagi",
+  "version": "0.0.5",
+  "description": "Multi-repo GitHub project management with Claude AI integration, designed for visualizing and controlling AI-driven development locally.",
+  "keywords": [
+    "tsunagi",
+    "claude",
+    "claude-code",
+    "ai",
+    "agent",
+    "task-management",
+    "worktree",
+    "github",
+    "developer-tools"
+  ],
+  "homepage": "https://github.com/minimalcorp/tsunagi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/minimalcorp/tsunagi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/minimalcorp/tsunagi/issues"
+  },
+  "author": "minimalcorp",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "type": "module",
+  "bin": {
+    "tsunagi": "./dist/cli.js"
+  },
+  "files": [
+    "dist/**/*",
+    "prisma/schema.prisma",
+    "prisma/migrations/**/*",
+    "prisma.config.ts",
+    ".next/standalone/**/*",
+    "scripts/fix-node-pty-permissions.cjs",
+    "tsunagi-marketplace/**/*",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsx src/with-plugin.ts dev",
+    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "prepack": "npm run build -w @minimalcorp/tsunagi-shared && npm run build -w @minimalcorp/tsunagi-server && npm run build -w @minimalcorp/tsunagi-web && npm run build && node scripts/bundle.mjs",
+    "postinstall": "node scripts/fix-node-pty-permissions.cjs",
+    "lint": "eslint",
+    "type-check": "tsc --noEmit",
+    "db:migrate": "npx prisma migrate dev"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@libsql/client": "0.8.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@prisma/adapter-libsql": "^7.3.0",
+    "@prisma/client": "^7.3.0",
+    "concurrently": "^9.2.1",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.8.2",
+    "fastify-socket.io": "^5.1.0",
+    "node-pty": "^1.1.0",
+    "prisma": "^7.3.0",
+    "simple-git": "^3.30.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.30",
+    "eslint": "^9",
+    "eslint-config-prettier": "^10.1.8",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.3"
+  }
+}

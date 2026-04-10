@@ -18,8 +18,7 @@ import { Loader2, Copy, Play, Check, SquarePen } from 'lucide-react';
 import { MonacoEditorModal } from '@/components/MonacoEditorModal';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-
-const FASTIFY_API_BASE = 'http://localhost:2792';
+import { apiUrl, getServerUrl } from '@/lib/api-url';
 
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
 export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
@@ -363,7 +362,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     setStatus('connecting');
 
     try {
-      const res = await fetch(`${FASTIFY_API_BASE}/api/terminal/sessions`, {
+      const res = await fetch(apiUrl('/api/terminal/sessions'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cwd, env, worktreePath, sessionId, command }),
@@ -398,7 +397,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   }
 
   function connectSocket(sessionId: string, reused: boolean, term: Terminal, signal: AbortSignal) {
-    const socket = io(FASTIFY_API_BASE, { transports: ['websocket'] });
+    const socket = io(getServerUrl(), { transports: ['websocket'] });
     socketRef.current = socket;
     // reused時: 最初のoutputイベント（リングバッファ）受信後にリサイズを再送する
     let firstMessageHandled = false;

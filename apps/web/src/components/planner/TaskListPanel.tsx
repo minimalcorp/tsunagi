@@ -1,6 +1,6 @@
 'use client';
 
-import type { Task, Repository } from '@/lib/types';
+import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
 import { SearchAndFilterBar, type FilterState } from '@/components/planner/FilterBar';
 import { TaskList } from '@/components/planner/TaskList';
 

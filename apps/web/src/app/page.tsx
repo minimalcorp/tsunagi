@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Task, Repository } from '@/lib/types';
+import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
 import { Header } from '@/components/Header';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
 import { TaskDialog } from '@/components/TaskDialog';
@@ -16,6 +16,7 @@ import { useTerminalTodos } from '@/hooks/useTerminalTodos';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
 import { toaster } from '@/lib/toaster';
+import { apiUrl } from '@/lib/api-url';
 
 export default function Home() {
   const router = useRouter();
@@ -105,9 +106,9 @@ export default function Home() {
     setIsLoading(true);
     try {
       const [tasksData, ownersData, envData] = await Promise.all([
-        fetch('/api/tasks').then((r) => r.json()),
-        fetch('/api/owners').then((r) => r.json()),
-        fetch('/api/env').then((r) => r.json()),
+        fetch(apiUrl('/api/tasks')).then((r) => r.json()),
+        fetch(apiUrl('/api/owners')).then((r) => r.json()),
+        fetch(apiUrl('/api/env')).then((r) => r.json()),
       ]);
 
       setTasks(tasksData.data.tasks);
@@ -256,7 +257,7 @@ export default function Home() {
     try {
       await Promise.all(
         reorderedTasks.map((task, index) =>
-          fetch(`/api/tasks/${task.id}`, {
+          fetch(apiUrl(`/api/tasks/${task.id}`), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order: index }),
@@ -270,7 +271,7 @@ export default function Home() {
 
   const handleCloneRepository = async (cloneData: { gitUrl: string; authToken?: string }) => {
     try {
-      const response = await fetch('/api/clone', {
+      const response = await fetch(apiUrl('/api/clone'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cloneData),
