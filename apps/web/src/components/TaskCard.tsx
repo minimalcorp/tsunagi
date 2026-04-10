@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
-import type { Task } from '@/lib/types';
+import type { Task } from '@minimalcorp/tsunagi-shared';
 import { ClaudeState } from '@/components/ClaudeState';
 import { getClaudeStatus } from '@/lib/claude-status';
 import { Progress } from '@/components/ui/progress';

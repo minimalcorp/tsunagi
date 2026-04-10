@@ -1,4 +1,4 @@
-import type { Tab } from './types';
+import type { Tab } from '@minimalcorp/tsunagi-shared';
 
 export type TabStatus = 'idle' | 'running' | 'waiting' | 'success' | 'error';
 

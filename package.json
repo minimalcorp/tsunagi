@@ -13,7 +13,8 @@
     "node": ">=20"
   },
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "concurrently --kill-others --names web,docs --prefix-colors blue,magenta \"npm run dev -w @minimalcorp/tsunagi\" \"npm run dev -w tsunagi-docs\"",

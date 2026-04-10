@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, X, Check } from 'lucide-react';
+import { apiUrl } from '@/lib/api-url';
 import { EnvVariableItem, type EnvironmentVariable } from './EnvVariableItem';
 import type { SelectedNode } from './EnvTreeNavigation';
 import { LoadingSpinner } from '../LoadingSpinner';
@@ -34,7 +35,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
         if (selectedNode.owner) params.set('owner', selectedNode.owner);
         if (selectedNode.repo) params.set('repo', selectedNode.repo);
 
-        const response = await fetch(`/api/env/list?${params}`);
+        const response = await fetch(apiUrl(`/api/env/list?${params}`));
         if (!response.ok) throw new Error('Failed to fetch environment variables');
 
         const data = await response.json();
@@ -80,7 +81,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
     }
 
     try {
-      const response = await fetch('/api/env/toggle', {
+      const response = await fetch(apiUrl('/api/env/toggle'), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +117,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
       if (selectedNode.owner) params.set('owner', selectedNode.owner);
       if (selectedNode.repo) params.set('repo', selectedNode.repo);
 
-      const response = await fetch(`/api/env?${params}`, {
+      const response = await fetch(apiUrl(`/api/env?${params}`), {
         method: 'DELETE',
       });
 
@@ -132,7 +133,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
 
   const handleUpdate = async (key: string, value: string) => {
     try {
-      const response = await fetch('/api/env', {
+      const response = await fetch(apiUrl('/api/env'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -194,7 +195,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
     }
 
     try {
-      const response = await fetch('/api/env', {
+      const response = await fetch(apiUrl('/api/env'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -213,7 +214,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
       if (selectedNode.owner) params.set('owner', selectedNode.owner);
       if (selectedNode.repo) params.set('repo', selectedNode.repo);
 
-      const listResponse = await fetch(`/api/env/list?${params}`);
+      const listResponse = await fetch(apiUrl(`/api/env/list?${params}`));
       if (listResponse.ok) {
         const data = await listResponse.json();
         const allVars = data.data.envVars || [];

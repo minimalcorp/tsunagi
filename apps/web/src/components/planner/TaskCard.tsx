@@ -13,7 +13,7 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
-import type { Task } from '@/lib/types';
+import type { Task } from '@minimalcorp/tsunagi-shared';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';

@@ -27,6 +27,12 @@ jobs:
       - name: Run linter
         run: npm run lint
 
+      - name: Build shared types
+        run: npm run build -w @minimalcorp/tsunagi-shared
+
+      - name: Generate Prisma client
+        run: npm run db:generate -w @minimalcorp/tsunagi-server
+
       - name: Run type-check
         run: npm run type-check
 

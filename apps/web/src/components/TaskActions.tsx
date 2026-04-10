@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import type { Task } from '@/lib/types';
+import type { Task } from '@minimalcorp/tsunagi-shared';
 import { normalizeBranchName } from '@/lib/branch-utils';
 import { Code2, Trash2 } from 'lucide-react';
+import { apiUrl } from '@/lib/api-url';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmDialog } from './ui/Dialog';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ export function TaskActions({ task, onDelete }: TaskActionsProps) {
     const notificationId = toast.loading('Opening VS Code...', worktreePath);
 
     try {
-      const response = await fetch('/api/commands/open', {
+      const response = await fetch(apiUrl('/api/commands/open'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

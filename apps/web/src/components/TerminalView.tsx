@@ -18,8 +18,7 @@ import { Loader2, Copy, Play, Check, SquarePen } from 'lucide-react';
 import { MonacoEditorModal } from '@/components/MonacoEditorModal';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-
-const FASTIFY_API_BASE = 'http://localhost:2792';
+import { apiUrl, getServerUrl } from '@/lib/api-url';
 
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
 export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
@@ -196,6 +195,16 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       return true;
     });
 
+    // alt screen (1049) から main screen に復帰した際、xterm.js は内部バッファを切り替えるが
+    // キャンバスの再描画は変更があった行のみに最適化されているため、上部の行が再描画されず
+    // 余白として見える問題がある（ネイティブターミナルでは発生しない xterm.js 固有の挙動）。
+    // onBufferChange で normal buffer への切り替えを検知し、refresh() で全行を強制再描画する。
+    term.buffer.onBufferChange((buf) => {
+      if (buf.type === 'normal') {
+        term.refresh(0, term.rows - 1);
+      }
+    });
+
     // xterm.js は CompositionHelper 内で composition 中のキーストロークを内部で抑制し、
     // compositionend 後の setTimeout で確定テキストのみ triggerDataEvent → onData で通知する。
     // そのため我々が compositionstart/end を監視して onData をガードする必要はない。
@@ -244,35 +253,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     }
     function handleEditorSessionDone() {
       isExternalEditorOpenRef.current = false;
-      // claude 2.1.94 は $EDITOR 終了後に Ink の内部状態と実画面の position がズレて
-      // 余白が発生する。実ブラウザリサイズでは直ることを確認済みなので、
-      // プログラム側から疑似的な dimension 変化 (bump-then-restore) を注入して
-      // Node.js の 'resize' event → Ink の full re-layout を強制発火させる。
-      //
-      // 注意点:
-      // - Node.js の 'resize' event は process.stdout の cols/rows が実際に
-      //   変化した時のみ発火するため、同サイズ resize では効かない。
-      // - 200ms 遅延: monaco-editor.sh が polling から exit して foreground PG が
-      //   claude に戻るのを待つ。sh が前景にいる間に resize すると SIGWINCH が
-      //   sh に届いてしまう。
-      // - rows+1: 一瞬増やす方向にすることで、入力欄が画面外に押し出される
-      //   flicker を避ける (rows-1 だと入力欄が 1 行上に動くのが見える)。
-      // - 30ms の間隔: 2 回の resize を別 tick で処理させて、Node 側で集約され
-      //   てしまうのを防ぐ。
-      setTimeout(() => {
-        const socket = socketRef.current;
-        const sid = sessionIdRef.current;
-        const term = termRef.current;
-        if (!socket?.connected || !sid || !term) return;
-        socket.emit('resize', { sessionId: sid, cols: term.cols, rows: term.rows + 1 });
-        setTimeout(() => {
-          const t = termRef.current;
-          const s = socketRef.current;
-          if (s?.connected && sid && t) {
-            s.emit('resize', { sessionId: sid, cols: t.cols, rows: t.rows });
-          }
-        }, 30);
-      }, 200);
       // アクティブタブのみフォーカスを復帰する
       if (!isActiveRef.current) return;
       // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない）
@@ -363,7 +343,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     setStatus('connecting');
 
     try {
-      const res = await fetch(`${FASTIFY_API_BASE}/api/terminal/sessions`, {
+      const res = await fetch(apiUrl('/api/terminal/sessions'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cwd, env, worktreePath, sessionId, command }),
@@ -398,7 +378,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   }
 
   function connectSocket(sessionId: string, reused: boolean, term: Terminal, signal: AbortSignal) {
-    const socket = io(FASTIFY_API_BASE, { transports: ['websocket'] });
+    const socket = io(getServerUrl(), { transports: ['websocket'] });
     socketRef.current = socket;
     // reused時: 最初のoutputイベント（リングバッファ）受信後にリサイズを再送する
     let firstMessageHandled = false;

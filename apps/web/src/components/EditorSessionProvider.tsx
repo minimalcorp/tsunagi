@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { MonacoEditorModal } from '@/components/MonacoEditorModal';
-
-const FASTIFY_API_BASE = 'http://localhost:2792';
+import { apiUrl } from '@/lib/api-url';
 
 interface EditorSession {
   sessionId: string;
@@ -44,7 +43,7 @@ export function EditorSessionProvider() {
 
   async function handleSubmit(text: string) {
     if (!session) return;
-    await fetch(`${FASTIFY_API_BASE}/api/editor/session/${session.sessionId}/complete`, {
+    await fetch(apiUrl(`/api/editor/session/${session.sessionId}/complete`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: text }),
@@ -56,7 +55,7 @@ export function EditorSessionProvider() {
     if (!session) return;
     // Cancel / Esc / × ボタンで閉じた場合、元のコンテンツで complete を呼ぶ。
     // これにより shell script が正常終了し、Claude Code は元の状態に戻る。
-    await fetch(`${FASTIFY_API_BASE}/api/editor/session/${session.sessionId}/complete`, {
+    await fetch(apiUrl(`/api/editor/session/${session.sessionId}/complete`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: session.content }),
