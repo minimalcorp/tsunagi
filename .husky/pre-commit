@@ -1,2 +1,4 @@
+npm run build -w @minimalcorp/tsunagi-shared
+npm run db:generate -w @minimalcorp/tsunagi-server
 npx lint-staged
 npm run type-check

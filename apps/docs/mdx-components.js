@@ -15,10 +15,7 @@ function Screenshot({ src, alt }) {
     typeof src === 'string' && src.startsWith('/') && !src.startsWith('//')
       ? `${basePath}${src}`
       : src;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={resolved} alt={alt} style={{ maxWidth: '100%', maxHeight: '80vh' }} />
-  );
+  return <img src={resolved} alt={alt} style={{ maxWidth: '100%', maxHeight: '80vh' }} />;
 }
 
 export function useMDXComponents(components) {
