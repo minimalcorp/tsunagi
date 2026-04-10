@@ -40,6 +40,26 @@ function log(msg: string): void {
   console.log(`[tsunagi:plugin] ${msg}`);
 }
 
+/** プラグインがインストール済みか確認する */
+function isPluginInstalled(): boolean {
+  try {
+    const output = execSync('claude plugin list', { stdio: 'pipe' }).toString();
+    return output.includes(PLUGIN_REF);
+  } catch {
+    return false;
+  }
+}
+
+/** marketplaceが登録済みか確認する */
+function isMarketplaceAdded(): boolean {
+  try {
+    const output = execSync('claude plugin marketplace list', { stdio: 'pipe' }).toString();
+    return output.includes(MARKETPLACE_NAME);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Run a `claude` CLI command. Returns true on success, false on failure.
  * Logs stderr on failure to aid debugging.
@@ -64,8 +84,13 @@ function runClaude(args: string): boolean {
  */
 export function ensureCleanPluginState(): void {
   // Phase 1: best-effort cleanup of any orphaned state from a previous run.
-  runClaude(`plugin uninstall ${PLUGIN_REF}`);
-  runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`);
+  // Check existence first to avoid error output when plugin is not installed (normal first-boot case).
+  if (isPluginInstalled()) {
+    runClaude(`plugin uninstall ${PLUGIN_REF}`);
+  }
+  if (isMarketplaceAdded()) {
+    runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`);
+  }
 
   // Phase 2: clean install. Failures here are fatal.
   const marketplaceDir = getMarketplaceDir();
