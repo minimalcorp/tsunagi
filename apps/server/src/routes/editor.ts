@@ -34,6 +34,7 @@ export async function editorRoutes(fastify: FastifyInstance) {
         content,
         status: 'pending',
         createdAt: Date.now(),
+        tabId: tabId ?? null,
       });
 
       // tabIdが指定されていれば、最後にinputを送信したソケットにのみ送信
@@ -74,6 +75,26 @@ export async function editorRoutes(fastify: FastifyInstance) {
       }
       await writeFile(session.filePath, request.body.content, 'utf8');
       session.status = 'done';
+
+      // sh が polling で "done" を検知して exit し claude が foreground に戻った後、
+      // cols を一瞬変えることで SIGWINCH を発火させる。
+      // rows 変更と異なり cols 変更では Ink が全画面クリア + 全 UI 再描画を行うため、
+      // $EDITOR exit 後に blank になる余白が解消される。
+      // 300ms: server が /complete を受信した時点が T=0。sh の polling(最大100ms) +
+      //        exit + claude foreground 復帰 で ~150ms。余裕を持たせた値。
+      if (session.tabId) {
+        const ptySession = ptyManager.getSession(session.tabId);
+        if (ptySession) {
+          const { cols, rows } = ptySession.pty;
+          setTimeout(() => {
+            ptySession.pty.resize(cols + 1, rows);
+            setTimeout(() => {
+              ptySession.pty.resize(cols, rows);
+            }, 100);
+          }, 300);
+        }
+      }
+
       return reply.send({ ok: true });
     }
   );
