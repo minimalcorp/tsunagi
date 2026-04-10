@@ -10,9 +10,12 @@ import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
 import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
 import { Button } from '@/components/ui/button';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export default function SettingsPage() {
   const router = useRouter();
+
+  useDocumentTitle('settings');
 
   // Initialize selectedNode from localStorage or default to Global
   const getInitialNode = (): SelectedNode => {
