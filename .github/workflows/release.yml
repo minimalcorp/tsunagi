@@ -100,6 +100,8 @@ jobs:
 
       - name: Bump version (workspace)
         id: bump
+        env:
+          HUSKY: '0'
         run: |
           npm version "${{ inputs.version }}" --workspace=@minimalcorp/tsunagi
           NEW_VERSION=$(node -p "require('./apps/cli/package.json').version")
@@ -196,12 +198,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build shared types
-        run: npm run build -w @minimalcorp/tsunagi-shared
-
-      - name: Generate Prisma client (server)
-        run: npm run db:generate -w @minimalcorp/tsunagi-server
-
       - name: Configure git author
         run: |
           git config user.name "github-actions[bot]"
@@ -209,6 +205,8 @@ jobs:
 
       - name: Bump version (docs)
         id: bump
+        env:
+          HUSKY: '0'
         run: |
           npm version "${{ inputs.version }}" --workspace=tsunagi-docs
           NEW_VERSION=$(node -p "require('./apps/docs/package.json').version")
@@ -237,8 +235,6 @@ jobs:
             fi
             git tag -a "docs-v${NEW_VERSION}" -m "Release docs-v${NEW_VERSION}"
             npm ci
-            npm run build -w @minimalcorp/tsunagi-shared
-            npm run db:generate -w @minimalcorp/tsunagi-server
             sleep 2
           done
           echo "::error::Push failed after 3 attempts"
