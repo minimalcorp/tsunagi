@@ -110,6 +110,9 @@ function shutdown(code: number): void {
 
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
+process.on('exit', () => {
+  if (!shuttingDown) cleanupPluginState();
+});
 
 fastifyChild.on('exit', (code) => {
   console.error(`[tsunagi] Fastify server exited with code ${code}`);
