@@ -100,6 +100,8 @@ jobs:
 
       - name: Bump version (workspace)
         id: bump
+        env:
+          HUSKY: '0'
         run: |
           npm version "${{ inputs.version }}" --workspace=@minimalcorp/tsunagi
           NEW_VERSION=$(node -p "require('./apps/cli/package.json').version")
@@ -203,6 +205,8 @@ jobs:
 
       - name: Bump version (docs)
         id: bump
+        env:
+          HUSKY: '0'
         run: |
           npm version "${{ inputs.version }}" --workspace=tsunagi-docs
           NEW_VERSION=$(node -p "require('./apps/docs/package.json').version")
