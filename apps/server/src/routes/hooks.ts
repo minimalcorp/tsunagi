@@ -41,16 +41,19 @@ export const hookEvents: HookEvent[] = [];
 interface TaskEntry {
   id: string;
   subject: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'deleted';
 }
 
 const sessionTasks = new Map<string, Map<string, TaskEntry>>();
 
-/** TaskEntryリストをTodo形式に変換 */
+/**
+ * TaskEntryリストをTodo形式に変換。
+ * 'deleted' を含めて全 status を pass-through し、表示時のフィルタは frontend 側に任せる。
+ */
 function tasksToTodos(tasks: Map<string, TaskEntry>) {
   return Array.from(tasks.values()).map((t) => ({
     content: t.subject,
-    status: t.status === 'in_progress' ? ('in_progress' as const) : t.status,
+    status: t.status,
   }));
 }
 
@@ -160,16 +163,23 @@ export async function hooksRoutes(fastify: FastifyInstance) {
             }
           }
 
-          // TaskUpdate: タスクのステータスを更新
+          // TaskUpdate: タスクのステータスを更新（'deleted' 含む。Mapからは除去せず保持し、表示層で除外）
           if (body.tool_name === 'TaskUpdate' && body.tool_response && body.tool_input) {
             const taskId = body.tool_input.taskId as string | undefined;
-            const statusChange = body.tool_response.statusChange as { to: string } | undefined;
+            // tool_input.status を優先（直接入力なので確実）、フォールバックで tool_response.statusChange.to
+            const newStatus =
+              (body.tool_input.status as string | undefined) ??
+              (body.tool_response.statusChange as { to: string } | undefined)?.to;
             const tasks = sessionTasks.get(sessionId);
-            if (tasks && taskId && statusChange?.to) {
+            if (tasks && taskId && newStatus) {
               const entry = tasks.get(taskId);
               if (entry) {
-                entry.status = statusChange.to as TaskEntry['status'];
+                entry.status = newStatus as TaskEntry['status'];
                 const todos = tasksToTodos(tasks);
+                fastify.log.info(
+                  { sessionId, taskId, newStatus, mapSize: tasks.size },
+                  '[hooks] TaskUpdate processed'
+                );
                 await updateTabStatus(sessionId, 'running', todos);
                 io.to(room).emit('todos-updated', { sessionId, todos });
                 todosUpdated = true;

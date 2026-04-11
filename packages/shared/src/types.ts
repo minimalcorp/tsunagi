@@ -24,10 +24,11 @@ export interface Task {
   worktreePath?: string; // worktreeのフルパス（APIから返される）
 }
 
-// Todo型（Claude TodoWrite hook由来）
+// Todo型（Claude TodoWrite / TaskCreate / TaskUpdate hook由来）
+// 'deleted' はデータ層で保持し、表示層（progress bar等）で除外する
 export interface Todo {
   content: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'deleted';
 }
 
 // Tab型（タブとメッセージ履歴を分離）

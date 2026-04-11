@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 
 export interface TabTodo {
   content: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'deleted';
 }
 
 interface TaskCardProps {
@@ -33,10 +33,12 @@ export function TaskCard({ task, isDragging, dragHandleProps, tabTodosMap }: Tas
     .filter((tab) => tab !== runningTab)
     .flatMap((tab) => tab.todos ?? []);
   const allTodos = [...nonRunningTodos, ...runningTodos];
-  const completedTodos = allTodos.filter((t) => t.status === 'completed').length;
-  const totalTodos = allTodos.length;
+  // 表示層で 'deleted' を除外して分母・完了数を計算（データ層には保持したまま）
+  const visibleTodos = allTodos.filter((t) => t.status !== 'deleted');
+  const completedTodos = visibleTodos.filter((t) => t.status === 'completed').length;
+  const totalTodos = visibleTodos.length;
   const showProgressBar = totalTodos > 0;
-  const currentTodo = allTodos.find((t) => t.status === 'in_progress');
+  const currentTodo = visibleTodos.find((t) => t.status === 'in_progress');
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     // ドラッグ中はリンク遷移を防止
