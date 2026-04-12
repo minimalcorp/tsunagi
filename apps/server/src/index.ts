@@ -23,18 +23,24 @@ import { editorRoutes } from './routes/editor.js';
 
 const PORT = 2792;
 
+const extraOrigins = (process.env.TSUNAGI_EXTRA_CORS_ORIGINS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const corsOrigins = ['http://localhost:2791', ...extraOrigins];
+
 async function start() {
   const fastify = Fastify({ logger: true });
 
   await fastify.register(fastifyCors, {
-    origin: ['http://localhost:2791'],
+    origin: corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   await fastify.register(fastifySocketIO, {
     transports: ['websocket'],
     cors: {
-      origin: ['http://localhost:2791'],
+      origin: corsOrigins,
     },
   });
 

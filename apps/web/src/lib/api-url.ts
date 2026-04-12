@@ -14,11 +14,15 @@
 const FASTIFY_PORT = 2792;
 
 export function getServerUrl(): string {
+  // 明示的な上書き（Docker ephemeral 環境、reverse proxy 等）
+  const override = process.env.NEXT_PUBLIC_TSUNAGI_SERVER_URL;
+  if (override) return override;
+
   if (typeof window !== 'undefined') {
     const { protocol, hostname } = window.location;
     return `${protocol}//${hostname}:${FASTIFY_PORT}`;
   }
-  return process.env.NEXT_PUBLIC_TSUNAGI_SERVER_URL ?? `http://localhost:${FASTIFY_PORT}`;
+  return `http://localhost:${FASTIFY_PORT}`;
 }
 
 /**
