@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { ChildProcess, spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as http from 'node:http';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle.js';
@@ -129,8 +130,6 @@ verifyArtifact(FASTIFY_ENTRY_JS, 'Fastify server artifact');
 verifyArtifact(NEXT_STANDALONE_ENTRY, 'Next.js standalone artifact');
 
 const PORT = process.env.PORT ?? '2791';
-let serverReady = false;
-let webReady = false;
 
 const spinner = createSpinner('Initializing...');
 
@@ -147,43 +146,51 @@ const nextChild: ChildProcess = spawn(process.execPath, [NEXT_STANDALONE_ENTRY],
 });
 
 // ---------------------------------------------------------------------------
-// Ready detection
+// Child process output forwarding
 // ---------------------------------------------------------------------------
-function onBothReady(): void {
-  spinner.stop();
-  console.log(TSUNAGI_AA);
-  console.log(`Open http://localhost:${PORT}`);
-}
-
-function checkReady(): void {
-  if (serverReady && webReady) onBothReady();
-}
-
 fastifyChild.stdout?.on('data', (data: Buffer) => {
-  const msg = data.toString();
-  if (isDebug) process.stdout.write(msg);
-  if (!serverReady && msg.includes('Fastify server running on port')) {
-    serverReady = true;
-    checkReady();
-  }
+  if (isDebug) process.stdout.write(data);
 });
-
 fastifyChild.stderr?.on('data', (data: Buffer) => {
   process.stderr.write(data);
 });
-
 nextChild.stdout?.on('data', (data: Buffer) => {
-  const msg = data.toString();
-  if (isDebug) process.stdout.write(msg);
-  // Next.js standalone logs: "✓ Ready in Xms" or "Listening on port XXXX"
-  if (!webReady && (msg.includes('Ready in') || msg.includes(`Listening on`))) {
-    webReady = true;
-    checkReady();
-  }
+  if (isDebug) process.stdout.write(data);
 });
-
 nextChild.stderr?.on('data', (data: Buffer) => {
   process.stderr.write(data);
+});
+
+// ---------------------------------------------------------------------------
+// Ready detection via /health polling
+// ---------------------------------------------------------------------------
+const SERVER_PORT = 2792;
+const POLL_INTERVAL_MS = 300;
+
+function pollHealth(port: number): Promise<void> {
+  return new Promise((resolve) => {
+    const poll = () => {
+      const req = http.get(`http://localhost:${port}/health`, (res) => {
+        if (res.statusCode === 200) {
+          res.resume();
+          resolve();
+        } else {
+          res.resume();
+          setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      });
+      req.on('error', () => {
+        setTimeout(poll, POLL_INTERVAL_MS);
+      });
+    };
+    poll();
+  });
+}
+
+Promise.all([pollHealth(SERVER_PORT), pollHealth(Number(PORT))]).then(() => {
+  spinner.stop();
+  console.log(TSUNAGI_AA);
+  console.log(`Open http://localhost:${PORT}`);
 });
 
 // ---------------------------------------------------------------------------

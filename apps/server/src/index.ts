@@ -41,6 +41,8 @@ async function start() {
   });
   fastify.decorate('io', io);
 
+  fastify.get('/health', async () => ({ status: 'ok' }));
+
   await fastify.register(tasksRoutes, { prefix: '/api' });
   await fastify.register(reposRoutes, { prefix: '/api' });
   await fastify.register(envRoutes, { prefix: '/api' });
