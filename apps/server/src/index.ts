@@ -1,12 +1,6 @@
-import Fastify, { type FastifyPluginAsync, type FastifyPluginOptions } from 'fastify';
+import Fastify from 'fastify';
 import fastifyCors from '@fastify/cors';
-import * as fastifySocketIONs from 'fastify-socket.io';
-const fastifySocketIO = ((
-  fastifySocketIONs as unknown as {
-    default?: FastifyPluginAsync<FastifyPluginOptions>;
-  }
-).default ??
-  (fastifySocketIONs as unknown as FastifyPluginAsync<FastifyPluginOptions>)) as FastifyPluginAsync<FastifyPluginOptions>;
+import { Server as SocketIOServer } from 'socket.io';
 
 import { tasksRoutes } from './routes/tasks.js';
 import { reposRoutes } from './routes/repos.js';
@@ -37,12 +31,11 @@ async function start() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
-  await fastify.register(fastifySocketIO, {
+  const io = new SocketIOServer(fastify.server, {
     transports: ['websocket'],
-    cors: {
-      origin: corsOrigins,
-    },
+    cors: { origin: corsOrigins },
   });
+  fastify.decorate('io', io);
 
   await fastify.register(tasksRoutes, { prefix: '/api' });
   await fastify.register(reposRoutes, { prefix: '/api' });
