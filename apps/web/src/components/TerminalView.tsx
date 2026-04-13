@@ -25,7 +25,7 @@ export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure
 
 export interface Todo {
   content: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'deleted';
 }
 
 interface TerminalViewProps {
@@ -505,8 +505,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const isPausedOrExited = status === 'paused' || status === 'exited' || status === 'error';
   const isConnected = status === 'connected';
 
-  const completedTodos = todos.filter((t) => t.status === 'completed').length;
-  const totalTodos = todos.length;
+  // 表示層で 'deleted' を除外して分母・完了数を計算
+  const visibleTodos = todos.filter((t) => t.status !== 'deleted');
+  const completedTodos = visibleTodos.filter((t) => t.status === 'completed').length;
+  const totalTodos = visibleTodos.length;
 
   // 短縮表示用UUID（先頭8文字 + …）
   const shortTabId = tabId.length > 8 ? `${tabId.slice(0, 8)}…` : tabId;
