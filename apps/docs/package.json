@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --port 2793",
     "build": "next build",
-    "postbuild": "pagefind --site out --output-subdir _pagefind",
+    "postbuild": "node scripts/fix-html-lang.js && pagefind --site out --output-subdir _pagefind",
     "start": "next start --port 2793",
     "lint": "eslint",
     "type-check": "tsc --noEmit"
