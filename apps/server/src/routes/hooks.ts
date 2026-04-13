@@ -41,16 +41,19 @@ export const hookEvents: HookEvent[] = [];
 interface TaskEntry {
   id: string;
   subject: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'deleted';
 }
 
 const sessionTasks = new Map<string, Map<string, TaskEntry>>();
 
-/** TaskEntryリストをTodo形式に変換 */
+/**
+ * TaskEntryリストをTodo形式に変換。
+ * 'deleted' を含めて全 status を pass-through し、表示時のフィルタは frontend 側に任せる。
+ */
 function tasksToTodos(tasks: Map<string, TaskEntry>) {
   return Array.from(tasks.values()).map((t) => ({
     content: t.subject,
-    status: t.status === 'in_progress' ? ('in_progress' as const) : t.status,
+    status: t.status,
   }));
 }
 
@@ -59,17 +62,19 @@ async function updateTabStatus(
   sessionId: string,
   status: string,
   todos?: unknown[]
-): Promise<void> {
+): Promise<{ count: number }> {
   try {
-    await prisma.tab.updateMany({
+    const result = await prisma.tab.updateMany({
       where: { tabId: sessionId },
       data: {
         status,
         ...(todos !== undefined && { todos: JSON.stringify(todos) }),
       },
     });
+    return { count: result.count };
   } catch (err) {
     console.warn(`[hooks] Failed to update tab status in DB:`, err);
+    return { count: 0 };
   }
 }
 
@@ -125,7 +130,15 @@ export async function hooksRoutes(fastify: FastifyInstance) {
               status: 'pending' | 'in_progress' | 'completed';
             }>;
             if (Array.isArray(todos)) {
-              await updateTabStatus(sessionId, 'running', todos);
+              fastify.log.info(
+                { sessionId, todosCount: todos.length },
+                '[hooks] TodoWrite received'
+              );
+              const { count } = await updateTabStatus(sessionId, 'running', todos);
+              fastify.log.info(
+                { sessionId, updatedTabCount: count },
+                '[hooks] TodoWrite tab updated'
+              );
               io.to(room).emit('todos-updated', { sessionId, todos });
               todosUpdated = true;
             }
@@ -150,16 +163,23 @@ export async function hooksRoutes(fastify: FastifyInstance) {
             }
           }
 
-          // TaskUpdate: タスクのステータスを更新
+          // TaskUpdate: タスクのステータスを更新（'deleted' 含む。Mapからは除去せず保持し、表示層で除外）
           if (body.tool_name === 'TaskUpdate' && body.tool_response && body.tool_input) {
             const taskId = body.tool_input.taskId as string | undefined;
-            const statusChange = body.tool_response.statusChange as { to: string } | undefined;
+            // tool_input.status を優先（直接入力なので確実）、フォールバックで tool_response.statusChange.to
+            const newStatus =
+              (body.tool_input.status as string | undefined) ??
+              (body.tool_response.statusChange as { to: string } | undefined)?.to;
             const tasks = sessionTasks.get(sessionId);
-            if (tasks && taskId && statusChange?.to) {
+            if (tasks && taskId && newStatus) {
               const entry = tasks.get(taskId);
               if (entry) {
-                entry.status = statusChange.to as TaskEntry['status'];
+                entry.status = newStatus as TaskEntry['status'];
                 const todos = tasksToTodos(tasks);
+                fastify.log.info(
+                  { sessionId, taskId, newStatus, mapSize: tasks.size },
+                  '[hooks] TaskUpdate processed'
+                );
                 await updateTabStatus(sessionId, 'running', todos);
                 io.to(room).emit('todos-updated', { sessionId, todos });
                 todosUpdated = true;
@@ -185,17 +205,19 @@ export async function hooksRoutes(fastify: FastifyInstance) {
           break;
 
         case 'StopFailure':
-          // APIエラーでターン終了 → failure状態に更新
-          await updateTabStatus(sessionId, 'error');
+          // APIエラーでターン終了 → failure状態に更新、todosをクリア
+          await updateTabStatus(sessionId, 'error', []);
           io.to(room).emit('status-changed', { sessionId, status: 'failure' });
+          io.to(room).emit('todos-updated', { sessionId, todos: [] });
           break;
 
         case 'SessionEnd':
-          // セッション終了（Escキー中断・Ctrl+C・/exit等）→ idle状態に更新
+          // セッション終了（Escキー中断・Ctrl+C・/exit等）→ idle状態に更新、todosをクリア
           // reason: "prompt_input_exit" = ユーザー中断、"other" = プロセスkill等
           fastify.log.info({ sessionId, reason: body.reason }, 'SessionEnd received');
-          await updateTabStatus(sessionId, 'idle');
+          await updateTabStatus(sessionId, 'idle', []);
           io.to(room).emit('status-changed', { sessionId, status: 'idle' });
+          io.to(room).emit('todos-updated', { sessionId, todos: [] });
           break;
 
         default:

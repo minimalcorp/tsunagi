@@ -1,12 +1,6 @@
-import Fastify, { type FastifyPluginAsync, type FastifyPluginOptions } from 'fastify';
+import Fastify from 'fastify';
 import fastifyCors from '@fastify/cors';
-import * as fastifySocketIONs from 'fastify-socket.io';
-const fastifySocketIO = ((
-  fastifySocketIONs as unknown as {
-    default?: FastifyPluginAsync<FastifyPluginOptions>;
-  }
-).default ??
-  (fastifySocketIONs as unknown as FastifyPluginAsync<FastifyPluginOptions>)) as FastifyPluginAsync<FastifyPluginOptions>;
+import { Server as SocketIOServer } from 'socket.io';
 
 import { tasksRoutes } from './routes/tasks.js';
 import { reposRoutes } from './routes/repos.js';
@@ -23,20 +17,25 @@ import { editorRoutes } from './routes/editor.js';
 
 const PORT = 2792;
 
+const extraOrigins = (process.env.TSUNAGI_EXTRA_CORS_ORIGINS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const corsOrigins = ['http://localhost:2791', ...extraOrigins];
+
 async function start() {
   const fastify = Fastify({ logger: true });
 
   await fastify.register(fastifyCors, {
-    origin: ['http://localhost:2791'],
+    origin: corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
-  await fastify.register(fastifySocketIO, {
+  const io = new SocketIOServer(fastify.server, {
     transports: ['websocket'],
-    cors: {
-      origin: ['http://localhost:2791'],
-    },
+    cors: { origin: corsOrigins },
   });
+  fastify.decorate('io', io);
 
   await fastify.register(tasksRoutes, { prefix: '/api' });
   await fastify.register(reposRoutes, { prefix: '/api' });
