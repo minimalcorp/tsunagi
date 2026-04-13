@@ -36,8 +36,10 @@ function getMarketplaceDir(): string {
   return candidate;
 }
 
-function log(msg: string): void {
-  console.log(`[tsunagi:plugin] ${msg}`);
+function debugLog(msg: string): void {
+  if (process.env.TSUNAGI_DEBUG) {
+    console.log(`[tsunagi:plugin] ${msg}`);
+  }
 }
 
 /** プラグインがインストール済みか確認する */
@@ -81,10 +83,14 @@ function runClaude(args: string): boolean {
  * marketplace registrations and then installing fresh copies.
  *
  * Exits the process with code 1 on install failure.
+ *
+ * @returns `'clean'` if orphaned state was cleaned up before install,
+ *          `'fresh'` if no prior state existed.
  */
-export function ensureCleanPluginState(): void {
+export function ensureCleanPluginState(): 'clean' | 'fresh' {
   // Phase 1: best-effort cleanup of any orphaned state from a previous run.
   // Check existence first to avoid error output when plugin is not installed (normal first-boot case).
+  const hadOrphan = isPluginInstalled() || isMarketplaceAdded();
   if (isPluginInstalled()) {
     runClaude(`plugin uninstall ${PLUGIN_REF}`);
   }
@@ -100,14 +106,16 @@ export function ensureCleanPluginState(): void {
     console.error(`[tsunagi:plugin] Marketplace path: ${marketplaceDir}`);
     process.exit(1);
   }
-  log('Marketplace added');
+  debugLog('Marketplace added');
 
   if (!runClaude(`plugin install ${PLUGIN_REF} --scope user`)) {
     console.error('[tsunagi:plugin] Failed to install Claude Code plugin.');
     runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`);
     process.exit(1);
   }
-  log('Plugin installed');
+  debugLog('Plugin installed');
+
+  return hadOrphan ? 'clean' : 'fresh';
 }
 
 /**

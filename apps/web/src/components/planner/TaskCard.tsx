@@ -76,8 +76,10 @@ export function TaskCard({ task, dragHandleProps }: TaskCardProps) {
   const repoColor = getRepoColor(task.owner, task.repo);
   const isClaudeRunning = (task.tabs ?? []).some((t) => t.status === 'running');
 
-  // タブのtodosからプログレスを計算（DB永続化済み）
-  const allTodos = (task.tabs ?? []).flatMap((tab) => tab.todos ?? []);
+  // タブのtodosからプログレスを計算（DB永続化済み）。'deleted' は表示層で除外
+  const allTodos = (task.tabs ?? [])
+    .flatMap((tab) => tab.todos ?? [])
+    .filter((t) => t.status !== 'deleted');
   const completedTodos = allTodos.filter((t) => t.status === 'completed').length;
   const totalTodos = allTodos.length;
   const shortId = task.id.slice(0, 5) + '\u2026';

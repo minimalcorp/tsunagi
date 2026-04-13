@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { ChildProcess, spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as http from 'node:http';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle.js';
@@ -47,24 +48,77 @@ const NEXT_STANDALONE_ENTRY = path.join(
   'server.js'
 );
 
+const isDebug = !!process.env.TSUNAGI_DEBUG;
+const isDocker = fs.existsSync('/.dockerenv');
+
+// ---------------------------------------------------------------------------
+// Braille-dots spinner
+// ---------------------------------------------------------------------------
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+function createSpinner(message: string): { stop: () => void } {
+  let i = 0;
+  const timer = setInterval(() => {
+    process.stdout.write(`\r${SPINNER_FRAMES[i % SPINNER_FRAMES.length]} ${message}`);
+    i++;
+  }, 80);
+
+  return {
+    stop() {
+      clearInterval(timer);
+      // Clear the spinner line
+      process.stdout.write('\r' + ' '.repeat(message.length + 4) + '\r');
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// ASCII art
+// ---------------------------------------------------------------------------
+const TSUNAGI_AA = `
+  __                          _
+ / /____ __ _____  ___ ____ _(_)
+/ __(_-</ // / _ \\/ _ \`/ _ \`/ /
+\\__/___/\\_,_/_//_/\\_,_/\\_, /_/
+                      /___/
+`;
+
+// ---------------------------------------------------------------------------
+// Phase 1: Auto-migrate (synchronous child process)
+// ---------------------------------------------------------------------------
 function runAutoMigrate(): void {
   if (!fs.existsSync(AUTO_MIGRATE_JS)) {
     console.error(`[tsunagi] Missing build artifact: ${AUTO_MIGRATE_JS}`);
     process.exit(1);
   }
   const result = spawnSync(process.execPath, [AUTO_MIGRATE_JS], {
-    stdio: 'inherit',
+    stdio: isDebug ? 'inherit' : ['inherit', 'pipe', 'pipe'],
     cwd: PACKAGE_ROOT,
   });
   if (result.status !== 0) {
+    const stderr = result.stderr?.toString().trim();
+    if (stderr) console.error(stderr);
     console.error('[tsunagi] Database migration failed.');
     process.exit(result.status ?? 1);
   }
+  // Display migration result (e.g. "1 migration applied.")
+  const stdout = result.stdout?.toString().trim();
+  if (stdout) console.log(stdout);
 }
 
 runAutoMigrate();
-ensureCleanPluginState();
 
+// ---------------------------------------------------------------------------
+// Phase 2: Plugin lifecycle
+// ---------------------------------------------------------------------------
+const pluginResult = ensureCleanPluginState();
+console.log(
+  pluginResult === 'clean' ? 'clean installed tsunagi plugin' : 'installed tsunagi plugin'
+);
+
+// ---------------------------------------------------------------------------
+// Phase 3: Verify build artifacts & spawn servers
+// ---------------------------------------------------------------------------
 function verifyArtifact(p: string, label: string): void {
   if (!fs.existsSync(p)) {
     console.error(`[tsunagi] Missing ${label}: ${p}`);
@@ -76,23 +130,88 @@ function verifyArtifact(p: string, label: string): void {
 verifyArtifact(FASTIFY_ENTRY_JS, 'Fastify server artifact');
 verifyArtifact(NEXT_STANDALONE_ENTRY, 'Next.js standalone artifact');
 
+const PORT = process.env.PORT ?? '2791';
+
+const spinner = createSpinner('Initializing...');
+
 const fastifyChild: ChildProcess = spawn(process.execPath, [FASTIFY_ENTRY_JS], {
-  stdio: 'inherit',
+  stdio: ['inherit', 'pipe', 'pipe'],
   cwd: PACKAGE_ROOT,
-  env: process.env,
+  env: { ...process.env, NODE_ENV: 'production' },
 });
 
 const nextChild: ChildProcess = spawn(process.execPath, [NEXT_STANDALONE_ENTRY], {
-  stdio: 'inherit',
+  stdio: ['inherit', 'pipe', 'pipe'],
   cwd: path.dirname(NEXT_STANDALONE_ENTRY),
-  env: { ...process.env, PORT: process.env.PORT ?? '2791' },
+  env: { ...process.env, PORT, NODE_ENV: 'production', HOSTNAME: '0.0.0.0' },
 });
 
+// ---------------------------------------------------------------------------
+// Child process output forwarding
+// ---------------------------------------------------------------------------
+fastifyChild.stdout?.on('data', (data: Buffer) => {
+  if (isDebug) process.stdout.write(data);
+});
+fastifyChild.stderr?.on('data', (data: Buffer) => {
+  process.stderr.write(data);
+});
+nextChild.stdout?.on('data', (data: Buffer) => {
+  if (isDebug) process.stdout.write(data);
+});
+nextChild.stderr?.on('data', (data: Buffer) => {
+  process.stderr.write(data);
+});
+
+// ---------------------------------------------------------------------------
+// Ready detection via /health polling
+// ---------------------------------------------------------------------------
+const SERVER_PORT = 2792;
+const POLL_INTERVAL_MS = 300;
+
+function pollHealth(port: number): Promise<void> {
+  return new Promise((resolve) => {
+    const poll = () => {
+      const req = http.get(`http://localhost:${port}/health`, (res) => {
+        if (res.statusCode === 200) {
+          res.resume();
+          resolve();
+        } else {
+          res.resume();
+          setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      });
+      req.on('error', () => {
+        setTimeout(poll, POLL_INTERVAL_MS);
+      });
+    };
+    poll();
+  });
+}
+
+Promise.all([pollHealth(SERVER_PORT), pollHealth(Number(PORT))]).then(() => {
+  spinner.stop();
+  console.log(TSUNAGI_AA);
+
+  const url = `http://localhost:${PORT}`;
+
+  if (!isDocker) {
+    const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
+    spawn(cmd, [url], { stdio: 'ignore', detached: true }).unref();
+  }
+
+  console.log(`Open ${url}`);
+});
+
+// ---------------------------------------------------------------------------
+// Shutdown
+// ---------------------------------------------------------------------------
 let shuttingDown = false;
 
 function shutdown(code: number): void {
   if (shuttingDown) return;
   shuttingDown = true;
+
+  spinner.stop();
 
   for (const child of [fastifyChild, nextChild]) {
     if (child && !child.killed && child.exitCode === null) {
@@ -115,10 +234,14 @@ process.on('exit', () => {
 });
 
 fastifyChild.on('exit', (code) => {
-  console.error(`[tsunagi] Fastify server exited with code ${code}`);
-  shutdown(code ?? 1);
+  if (!shuttingDown) {
+    console.error(`[tsunagi] Fastify server exited unexpectedly (code ${code})`);
+    shutdown(code ?? 1);
+  }
 });
 nextChild.on('exit', (code) => {
-  console.error(`[tsunagi] Next.js server exited with code ${code}`);
-  shutdown(code ?? 1);
+  if (!shuttingDown) {
+    console.error(`[tsunagi] Next.js server exited unexpectedly (code ${code})`);
+    shutdown(code ?? 1);
+  }
 });

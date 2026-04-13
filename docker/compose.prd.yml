@@ -1,0 +1,44 @@
+services:
+  tsunagi:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    working_dir: /workspace
+    user: root
+    volumes:
+      - ..:/workspace:cached
+      - node-modules-prd:/workspace/node_modules
+      - tsunagi-data-prd:/home/node/.tsunagi
+      - ${SSH_SOCK_HOST}:${SSH_SOCK_CONTAINER}
+      - ~/.gitconfig:/home/node/.gitconfig:ro
+    environment:
+      - NEXT_PUBLIC_TSUNAGI_SERVER_URL=http://localhost:2892
+      - TSUNAGI_EXTRA_CORS_ORIGINS=http://localhost:2891
+      - SSH_AUTH_SOCK=${SSH_SOCK_CONTAINER}
+      - HUSKY=0
+    ports:
+      - '2891:2791'
+      - '2892:2792'
+      - '2893:2793'
+    # root で volume 所有権と SSH socket 権限を修正後、node に切り替えて起動
+    # npm ci (devDeps含む) → build → bundle → NODE_ENV=production で CLI 起動
+    command:
+      - sh
+      - -c
+      - |
+        chown node:node /workspace/node_modules /home/node/.tsunagi &&
+        chmod 777 ${SSH_SOCK_CONTAINER} 2>/dev/null || true
+        exec runuser -u node -- sh -c '
+          npm ci &&
+          npm run build &&
+          node apps/cli/scripts/bundle.mjs &&
+          NODE_ENV=production exec node apps/cli/dist/cli.js
+        '
+
+volumes:
+  node-modules-prd:
+  tsunagi-data-prd:
+
+networks:
+  default:
+    name: tsunagi-prd-network
