@@ -80,11 +80,13 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
   const isClaudeRunning = tabs.some((t) => t.status === 'running');
 
   // リアルタイムのtabTodosMapがあればそちらを優先、なければDB todosにフォールバック。'deleted' は表示層で除外
-  const runningTab = tabs.find((tab) => tab.status === 'running');
-  const realtimeTodos = runningTab && tabTodosMap ? tabTodosMap.get(runningTab.tab_id) : undefined;
-  const allTodos = (
-    realtimeTodos ?? tabs.flatMap((tab) => tab.todos ?? [])
-  ).filter((t) => t.status !== 'deleted');
+  // running → success 遷移後もMapにデータが残るため、全タブを確認する
+  const realtimeTodos = tabTodosMap
+    ? tabs.map((tab) => tabTodosMap.get(tab.tab_id)).find((todos) => todos !== undefined)
+    : undefined;
+  const allTodos = (realtimeTodos ?? tabs.flatMap((tab) => tab.todos ?? [])).filter(
+    (t) => t.status !== 'deleted'
+  );
   const completedTodos = allTodos.filter((t) => t.status === 'completed').length;
   const totalTodos = allTodos.length;
   const shortId = task.id.slice(0, 5) + '\u2026';
