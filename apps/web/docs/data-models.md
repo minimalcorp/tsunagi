@@ -192,10 +192,10 @@ interface Task {
 
 #### order
 
-- **型**: `number | undefined`
+- **型**: `number`（必須、タスク作成時に未指定なら自動採番）
 - **範囲**: 0以上の整数（0, 1, 2, 3, ...）
 - **意味**: 小さいほど優先度が高い（order 0 が最優先）
-- **生成**: Claudeがタスク内容・工数・緊急性を加味して自動判定
+- **生成**: 未指定時は同一リポジトリ内の MAX(order) + 1 を自動割り当て。Claudeが明示指定することも可能
 - **例**:
   - `0` - 最優先タスク
   - `1` - 2番目に優先
@@ -209,7 +209,7 @@ interface Task {
   - タスクの緊急性・重要性
   - 依存関係（将来実装）
   - 工数とのバランス
-- **ソート**: `tasks.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))`
+- **ソート**: `tasks.sort((a, b) => a.order - b.order)`
 
 #### logs
 
