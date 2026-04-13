@@ -47,6 +47,8 @@ const NEXT_STANDALONE_ENTRY = path.join(
   'web',
   'server.js'
 );
+const DOCS_DIR = path.join(PACKAGE_ROOT, 'docs');
+const DOCS_PORT = 2793;
 
 const isDebug = !!process.env.TSUNAGI_DEBUG;
 const isDocker = fs.existsSync('/.dockerenv');
@@ -117,6 +119,78 @@ console.log(
 );
 
 // ---------------------------------------------------------------------------
+// Docs static file server
+// ---------------------------------------------------------------------------
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css',
+  '.js': 'application/javascript',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.wasm': 'application/wasm',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.txt': 'text/plain',
+  '.xml': 'application/xml',
+};
+
+function startDocsServer(): http.Server | null {
+  if (!fs.existsSync(DOCS_DIR)) return null;
+
+  const serveFile = (filePath: string, res: http.ServerResponse) => {
+    const ext = path.extname(filePath);
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404).end();
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(data);
+    });
+  };
+
+  const server = http.createServer((req, res) => {
+    let urlPath: string;
+    try {
+      urlPath = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
+    } catch {
+      res.writeHead(400).end();
+      return;
+    }
+
+    const filePath = path.resolve(DOCS_DIR, '.' + urlPath);
+    if (!filePath.startsWith(DOCS_DIR)) {
+      res.writeHead(403).end();
+      return;
+    }
+
+    fs.stat(filePath, (err, stat) => {
+      if (err) {
+        res.writeHead(404).end();
+        return;
+      }
+      if (stat.isDirectory()) {
+        if (!urlPath.endsWith('/')) {
+          res.writeHead(301, { Location: urlPath + '/' }).end();
+          return;
+        }
+        serveFile(path.join(filePath, 'index.html'), res);
+      } else {
+        serveFile(filePath, res);
+      }
+    });
+  });
+
+  server.listen(DOCS_PORT, '0.0.0.0');
+  return server;
+}
+
+// ---------------------------------------------------------------------------
 // Phase 3: Verify build artifacts & spawn servers
 // ---------------------------------------------------------------------------
 function verifyArtifact(p: string, label: string): void {
@@ -145,6 +219,8 @@ const nextChild: ChildProcess = spawn(process.execPath, [NEXT_STANDALONE_ENTRY],
   cwd: path.dirname(NEXT_STANDALONE_ENTRY),
   env: { ...process.env, PORT, NODE_ENV: 'production', HOSTNAME: '0.0.0.0' },
 });
+
+const docsServer = startDocsServer();
 
 // ---------------------------------------------------------------------------
 // Child process output forwarding
@@ -200,6 +276,9 @@ Promise.all([pollHealth(SERVER_PORT), pollHealth(Number(PORT))]).then(() => {
   }
 
   console.log(`Open ${url}`);
+  if (docsServer) {
+    console.log(`Docs http://localhost:${DOCS_PORT}`);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -222,6 +301,7 @@ function shutdown(code: number): void {
       }
     }
   }
+  docsServer?.close();
 
   cleanupPluginState();
   process.exit(code);

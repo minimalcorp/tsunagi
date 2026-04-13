@@ -76,6 +76,7 @@ async function cleanCliBundleDirs() {
     path.join(CLI_DIR, 'dist/server'),
     path.join(CLI_DIR, '.next'),
     path.join(CLI_DIR, 'prisma'),
+    path.join(CLI_DIR, 'docs'),
   ];
   const files = [
     path.join(CLI_DIR, 'prisma.config.ts'),
@@ -116,6 +117,14 @@ async function main() {
     path.join(WEB_DIR, '.next/static'),
     path.join(CLI_DIR, '.next/standalone/apps/web/.next/static')
   );
+
+  const docsOutDir = path.join(REPO_ROOT, 'apps/docs/out');
+  if (existsSync(docsOutDir)) {
+    log('copying apps/docs/out → apps/cli/docs');
+    await copyDir(docsOutDir, path.join(CLI_DIR, 'docs'));
+  } else {
+    log('skipping docs (apps/docs/out not found)');
+  }
 
   log('done');
 }
