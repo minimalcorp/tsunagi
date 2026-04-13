@@ -17,10 +17,12 @@ import type { Task } from '@minimalcorp/tsunagi-shared';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import type { TabTodosMap } from '@/hooks/useTerminalTodos';
 
 interface TaskCardProps {
   task: Task;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
+  tabTodosMap?: TabTodosMap;
 }
 
 const STATUS_STYLES: Record<Task['status'], string> = {
@@ -70,16 +72,21 @@ function ClaudeStatusIndicator({ tabs }: { tabs: Task['tabs'] }) {
   return null;
 }
 
-export function TaskCard({ task, dragHandleProps }: TaskCardProps) {
+export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const repoColor = getRepoColor(task.owner, task.repo);
-  const isClaudeRunning = (task.tabs ?? []).some((t) => t.status === 'running');
+  const tabs = task.tabs ?? [];
+  const isClaudeRunning = tabs.some((t) => t.status === 'running');
 
-  // タブのtodosからプログレスを計算（DB永続化済み）。'deleted' は表示層で除外
-  const allTodos = (task.tabs ?? [])
-    .flatMap((tab) => tab.todos ?? [])
-    .filter((t) => t.status !== 'deleted');
+  // リアルタイムのtabTodosMapがあればそちらを優先、なければDB todosにフォールバック。'deleted' は表示層で除外
+  // running → success 遷移後もMapにデータが残るため、全タブを確認する
+  const realtimeTodos = tabTodosMap
+    ? tabs.map((tab) => tabTodosMap.get(tab.tab_id)).find((todos) => todos !== undefined)
+    : undefined;
+  const allTodos = (realtimeTodos ?? tabs.flatMap((tab) => tab.todos ?? [])).filter(
+    (t) => t.status !== 'deleted'
+  );
   const completedTodos = allTodos.filter((t) => t.status === 'completed').length;
   const totalTodos = allTodos.length;
   const shortId = task.id.slice(0, 5) + '\u2026';

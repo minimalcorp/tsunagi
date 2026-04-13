@@ -3,6 +3,7 @@
 import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
 import { SearchAndFilterBar, type FilterState } from '@/components/planner/FilterBar';
 import { TaskList } from '@/components/planner/TaskList';
+import type { TabTodosMap } from '@/hooks/useTerminalTodos';
 
 interface TaskListPanelProps {
   tasks: Task[];
@@ -11,6 +12,7 @@ interface TaskListPanelProps {
   onFilterChange: (filters: FilterState) => void;
   onReorder: (reorderedTasks: Task[]) => void;
   onAddTask?: () => void;
+  tabTodosMap: TabTodosMap;
 }
 
 export function TaskListPanel({
@@ -20,6 +22,7 @@ export function TaskListPanel({
   onFilterChange,
   onReorder,
   onAddTask,
+  tabTodosMap,
 }: TaskListPanelProps) {
   return (
     <div className="flex h-full flex-col">
@@ -36,7 +39,7 @@ export function TaskListPanel({
       {/* Scrollable task list */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {tasks.length > 0 ? (
-          <TaskList tasks={tasks} onReorder={onReorder} />
+          <TaskList tasks={tasks} onReorder={onReorder} tabTodosMap={tabTodosMap} />
         ) : (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
             No tasks found

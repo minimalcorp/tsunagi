@@ -194,24 +194,36 @@ export async function createTask(
     );
   }
 
-  // 1. order指定時は玉突き処理
-  if (order !== undefined) {
-    await taskRepo.bumpOrder(order);
-  }
+  // 1. order解決 + bumpOrder + DB登録をアトミックに実行
+  const newTask = await prisma.$transaction(async (tx) => {
+    let resolvedOrder: number;
+    if (order !== undefined) {
+      resolvedOrder = order;
+      await taskRepo.bumpOrder(resolvedOrder, undefined, tx);
+    } else {
+      const result = await tx.task.aggregate({
+        where: { owner, repo, deletedAt: null },
+        _max: { order: true },
+      });
+      resolvedOrder = (result._max.order ?? -1) + 1;
+    }
 
-  // 2. DBにタスク登録
-  const newTask = await taskRepo.createTask({
-    title,
-    description,
-    status,
-    owner,
-    repo,
-    branch,
-    baseBranch,
-    repoId: repository.id,
-    worktreeStatus: 'pending',
-    effort,
-    order,
+    return await taskRepo.createTask(
+      {
+        title,
+        description,
+        status,
+        owner,
+        repo,
+        branch,
+        baseBranch,
+        repoId: repository.id,
+        worktreeStatus: 'pending',
+        effort,
+        order: resolvedOrder,
+      },
+      tx
+    );
   });
 
   // 3. worktree作成

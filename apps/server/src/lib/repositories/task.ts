@@ -1,6 +1,8 @@
 import { prisma } from '../db.js';
 import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
 
+export type TxClient = Parameters<Parameters<(typeof prisma)['$transaction']>[0]>[0];
+
 // タスク一覧取得（deleted: false のみデフォルト）
 export async function getTasks(filter?: {
   includeDeleted?: boolean;
@@ -24,7 +26,7 @@ export async function getTasks(filter?: {
         orderBy: { order: 'asc' },
       },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
   });
 
   return tasks.map((task) => mapTask(task));
@@ -48,9 +50,11 @@ export async function getTask(id: string): Promise<Task | null> {
 
 // タスク作成
 export async function createTask(
-  task: Omit<Task, 'id' | 'deleted' | 'deletedAt' | 'createdAt' | 'updatedAt' | 'tabs'>
+  task: Omit<Task, 'id' | 'deleted' | 'deletedAt' | 'createdAt' | 'updatedAt' | 'tabs'>,
+  tx?: TxClient
 ): Promise<Task> {
-  const newTask = await prisma.task.create({
+  const client = tx ?? prisma;
+  const newTask = await client.task.create({
     data: {
       status: task.status,
       title: task.title,
@@ -105,8 +109,13 @@ export async function updateTask(
 }
 
 // 指定order以上のタスクを+1ずらす（玉突き）
-export async function bumpOrder(targetOrder: number, excludeTaskId?: string): Promise<void> {
-  await prisma.task.updateMany({
+export async function bumpOrder(
+  targetOrder: number,
+  excludeTaskId?: string,
+  tx?: TxClient
+): Promise<void> {
+  const client = tx ?? prisma;
+  await client.task.updateMany({
     where: {
       order: { gte: targetOrder },
       deletedAt: null,
@@ -264,7 +273,7 @@ type PrismaTask = {
   worktreeStatus: string;
   pullRequestUrl: string | null;
   effort: number | null;
-  order: number | null;
+  order: number;
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -295,7 +304,7 @@ function mapTask(task: PrismaTask): Task {
     worktreeStatus: task.worktreeStatus as Task['worktreeStatus'],
     pullRequestUrl: task.pullRequestUrl ?? undefined,
     effort: task.effort ?? undefined,
-    order: task.order ?? undefined,
+    order: task.order,
     deletedAt: task.deletedAt?.toISOString(),
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),

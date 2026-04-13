@@ -109,7 +109,7 @@ export default function Home() {
           return false;
         return true;
       })
-      .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
+      .sort((a, b) => a.order - b.order);
   }, [tasks, filterState]);
 
   // 初回データロード
@@ -159,7 +159,7 @@ export default function Home() {
     [tasks]
   );
 
-  useTerminalTodos(runningTabIds);
+  const tabTodosMap = useTerminalTodos(runningTabIds);
 
   useTabStatusEvents(allTabIds, (tabId, status) => {
     setTasks((prev) =>
@@ -390,6 +390,7 @@ export default function Home() {
             onFilterChange={setFilterState}
             onReorder={handleReorder}
             onAddTask={() => setIsAddTaskDialogOpen(true)}
+            tabTodosMap={tabTodosMap}
           />
         </div>
 
