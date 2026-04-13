@@ -16,15 +16,15 @@ function getStateDir(): string {
 
 async function autoMigrate() {
   try {
-    console.log('DB migration started');
     await fs.mkdir(getStateDir(), { recursive: true });
 
     const { stdout } = await execAsync('npx prisma migrate deploy');
-    const lines = stdout
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith('Prisma schema loaded'));
-    if (lines.length > 0) console.log(lines.join('\n'));
+    // Extract "N migration(s) applied." line from prisma output
+    const match = stdout.match(/(\d+)\s+migrations?\s+applied/i);
+    if (match) {
+      const count = parseInt(match[1], 10);
+      console.log(`${count} migration${count === 1 ? '' : 's'} applied.`);
+    }
   } catch (error) {
     console.error('DB migration failed:', error instanceof Error ? error.message : error);
     process.exit(1);
