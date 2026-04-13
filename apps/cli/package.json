@@ -41,6 +41,7 @@
     "prisma.config.ts",
     ".next/standalone/**/*",
     "scripts/fix-node-pty-permissions.cjs",
+    "scripts/monaco-editor.sh",
     "tsunagi-marketplace/**/*",
     "LICENSE",
     "README.md"
