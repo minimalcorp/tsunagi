@@ -36,6 +36,7 @@
   },
   "files": [
     "dist/**/*",
+    "docs/**/*",
     "prisma/schema.prisma",
     "prisma/migrations/**/*",
     "prisma.config.ts",

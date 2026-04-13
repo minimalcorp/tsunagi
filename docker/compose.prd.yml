@@ -30,6 +30,7 @@ services:
         chmod 777 ${SSH_SOCK_CONTAINER} 2>/dev/null || true
         exec runuser -u node -- sh -c '
           npm ci &&
+          npm run build -w @minimalcorp/tsunagi-shared &&
           npm run build &&
           node apps/cli/scripts/bundle.mjs &&
           NODE_ENV=production exec node apps/cli/dist/cli.js

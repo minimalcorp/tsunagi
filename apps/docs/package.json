@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev --port 2793",
     "build": "next build",
+    "postbuild": "pagefind --site out --output-subdir _pagefind",
     "start": "next start --port 2793",
     "lint": "eslint",
     "type-check": "tsc --noEmit"
@@ -23,6 +24,7 @@
     "@types/react-dom": "^19.0.0",
     "eslint": "^9",
     "eslint-config-prettier": "^10.1.8",
+    "pagefind": "^1.5.2",
     "typescript": "^5.9.3"
   }
 }
