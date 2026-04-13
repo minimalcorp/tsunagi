@@ -24,7 +24,11 @@ const extraOrigins = (process.env.TSUNAGI_EXTRA_CORS_ORIGINS ?? '')
 const corsOrigins = ['http://localhost:2791', ...extraOrigins];
 
 async function start() {
-  const fastify = Fastify({ logger: true });
+  const fastify = Fastify({
+    logger: {
+      level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'error' : 'info'),
+    },
+  });
 
   await fastify.register(fastifyCors, {
     origin: corsOrigins,
@@ -36,6 +40,8 @@ async function start() {
     cors: { origin: corsOrigins },
   });
   fastify.decorate('io', io);
+
+  fastify.get('/health', async () => ({ status: 'ok' }));
 
   await fastify.register(tasksRoutes, { prefix: '/api' });
   await fastify.register(reposRoutes, { prefix: '/api' });
