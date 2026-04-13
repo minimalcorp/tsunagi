@@ -39,7 +39,7 @@ model Task {
   pullRequestUrl String?   @map("pull_request_url")
 
   effort         Int?
-  order          Int?
+  order          Int     @default(0)
   deletedAt      DateTime? @map("deleted_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")

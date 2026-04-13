@@ -15,7 +15,7 @@ export interface Task {
   pullRequestUrl?: string;
 
   effort?: number;
-  order?: number;
+  order: number;
   deletedAt?: string;
   createdAt: string;
   updatedAt: string;
