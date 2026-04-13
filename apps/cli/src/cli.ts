@@ -142,7 +142,7 @@ const fastifyChild: ChildProcess = spawn(process.execPath, [FASTIFY_ENTRY_JS], {
 const nextChild: ChildProcess = spawn(process.execPath, [NEXT_STANDALONE_ENTRY], {
   stdio: ['inherit', 'pipe', 'pipe'],
   cwd: path.dirname(NEXT_STANDALONE_ENTRY),
-  env: { ...process.env, PORT, NODE_ENV: 'production' },
+  env: { ...process.env, PORT, NODE_ENV: 'production', HOSTNAME: '0.0.0.0' },
 });
 
 // ---------------------------------------------------------------------------
