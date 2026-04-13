@@ -77,7 +77,10 @@ async function cleanCliBundleDirs() {
     path.join(CLI_DIR, '.next'),
     path.join(CLI_DIR, 'prisma'),
   ];
-  const files = [path.join(CLI_DIR, 'prisma.config.ts')];
+  const files = [
+    path.join(CLI_DIR, 'prisma.config.ts'),
+    path.join(CLI_DIR, 'scripts/monaco-editor.sh'),
+  ];
   for (const d of dirs) await fs.rm(d, { recursive: true, force: true });
   for (const f of files) await fs.rm(f, { force: true });
 }
@@ -97,6 +100,13 @@ async function main() {
 
   log('copying apps/server/prisma.config.ts → apps/cli/prisma.config.ts');
   await copyFile(path.join(SERVER_DIR, 'prisma.config.ts'), path.join(CLI_DIR, 'prisma.config.ts'));
+
+  log('copying apps/server/scripts/monaco-editor.sh → apps/cli/scripts/monaco-editor.sh');
+  await copyFile(
+    path.join(SERVER_DIR, 'scripts/monaco-editor.sh'),
+    path.join(CLI_DIR, 'scripts/monaco-editor.sh')
+  );
+  await fs.chmod(path.join(CLI_DIR, 'scripts/monaco-editor.sh'), 0o755);
 
   log('copying apps/web/.next/standalone → apps/cli/.next/standalone');
   await copyDir(path.join(WEB_DIR, '.next/standalone'), path.join(CLI_DIR, '.next/standalone'));
