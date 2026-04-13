@@ -38,8 +38,8 @@ ps: ## サービス状態表示
 # ---------------------------------------------------------------------------
 .PHONY: up-prd down-prd down-v-prd logs-prd ps-prd
 
-up-prd: ## 本番ビルド → CLI起動 (foreground, Ctrl+C で停止)
-	$(SSH_ENV) $(COMPOSE_PRD) up --build
+up-prd: ## 本番ビルド → CLI起動
+	$(SSH_ENV) $(COMPOSE_PRD) up -d --build
 
 down-prd: ## 停止 & container削除
 	$(SSH_ENV) $(COMPOSE_PRD) down

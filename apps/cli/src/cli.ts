@@ -49,6 +49,7 @@ const NEXT_STANDALONE_ENTRY = path.join(
 );
 
 const isDebug = !!process.env.TSUNAGI_DEBUG;
+const isDocker = fs.existsSync('/.dockerenv');
 
 // ---------------------------------------------------------------------------
 // Braille-dots spinner
@@ -190,7 +191,15 @@ function pollHealth(port: number): Promise<void> {
 Promise.all([pollHealth(SERVER_PORT), pollHealth(Number(PORT))]).then(() => {
   spinner.stop();
   console.log(TSUNAGI_AA);
-  console.log(`Open http://localhost:${PORT}`);
+
+  const url = `http://localhost:${PORT}`;
+
+  if (!isDocker) {
+    const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
+    spawn(cmd, [url], { stdio: 'ignore', detached: true }).unref();
+  }
+
+  console.log(`Open ${url}`);
 });
 
 // ---------------------------------------------------------------------------
