@@ -245,7 +245,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { id } = request.params;
-        const updatedTask = await updateTask({ id }, request.body);
+        const updatedTask = await updateTask({ id }, request.body, { io });
         return reply.status(200).send({ data: { task: updatedTask } });
       } catch (error) {
         if (error instanceof TaskServiceError && error.code === 'TASK_NOT_FOUND') {
@@ -261,7 +261,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
   fastify.delete<{ Params: { id: string } }>('/tasks/:id', async (request, reply) => {
     try {
       const { id } = request.params;
-      await deleteTask({ id });
+      await deleteTask({ id }, { io });
       return reply.status(200).send({ data: { success: true } });
     } catch (error) {
       if (error instanceof TaskServiceError && error.code === 'TASK_NOT_FOUND') {
