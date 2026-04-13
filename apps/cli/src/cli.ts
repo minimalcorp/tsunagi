@@ -169,7 +169,7 @@ fastifyChild.stdout?.on('data', (data: Buffer) => {
 });
 
 fastifyChild.stderr?.on('data', (data: Buffer) => {
-  if (isDebug) process.stderr.write(data);
+  process.stderr.write(data);
 });
 
 nextChild.stdout?.on('data', (data: Buffer) => {
@@ -183,7 +183,7 @@ nextChild.stdout?.on('data', (data: Buffer) => {
 });
 
 nextChild.stderr?.on('data', (data: Buffer) => {
-  if (isDebug) process.stderr.write(data);
+  process.stderr.write(data);
 });
 
 // ---------------------------------------------------------------------------
