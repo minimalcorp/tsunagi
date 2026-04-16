@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Ellipsis, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Code2, Ellipsis, Pencil, Terminal, Trash2 } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
 import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
 import { TaskDialog } from '@/components/TaskDialog';
@@ -188,6 +188,52 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     }
   };
 
+  // Terminal を開く
+  const handleOpenTerminal = async () => {
+    if (!task) return;
+    const notificationId = toast.loading('Opening terminal...', task.worktreePath);
+    try {
+      const res = await fetch(apiUrl('/api/commands/open'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commandType: 'terminal',
+          owner: task.owner,
+          repo: task.repo,
+          branch: task.branch,
+        }),
+      });
+      if (!res.ok) throw new Error('Command execution failed');
+      toast.success(notificationId, 'Successfully opened terminal', task.worktreePath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(notificationId, 'Failed to open terminal', message);
+    }
+  };
+
+  // VS Code を開く
+  const handleOpenVSCode = async () => {
+    if (!task) return;
+    const notificationId = toast.loading('Opening VS Code...', task.worktreePath);
+    try {
+      const res = await fetch(apiUrl('/api/commands/open'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commandType: 'vscode',
+          owner: task.owner,
+          repo: task.repo,
+          branch: task.branch,
+        }),
+      });
+      if (!res.ok) throw new Error('Command execution failed');
+      toast.success(notificationId, 'Successfully opened VS Code', task.worktreePath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(notificationId, 'Failed to open VS Code', message);
+    }
+  };
+
   // タスク削除
   const handleTaskDelete = () => {
     if (!task) return;
@@ -260,6 +306,15 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
                 <Pencil className="w-4 h-4" />
                 Detail / Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleOpenTerminal}>
+                <Terminal className="w-4 h-4" />
+                Open Terminal
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleOpenVSCode}>
+                <Code2 className="w-4 h-4" />
+                Open VS Code
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
