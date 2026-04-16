@@ -27,11 +27,37 @@ import { acquireSingleInstanceLock } from './single-instance-lock.js';
  *   <pkg>/tsunagi-marketplace/plugins/tsunagi-plugin/.claude-plugin/plugin.json
  */
 
+// ---------------------------------------------------------------------------
+// Braille-dots spinner
+// ---------------------------------------------------------------------------
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+function createSpinner(message: string): { stop: () => void } {
+  let i = 0;
+  // Write first frame immediately so it shows even during spawnSync/execSync blocking
+  process.stdout.write(`\r${SPINNER_FRAMES[0]} ${message}`);
+  i++;
+  const timer = setInterval(() => {
+    process.stdout.write(`\r${SPINNER_FRAMES[i % SPINNER_FRAMES.length]} ${message}`);
+    i++;
+  }, 80);
+
+  return {
+    stop() {
+      clearInterval(timer);
+      // Clear the spinner line
+      process.stdout.write('\r' + ' '.repeat(message.length + 4) + '\r');
+    },
+  };
+}
+
 if (process.platform !== 'darwin' && process.platform !== 'linux') {
   console.error(`[tsunagi] Unsupported platform: ${process.platform}`);
   console.error('[tsunagi] Tsunagi currently supports macOS and Linux only.');
   process.exit(1);
 }
+
+let spinner = createSpinner('Initializing...');
 
 acquireSingleInstanceLock();
 
@@ -52,27 +78,6 @@ const DOCS_PORT = 2793;
 
 const isDebug = !!process.env.TSUNAGI_DEBUG;
 const isDocker = fs.existsSync('/.dockerenv');
-
-// ---------------------------------------------------------------------------
-// Braille-dots spinner
-// ---------------------------------------------------------------------------
-const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-
-function createSpinner(message: string): { stop: () => void } {
-  let i = 0;
-  const timer = setInterval(() => {
-    process.stdout.write(`\r${SPINNER_FRAMES[i % SPINNER_FRAMES.length]} ${message}`);
-    i++;
-  }, 80);
-
-  return {
-    stop() {
-      clearInterval(timer);
-      // Clear the spinner line
-      process.stdout.write('\r' + ' '.repeat(message.length + 4) + '\r');
-    },
-  };
-}
 
 // ---------------------------------------------------------------------------
 // ASCII art
@@ -113,10 +118,7 @@ runAutoMigrate();
 // ---------------------------------------------------------------------------
 // Phase 2: Plugin lifecycle
 // ---------------------------------------------------------------------------
-const pluginResult = ensureCleanPluginState();
-console.log(
-  pluginResult === 'clean' ? 'clean installed tsunagi plugin' : 'installed tsunagi plugin'
-);
+ensureCleanPluginState();
 
 // ---------------------------------------------------------------------------
 // Docs static file server
@@ -206,8 +208,6 @@ verifyArtifact(NEXT_STANDALONE_ENTRY, 'Next.js standalone artifact');
 
 const PORT = process.env.PORT ?? '2791';
 
-const spinner = createSpinner('Initializing...');
-
 const fastifyChild: ChildProcess = spawn(process.execPath, [FASTIFY_ENTRY_JS], {
   stdio: ['inherit', 'pipe', 'pipe'],
   cwd: PACKAGE_ROOT,
@@ -292,6 +292,7 @@ function shutdown(code: number): void {
 
   spinner.stop();
 
+  const cleanupSpinner = createSpinner('Cleaning up...');
   for (const child of [fastifyChild, nextChild]) {
     if (child && !child.killed && child.exitCode === null) {
       try {
@@ -304,6 +305,7 @@ function shutdown(code: number): void {
   docsServer?.close();
 
   cleanupPluginState();
+  cleanupSpinner.stop();
   process.exit(code);
 }
 

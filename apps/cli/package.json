@@ -1,6 +1,6 @@
 {
   "name": "@minimalcorp/tsunagi",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "description": "Multi-repo GitHub project management with Claude AI integration, designed for visualizing and controlling AI-driven development locally.",
   "keywords": [
     "tsunagi",
@@ -58,12 +58,11 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
+    "dotenv": "^17.2.3",
     "@libsql/client": "0.8.1",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@prisma/adapter-libsql": "^7.3.0",
     "@prisma/client": "^7.3.0",
-    "concurrently": "^9.2.1",
-    "dotenv": "^17.2.3",
     "fastify": "^5.8.2",
     "node-pty": "^1.1.0",
     "prisma": "^7.3.0",
