@@ -58,6 +58,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
+    "dotenv": "^17.2.3",
     "@libsql/client": "0.8.1",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@prisma/adapter-libsql": "^7.3.0",
