@@ -80,8 +80,11 @@ export async function editorRoutes(fastify: FastifyInstance) {
       // $EDITOR から復帰した後の通常 rerender では再 emit されず、画面から消えてしまう。
       // ユーザー操作で「ブラウザ window を 1 文字分 resize」したケースでは Static を含む
       // フレーム全体が再 emit され、それなりに適切な見た目に復帰することが分かっている。
-      // /complete 後に同等の SIGWINCH を発火させるため、PTY を cols+1 に bump → 元 cols
+      // /complete 後に同等の SIGWINCH を発火させるため、PTY を cols-1 に bump → 元 cols
       // に戻す。
+      // cols+1 ではなく cols-1 を使う理由: bump 中は PTY 側が xterm より狭くなるだけで
+      // 出力は必ず xterm 幅に収まる。逆に cols+1 だと bump 中に Claude が xterm より
+      // 広い行を出力し、xterm 側で wrap → 余計なスクロールを誘発する。
       // 別案として `/` + backspace を PTY に注入する方法もあるが、`/` は空入力先頭で
       // slash-command menu を起動する一方、文字入力済みの状況では単なる文字挿入として
       // 扱われ、期待する full-frame rerender が発火しないため不採用。
@@ -92,12 +95,16 @@ export async function editorRoutes(fastify: FastifyInstance) {
         const ptySession = ptyManager.getSession(session.tabId);
         if (ptySession) {
           const { cols, rows } = ptySession.pty;
-          setTimeout(() => {
-            ptySession.pty.resize(cols + 1, rows);
+          // cols が 1 以下のときは bump できない（resize(0, ...) は無効）。実用上ほぼ
+          // 起き得ないが安全側に倒して何もしない。
+          if (cols > 1) {
             setTimeout(() => {
-              ptySession.pty.resize(cols, rows);
-            }, 100);
-          }, 300);
+              ptySession.pty.resize(cols - 1, rows);
+              setTimeout(() => {
+                ptySession.pty.resize(cols, rows);
+              }, 100);
+            }, 300);
+          }
         }
       }
 
