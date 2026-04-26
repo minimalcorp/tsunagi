@@ -199,6 +199,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // キャンバスの再描画は変更があった行のみに最適化されているため、上部の行が再描画されず
     // 余白として見える問題がある（ネイティブターミナルでは発生しない xterm.js 固有の挙動）。
     // onBufferChange で normal buffer への切り替えを検知し、refresh() で全行を強制再描画する。
+    // editor session 中は suppressResizeRef=true だが、alt→normal 復帰時の refresh は
+    // 必ず走らせたい（main buffer のログエリアを復元するため）。
     term.buffer.onBufferChange((buf) => {
       if (buf.type === 'normal') {
         term.refresh(0, term.rows - 1);
@@ -210,6 +212,11 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // そのため我々が compositionstart/end を監視して onData をガードする必要はない。
 
     const observer = new ResizeObserver(() => {
+      // editor session (Ctrl+G Monaco modal) 中は fit / sendResize を一切行わない。
+      // Base UI Dialog が body に scrollbar-gutter 等を付与して viewport 幅が変わっても
+      // PTY へ SIGWINCH を投げない。alt screen 中の size 変更 → 復帰後の Ink redraw で
+      // main buffer のログエリアが消える問題を回避する。
+      if (isExternalEditorOpenRef.current) return;
       fitAddon.fit();
       // reused接続中はリングバッファ受信前にsendResizeしない（suppressResizeRefで制御）
       if (!suppressResizeRef.current) {
@@ -246,13 +253,25 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   // エディタセッション開閉イベント（EditorSessionProvider → TerminalView 通知）
   useEffect(() => {
     function handleEditorSessionOpen() {
-      // xterm の _keyUp による focus 再取得を防ぐフラグを立てる
+      // xterm の _keyUp による focus 再取得を防ぐ + ResizeObserver 抑制の根拠フラグ。
+      // Monaco modal の scroll lock で body 幅が変化しても PTY へ resize を投げないことで
+      // alt screen 中の SIGWINCH → 復帰後の Ink full-redraw による main buffer 消失を防ぐ。
       isExternalEditorOpenRef.current = true;
       // xterm から明示的に blur して Monaco がフォーカスを取得できるようにする
       termRef.current?.blur();
     }
     function handleEditorSessionDone() {
-      isExternalEditorOpenRef.current = false;
+      // monaco-editor.sh の alt screen 抜け（0.1s poll + curl RTT）を待って観測解除する。
+      // これで modal close 直後の ResizeObserver fit が session 中の fit 再開として扱われ、
+      // alt→normal 復帰後に落ち着いた状態で PTY と同期する。
+      setTimeout(() => {
+        isExternalEditorOpenRef.current = false;
+        // close 時に viewport が変化していれば observer が次回 tick で fit+sendResize する。
+        // 変化していなくても xterm 側は session 中 fit していないので PTY と不整合はない。
+        // 明示的に一度 fit+sendResize して念のため同期する。
+        fitAddonRef.current?.fit();
+        sendResize();
+      }, 200);
       // アクティブタブのみフォーカスを復帰する
       if (!isActiveRef.current) return;
       // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない）
@@ -416,7 +435,24 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         term.write(data, () => {
           suppressResizeRef.current = false;
           fitAddonRef.current?.fit();
-          sendResize();
+          // cols を +1 → 元に戻す bump でPTYにSIGWINCHを発生させ、
+          // Claude (Ink) の内部状態を fresh な xterm 状態と再同期させる。
+          // 同一サイズの resize は PTY 側で no-op となり SIGWINCH が飛ばないため、
+          // ページ遷移後にカーソル位置がずれる問題を解消する。
+          const s = socketRef.current;
+          const t = termRef.current;
+          const sid = sessionIdRef.current;
+          if (s?.connected && sid && t) {
+            s.emit('resize', { sessionId: sid, cols: t.cols + 1, rows: t.rows });
+            setTimeout(() => {
+              const s2 = socketRef.current;
+              const t2 = termRef.current;
+              if (s2?.connected && sid && t2) {
+                s2.emit('resize', { sessionId: sid, cols: t2.cols, rows: t2.rows });
+              }
+            }, 50);
+          }
+          term.scrollToBottom();
         });
       } else {
         term.write(data);
