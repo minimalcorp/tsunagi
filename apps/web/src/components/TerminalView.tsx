@@ -261,17 +261,41 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       termRef.current?.blur();
     }
     function handleEditorSessionDone() {
-      // monaco-editor.sh の alt screen 抜け（0.1s poll + curl RTT）を待って観測解除する。
-      // これで modal close 直後の ResizeObserver fit が session 中の fit 再開として扱われ、
-      // alt→normal 復帰後に落ち着いた状態で PTY と同期する。
+      // Ink の <Static>（Claude の welcome splash や会話履歴など）は emit-once 設計で、
+      // $EDITOR から復帰した後の通常 rerender では再 emit されず画面から消えてしまう。
+      // ユーザー操作で window を 1 文字分 resize したケースでは Static を含むフレーム
+      // 全体が再 emit され、それなりに適切な見た目に復帰することが分かっている。
+      // 同等の SIGWINCH を発火させるため、xterm + PTY を一時的に縮める cols bump を行う。
+      //
+      // フロントエンドで bump する理由: user の window resize と同じく xterm / PTY が
+      // 同時に新サイズになる方が Ink の挙動が安定する。サーバー側で PTY だけ resize
+      // すると xterm との dimension mismatch が発生する。
+      //
+      // cols+ ではなく cols- を使う理由: bump 中は PTY が xterm より狭くなるだけで
+      // 出力は必ず xterm 幅に収まる。逆に cols+ だと bump 中に Claude が xterm より
+      // 広い行を出力し、xterm 側で wrap → 余計なスクロールを誘発する。
+      //
+      // - 300ms 遅延: sh の polling(最大100ms) + exit + claude foreground 復帰 を待つ
+      // - 100ms 間隔: Ink の re-layout 完了後に元の cols に戻す（fit() で container
+      //   実サイズに re-fit）
+      const BUMP_DELTA = 30;
       setTimeout(() => {
-        isExternalEditorOpenRef.current = false;
-        // close 時に viewport が変化していれば observer が次回 tick で fit+sendResize する。
-        // 変化していなくても xterm 側は session 中 fit していないので PTY と不整合はない。
-        // 明示的に一度 fit+sendResize して念のため同期する。
-        fitAddonRef.current?.fit();
-        sendResize();
-      }, 200);
+        const term = termRef.current;
+        if (term && term.cols > BUMP_DELTA) {
+          term.resize(term.cols - BUMP_DELTA, term.rows);
+          sendResize();
+          setTimeout(() => {
+            isExternalEditorOpenRef.current = false;
+            fitAddonRef.current?.fit();
+            sendResize();
+          }, 100);
+        } else {
+          // bump できないほど terminal が小さい場合は flag 解除のみ
+          isExternalEditorOpenRef.current = false;
+          fitAddonRef.current?.fit();
+          sendResize();
+        }
+      }, 300);
       // アクティブタブのみフォーカスを復帰する
       if (!isActiveRef.current) return;
       // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない）
