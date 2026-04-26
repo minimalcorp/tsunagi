@@ -78,22 +78,25 @@ export async function editorRoutes(fastify: FastifyInstance) {
 
       // Ink の <Static>（Claude の welcome splash や会話履歴など）は emit-once 設計で、
       // $EDITOR から復帰した後の通常 rerender では再 emit されず、画面から消えてしまう。
-      // Claude 2.1.119 では cols 変更の SIGWINCH でも Static は再 emit されないため、
-      // 代わりにユーザーによる実キーストロークを模倣して Ink の input-driven rerender を
-      // 発火させる: "/" で slash-command menu を開いて即 backspace で閉じる。
-      // menu open/close の state 遷移で Ink が full frame emit を行い Static が復帰する。
+      // ユーザー操作で「ブラウザ window を 1 文字分 resize」したケースでは Static を含む
+      // フレーム全体が再 emit され、それなりに適切な見た目に復帰することが分かっている。
+      // /complete 後に同等の SIGWINCH を発火させるため、PTY を cols+1 に bump → 元 cols
+      // に戻す。
+      // 別案として `/` + backspace を PTY に注入する方法もあるが、`/` は空入力先頭で
+      // slash-command menu を起動する一方、文字入力済みの状況では単なる文字挿入として
+      // 扱われ、期待する full-frame rerender が発火しないため不採用。
       //
       // - 300ms 遅延: sh の polling(最大100ms) + exit + claude foreground 復帰 を待つ
-      // - 50ms 間隔: `/` 処理後に slash menu が開いた状態で backspace を送る
-      // - net: 入力欄は元の状態に戻る（`/` を打って消したのと同じ）
+      // - 100ms 間隔: Ink の re-layout 完了後に元の cols に戻す
       if (session.tabId) {
         const ptySession = ptyManager.getSession(session.tabId);
         if (ptySession) {
+          const { cols, rows } = ptySession.pty;
           setTimeout(() => {
-            ptySession.pty.write('/');
+            ptySession.pty.resize(cols + 1, rows);
             setTimeout(() => {
-              ptySession.pty.write('\x7f'); // DEL (backspace)
-            }, 50);
+              ptySession.pty.resize(cols, rows);
+            }, 100);
           }, 300);
         }
       }
