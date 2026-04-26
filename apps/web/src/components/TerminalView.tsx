@@ -23,6 +23,12 @@ import { apiUrl, getServerUrl } from '@/lib/api-url';
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
 export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
 
+// Ink の <Static> を再 emit させるため、xterm + PTY を一時的にこの幅に揃える。
+// 一定の幅を下回ると Ink が full-frame redraw を行い Static が再描画されるという
+// 観測に基づくしきい値。元 cols が既にこの値の場合のみ -1 にして必ず cols を変化させ、
+// SIGWINCH を発火させる。
+const COLS_RESET_SIZE = 64;
+
 export interface Todo {
   content: string;
   status: 'pending' | 'in_progress' | 'completed' | 'deleted';
@@ -271,16 +277,11 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       // 同時に新サイズになる方が Ink の挙動が安定する。サーバー側で PTY だけ resize
       // すると xterm との dimension mismatch が発生する。
       //
-      // 一定の幅を下回ると Ink が full-frame redraw を行い Static が再 emit されることが
-      // 観測されているため、bump 時は必ず COLS_RESET_SIZE 以下の幅に揃える。
-      // ただし元 cols が既に COLS_RESET_SIZE と等しい場合は cols が変化せず SIGWINCH が
-      // 発火しないため、その場合だけ COLS_RESET_SIZE - 1 に揃える。これで bump 時には
-      // 必ず cols が変化し、その後 fit() で container 実サイズに戻ることを保証する。
+      // bump サイズの選び方は COLS_RESET_SIZE のコメントを参照。
       //
       // - 300ms 遅延: sh の polling(最大100ms) + exit + claude foreground 復帰 を待つ
       // - 100ms 間隔: Ink の re-layout 完了後に元の cols に戻す（fit() で container
       //   実サイズに re-fit）
-      const COLS_RESET_SIZE = 64;
       setTimeout(() => {
         const term = termRef.current;
         if (term) {
@@ -459,21 +460,20 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         term.write(data, () => {
           suppressResizeRef.current = false;
           fitAddonRef.current?.fit();
-          // cols を +1 → 元に戻す bump でPTYにSIGWINCHを発生させ、
+          // 一時的に xterm + PTY を COLS_RESET_SIZE に揃える bump で SIGWINCH を発火させ、
           // Claude (Ink) の内部状態を fresh な xterm 状態と再同期させる。
           // 同一サイズの resize は PTY 側で no-op となり SIGWINCH が飛ばないため、
           // ページ遷移後にカーソル位置がずれる問題を解消する。
-          const s = socketRef.current;
+          // editor-session-done と同じ「xterm と PTY を同時に同じ値に resize する」
+          // 対称パターンを使い、dimension mismatch を避ける。
           const t = termRef.current;
-          const sid = sessionIdRef.current;
-          if (s?.connected && sid && t) {
-            s.emit('resize', { sessionId: sid, cols: t.cols - 1, rows: t.rows });
+          if (t) {
+            const bumpCols = t.cols === COLS_RESET_SIZE ? COLS_RESET_SIZE - 1 : COLS_RESET_SIZE;
+            t.resize(bumpCols, t.rows);
+            sendResize();
             setTimeout(() => {
-              const s2 = socketRef.current;
-              const t2 = termRef.current;
-              if (s2?.connected && sid && t2) {
-                s2.emit('resize', { sessionId: sid, cols: t2.cols, rows: t2.rows });
-              }
+              fitAddonRef.current?.fit();
+              sendResize();
             }, 50);
           }
           term.scrollToBottom();
