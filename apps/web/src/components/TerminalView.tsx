@@ -271,18 +271,21 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       // 同時に新サイズになる方が Ink の挙動が安定する。サーバー側で PTY だけ resize
       // すると xterm との dimension mismatch が発生する。
       //
-      // cols+ ではなく cols- を使う理由: bump 中は PTY が xterm より狭くなるだけで
-      // 出力は必ず xterm 幅に収まる。逆に cols+ だと bump 中に Claude が xterm より
-      // 広い行を出力し、xterm 側で wrap → 余計なスクロールを誘発する。
+      // 一定の幅を下回ると Ink が full-frame redraw を行い Static が再 emit されることが
+      // 観測されているため、bump 時は必ず COLS_RESET_SIZE 以下の幅に揃える。
+      // ただし元 cols が既に COLS_RESET_SIZE と等しい場合は cols が変化せず SIGWINCH が
+      // 発火しないため、その場合だけ COLS_RESET_SIZE - 1 に揃える。これで bump 時には
+      // 必ず cols が変化し、その後 fit() で container 実サイズに戻ることを保証する。
       //
       // - 300ms 遅延: sh の polling(最大100ms) + exit + claude foreground 復帰 を待つ
       // - 100ms 間隔: Ink の re-layout 完了後に元の cols に戻す（fit() で container
       //   実サイズに re-fit）
-      const BUMP_DELTA = 30;
+      const COLS_RESET_SIZE = 64;
       setTimeout(() => {
         const term = termRef.current;
-        if (term && term.cols > BUMP_DELTA) {
-          term.resize(term.cols - BUMP_DELTA, term.rows);
+        if (term) {
+          const bumpCols = term.cols === COLS_RESET_SIZE ? COLS_RESET_SIZE - 1 : COLS_RESET_SIZE;
+          term.resize(bumpCols, term.rows);
           sendResize();
           setTimeout(() => {
             isExternalEditorOpenRef.current = false;
@@ -290,10 +293,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
             sendResize();
           }, 100);
         } else {
-          // bump できないほど terminal が小さい場合は flag 解除のみ
           isExternalEditorOpenRef.current = false;
-          fitAddonRef.current?.fit();
-          sendResize();
         }
       }, 300);
       // アクティブタブのみフォーカスを復帰する
@@ -467,7 +467,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
           const t = termRef.current;
           const sid = sessionIdRef.current;
           if (s?.connected && sid && t) {
-            s.emit('resize', { sessionId: sid, cols: t.cols + 1, rows: t.rows });
+            s.emit('resize', { sessionId: sid, cols: t.cols - 1, rows: t.rows });
             setTimeout(() => {
               const s2 = socketRef.current;
               const t2 = termRef.current;
