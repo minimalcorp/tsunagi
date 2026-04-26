@@ -23,6 +23,12 @@ import { apiUrl, getServerUrl } from '@/lib/api-url';
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
 export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
 
+// Ink の <Static> を再 emit させるため、xterm + PTY を一時的にこの幅に揃える。
+// 一定の幅を下回ると Ink が full-frame redraw を行い Static が再描画されるという
+// 観測に基づくしきい値。元 cols が既にこの値の場合のみ -1 にして必ず cols を変化させ、
+// SIGWINCH を発火させる。
+const COLS_RESET_SIZE = 64;
+
 export interface Todo {
   content: string;
   status: 'pending' | 'in_progress' | 'completed' | 'deleted';
@@ -199,6 +205,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // キャンバスの再描画は変更があった行のみに最適化されているため、上部の行が再描画されず
     // 余白として見える問題がある（ネイティブターミナルでは発生しない xterm.js 固有の挙動）。
     // onBufferChange で normal buffer への切り替えを検知し、refresh() で全行を強制再描画する。
+    // editor session 中は suppressResizeRef=true だが、alt→normal 復帰時の refresh は
+    // 必ず走らせたい（main buffer のログエリアを復元するため）。
     term.buffer.onBufferChange((buf) => {
       if (buf.type === 'normal') {
         term.refresh(0, term.rows - 1);
@@ -210,6 +218,11 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // そのため我々が compositionstart/end を監視して onData をガードする必要はない。
 
     const observer = new ResizeObserver(() => {
+      // editor session (Ctrl+G Monaco modal) 中は fit / sendResize を一切行わない。
+      // Base UI Dialog が body に scrollbar-gutter 等を付与して viewport 幅が変わっても
+      // PTY へ SIGWINCH を投げない。alt screen 中の size 変更 → 復帰後の Ink redraw で
+      // main buffer のログエリアが消える問題を回避する。
+      if (isExternalEditorOpenRef.current) return;
       fitAddon.fit();
       // reused接続中はリングバッファ受信前にsendResizeしない（suppressResizeRefで制御）
       if (!suppressResizeRef.current) {
@@ -246,13 +259,44 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   // エディタセッション開閉イベント（EditorSessionProvider → TerminalView 通知）
   useEffect(() => {
     function handleEditorSessionOpen() {
-      // xterm の _keyUp による focus 再取得を防ぐフラグを立てる
+      // xterm の _keyUp による focus 再取得を防ぐ + ResizeObserver 抑制の根拠フラグ。
+      // Monaco modal の scroll lock で body 幅が変化しても PTY へ resize を投げないことで
+      // alt screen 中の SIGWINCH → 復帰後の Ink full-redraw による main buffer 消失を防ぐ。
       isExternalEditorOpenRef.current = true;
       // xterm から明示的に blur して Monaco がフォーカスを取得できるようにする
       termRef.current?.blur();
     }
     function handleEditorSessionDone() {
-      isExternalEditorOpenRef.current = false;
+      // Ink の <Static>（Claude の welcome splash や会話履歴など）は emit-once 設計で、
+      // $EDITOR から復帰した後の通常 rerender では再 emit されず画面から消えてしまう。
+      // ユーザー操作で window を 1 文字分 resize したケースでは Static を含むフレーム
+      // 全体が再 emit され、それなりに適切な見た目に復帰することが分かっている。
+      // 同等の SIGWINCH を発火させるため、xterm + PTY を一時的に縮める cols bump を行う。
+      //
+      // フロントエンドで bump する理由: user の window resize と同じく xterm / PTY が
+      // 同時に新サイズになる方が Ink の挙動が安定する。サーバー側で PTY だけ resize
+      // すると xterm との dimension mismatch が発生する。
+      //
+      // bump サイズの選び方は COLS_RESET_SIZE のコメントを参照。
+      //
+      // - 300ms 遅延: sh の polling(最大100ms) + exit + claude foreground 復帰 を待つ
+      // - 100ms 間隔: Ink の re-layout 完了後に元の cols に戻す（fit() で container
+      //   実サイズに re-fit）
+      setTimeout(() => {
+        const term = termRef.current;
+        if (term) {
+          const bumpCols = term.cols === COLS_RESET_SIZE ? COLS_RESET_SIZE - 1 : COLS_RESET_SIZE;
+          term.resize(bumpCols, term.rows);
+          sendResize();
+          setTimeout(() => {
+            isExternalEditorOpenRef.current = false;
+            fitAddonRef.current?.fit();
+            sendResize();
+          }, 100);
+        } else {
+          isExternalEditorOpenRef.current = false;
+        }
+      }, 300);
       // アクティブタブのみフォーカスを復帰する
       if (!isActiveRef.current) return;
       // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない）
@@ -416,7 +460,23 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         term.write(data, () => {
           suppressResizeRef.current = false;
           fitAddonRef.current?.fit();
-          sendResize();
+          // 一時的に xterm + PTY を COLS_RESET_SIZE に揃える bump で SIGWINCH を発火させ、
+          // Claude (Ink) の内部状態を fresh な xterm 状態と再同期させる。
+          // 同一サイズの resize は PTY 側で no-op となり SIGWINCH が飛ばないため、
+          // ページ遷移後にカーソル位置がずれる問題を解消する。
+          // editor-session-done と同じ「xterm と PTY を同時に同じ値に resize する」
+          // 対称パターンを使い、dimension mismatch を避ける。
+          const t = termRef.current;
+          if (t) {
+            const bumpCols = t.cols === COLS_RESET_SIZE ? COLS_RESET_SIZE - 1 : COLS_RESET_SIZE;
+            t.resize(bumpCols, t.rows);
+            sendResize();
+            setTimeout(() => {
+              fitAddonRef.current?.fit();
+              sendResize();
+            }, 50);
+          }
+          term.scrollToBottom();
         });
       } else {
         term.write(data);

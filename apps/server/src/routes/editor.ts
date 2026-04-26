@@ -76,24 +76,10 @@ export async function editorRoutes(fastify: FastifyInstance) {
       await writeFile(session.filePath, request.body.content, 'utf8');
       session.status = 'done';
 
-      // sh が polling で "done" を検知して exit し claude が foreground に戻った後、
-      // cols を一瞬変えることで SIGWINCH を発火させる。
-      // rows 変更と異なり cols 変更では Ink が全画面クリア + 全 UI 再描画を行うため、
-      // $EDITOR exit 後に blank になる余白が解消される。
-      // 300ms: server が /complete を受信した時点が T=0。sh の polling(最大100ms) +
-      //        exit + claude foreground 復帰 で ~150ms。余裕を持たせた値。
-      if (session.tabId) {
-        const ptySession = ptyManager.getSession(session.tabId);
-        if (ptySession) {
-          const { cols, rows } = ptySession.pty;
-          setTimeout(() => {
-            ptySession.pty.resize(cols + 1, rows);
-            setTimeout(() => {
-              ptySession.pty.resize(cols, rows);
-            }, 100);
-          }, 300);
-        }
-      }
+      // Ink の <Static> 再 emit を発火させる cols bump はフロントエンド (TerminalView)
+      // 側で行う。理由: ユーザー操作の window resize と同等の挙動（xterm と PTY が
+      // 同時に新サイズになる）にしたいため。サーバー側で PTY だけ resize すると xterm
+      // との dimension mismatch が発生する。
 
       return reply.send({ ok: true });
     }

@@ -18,12 +18,11 @@ if [ -z "$TMPFILE" ]; then
   exit 1
 fi
 
-# 代替画面 (alt screen) に切り替えて script の出力を claude の描画領域から隔離する。
-# vim/nano 等の通常の $EDITOR と同じ作法。これをやらないと script の stderr 出力が
-# main buffer に積まれて、claude の Ink renderer の位置情報と実画面がズレ、
-# $EDITOR 終了後の描画に余白が生じる。
+# alt screen に切り替えて $EDITOR フローの間は main buffer を凍結する。
+# vim/nano 等の通常の $EDITOR と同じ作法。これにより:
+# - sh script の（潜在的な）出力や claude の Ink 再描画の副作用が main buffer に影響しない
+# - sh exit 時の `\033[?1049l` で main buffer が pre-Ctrl+G 時の状態に完全復元される
 printf '\033[?1049h'
-# どんな経路で終了しても alt screen から確実に復帰させる
 trap 'printf "\033[?1049l"' EXIT
 
 # エラー報告用: alt screen から抜けてから stderr に出す
@@ -46,9 +45,6 @@ if [ -z "$SESSION_ID" ]; then
 fi
 
 # 完了までポーリング（無制限、0.1秒間隔。Ctrl+C で中断可能）
-# 速めの polling 間隔にしているのは、Cmd+Enter Submit 後に sh が foreground PG から
-# 抜けるまでの遅延を最小化するため（TerminalView 側の resize nudge が claude に
-# 届くように）。
 # レスポンスはプレーンテキスト "done" or "pending"（JSON パース不要）
 while true; do
   STATUS=$(curl -sf "$API_BASE/api/editor/session/$SESSION_ID" 2>/dev/null || echo "pending")
