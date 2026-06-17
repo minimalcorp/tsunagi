@@ -21,6 +21,9 @@ out/
 build
 dist
 
+# generated at publish time by apps/cli prepack (scripts/generate-shrinkwrap.mjs)
+apps/cli/npm-shrinkwrap.json
+
 # misc
 .DS_Store
 *.pem

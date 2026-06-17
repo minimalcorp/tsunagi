@@ -35,6 +35,7 @@
     "tsunagi": "./dist/cli.js"
   },
   "files": [
+    "npm-shrinkwrap.json",
     "dist/**/*",
     "docs/**/*",
     "prisma/schema.prisma",
@@ -50,7 +51,7 @@
   "scripts": {
     "dev": "tsx src/with-plugin.ts dev",
     "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
-    "prepack": "npm run build -w @minimalcorp/tsunagi-shared && npm run build -w @minimalcorp/tsunagi-server && npm run build -w @minimalcorp/tsunagi-web && npm run build && node scripts/bundle.mjs",
+    "prepack": "npm run build -w @minimalcorp/tsunagi-shared && npm run build -w @minimalcorp/tsunagi-server && npm run build -w @minimalcorp/tsunagi-web && npm run build && node scripts/bundle.mjs && node scripts/generate-shrinkwrap.mjs",
     "postinstall": "node scripts/fix-node-pty-permissions.cjs",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
