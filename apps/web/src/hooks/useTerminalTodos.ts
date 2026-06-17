@@ -48,6 +48,14 @@ export function useTerminalTodos(runningTabIds: string[]): TabTodosMap {
           }
         }
       );
+
+      // 再接続時はサーバ側 socket が新規（room 未参加）になるため、購読中の room を張り直す。
+      // これを怠るとスリープ復帰後に Todos のリアルタイム更新が静かに止まる。
+      socket.on('connect', () => {
+        for (const room of joinedRoomsRef.current) {
+          socket.emit('join', { room, mode: 'subscribe' });
+        }
+      });
     }
 
     const socket = socketRef.current;
@@ -56,7 +64,7 @@ export function useTerminalTodos(runningTabIds: string[]): TabTodosMap {
     for (const tabId of runningTabIds) {
       const room = `tab:${tabId}`;
       if (!joinedRoomsRef.current.has(room)) {
-        socket.emit('join', { room });
+        socket.emit('join', { room, mode: 'subscribe' });
         joinedRoomsRef.current.add(room);
       }
     }

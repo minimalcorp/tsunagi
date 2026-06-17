@@ -101,6 +101,12 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const hasConnectedOnceRef = useRef(false);
   // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
   const suppressResizeRef = useRef(false);
+  // term.onData の購読。connectSocket のたびに張り直すため dispose を保持して解放漏れを防ぐ。
+  const onDataDisposeRef = useRef<{ dispose: () => void } | null>(null);
+  // visibilitychange ヘルスチェックのタイムアウトタイマー（多重発火・解放漏れ防止）
+  const healthCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // サーバ側セッションが GC 済みで join に失敗した際の自動再生成回数（無限ループ防止）
+  const sessionRecreateRef = useRef(0);
   const [status, setStatus] = useState<TerminalStatus>('idle');
   const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>('idle');
   const [todos, setTodos] = useState<Todo[]>(initialTodos ?? []);
@@ -240,10 +246,13 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     return () => {
       abortController.abort();
       observer.disconnect();
+      onDataDisposeRef.current?.dispose();
+      onDataDisposeRef.current = null;
       term.dispose();
       termRef.current = null;
       fitAddonRef.current = null;
       // アンマウント時はsocketのみ切断。PTYはサーバー側で生存継続（GCタイマーが管理）
+      socketRef.current?.removeAllListeners();
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
@@ -315,7 +324,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
   // フォアグラウンド復帰時にWebSocket接続の生死を検証し、死んでいれば即座に再接続する
   useEffect(() => {
-    const HEALTH_CHECK_TIMEOUT_MS = 3000;
+    // 復帰直後はメインスレッドが輻輳しがちで ack の往復が遅れるため、
+    // 短すぎるタイムアウトは健全な接続でも誤切断を招く。余裕を持たせる。
+    const HEALTH_CHECK_TIMEOUT_MS = 6000;
 
     function handleVisibilityChange() {
       if (document.visibilityState !== 'visible') return;
@@ -323,15 +334,31 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       const socket = socketRef.current;
       if (!socket || !socket.connected) return;
 
-      // ヘルスチェック: サーバーにpingを送り、応答がなければ強制切断→自動再接続
-      const timer = setTimeout(() => {
-        // タイムアウト: 接続が死んでいる → 強制切断してSocket.IOの自動再接続に委ねる
+      // 直前のヘルスチェックのタイマーが残っていれば破棄してから張り直す
+      // （ack リスナーは once 登録のため発火時に自動解放される）
+      if (healthCheckTimerRef.current) {
+        clearTimeout(healthCheckTimerRef.current);
+        healthCheckTimerRef.current = null;
+      }
+
+      // ヘルスチェック: サーバーにpingを送り、応答がなければ明示的に再接続する
+      healthCheckTimerRef.current = setTimeout(() => {
+        healthCheckTimerRef.current = null;
         socket.off('health-check-ack', onAck);
+        // 接続が死んでいる。手動 disconnect だけで終えると Socket.IO の自動再接続が
+        // 無効化され "Session ended" のデッドエンドに陥るため、明示的に再接続を起動する。
+        // 同一 socket を再利用するため connectSocket は呼ばれず、onData の多重化も起きない。
         socket.disconnect();
+        socket.connect();
+        // disconnect ハンドラが status を 'exited' にするのを上書きして再接続中表示にする
+        setStatus('connecting');
       }, HEALTH_CHECK_TIMEOUT_MS);
 
       function onAck() {
-        clearTimeout(timer);
+        if (healthCheckTimerRef.current) {
+          clearTimeout(healthCheckTimerRef.current);
+          healthCheckTimerRef.current = null;
+        }
         // 接続は生きている → フォーカスのみ復帰
         if (isActiveRef.current) {
           termRef.current?.focus();
@@ -345,6 +372,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (healthCheckTimerRef.current) {
+        clearTimeout(healthCheckTimerRef.current);
+        healthCheckTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -422,6 +453,18 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   }
 
   function connectSocket(sessionId: string, reused: boolean, term: Terminal, signal: AbortSignal) {
+    // 再接続（reconnectSession 等）で connectSocket が再呼び出しされた場合、
+    // 旧 socket と旧 onData 購読を必ず破棄してからやり直す。
+    // これを怠ると旧 socket が Socket.IO の自動再接続で生き返り、
+    // onData リスナーが多重化して 1 キーストロークが複数回 PTY へ書き込まれる
+    // （例: /clear が大量入力される）。
+    onDataDisposeRef.current?.dispose();
+    onDataDisposeRef.current = null;
+    if (socketRef.current) {
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+    }
+
     const socket = io(getServerUrl(), { transports: ['websocket'] });
     socketRef.current = socket;
     // reused時: 最初のoutputイベント（リングバッファ）受信後にリサイズを再送する
@@ -443,9 +486,11 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         term.writeln('\x1b[90mConnected.\x1b[0m');
       }
       setStatus('connected');
+      // 接続成功 → セッション自動再生成カウンタをリセット
+      sessionRecreateRef.current = 0;
 
       // roomに参加（再接続時も必ず再参加する）
-      socket.emit('join', { room: `tab:${sessionId}` });
+      socket.emit('join', { room: `tab:${sessionId}`, mode: 'terminal' });
 
       // 再接続時: アクティブタブならフォーカスを復帰
       if (isReconnect && isActiveRef.current) {
@@ -492,6 +537,14 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
     socket.on('error', ({ message }: { message: string }) => {
       console.error('[TerminalView] Socket error message:', message);
+      // サーバ側セッションが GC 済み等で存在しない場合、再接続では join が必ず失敗するため
+      // セッションを作り直す（POST /sessions で PTY を再起動し、command があれば claude を resume）。
+      // 無限ループ防止のため自動再生成は1回までに制限し、connect 成功でリセットする。
+      if (message.startsWith('Session not found') && sessionRecreateRef.current < 1) {
+        sessionRecreateRef.current += 1;
+        void reconnectSession();
+        return;
+      }
       setStatus('error');
     });
 
@@ -531,7 +584,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       }
     );
 
-    term.onData((data) => {
+    onDataDisposeRef.current = term.onData((data) => {
       if (socket.connected && sessionIdRef.current) {
         socket.emit('input', { sessionId: sessionIdRef.current, data });
       }

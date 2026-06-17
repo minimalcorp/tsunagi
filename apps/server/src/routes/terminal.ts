@@ -37,90 +37,119 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     let dataHandlerDispose: (() => void) | null = null;
     let exitHandlerDispose: (() => void) | null = null;
 
-    // join: roomに参加してPTYセッションと接続
-    socket.on('join', ({ room }: { room: string }) => {
-      const sessionId = room.startsWith('tab:') ? room.slice(4) : room;
-      boundSessionId = sessionId;
+    // join: roomに参加する。
+    // - mode='subscribe': status-changed / todos-updated のブロードキャスト受信のみ。
+    //   PTY IO は接続しない。タスク一覧 / プランナーの購読 hook 用。PTY が未起動でも参加できる。
+    // - mode='terminal'（既定）: PTY の入出力を接続する。TerminalView 用。
+    socket.on(
+      'join',
+      ({ room, mode = 'terminal' }: { room: string; mode?: 'terminal' | 'subscribe' }) => {
+        const sessionId = room.startsWith('tab:') ? room.slice(4) : room;
 
-      const session = ptyManager.getSession(sessionId);
-      if (!session) {
-        socket.emit('error', { message: `Session not found: ${sessionId}` });
-        return;
-      }
-
-      socket.join(room);
-
-      // 接続確立 → GCタイマーをキャンセル
-      ptyManager.cancelGc(sessionId);
-
-      const { pty: ptyProcess } = session;
-      const isReused = session.scrollback.length > 0;
-
-      // リングバッファの内容を一括送信（再接続時の画面復元）
-      if (isReused) {
-        const buffered = session.scrollback.join('');
-        // 末尾の \r\n / \n / \r をトリムする。
-        const trimmed = buffered.replace(/[\r\n]+$/, '');
-        socket.emit('output', { data: trimmed });
-      }
-
-      // reused の場合、最初の resize まで onData 出力をバッファリング
-      let initialResizeHandled = !isReused;
-      const pendingOutput: string[] = [];
-
-      // PTY出力 → このsocketのみに送信（io.to(room)だと同一PTYに複数socket接続時に重複するため）
-      const dataHandler = ptyProcess.onData((data: string) => {
-        if (!initialResizeHandled) {
-          pendingOutput.push(data);
+        // 購読のみ: room メンバーシップだけ付与して終了。PTY ハンドラ・input/resize は登録せず、
+        // boundSessionId もセットしない（disconnect 時に他人のセッションへ GC を仕掛けないため）。
+        if (mode === 'subscribe') {
+          socket.join(room);
           return;
         }
-        socket.emit('output', { data });
-      });
-      dataHandlerDispose = () => dataHandler.dispose();
 
-      // PTYプロセス終了 → room全体に通知（全接続クライアントに終了を伝える）+ セッション削除
-      const exitHandler = ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
-        io.to(room).emit('exit', { exitCode });
-        // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット、todosをクリア
-        io.to(room).emit('status-changed', { sessionId, status: 'idle' });
-        io.to(room).emit('todos-updated', { sessionId, todos: [] });
-        prisma.tab
-          .updateMany({
-            where: { tabId: sessionId },
-            data: { status: 'idle', todos: '[]' },
-          })
-          .catch(() => {
-            /* DB更新失敗は無視 */
-          });
-        ptyManager.deleteSession(sessionId);
-      });
-      exitHandlerDispose = () => exitHandler.dispose();
+        boundSessionId = sessionId;
 
-      // resize イベント: PTYリサイズ
-      socket.on(
-        'resize',
-        ({ sessionId: sid, cols, rows }: { sessionId: string; cols: number; rows: number }) => {
-          if (sid !== sessionId) return;
-          ptyProcess.resize(cols, rows);
+        const session = ptyManager.getSession(sessionId);
+        if (!session) {
+          socket.emit('error', { message: `Session not found: ${sessionId}` });
+          return;
+        }
 
-          // reused時: 初回 resize 後にバッファリングしていた出力をフラッシュ
+        // 同一 socket が複数回 join した場合に、前回登録した PTY ハンドラ・input/resize
+        // リスナーを必ず解放してから張り直す。これを怠ると ptyProcess.onData が多重登録され
+        // 出力が多重 emit され、input ハンドラの多重化で 1 入力が複数回 PTY へ書き込まれる。
+        dataHandlerDispose?.();
+        exitHandlerDispose?.();
+        dataHandlerDispose = null;
+        exitHandlerDispose = null;
+        socket.removeAllListeners('resize');
+        socket.removeAllListeners('input');
+
+        socket.join(room);
+
+        // 接続確立 → GCタイマーをキャンセル
+        ptyManager.cancelGc(sessionId);
+
+        const { pty: ptyProcess } = session;
+        const isReused = session.scrollback.length > 0;
+
+        // リングバッファの内容を一括送信（再接続時の画面復元）
+        if (isReused) {
+          const buffered = session.scrollback.join('');
+          // 末尾の \r\n / \n / \r をトリムする。
+          const trimmed = buffered.replace(/[\r\n]+$/, '');
+          socket.emit('output', { data: trimmed });
+        }
+
+        // reused の場合、最初の resize まで onData 出力をバッファリング
+        let initialResizeHandled = !isReused;
+        const pendingOutput: string[] = [];
+
+        // PTY出力 → このsocketのみに送信（io.to(room)だと同一PTYに複数socket接続時に重複するため）
+        const dataHandler = ptyProcess.onData((data: string) => {
           if (!initialResizeHandled) {
-            initialResizeHandled = true;
-            if (pendingOutput.length > 0) {
-              const flushed = pendingOutput.join('');
-              pendingOutput.length = 0;
-              socket.emit('output', { data: flushed });
+            pendingOutput.push(data);
+            return;
+          }
+          socket.emit('output', { data });
+        });
+        dataHandlerDispose = () => dataHandler.dispose();
+
+        // PTYプロセス終了 → room全体に通知（全接続クライアントに終了を伝える）+ セッション削除
+        const exitHandler = ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
+          io.to(room).emit('exit', { exitCode });
+          // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット、todosをクリア
+          io.to(room).emit('status-changed', { sessionId, status: 'idle' });
+          io.to(room).emit('todos-updated', { sessionId, todos: [] });
+          prisma.tab
+            .updateMany({
+              where: { tabId: sessionId },
+              data: { status: 'idle', todos: '[]' },
+            })
+            .catch(() => {
+              /* DB更新失敗は無視 */
+            });
+          ptyManager.deleteSession(sessionId);
+        });
+        exitHandlerDispose = () => exitHandler.dispose();
+
+        // resize イベント: PTYリサイズ
+        socket.on(
+          'resize',
+          ({ sessionId: sid, cols, rows }: { sessionId: string; cols: number; rows: number }) => {
+            if (sid !== sessionId) return;
+            ptyProcess.resize(cols, rows);
+
+            // reused時: 初回 resize 後にバッファリングしていた出力をフラッシュ
+            if (!initialResizeHandled) {
+              initialResizeHandled = true;
+              if (pendingOutput.length > 0) {
+                const flushed = pendingOutput.join('');
+                pendingOutput.length = 0;
+                socket.emit('output', { data: flushed });
+              }
             }
           }
-        }
-      );
+        );
 
-      // input イベント: PTYへ書き込み + アクティブソケット追跡
-      socket.on('input', ({ sessionId: sid, data }: { sessionId: string; data: string }) => {
-        if (sid !== sessionId) return;
-        ptyManager.setActiveSocket(sessionId, socket.id);
-        ptyProcess.write(data);
-      });
+        // input イベント: PTYへ書き込み + アクティブソケット追跡
+        socket.on('input', ({ sessionId: sid, data }: { sessionId: string; data: string }) => {
+          if (sid !== sessionId) return;
+          ptyManager.setActiveSocket(sessionId, socket.id);
+          ptyProcess.write(data);
+        });
+      }
+    );
+
+    // leave: room から退出（status/todos hook がタブ購読を解除する際に emit する）
+    socket.on('leave', ({ room }: { room: string }) => {
+      socket.leave(room);
     });
 
     // health-check: クライアントからの接続生死確認に即応答
