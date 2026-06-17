@@ -54,6 +54,14 @@ export function useTabStatusEvents(
           }
         }
       );
+
+      // 再接続時はサーバ側 socket が新規（room 未参加）になるため、購読中の room を張り直す。
+      // これを怠るとスリープ復帰後にステータスのリアルタイム更新が静かに止まる。
+      socket.on('connect', () => {
+        for (const room of joinedRoomsRef.current) {
+          socket.emit('join', { room, mode: 'subscribe' });
+        }
+      });
     }
     return socketRef.current;
   }, []);

@@ -38,6 +38,11 @@ async function start() {
   const io = new SocketIOServer(fastify.server, {
     transports: ['websocket'],
     cors: { origin: corsOrigins },
+    // 死んだ接続（スリープ・ネットワーク断等）を早めに検出して、ぶら下がった socket が
+    // 保持する PTY の onData/onExit ハンドラを早く解放する。既定 (25s/20s) では検出までに
+    // 最大 ~45s かかり、その間ゾンビ socket がリスナーを溜め込み出力が多重化する。
+    pingInterval: 15000,
+    pingTimeout: 10000,
   });
   fastify.decorate('io', io);
 
