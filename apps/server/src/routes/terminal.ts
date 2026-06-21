@@ -38,114 +38,129 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     let exitHandlerDispose: (() => void) | null = null;
 
     // join: roomに参加する。
-    // - mode='subscribe': status-changed / todos-updated のブロードキャスト受信のみ。
-    //   PTY IO は接続しない。タスク一覧 / プランナーの購読 hook 用。PTY が未起動でも参加できる。
-    // - mode='terminal'（既定）: PTY の入出力を接続する。TerminalView 用。
-    socket.on(
-      'join',
-      ({ room, mode = 'terminal' }: { room: string; mode?: 'terminal' | 'subscribe' }) => {
-        const sessionId = room.startsWith('tab:') ? room.slice(4) : room;
+    // - mode='terminal': PTY の入出力を接続する。TerminalView 用。明示指定が必須。
+    // - mode='subscribe'（既定。mode 省略・不明値もここに含む）: status-changed /
+    //   todos-updated のブロードキャスト受信のみ。PTY IO は接続しない。
+    //   タスク一覧 / プランナーの購読 hook 用。PTY が未起動でも参加できる。
+    socket.on('join', ({ room, mode }: { room: string; mode?: 'terminal' | 'subscribe' }) => {
+      const sessionId = room.startsWith('tab:') ? room.slice(4) : room;
 
-        // 購読のみ: room メンバーシップだけ付与して終了。PTY ハンドラ・input/resize は登録せず、
-        // boundSessionId もセットしない（disconnect 時に他人のセッションへ GC を仕掛けないため）。
-        if (mode === 'subscribe') {
-          socket.join(room);
-          return;
-        }
-
-        boundSessionId = sessionId;
-
-        const session = ptyManager.getSession(sessionId);
-        if (!session) {
-          socket.emit('error', { message: `Session not found: ${sessionId}` });
-          return;
-        }
-
-        // 同一 socket が複数回 join した場合に、前回登録した PTY ハンドラ・input/resize
-        // リスナーを必ず解放してから張り直す。これを怠ると ptyProcess.onData が多重登録され
-        // 出力が多重 emit され、input ハンドラの多重化で 1 入力が複数回 PTY へ書き込まれる。
-        dataHandlerDispose?.();
-        exitHandlerDispose?.();
-        dataHandlerDispose = null;
-        exitHandlerDispose = null;
-        socket.removeAllListeners('resize');
-        socket.removeAllListeners('input');
-
+      // PTY バインドは mode==='terminal' を明示した socket のみ。
+      // mode 省略・不明な値はすべて購読扱いにし、PTY IO を絶対に接続しない。
+      // （購読 hook の join が mode 省略で誤って PTY バインドし、input/onData/exit
+      //   ハンドラ登録や GC 干渉で入力多重化を招く事故を構造的に防ぐ）
+      // 購読のみ: room メンバーシップだけ付与して終了。boundSessionId もセットしない
+      // （disconnect 時に他人のセッションへ GC を仕掛けないため）。
+      if (mode !== 'terminal') {
         socket.join(room);
+        return;
+      }
 
-        // 接続確立 → GCタイマーをキャンセル
-        ptyManager.cancelGc(sessionId);
+      boundSessionId = sessionId;
 
-        const { pty: ptyProcess } = session;
-        const isReused = session.scrollback.length > 0;
+      const session = ptyManager.getSession(sessionId);
+      if (!session) {
+        socket.emit('error', { message: `Session not found: ${sessionId}` });
+        return;
+      }
 
-        // リングバッファの内容を一括送信（再接続時の画面復元）
-        if (isReused) {
-          const buffered = session.scrollback.join('');
-          // 末尾の \r\n / \n / \r をトリムする。
-          const trimmed = buffered.replace(/[\r\n]+$/, '');
-          socket.emit('output', { data: trimmed });
+      // 同一 socket が複数回 join した場合に、前回登録した PTY ハンドラ・input/resize
+      // リスナーを必ず解放してから張り直す。これを怠ると ptyProcess.onData が多重登録され
+      // 出力が多重 emit され、input ハンドラの多重化で 1 入力が複数回 PTY へ書き込まれる。
+      dataHandlerDispose?.();
+      exitHandlerDispose?.();
+      dataHandlerDispose = null;
+      exitHandlerDispose = null;
+      socket.removeAllListeners('resize');
+      socket.removeAllListeners('input');
+
+      socket.join(room);
+
+      // 接続確立 → GCタイマーをキャンセル
+      ptyManager.cancelGc(sessionId);
+
+      // この socket を PTY の所有者(active socket)にする。input の書き込みは所有者の
+      // socket からのみ許可し（下記 input ハンドラのゲート参照）、複数 socket が同一 PTY に
+      // バインドしても 1 キーストロークが多重書き込みされないことを構造的に保証する。
+      const prevOwner = ptyManager.getActiveSocket(sessionId);
+      if (prevOwner && prevOwner !== socket.id) {
+        console.log(
+          `[terminal] session ${sessionId}: owner ${prevOwner} -> ${socket.id} (previous terminal socket still bound)`
+        );
+      }
+      ptyManager.setActiveSocket(sessionId, socket.id);
+
+      const { pty: ptyProcess } = session;
+      const isReused = session.scrollback.length > 0;
+
+      // リングバッファの内容を一括送信（再接続時の画面復元）
+      if (isReused) {
+        const buffered = session.scrollback.join('');
+        // 末尾の \r\n / \n / \r をトリムする。
+        const trimmed = buffered.replace(/[\r\n]+$/, '');
+        socket.emit('output', { data: trimmed });
+      }
+
+      // reused の場合、最初の resize まで onData 出力をバッファリング
+      let initialResizeHandled = !isReused;
+      const pendingOutput: string[] = [];
+
+      // PTY出力 → このsocketのみに送信（io.to(room)だと同一PTYに複数socket接続時に重複するため）
+      const dataHandler = ptyProcess.onData((data: string) => {
+        if (!initialResizeHandled) {
+          pendingOutput.push(data);
+          return;
         }
+        socket.emit('output', { data });
+      });
+      dataHandlerDispose = () => dataHandler.dispose();
 
-        // reused の場合、最初の resize まで onData 出力をバッファリング
-        let initialResizeHandled = !isReused;
-        const pendingOutput: string[] = [];
+      // PTYプロセス終了 → room全体に通知（全接続クライアントに終了を伝える）+ セッション削除
+      const exitHandler = ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
+        io.to(room).emit('exit', { exitCode });
+        // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット、todosをクリア
+        io.to(room).emit('status-changed', { sessionId, status: 'idle' });
+        io.to(room).emit('todos-updated', { sessionId, todos: [] });
+        prisma.tab
+          .updateMany({
+            where: { tabId: sessionId },
+            data: { status: 'idle', todos: '[]' },
+          })
+          .catch(() => {
+            /* DB更新失敗は無視 */
+          });
+        ptyManager.deleteSession(sessionId);
+      });
+      exitHandlerDispose = () => exitHandler.dispose();
 
-        // PTY出力 → このsocketのみに送信（io.to(room)だと同一PTYに複数socket接続時に重複するため）
-        const dataHandler = ptyProcess.onData((data: string) => {
+      // resize イベント: PTYリサイズ
+      socket.on(
+        'resize',
+        ({ sessionId: sid, cols, rows }: { sessionId: string; cols: number; rows: number }) => {
+          if (sid !== sessionId) return;
+          ptyProcess.resize(cols, rows);
+
+          // reused時: 初回 resize 後にバッファリングしていた出力をフラッシュ
           if (!initialResizeHandled) {
-            pendingOutput.push(data);
-            return;
-          }
-          socket.emit('output', { data });
-        });
-        dataHandlerDispose = () => dataHandler.dispose();
-
-        // PTYプロセス終了 → room全体に通知（全接続クライアントに終了を伝える）+ セッション削除
-        const exitHandler = ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
-          io.to(room).emit('exit', { exitCode });
-          // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット、todosをクリア
-          io.to(room).emit('status-changed', { sessionId, status: 'idle' });
-          io.to(room).emit('todos-updated', { sessionId, todos: [] });
-          prisma.tab
-            .updateMany({
-              where: { tabId: sessionId },
-              data: { status: 'idle', todos: '[]' },
-            })
-            .catch(() => {
-              /* DB更新失敗は無視 */
-            });
-          ptyManager.deleteSession(sessionId);
-        });
-        exitHandlerDispose = () => exitHandler.dispose();
-
-        // resize イベント: PTYリサイズ
-        socket.on(
-          'resize',
-          ({ sessionId: sid, cols, rows }: { sessionId: string; cols: number; rows: number }) => {
-            if (sid !== sessionId) return;
-            ptyProcess.resize(cols, rows);
-
-            // reused時: 初回 resize 後にバッファリングしていた出力をフラッシュ
-            if (!initialResizeHandled) {
-              initialResizeHandled = true;
-              if (pendingOutput.length > 0) {
-                const flushed = pendingOutput.join('');
-                pendingOutput.length = 0;
-                socket.emit('output', { data: flushed });
-              }
+            initialResizeHandled = true;
+            if (pendingOutput.length > 0) {
+              const flushed = pendingOutput.join('');
+              pendingOutput.length = 0;
+              socket.emit('output', { data: flushed });
             }
           }
-        );
+        }
+      );
 
-        // input イベント: PTYへ書き込み + アクティブソケット追跡
-        socket.on('input', ({ sessionId: sid, data }: { sessionId: string; data: string }) => {
-          if (sid !== sessionId) return;
-          ptyManager.setActiveSocket(sessionId, socket.id);
-          ptyProcess.write(data);
-        });
-      }
-    );
+      // input イベント: 所有者 socket からの入力のみ PTY へ書き込む。
+      // ゾンビ/非所有 socket（再接続前の旧 socket・誤バインド socket 等）からの重複 input は
+      // 破棄し、1 キーストロークの多重書き込み（例: /clear が連続入力される）を防ぐ。
+      socket.on('input', ({ sessionId: sid, data }: { sessionId: string; data: string }) => {
+        if (sid !== sessionId) return;
+        if (ptyManager.getActiveSocket(sessionId) !== socket.id) return;
+        ptyProcess.write(data);
+      });
+    });
 
     // leave: room から退出（status/todos hook がタブ購読を解除する際に emit する）
     socket.on('leave', ({ room }: { room: string }) => {
@@ -162,8 +177,14 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       dataHandlerDispose?.();
       exitHandlerDispose?.();
       if (boundSessionId) {
+        // 所有者だった socket の切断時のみ GC をスケジュールする。
+        // 再接続で新しい socket が既に所有者になっている場合や、ゾンビ/非所有 socket の
+        // 遅延切断では GC を張らない（現役セッションが誤って GC 対象になるのを防ぐ）。
+        const wasOwner = ptyManager.getActiveSocket(boundSessionId) === socket.id;
         ptyManager.clearActiveSocket(boundSessionId, socket.id);
-        ptyManager.scheduleGc(boundSessionId);
+        if (wasOwner) {
+          ptyManager.scheduleGc(boundSessionId);
+        }
       }
     });
   });

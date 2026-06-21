@@ -71,11 +71,14 @@ export function useTabStatusEvents(
 
     const socket = ensureConnected();
 
-    // 新しいタブのroomに参加
+    // 新しいタブのroomに参加（購読のみ: PTY IO を接続しない）
+    // mode を省略するとサーバー側で 'terminal' 扱いになり、PTY に input/onData/exit
+    // ハンドラが登録され GC スケジュールにも参加してしまう。status 購読専用のため
+    // 必ず mode='subscribe' を指定する（再接続ハンドラ・useTerminalTodos と統一）。
     for (const tabId of tabIds) {
       const room = `tab:${tabId}`;
       if (!joinedRoomsRef.current.has(room)) {
-        socket.emit('join', { room });
+        socket.emit('join', { room, mode: 'subscribe' });
         joinedRoomsRef.current.add(room);
       }
     }
