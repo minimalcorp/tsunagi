@@ -5,9 +5,9 @@
   "description": "Next.js UI for tsunagi",
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 2791",
+    "dev": "next dev -p 2792",
     "build": "next build",
-    "start": "next start -p 2791",
+    "start": "next start -p 2792",
     "lint": "eslint",
     "type-check": "tsc --noEmit"
   },

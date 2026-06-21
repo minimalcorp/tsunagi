@@ -4,11 +4,14 @@
 
 ## ポートマッピング
 
-| サービス         | ホスト | container |
-| ---------------- | ------ | --------- |
-| Web (Next.js)    | 2891   | 2791      |
-| Server (Fastify) | 2892   | 2792      |
-| Docs             | 2893   | 2793      |
+Fastify (container 2791 → host 2891) が単一入口。Web/API/WebSocket をまとめて配信し、
+それ以外は内部 Next.js (2792) へプロキシする。**アクセスは host:2891 のみ**でよい。
+
+| サービス           | ホスト | container | 備考                                 |
+| ------------------ | ------ | --------- | ------------------------------------ |
+| 単一入口 (Fastify) | 2891   | 2791      | Web/API/WS をここで配信。アクセス先  |
+| Next.js (内部)     | 2892   | 2792      | Fastify がプロキシ。直接アクセス不要 |
+| Docs               | 2893   | 2793      |                                      |
 
 ## 前提条件
 
@@ -39,9 +42,23 @@ make up
 
 起動後:
 
-- Web UI: http://localhost:2891
-- API: http://localhost:2892
+- Web UI / API / WebSocket: http://localhost:2891 （すべてここ経由）
 - Docs: http://localhost:2893
+
+### Basic 認証付きで起動（cloudflared 等で外部公開する場合）
+
+外部公開時は認証なしだと脆弱なため、Basic 認証を有効化して起動する。
+`TSUNAGI_BASIC_AUTH_USER` と `TSUNAGI_BASIC_AUTH_PASSWORD` の **両方** を渡すと有効化される
+（どちらか欠けると無効）。
+
+```bash
+TSUNAGI_BASIC_AUTH_USER=tsunagi TSUNAGI_BASIC_AUTH_PASSWORD=xxxx make up
+```
+
+- 外部（cloudflared 経由）からのアクセスはページ/API/WS すべて認証必須になる
+- ローカルマシン上の Claude Code 連携 (hooks / MCP) や死活監視は認証なしで通る
+- 本番ビルド版でも同様に渡せる: `TSUNAGI_BASIC_AUTH_USER=tsunagi TSUNAGI_BASIC_AUTH_PASSWORD=xxxx make up-prd`
+- 値はコミットされない（compose は環境変数を参照するだけ）。リポジトリ root の `.env`（gitignore 対象）に書いてもよい
 
 ### ログ確認
 
