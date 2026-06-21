@@ -4,6 +4,8 @@ node_modules
 # Next.js
 .next
 out
+# Next が dev 実行時に独自フォーマットで自動書き換えするため prettier 対象外にする
+apps/web/tsconfig.json
 
 # Build
 build
