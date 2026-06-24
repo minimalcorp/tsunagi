@@ -9,6 +9,10 @@ import { prisma } from '../lib/db.js';
 // サーバーはプロジェクトルートから起動されるため process.cwd() でルートを取得
 const TSUNAGI_EDITOR_PATH = path.resolve(process.cwd(), 'scripts/monaco-editor.sh');
 
+// Fastify(API) の公開ポート。index.ts と同じ既定値。monaco-editor.sh など PTY 内の
+// プロセスが API を叩く際の同一ホスト向けベース URL に使う。
+const SERVER_PORT = Number(process.env.PORT) || 2791;
+
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
 }
@@ -240,6 +244,9 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       const tsunagiDefaultEnv: Record<string, string> = {
         EDITOR: TSUNAGI_EDITOR_PATH,
         TSUNAGI_SESSION_ID: sessionId,
+        // monaco-editor.sh が API(Fastify) を叩くためのベース URL。サーバーと同一
+        // ホストなので localhost。単一ポート化で API は SERVER_PORT(既定 2791)。
+        TSUNAGI_API_BASE: `http://localhost:${SERVER_PORT}`,
       };
       const mergedEnv = { ...tsunagiDefaultEnv, ...globalEnv, ...env };
 
