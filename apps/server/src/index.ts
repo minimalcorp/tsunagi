@@ -97,10 +97,14 @@ async function start() {
   // - /api/* と /health は上で定義済みルートが wildcard より優先される。
   // - /socket.io は Socket.IO が HTTP サーバ層で先取りするためここには来ない。
   // - websocket は false。HMR は下の透過リレーで、Socket.IO は engine.io が終端する。
+  // - OPTIONS は除外。@fastify/cors が `OPTIONS *` を登録済みで、proxy が同じ
+  //   `OPTIONS /*` を登録すると "Method 'OPTIONS' already declared" で起動失敗する。
+  //   preflight は cors が処理するため proxy 側で OPTIONS を扱う必要はない。
   await fastify.register(httpProxy, {
     upstream: `http://localhost:${NEXT_PORT}`,
     prefix: '/',
     websocket: false,
+    httpMethods: ['DELETE', 'GET', 'HEAD', 'PATCH', 'POST', 'PUT'],
   });
 
   // 開発時のみ: Next.js の HMR(WebSocket = /_next/webpack-hmr) を 2791 経由でも
