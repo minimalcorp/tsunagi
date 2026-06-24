@@ -11,7 +11,9 @@
 set -e
 
 TMPFILE="$1"
-API_BASE="http://localhost:2792"
+# API ベース URL は PTY 生成時に terminal.ts が注入する（TSUNAGI_API_BASE）。
+# 未設定時は単一ポート構成の Fastify 既定ポート(2791)へフォールバック。
+API_BASE="${TSUNAGI_API_BASE:-http://localhost:2791}"
 
 if [ -z "$TMPFILE" ]; then
   echo "Usage: monaco-editor.sh <tmpfile>" >&2
