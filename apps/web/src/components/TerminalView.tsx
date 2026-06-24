@@ -465,7 +465,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       socketRef.current.disconnect();
     }
 
-    const socket = io(getServerUrl(), { transports: ['websocket'] });
+    // polling を含める。iOS(WebKit) は Basic 認証情報を WS ハンドシェイクに付与しない
+    // ため、認証付き公開時は polling(XHR) でないと接続できない。デスクトップは WS に昇格。
+    const socket = io(getServerUrl(), { transports: ['polling', 'websocket'] });
     socketRef.current = socket;
     // reused時: 最初のoutputイベント（リングバッファ）受信後にリサイズを再送する
     let firstMessageHandled = false;
