@@ -62,10 +62,13 @@ async function start() {
   }
 
   const io = new SocketIOServer(fastify.server, {
-    transports: ['websocket'],
+    // polling を許可しておく。iOS Safari/Chrome(WebKit) は Basic 認証のキャッシュ
+    // 資格情報を WebSocket ハンドシェイクには付与しない既知の挙動があり、WS のみだと
+    // 認証付き公開時に iOS 端末から接続できず "connecting..." のまま固まる。polling は
+    // XHR なので Authorization が乗り、認証を通過できる（デスクトップは WS に自動昇格）。
+    transports: ['polling', 'websocket'],
     cors: { origin: corsOrigins },
-    // Basic 認証（有効時）。WS ハンドシェイクの Authorization をブラウザがキャッシュ
-    // 済み認証情報として送るため、ここで検証する。
+    // Basic 認証（有効時）。polling は XHR、WS はハンドシェイクの Authorization を検証する。
     allowRequest: basicAuth
       ? (req, callback) =>
           callback(null, basicAuth.isAuthorized(req.headers, req.url, req.socket.remoteAddress))

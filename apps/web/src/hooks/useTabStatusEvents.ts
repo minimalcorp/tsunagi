@@ -42,7 +42,8 @@ export function useTabStatusEvents(
 
   const ensureConnected = useCallback(() => {
     if (!socketRef.current) {
-      const socket = io(getServerUrl(), { transports: ['websocket'] });
+      // polling 併用: iOS(WebKit) は Basic 認証情報を WS に付与しないため（認証付き公開時の iOS 対策）
+      const socket = io(getServerUrl(), { transports: ['polling', 'websocket'] });
       socketRef.current = socket;
 
       socket.on(
