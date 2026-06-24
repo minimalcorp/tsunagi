@@ -12,9 +12,14 @@ services:
       - ${SSH_SOCK_HOST}:${SSH_SOCK_CONTAINER}
       - ~/.gitconfig:/home/node/.gitconfig:ro
     environment:
-      - NEXT_PUBLIC_TSUNAGI_SERVER_URL=http://localhost:2892
+      # Fastify(container 2791 → host 2891)を単一入口に同一オリジン配信するため、
+      # API/WS 向き先の上書きは不要。host:2891 でアクセスする。
       - TSUNAGI_EXTRA_CORS_ORIGINS=http://localhost:2891
       - SSH_AUTH_SOCK=${SSH_SOCK_CONTAINER}
+      # Basic 認証: ホストで両方 export して `make up` すると有効化される（未設定なら無効）。
+      #   例: TSUNAGI_BASIC_AUTH_USER=tsunagi TSUNAGI_BASIC_AUTH_PASSWORD=xxxx make up
+      - TSUNAGI_BASIC_AUTH_USER=${TSUNAGI_BASIC_AUTH_USER:-}
+      - TSUNAGI_BASIC_AUTH_PASSWORD=${TSUNAGI_BASIC_AUTH_PASSWORD:-}
     ports:
       - '2891:2791'
       - '2892:2792'

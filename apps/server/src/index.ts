@@ -1,5 +1,8 @@
+import net from 'node:net';
+
 import Fastify from 'fastify';
 import fastifyCors from '@fastify/cors';
+import httpProxy from '@fastify/http-proxy';
 import { Server as SocketIOServer } from 'socket.io';
 
 import { tasksRoutes } from './routes/tasks.js';
@@ -14,14 +17,22 @@ import { hooksRoutes } from './routes/hooks.js';
 import { mcpRoutes } from './routes/mcp.js';
 import { terminalRoutes } from './routes/terminal.js';
 import { editorRoutes } from './routes/editor.js';
+import { createBasicAuth } from './basic-auth.js';
 
-const PORT = 2792;
+// Fastify は単一の公開エンドポイント。Next.js は内部ポートで動かしプロキシする。
+const PORT = Number(process.env.PORT) || 2791;
+const NEXT_PORT = Number(process.env.TSUNAGI_NEXT_PORT) || 2792;
 
 const extraOrigins = (process.env.TSUNAGI_EXTRA_CORS_ORIGINS ?? '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
-const corsOrigins = ['http://localhost:2791', ...extraOrigins];
+// 本番(cloudflared 等)は同一オリジンで CORS 不要。dev は Next を 2792 で直接開く
+// ため、その origin からの cross-origin リクエストを許可する。
+const corsOrigins = [`http://localhost:${NEXT_PORT}`, ...extraOrigins];
+
+// TSUNAGI_BASIC_AUTH_USER / TSUNAGI_BASIC_AUTH_PASSWORD が両方ある時だけ有効。
+const basicAuth = createBasicAuth();
 
 async function start() {
   const fastify = Fastify({
@@ -35,9 +46,30 @@ async function start() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
+  // Basic 認証（有効時のみ）。CORS の後に登録することで preflight(OPTIONS) は
+  // @fastify/cors が先に応答し、認証で弾かれない。
+  if (basicAuth) {
+    fastify.addHook('onRequest', async (request, reply) => {
+      if (basicAuth.isAuthorized(request.headers, request.url, request.socket.remoteAddress)) {
+        return;
+      }
+      reply
+        .header('WWW-Authenticate', basicAuth.challenge)
+        .code(401)
+        .send('Authentication required');
+      return reply;
+    });
+  }
+
   const io = new SocketIOServer(fastify.server, {
     transports: ['websocket'],
     cors: { origin: corsOrigins },
+    // Basic 認証（有効時）。WS ハンドシェイクの Authorization をブラウザがキャッシュ
+    // 済み認証情報として送るため、ここで検証する。
+    allowRequest: basicAuth
+      ? (req, callback) =>
+          callback(null, basicAuth.isAuthorized(req.headers, req.url, req.socket.remoteAddress))
+      : undefined,
     // 死んだ接続（スリープ・ネットワーク断等）を早めに検出して、ぶら下がった socket が
     // 保持する PTY の onData/onExit ハンドラを早く解放する。既定 (25s/20s) では検出までに
     // 最大 ~45s かかり、その間ゾンビ socket がリスナーを溜め込み出力が多重化する。
@@ -60,6 +92,52 @@ async function start() {
   await fastify.register(mcpRoutes, { prefix: '/api' });
   await fastify.register(terminalRoutes, { prefix: '/api' });
   await fastify.register(editorRoutes, { prefix: '/api' });
+
+  // catch-all リバースプロキシ: /api・/socket.io・/health 以外を内部 Next.js へ転送。
+  // - /api/* と /health は上で定義済みルートが wildcard より優先される。
+  // - /socket.io は Socket.IO が HTTP サーバ層で先取りするためここには来ない。
+  // - websocket は false。HMR は下の透過リレーで、Socket.IO は engine.io が終端する。
+  // - OPTIONS は除外。@fastify/cors が `OPTIONS *` を登録済みで、proxy が同じ
+  //   `OPTIONS /*` を登録すると "Method 'OPTIONS' already declared" で起動失敗する。
+  //   preflight は cors が処理するため proxy 側で OPTIONS を扱う必要はない。
+  await fastify.register(httpProxy, {
+    upstream: `http://localhost:${NEXT_PORT}`,
+    prefix: '/',
+    websocket: false,
+    httpMethods: ['DELETE', 'GET', 'HEAD', 'PATCH', 'POST', 'PUT'],
+  });
+
+  // 開発時のみ: Next.js の HMR(WebSocket = /_next/webpack-hmr) を 2791 経由でも
+  // 使えるよう透過 TCP リレーする。これにより dev も本番と同じく単一ポート(2791)で
+  // 完結し、HMR / API / Socket.IO がすべて同一オリジンで動く。
+  //
+  // 注意: @fastify/http-proxy の websocket:true は upgrade を Fastify router 経由で
+  // ディスパッチするため、/socket.io の upgrade まで catch-all ルートが拾い例外を
+  // 投げる（Socket.IO 接続毎にエラーログ）。そのため WS は自前で /_next/webpack-hmr
+  // だけを対象にし、/socket.io には一切触れず engine.io に委ねる。
+  // 本番(standalone Next)は HMR が無いので何もしない。
+  if (process.env.NODE_ENV !== 'production') {
+    fastify.server.on('upgrade', (req, socket, head) => {
+      if (!req.url?.startsWith('/_next/webpack-hmr')) return;
+      if (basicAuth && !basicAuth.isAuthorized(req.headers, req.url, req.socket.remoteAddress)) {
+        socket.destroy();
+        return;
+      }
+      const upstream = net.connect(NEXT_PORT, '127.0.0.1', () => {
+        upstream.write(`${req.method} ${req.url} HTTP/1.1\r\n`);
+        const raw = req.rawHeaders;
+        for (let i = 0; i < raw.length; i += 2) {
+          upstream.write(`${raw[i]}: ${raw[i + 1]}\r\n`);
+        }
+        upstream.write('\r\n');
+        if (head?.length) upstream.write(head);
+        socket.pipe(upstream);
+        upstream.pipe(socket);
+      });
+      upstream.on('error', () => socket.destroy());
+      socket.on('error', () => upstream.destroy());
+    });
+  }
 
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
   console.log(`Fastify server running on port ${PORT}`);

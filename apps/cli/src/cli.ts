@@ -206,18 +206,20 @@ function verifyArtifact(p: string, label: string): void {
 verifyArtifact(FASTIFY_ENTRY_JS, 'Fastify server artifact');
 verifyArtifact(NEXT_STANDALONE_ENTRY, 'Next.js standalone artifact');
 
+// Fastify が単一の公開ポート。Next.js は内部ポートで動かし Fastify からプロキシする。
 const PORT = process.env.PORT ?? '2791';
+const NEXT_PORT = '2792';
 
 const fastifyChild: ChildProcess = spawn(process.execPath, [FASTIFY_ENTRY_JS], {
   stdio: ['inherit', 'pipe', 'pipe'],
   cwd: PACKAGE_ROOT,
-  env: { ...process.env, NODE_ENV: 'production' },
+  env: { ...process.env, NODE_ENV: 'production', PORT, TSUNAGI_NEXT_PORT: NEXT_PORT },
 });
 
 const nextChild: ChildProcess = spawn(process.execPath, [NEXT_STANDALONE_ENTRY], {
   stdio: ['inherit', 'pipe', 'pipe'],
   cwd: path.dirname(NEXT_STANDALONE_ENTRY),
-  env: { ...process.env, PORT, NODE_ENV: 'production', HOSTNAME: '0.0.0.0' },
+  env: { ...process.env, PORT: NEXT_PORT, NODE_ENV: 'production', HOSTNAME: '0.0.0.0' },
 });
 
 const docsServer = startDocsServer();
@@ -241,7 +243,6 @@ nextChild.stderr?.on('data', (data: Buffer) => {
 // ---------------------------------------------------------------------------
 // Ready detection via /health polling
 // ---------------------------------------------------------------------------
-const SERVER_PORT = 2792;
 const POLL_INTERVAL_MS = 300;
 
 function pollHealth(port: number): Promise<void> {
@@ -264,7 +265,8 @@ function pollHealth(port: number): Promise<void> {
   });
 }
 
-Promise.all([pollHealth(SERVER_PORT), pollHealth(Number(PORT))]).then(() => {
+// Fastify(PORT) と Next(NEXT_PORT) は各々 /health を持つ。各プロセスを直接叩く。
+Promise.all([pollHealth(Number(PORT)), pollHealth(Number(NEXT_PORT))]).then(() => {
   spinner.stop();
   console.log(TSUNAGI_AA);
 

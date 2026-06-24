@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
+    "@fastify/http-proxy": "^11.5.0",
     "@libsql/client": "0.8.1",
     "@minimalcorp/tsunagi-shared": "*",
     "@modelcontextprotocol/sdk": "^1.27.1",
