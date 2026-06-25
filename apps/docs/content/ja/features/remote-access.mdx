@@ -1,0 +1,83 @@
+---
+title: 外部からの利用
+description: Basic 認証と cloudflared で Tsunagi を外部公開し、テザリングの通信量を抑える。
+---
+
+import { Callout } from 'nextra/components';
+
+# 外部からの利用
+
+Tsunagi は通常ローカルマシン上で動きます。外出先のスマホやテザリングした
+ノート PC など、**外から操作したい**ときは、[cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+のようなトンネルで公開し、Basic 認証で保護できます。
+
+## Basic 認証
+
+Tsunagi を起動するシェルで以下の環境変数を**両方**設定すると Basic 認証が
+有効になります:
+
+| 変数                          | 用途                |
+| ----------------------------- | ------------------- |
+| `TSUNAGI_BASIC_AUTH_USER`     | Basic 認証のユーザー名 |
+| `TSUNAGI_BASIC_AUTH_PASSWORD` | Basic 認証のパスワード |
+
+```bash
+TSUNAGI_BASIC_AUTH_USER=alice \
+TSUNAGI_BASIC_AUTH_PASSWORD=長くてランダムな秘密の文字列 \
+tsunagi
+```
+
+認証が有効になるのは**両方**設定されているときだけです。どちらかが欠けて
+いると Tsunagi は認証なしで動きます (localhost 専用利用向け)。
+
+<Callout type="info">
+  外部からのリクエスト (Cloudflare 経由のもの) は常に認証が必須です。一方、同一マシン上の内部連携
+  ——Claude Code プラグインの hooks、MCP、Monaco エディタヘルパー、死活監視——は認証なしで通るので、
+  これまで通り動きます。判定は Cloudflare が必ず付与するヘッダに基づくため、外部から「ローカルに偽装」
+  することはできません。
+</Callout>
+
+Basic 認証を有効にすれば、あとはローカルポートにトンネルを向けるだけで公開
+できます:
+
+```bash
+cloudflared tunnel --url http://localhost:2791
+```
+
+<Callout type="warning">
+  外部公開する前に必ず強固なパスワードを設定してください。URL に到達して Basic 認証を通過した相手は、
+  あなたのマシンのターミナルにフルアクセスできます。
+</Callout>
+
+## 通信量: Chrome Remote Desktop の 10 分の 1 以下
+
+スマホのテザリングで作業する場合、通信量は重要です。Tsunagi は
+**テキストベースのターミナル** (xterm.js が PTY 出力を WebSocket で配信) なので、
+送るのは文字だけでピクセルは送りません。**Chrome Remote Desktop (CRD)** の
+ような画面共有ツールは画面全体を映像エンコードするため、スクロールやキー入力の
+たびに帯域を消費します。
+
+| ツール                    | 通常作業時の通信量  |
+| ------------------------- | ------------------- |
+| **Tsunagi**               | 約 10〜15 MB/時     |
+| **Chrome Remote Desktop** | 約 100 MB〜1 GB/時  |
+
+通常作業で **10 倍以上、多くの場合 20〜30 倍**の差です。テザリングでは、これは
+月あたり数 GB か数十 GB かの違いになります。
+
+<Callout type="info">
+  Tsunagi の数値は通常のインタラクティブ作業をローカルループバックで実測したものです。実際のテザリング
+  では TLS / トンネルのオーバーヘッドが少し乗りますが、桁は変わりません。CRD の数値はサードパーティの
+  概算で、解像度や画面の動きによって変動します。
+</Callout>
+
+## CRD を failover として使う
+
+テザリング向けの実用的なハイブリッド構成: **普段は Tsunagi をメイン**の
+リモート環境として使って通信量を最小に抑えつつ、Tsunagi に到達できない稀な
+ケース (トンネル断、GUI アプリが必要、ターミナル以外の作業) のために **CRD を
+failover** として残しておく、というやり方です。
+
+重い CRD 経路に切り替えるのはたまにだけなので、いざという時のフルデスクトップ
+の逃げ道を確保しつつ、全体のテザリング消費は Tsunagi の低い水準に近いまま保て
+ます。
