@@ -176,6 +176,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   // xterm 初期化（マウント時のみ）
   useEffect(() => {
     if (!containerRef.current) return;
+    // cleanup でも参照するため、effect 実行時点の要素をローカルに退避する
+    // （ref は cleanup 実行時に変化している可能性があるため）。
+    const container = containerRef.current;
 
     const term = new Terminal({
       cursorBlink: true,
@@ -219,9 +222,31 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       }
     });
 
-    // xterm.js は CompositionHelper 内で composition 中のキーストロークを内部で抑制し、
-    // compositionend 後の setTimeout で確定テキストのみ triggerDataEvent → onData で通知する。
-    // そのため我々が compositionstart/end を監視して onData をガードする必要はない。
+    // iPadOS Safari + ハードウェアキーボードは IME 確定時に compositionend を2回発火する
+    // （1回目: data=確定文字 / 2回目: data="" 約20ms後）。xterm.js の CompositionHelper は
+    // compositionend ごとに確定テキストを onData へ送るため、2回目で同じ文字列が再送され
+    // PTY に二重入力される（例:「あいうえお」→「あいうえおあいうえお」）。
+    // 2つの onData はどちらも compositionend 後（isComposing=false）に発火するため、
+    // composition 中を抑制するガードでは防げない。
+    // 対策: 余分な2回目（空データ かつ 直前 compositionend から極短時間）を、xterm の
+    // textarea リスナーへ届く前に capture フェーズ（親要素）で握りつぶす。
+    // - 確定文字を持つ1回目は必ず通過する
+    // - ソフトウェアキーボード/デスクトップは compositionend 1回のみのため影響なし
+    // - IME キャンセル時の空 compositionend は直前に確定が無いため抑制されない
+    let lastCompositionEndAt = 0;
+    const DUP_COMPOSITION_END_MS = 100; // 実測の二重発火間隔は約18ms
+    const onCompositionEndCapture = (e: Event) => {
+      const now = performance.now();
+      if (
+        (e as CompositionEvent).data === '' &&
+        now - lastCompositionEndAt < DUP_COMPOSITION_END_MS
+      ) {
+        e.stopImmediatePropagation();
+        return;
+      }
+      lastCompositionEndAt = now;
+    };
+    container.addEventListener('compositionend', onCompositionEndCapture, true);
 
     const observer = new ResizeObserver(() => {
       // editor session (Ctrl+G Monaco modal) 中は fit / sendResize を一切行わない。
@@ -246,6 +271,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     return () => {
       abortController.abort();
       observer.disconnect();
+      container.removeEventListener('compositionend', onCompositionEndCapture, true);
       onDataDisposeRef.current?.dispose();
       onDataDisposeRef.current = null;
       term.dispose();
