@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { Footer, Layout, Navbar } from 'nextra-theme-docs';
 import { Banner } from 'nextra/components';
+import type { PageMapItem } from 'nextra';
 import { getPageMap } from 'nextra/page-map';
 import type { ReactNode } from 'react';
 import logoIcon from '../icon.png';
@@ -12,6 +13,25 @@ export type Locale = (typeof LOCALES)[number];
 
 function isValidLocale(value: string): value is Locale {
   return (LOCALES as readonly string[]).includes(value);
+}
+
+// getPageMap(`/${lang}`) が返す route は locale 相対 (/getting-started/...) のため、
+// middleware を持たない static export (output: 'export') では locale が欠落し、
+// サイドバーやページ送りのリンクが 404 になる。再帰的に /<lang> を前置して補完する。
+function prefixLocaleRoutes(items: PageMapItem[], lang: string): PageMapItem[] {
+  return items.map((item) => {
+    if ('children' in item) {
+      const route =
+        'route' in item && typeof item.route === 'string' && !item.route.startsWith(`/${lang}`)
+          ? `/${lang}${item.route === '/' ? '' : item.route}`
+          : item.route;
+      return { ...item, route, children: prefixLocaleRoutes(item.children, lang) };
+    }
+    if ('route' in item && typeof item.route === 'string' && !item.route.startsWith(`/${lang}`)) {
+      return { ...item, route: `/${lang}${item.route === '/' ? '' : item.route}` };
+    }
+    return item;
+  });
 }
 
 // static export 用のロケール一覧を事前生成する
@@ -62,14 +82,14 @@ export default async function LangLayout({ children, params }: LayoutProps) {
     </Footer>
   );
 
-  const pageMap = await getPageMap(`/${lang}`);
+  const pageMap = prefixLocaleRoutes(await getPageMap(`/${lang}`), lang);
 
   return (
     <Layout
       banner={banner}
       navbar={navbar}
       footer={footer}
-      docsRepositoryBase={`https://github.com/minimalcorp/tsunagi/tree/main/apps/docs/content/${lang}`}
+      docsRepositoryBase="https://github.com/minimalcorp/tsunagi/tree/main/apps/docs"
       i18n={[
         { locale: 'en', name: 'English' },
         { locale: 'ja', name: '日本語' },
