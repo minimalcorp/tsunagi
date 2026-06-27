@@ -17,6 +17,30 @@ interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
 }
 
+/**
+ * 再接続時の画面復元用 scrollback から「端末への問い合わせ（クエリ）」シーケンスを除去する。
+ *
+ * Claude(Ink) は描画中に DECXCPR(ESC[?6n) や DA(ESC[c) を大量に出力する。これらは生の
+ * まま scrollback に蓄積される。再接続時に scrollback をそのまま replay すると、xterm.js が
+ * 「今ホストから来たクエリ」と誤認して応答を生成し（deviceStatusPrivate / sendDeviceAttributes →
+ * triggerDataEvent）、その応答が onData → emit('input') → PTY へ注入される。
+ * 結果、シェルや Claude の入力欄に "1;2c64;3R64;3R..."（DA応答 ESC[?1;2c / CPR応答 ESC[?r;cR の
+ * 可視部）が勝手に入力される。
+ *
+ * クエリ列は視覚出力を持たないため、replay からは除去して構わない（画面復元は壊れない）。
+ * 対象は CSI ... n（DSR系: ESC[?6n / ESC[6n / ESC[5n）と CSI ... c（DA系: ESC[c / ESC[0c /
+ * ESC[>c）。チャンク境界を跨ぐクエリ列を取りこぼさないよう、必ず scrollback を join した
+ * 後の文字列に適用する。
+ *
+ * 注意: ライブ出力（onData 経由の emit('output')）には適用しない。動作中の Claude が正当に
+ * 要求しているクエリへの応答は PTY に返す必要があるため、除去は replay 限定とする。
+ */
+function stripTerminalQueries(s: string): string {
+  return s
+    .replace(/\x1b\[[?>]?[0-9;]*n/g, '') // DSR: ESC[?6n(主犯) / ESC[6n / ESC[5n など
+    .replace(/\x1b\[[?>=]?[0-9;]*c/g, ''); // DA: ESC[c / ESC[0c / ESC[>c / ESC[=c
+}
+
 interface CreateSessionBody {
   cwd?: string;
   env?: Record<string, string>;
@@ -99,7 +123,10 @@ export async function terminalRoutes(fastify: FastifyInstance) {
 
       // リングバッファの内容を一括送信（再接続時の画面復元）
       if (isReused) {
-        const buffered = session.scrollback.join('');
+        // 端末クエリ列（ESC[?6n / ESC[c 等）を除去してから replay する。
+        // これを怠ると xterm.js が応答を生成し PTY へ注入され、入力欄に "1;2c64;3R..." が
+        // 勝手に入力される（stripTerminalQueries のコメント参照）。
+        const buffered = stripTerminalQueries(session.scrollback.join(''));
         // 末尾の \r\n / \n / \r をトリムする。
         const trimmed = buffered.replace(/[\r\n]+$/, '');
         socket.emit('output', { data: trimmed });
