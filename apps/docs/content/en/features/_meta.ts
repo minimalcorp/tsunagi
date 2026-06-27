@@ -3,4 +3,5 @@ export default {
   'task-management': 'Task Management',
   plugin: 'Tsunagi Plugin',
   'environment-variables': 'Environment Variables',
+  'remote-access': 'Remote Access',
 };

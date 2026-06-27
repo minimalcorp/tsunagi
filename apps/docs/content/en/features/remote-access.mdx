@@ -1,0 +1,85 @@
+---
+title: Remote Access
+description: Expose Tsunagi externally with Basic Auth and cloudflared, and keep tethering data low.
+---
+
+import { Callout } from 'nextra/components';
+
+# Remote Access
+
+Tsunagi normally runs on your local machine. When you want to drive it
+from outside — your phone on the go, a tethered laptop — you can put it
+behind a tunnel like [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+and protect it with Basic Auth.
+
+## Basic Auth
+
+Set **both** of these environment variables in the shell that launches
+Tsunagi to turn on Basic Auth:
+
+| Variable                      | Purpose             |
+| ----------------------------- | ------------------- |
+| `TSUNAGI_BASIC_AUTH_USER`     | Basic Auth username |
+| `TSUNAGI_BASIC_AUTH_PASSWORD` | Basic Auth password |
+
+```bash
+TSUNAGI_BASIC_AUTH_USER=alice \
+TSUNAGI_BASIC_AUTH_PASSWORD=a-long-random-secret \
+tsunagi
+```
+
+Auth is enabled only when **both** are set; if either is missing, Tsunagi
+runs with no auth (suitable for localhost-only use).
+
+<Callout type="info">
+  External requests (those arriving via Cloudflare) always require auth. Local same-machine
+  integrations — the Claude Code plugin hooks, MCP, the Monaco editor helper, health checks — stay
+  exempt so they keep working without credentials. External access can't impersonate local because
+  the check relies on headers Cloudflare always sets.
+</Callout>
+
+With Basic Auth on, exposing Tsunagi is as simple as pointing a tunnel at
+its local port:
+
+```bash
+cloudflared tunnel --url http://localhost:2791
+```
+
+<Callout type="warning">
+  Always set a strong password before exposing Tsunagi. Anyone who reaches the URL and passes Basic
+  Auth gets full terminal access to your machine.
+</Callout>
+
+## Data usage: 10×+ lighter than Chrome Remote Desktop
+
+If you work over a phone tether, data volume matters. Tsunagi is a
+**text-based terminal** (xterm.js streaming PTY output over a WebSocket),
+so it only sends characters — not pixels. Screen-sharing tools like
+**Chrome Remote Desktop (CRD)** encode the whole screen as video, so
+every scroll and keystroke costs bandwidth.
+
+| Tool                      | Typical usage     |
+| ------------------------- | ----------------- |
+| **Tsunagi**               | ~10–15 MB/hour    |
+| **Chrome Remote Desktop** | ~100 MB–1 GB/hour |
+
+That's a **10×+ difference, often 20–30×** for normal work. On a tethered
+connection this is the difference between a few GB and tens of GB per
+month.
+
+<Callout type="info">
+  The Tsunagi figure is measured on the local loopback for typical interactive work; real tethering
+  usage adds a little TLS / tunnel overhead but stays the same order of magnitude. The CRD figures
+  are third-party estimates and vary with resolution and screen activity.
+</Callout>
+
+## Using CRD as a failover
+
+A practical hybrid for tethering: use **Tsunagi as your primary** remote
+environment to keep data usage tiny, and keep **CRD as a failover** for
+the rare case Tsunagi is unreachable (tunnel down, needing a GUI app, a
+non-terminal task).
+
+Because you only fall back to the heavy CRD path occasionally, your
+overall tethering consumption stays close to Tsunagi's low baseline while
+you still have a full-desktop escape hatch when you need one.
