@@ -143,7 +143,7 @@ export async function deleteTask(id: string): Promise<boolean> {
 // ============================================
 
 // タブ作成
-export async function createTab(taskId: string): Promise<Tab | null> {
+export async function createTab(taskId: string, mode: Tab['mode'] = 'claude'): Promise<Tab | null> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: { tabs: true },
@@ -163,6 +163,7 @@ export async function createTab(taskId: string): Promise<Tab | null> {
       taskId,
       order,
       status: 'idle',
+      mode,
       startedAt: new Date(),
     },
   });
@@ -284,6 +285,7 @@ type PrismaTab = {
   tabId: string;
   order: number;
   status: string;
+  mode: string;
   todos: string | null;
   startedAt: Date;
   completedAt: Date | null;
@@ -317,6 +319,7 @@ function mapTab(tab: PrismaTab): Tab {
     tab_id: tab.tabId,
     order: tab.order,
     status: tab.status as Tab['status'],
+    mode: tab.mode as Tab['mode'],
     todos: tab.todos ? JSON.parse(tab.todos) : [],
     startedAt: tab.startedAt.toISOString(),
     completedAt: tab.completedAt?.toISOString(),

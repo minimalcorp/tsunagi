@@ -142,12 +142,14 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   };
 
   // タブ作成（新規tab_idを返す）
-  const handleTabCreate = async (): Promise<string | undefined> => {
+  const handleTabCreate = async (
+    mode: 'terminal' | 'claude' = 'claude'
+  ): Promise<string | undefined> => {
     try {
       const response = await fetch(apiUrl(`/api/tasks/${id}/tabs`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ mode }),
       });
 
       if (!response.ok) throw new Error('Failed to create tab');

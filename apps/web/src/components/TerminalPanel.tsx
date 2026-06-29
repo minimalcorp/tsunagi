@@ -22,7 +22,7 @@ interface TerminalPanelProps {
   tabs: Tab[];
   activeTabId?: string;
   onTabChange: (tabId: string) => void;
-  onTabCreate: () => Promise<string | undefined>;
+  onTabCreate: (mode: TabCreateMode) => Promise<string | undefined>;
   onTabDelete: (tabId: string) => void;
   /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
@@ -69,9 +69,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     // タブごとのリアルタイムステータス（TerminalViewからの通知）
     const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(new Map());
 
-    // タブごとの起動モード（terminal: claudeなし / claude: claude自動起動）
-    const [tabModeMap, setTabModeMap] = useState<Map<string, TabCreateMode>>(new Map());
-
     // 各TerminalViewへのrefマップ
     const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
 
@@ -117,16 +114,11 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     const handleTabCreate = useCallback(
       async (mode: TabCreateMode) => {
-        const newTabId = await onTabCreate();
+        const newTabId = await onTabCreate(mode);
         if (newTabId) {
           setMountedTabIds((prev) => {
             const next = new Set(prev);
             next.add(newTabId);
-            return next;
-          });
-          setTabModeMap((prev) => {
-            const next = new Map(prev);
-            next.set(newTabId, mode);
             return next;
           });
         }
@@ -149,11 +141,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           return next;
         });
         setTabStatusMap((prev) => {
-          const next = new Map(prev);
-          next.delete(tabId);
-          return next;
-        });
-        setTabModeMap((prev) => {
           const next = new Map(prev);
           next.delete(tabId);
           return next;
@@ -219,9 +206,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   cwd={task.worktreePath}
                   worktreePath={task.worktreePath}
                   command={
-                    tabModeMap.get(tab.tab_id) !== 'terminal'
-                      ? `claude --dangerously-skip-permissions --resume ${tab.tab_id} 2>/dev/null || claude --dangerously-skip-permissions --session-id ${tab.tab_id}`
-                      : undefined
+                    tab.mode === 'terminal'
+                      ? undefined
+                      : `claude --dangerously-skip-permissions --resume ${tab.tab_id} 2>/dev/null || claude --dangerously-skip-permissions --session-id ${tab.tab_id}`
                   }
                   className="h-full"
                   initialTodos={tab.todos}

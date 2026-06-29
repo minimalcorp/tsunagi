@@ -70,6 +70,7 @@ export function PlannerPanel() {
         tab_id: tabId,
         order: tabs.length,
         status: 'idle',
+        mode,
         startedAt: now,
         updatedAt: now,
       };
