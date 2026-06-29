@@ -141,6 +141,17 @@ export function SessionTabs({
     }
   }, [activeTabId, tabs]);
 
+  // Terminalモードのタブには連番ラベル（terminal 1, terminal 2, ...）を割り当てる。
+  // Claude用のステータス表示が存在しないため、番号で識別できるようにする。
+  const terminalNumbers = new Map<string, number>();
+  let terminalCount = 0;
+  for (const tab of tabs) {
+    if (tab.mode === 'terminal') {
+      terminalCount += 1;
+      terminalNumbers.set(tab.tab_id, terminalCount);
+    }
+  }
+
   return (
     <>
       <ConfirmDialog
@@ -188,7 +199,11 @@ export function SessionTabs({
             `}
             >
               <div className="font-medium flex items-center gap-2">
-                <TabStatusIndicator entry={entry} />
+                {tab.mode === 'terminal' ? (
+                  <span className="text-xs">terminal {terminalNumbers.get(tab.tab_id)}</span>
+                ) : (
+                  <TabStatusIndicator entry={entry} />
+                )}
               </div>
               {tabs.length > 1 && (
                 <Button

@@ -423,26 +423,30 @@ export async function tasksRoutes(fastify: FastifyInstance) {
   });
 
   // POST /tasks/:id/tabs
-  fastify.post<{ Params: { id: string } }>('/tasks/:id/tabs', async (request, reply) => {
-    try {
-      const { id: taskId } = request.params;
+  fastify.post<{ Params: { id: string }; Body: { mode?: 'terminal' | 'claude' } }>(
+    '/tasks/:id/tabs',
+    async (request, reply) => {
+      try {
+        const { id: taskId } = request.params;
+        const mode = request.body?.mode === 'terminal' ? 'terminal' : 'claude';
 
-      const task = await taskRepo.getTask(taskId);
-      if (!task) {
-        return reply.status(404).send({ error: 'Task not found' });
-      }
+        const task = await taskRepo.getTask(taskId);
+        if (!task) {
+          return reply.status(404).send({ error: 'Task not found' });
+        }
 
-      const newTab = await taskRepo.createTab(taskId);
-      if (!newTab) {
+        const newTab = await taskRepo.createTab(taskId, mode);
+        if (!newTab) {
+          return reply.status(500).send({ error: 'Failed to create tab' });
+        }
+
+        return reply.status(201).send({ data: { tab: newTab } });
+      } catch (error) {
+        fastify.log.error(error, 'POST /tasks/:id/tabs error');
         return reply.status(500).send({ error: 'Failed to create tab' });
       }
-
-      return reply.status(201).send({ data: { tab: newTab } });
-    } catch (error) {
-      fastify.log.error(error, 'POST /tasks/:id/tabs error');
-      return reply.status(500).send({ error: 'Failed to create tab' });
     }
-  });
+  );
 
   // PUT /tasks/:id/tabs/:tab_id
   fastify.put<{ Params: { id: string; tab_id: string }; Body: TabUpdateBody }>(
