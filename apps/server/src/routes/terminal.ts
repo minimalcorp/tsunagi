@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { ptyManager } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
+import { getEnv } from '../lib/repositories/environment.js';
 
 // サーバーはプロジェクトルートから起動されるため process.cwd() でルートを取得
 const TSUNAGI_EDITOR_PATH = path.resolve(process.cwd(), 'scripts/monaco-editor.sh');
@@ -251,21 +252,25 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      // DBからglobal環境変数を取得（有効なもののみ）
-      const globalEnv: Record<string, string> = {};
+      // sessionId(=tab_id) から Task(owner/repo) を解決し、repo スコープまで階層マージした
+      // 環境変数を取得する（global → owner → repo、後勝ちで上書き）。
+      // Plannerタブ等、Taskに紐づかないタブは Tab レコードが存在しないため global のみになる。
+      let dbEnv: Record<string, string> = {};
       try {
-        const globalEnvVars = await prisma.environmentVariable.findMany({
-          where: { scope: 'global', enabled: true },
+        const tab = await prisma.tab.findUnique({
+          where: { tabId: sessionId },
+          include: { task: true },
         });
-        globalEnvVars.forEach((e: { key: string; value: string }) => {
-          globalEnv[e.key] = e.value;
-        });
-        fastify.log.info({ count: globalEnvVars.length }, 'Loaded global env vars');
+        dbEnv = tab ? await getEnv('repo', tab.task.owner, tab.task.repo) : await getEnv('global');
+        fastify.log.info(
+          { count: Object.keys(dbEnv).length, owner: tab?.task.owner, repo: tab?.task.repo },
+          'Loaded env vars'
+        );
       } catch (err) {
-        fastify.log.warn({ err }, 'Failed to load global env vars');
+        fastify.log.warn({ err }, 'Failed to load env vars');
       }
 
-      // 優先順位: リクエストで渡されたenv > DBのglobal env > tsunagi独自のEDITOR設定
+      // 優先順位: リクエストで渡されたenv > DB env(global/owner/repo) > tsunagi独自のEDITOR設定
       // tsunagi-editor.sh をデフォルトにすることで Ctrl+G が Monaco Modal を開く。
       // DB / リクエストで EDITOR が明示設定されている場合はそちらが優先される。
       const tsunagiDefaultEnv: Record<string, string> = {
@@ -275,7 +280,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         // ホストなので localhost。単一ポート化で API は SERVER_PORT(既定 2791)。
         TSUNAGI_API_BASE: `http://localhost:${SERVER_PORT}`,
       };
-      const mergedEnv = { ...tsunagiDefaultEnv, ...globalEnv, ...env };
+      const mergedEnv = { ...tsunagiDefaultEnv, ...dbEnv, ...env };
 
       const session = ptyManager.createSession(sessionId, workingDir, mergedEnv);
 
