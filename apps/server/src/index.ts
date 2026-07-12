@@ -73,11 +73,14 @@ async function start() {
       ? (req, callback) =>
           callback(null, basicAuth.isAuthorized(req.headers, req.url, req.socket.remoteAddress))
       : undefined,
-    // 死んだ接続（スリープ・ネットワーク断等）を早めに検出して、ぶら下がった socket が
-    // 保持する PTY の onData/onExit ハンドラを早く解放する。既定 (25s/20s) では検出までに
-    // 最大 ~45s かかり、その間ゾンビ socket がリスナーを溜め込み出力が多重化する。
-    pingInterval: 15000,
-    pingTimeout: 10000,
+    // 死んだ接続（スリープ・ネットワーク断等）を検出して、ぶら下がった socket が
+    // 保持する PTY の onData/onExit ハンドラを解放する。フォアグラウンド表示中の詰まり検知は
+    // クライアント側の能動的なヘルスチェック（TerminalView.tsx の visibilitychange/interval）に
+    // 委ね、ここは主にバックグラウンド/スリープ由来のゾンビ socket 検出用。
+    // 既定 (25s/20s) より短いが、cloudflared 等のトンネル越しの一時的な詰まりを誤って
+    // 切断と判定しないよう、15s/10s よりは緩めている。
+    pingInterval: 20000,
+    pingTimeout: 15000,
   });
   fastify.decorate('io', io);
 

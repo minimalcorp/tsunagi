@@ -97,14 +97,18 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   // xterm の customKeyEventHandler（_keyUp内のfocus再取得）から参照する。
   const isExternalEditorOpenRef = useRef(false);
   const isActiveRef = useRef(isActive);
+  // 周期ヘルスチェックが最新の status を参照するためのref（setInterval内では state を直接見れないため）
+  const statusRef = useRef<TerminalStatus>('idle');
   // 初回接続かどうかを追跡（再接続時のフォーカス復帰判定用）
   const hasConnectedOnceRef = useRef(false);
   // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
   const suppressResizeRef = useRef(false);
   // term.onData の購読。connectSocket のたびに張り直すため dispose を保持して解放漏れを防ぐ。
   const onDataDisposeRef = useRef<{ dispose: () => void } | null>(null);
-  // visibilitychange ヘルスチェックのタイムアウトタイマー（多重発火・解放漏れ防止）
+  // ヘルスチェックのタイムアウトタイマー（多重発火・解放漏れ防止）
   const healthCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ヘルスチェックの health-check-ack リスナー（タイムアウト時に確実に解放するため保持）
+  const healthCheckAckHandlerRef = useRef<(() => void) | null>(null);
   // サーバ側セッションが GC 済みで join に失敗した際の自動再生成回数（無限ループ防止）
   const sessionRecreateRef = useRef(0);
   const [status, setStatus] = useState<TerminalStatus>('idle');
@@ -139,6 +143,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
   useLayoutEffect(() => {
     isActiveRef.current = isActive;
+  });
+
+  useLayoutEffect(() => {
+    statusRef.current = status;
   });
 
   // アクティブになったタイミングで xterm にフォーカスを当てる
@@ -348,29 +356,29 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     };
   }, []);
 
-  // フォアグラウンド復帰時にWebSocket接続の生死を検証し、死んでいれば即座に再接続する
+  // WebSocket接続の生死を能動的に検証し、死んでいれば即座に再接続する。
+  // - visibilitychange: フォアグラウンド復帰直後に1回
+  // - setInterval: フォアグラウンド表示中、engine.ioのping/pongだけに頼らず定期的に
+  //   （cloudflared等のトンネル越しの詰まりを早期検知するため）
   useEffect(() => {
     // 復帰直後はメインスレッドが輻輳しがちで ack の往復が遅れるため、
     // 短すぎるタイムアウトは健全な接続でも誤切断を招く。余裕を持たせる。
     const HEALTH_CHECK_TIMEOUT_MS = 6000;
+    const HEALTH_CHECK_INTERVAL_MS = 8000;
 
-    function handleVisibilityChange() {
-      if (document.visibilityState !== 'visible') return;
-
+    function runHealthCheck(opts: { refocus: boolean }) {
       const socket = socketRef.current;
       if (!socket || !socket.connected) return;
-
-      // 直前のヘルスチェックのタイマーが残っていれば破棄してから張り直す
-      // （ack リスナーは once 登録のため発火時に自動解放される）
-      if (healthCheckTimerRef.current) {
-        clearTimeout(healthCheckTimerRef.current);
-        healthCheckTimerRef.current = null;
-      }
+      // 前回のチェックが完了していなければ多重発火させない
+      if (healthCheckTimerRef.current) return;
 
       // ヘルスチェック: サーバーにpingを送り、応答がなければ明示的に再接続する
       healthCheckTimerRef.current = setTimeout(() => {
         healthCheckTimerRef.current = null;
-        socket.off('health-check-ack', onAck);
+        if (healthCheckAckHandlerRef.current) {
+          socket.off('health-check-ack', healthCheckAckHandlerRef.current);
+          healthCheckAckHandlerRef.current = null;
+        }
         // 接続が死んでいる。手動 disconnect だけで終えると Socket.IO の自動再接続が
         // 無効化され "Session ended" のデッドエンドに陥るため、明示的に再接続を起動する。
         // 同一 socket を再利用するため connectSocket は呼ばれず、onData の多重化も起きない。
@@ -380,27 +388,47 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         setStatus('connecting');
       }, HEALTH_CHECK_TIMEOUT_MS);
 
-      function onAck() {
+      const onAck = () => {
         if (healthCheckTimerRef.current) {
           clearTimeout(healthCheckTimerRef.current);
           healthCheckTimerRef.current = null;
         }
-        // 接続は生きている → フォーカスのみ復帰
-        if (isActiveRef.current) {
+        healthCheckAckHandlerRef.current = null;
+        // 接続は生きている → フォアグラウンド復帰時のみフォーカスを戻す
+        // （周期チェックのたびにフォーカスを奪うと他のUI操作を妨げるため）
+        if (opts.refocus && isActiveRef.current) {
           termRef.current?.focus();
         }
-      }
-
+      };
+      healthCheckAckHandlerRef.current = onAck;
       socket.once('health-check-ack', onAck);
       socket.emit('health-check');
     }
 
+    function handleVisibilityChange() {
+      if (document.visibilityState !== 'visible') return;
+      runHealthCheck({ refocus: true });
+    }
+
+    // ブラウザは非表示タブの setInterval をスロットルするため、非表示中は実質発火しない。
+    // バックグラウンド/スリープ時の検知は visibilitychange と engine.io の ping/pong に委ねる。
+    const intervalId = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (statusRef.current !== 'connected') return;
+      runHealthCheck({ refocus: false });
+    }, HEALTH_CHECK_INTERVAL_MS);
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(intervalId);
       if (healthCheckTimerRef.current) {
         clearTimeout(healthCheckTimerRef.current);
         healthCheckTimerRef.current = null;
+      }
+      if (healthCheckAckHandlerRef.current) {
+        socketRef.current?.off('health-check-ack', healthCheckAckHandlerRef.current);
+        healthCheckAckHandlerRef.current = null;
       }
     };
   }, []);
