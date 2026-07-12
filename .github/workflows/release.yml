@@ -81,8 +81,10 @@ jobs:
 
       # npm Trusted Publishing は npm CLI v11.5.1 以降が必要 (2025-07 GA)。
       # Node 24.12.0 同梱の npm が古い場合に備えて明示的に upgrade する。
+      # npm@latest (v12+) は Node ^24.15.0 以降を要求し、Node 24.12.0 とは
+      # engine 不適合でインストールに失敗するため、11.x系に固定する。
       - name: Ensure npm >= 11.5.1 (for Trusted Publishing)
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: npm ci
