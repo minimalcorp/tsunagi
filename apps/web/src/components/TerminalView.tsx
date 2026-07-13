@@ -52,6 +52,8 @@ interface TerminalViewProps {
   className?: string;
   /** DBから読み込んだ初期Todoリスト */
   initialTodos?: Todo[];
+  /** DBから読み込んだ初期Claudeステータス（ページ再訪時にsuccess等を維持するため） */
+  initialClaudeStatus?: ClaudeStatus;
   /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
   /** タブがアクティブかどうか（フォーカス制御用） */
@@ -81,6 +83,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     command,
     className = '',
     initialTodos,
+    initialClaudeStatus,
     isActive,
     onTodosUpdated,
     onStatusChange,
@@ -112,7 +115,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   // サーバ側セッションが GC 済みで join に失敗した際の自動再生成回数（無限ループ防止）
   const sessionRecreateRef = useRef(0);
   const [status, setStatus] = useState<TerminalStatus>('idle');
-  const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>('idle');
+  const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>(initialClaudeStatus ?? 'idle');
+  // ESC中断検知（term.onData のクロージャから最新値を読むためのref）
+  const claudeStatusRef = useRef<ClaudeStatus>(initialClaudeStatus ?? 'idle');
   const [todos, setTodos] = useState<Todo[]>(initialTodos ?? []);
   const [copied, setCopied] = useState(false);
   const { effectiveTheme } = useTheme();
@@ -147,6 +152,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
   useLayoutEffect(() => {
     statusRef.current = status;
+  });
+
+  useLayoutEffect(() => {
+    claudeStatusRef.current = claudeStatus;
   });
 
   // アクティブになったタイミングで xterm にフォーカスを当てる
@@ -433,6 +442,18 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     };
   }, []);
 
+  /**
+   * ESC中断をサーバに通知する。Claude CLIはESC中断時にStop/SessionEndを発火しないため、
+   * クライアント側でESC押下を検知してtab.statusをidleに戻す。
+   */
+  async function notifyInterrupt(sessionId: string) {
+    try {
+      await fetch(apiUrl(`/api/internal/tabs/${sessionId}/interrupt`), { method: 'POST' });
+    } catch (err) {
+      console.warn('[TerminalView] Failed to notify interrupt:', err);
+    }
+  }
+
   function sendResize() {
     const socket = socketRef.current;
     const term = termRef.current;
@@ -641,6 +662,15 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     );
 
     onDataDisposeRef.current = term.onData((data) => {
+      // ESC単体（矢印キー等のエスケープシーケンスは複数バイトのため対象外）押下時、
+      // running/waiting中ならClaude中断とみなしサーバへ通知する
+      if (
+        data === '\x1b' &&
+        (claudeStatusRef.current === 'running' || claudeStatusRef.current === 'waiting') &&
+        sessionIdRef.current
+      ) {
+        void notifyInterrupt(sessionIdRef.current);
+      }
       if (socket.connected && sessionIdRef.current) {
         socket.emit('input', { sessionId: sessionIdRef.current, data });
       }

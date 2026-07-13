@@ -74,4 +74,26 @@ export async function internalRoutes(fastify: FastifyInstance) {
       return reply.status(200).send({ ok: true });
     }
   );
+
+  // POST /internal/tabs/:tab_id/interrupt - ESC等によるClaude中断をidleに反映
+  fastify.post<{ Params: { tab_id: string } }>(
+    '/internal/tabs/:tab_id/interrupt',
+    async (request, reply) => {
+      const { tab_id } = request.params;
+
+      const result = await prisma.tab.updateMany({
+        where: { tabId: tab_id },
+        data: { status: 'idle' },
+      });
+
+      if (result.count === 0) {
+        return reply.status(404).send({ error: 'Tab not found' });
+      }
+
+      const room = `tab:${tab_id}`;
+      io.to(room).emit('status-changed', { sessionId: tab_id, status: 'idle' });
+
+      return reply.status(200).send({ data: { tabId: tab_id, status: 'idle' } });
+    }
+  );
 }

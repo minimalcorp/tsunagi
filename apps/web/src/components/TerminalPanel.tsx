@@ -66,8 +66,34 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       }
     }, [activeTabId]);
 
-    // タブごとのリアルタイムステータス（TerminalViewからの通知）
-    const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(new Map());
+    // タブごとのリアルタイムステータス（TerminalViewからの通知）。
+    // 初期値はDBの tab.status からシードする（ページ再訪時に success 等を維持するため）。
+    const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(
+      () =>
+        new Map(
+          tabs.map((tab) => [
+            tab.tab_id,
+            { terminal: 'connecting', claude: tab.status as ClaudeStatus },
+          ])
+        )
+    );
+
+    // tabs が再フェッチされた場合も未追跡タブをシードする。
+    // 既にリアルタイム値を持つタブは上書きしない（Socket.IO由来の最新状態を優先する）。
+    useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTabStatusMap((prev) => {
+        let changed = false;
+        const next = new Map(prev);
+        for (const tab of tabs) {
+          if (!next.has(tab.tab_id)) {
+            next.set(tab.tab_id, { terminal: 'connecting', claude: tab.status as ClaudeStatus });
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, [tabs]);
 
     // 各TerminalViewへのrefマップ
     const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
@@ -212,6 +238,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   }
                   className="h-full"
                   initialTodos={tab.todos}
+                  initialClaudeStatus={tab.status as ClaudeStatus}
                   onTodosUpdated={onTodosUpdated}
                   onStatusChange={handleStatusChange}
                 />
