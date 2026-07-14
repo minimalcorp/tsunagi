@@ -52,3 +52,13 @@ logs-prd: ## ログを follow 表示
 
 ps-prd: ## サービス状態表示
 	$(SSH_ENV) $(COMPOSE_PRD) ps
+
+# ---------------------------------------------------------------------------
+# whisper-server (音声入力)
+# mlx-whisperはApple Silicon Mac専用でDocker(Linux)上では動作しないため、
+# これだけはコンテナ経由ではなくホストマシン上で直接実行する。
+# ---------------------------------------------------------------------------
+.PHONY: whisper
+
+whisper: ## ローカルWhisperサーバーをセットアップ・起動 (ホスト上で直接実行、要Apple Silicon Mac)
+	cd apps/whisper-server && ./run.sh

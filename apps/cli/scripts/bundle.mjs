@@ -26,6 +26,7 @@ const REPO_ROOT = path.resolve(CLI_DIR, '..', '..');
 
 const SERVER_DIR = path.join(REPO_ROOT, 'apps/server');
 const WEB_DIR = path.join(REPO_ROOT, 'apps/web');
+const WHISPER_SERVER_DIR = path.join(REPO_ROOT, 'apps/whisper-server');
 
 function log(msg) {
   console.log(`[bundle] ${msg}`);
@@ -77,6 +78,7 @@ async function cleanCliBundleDirs() {
     path.join(CLI_DIR, '.next'),
     path.join(CLI_DIR, 'prisma'),
     path.join(CLI_DIR, 'docs'),
+    path.join(CLI_DIR, 'whisper-server'),
   ];
   const files = [
     path.join(CLI_DIR, 'prisma.config.ts'),
@@ -117,6 +119,13 @@ async function main() {
     path.join(WEB_DIR, '.next/static'),
     path.join(CLI_DIR, '.next/standalone/apps/web/.next/static')
   );
+
+  log('copying apps/whisper-server → apps/cli/whisper-server');
+  await fs.mkdir(path.join(CLI_DIR, 'whisper-server'), { recursive: true });
+  await fs.cp(WHISPER_SERVER_DIR, path.join(CLI_DIR, 'whisper-server'), {
+    recursive: true,
+    filter: (src) => !/\/(\.venv|__pycache__)(\/|$)/.test(src),
+  });
 
   const docsOutDir = path.join(REPO_ROOT, 'apps/docs/out');
   if (existsSync(docsOutDir)) {

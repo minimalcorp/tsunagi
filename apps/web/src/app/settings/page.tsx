@@ -9,6 +9,7 @@ import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
 import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
 import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
+import { VoiceInputSection } from '@/components/settings/VoiceInputSection';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
@@ -134,6 +135,9 @@ export default function SettingsPage() {
                   <RepositoryManagement />
                 </div>
               )}
+
+              {/* Voice Input (Global scope only, device-wide feature) */}
+              {selectedNode.scope === 'global' && <VoiceInputSection />}
 
               {/* Remove Repository (Repo scope only) */}
               {selectedNode.scope === 'repo' && selectedNode.owner && selectedNode.repo && (

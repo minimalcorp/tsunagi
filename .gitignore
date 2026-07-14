@@ -59,3 +59,8 @@ generated/
 
 # Prisma generated client (server)
 apps/server/src/generated/
+
+# python (apps/whisper-server, user-managed)
+.venv/
+__pycache__/
+*.pyc

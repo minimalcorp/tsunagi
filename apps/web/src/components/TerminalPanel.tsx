@@ -159,6 +159,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     const handleTabCreateClaude = useCallback(() => handleTabCreate('claude'), [handleTabCreate]);
 
+    const handleVoiceInputTranscribed = useCallback(
+      (text: string) => {
+        if (!activeTabId) return;
+        terminalRefs.current.get(activeTabId)?.sendInput(text);
+      },
+      [activeTabId]
+    );
+
     const handleTabDelete = useCallback(
       (tabId: string) => {
         setMountedTabIds((prev) => {
@@ -190,6 +198,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               onTabCreateClaude={handleTabCreateClaude}
               onTabDelete={handleTabDelete}
               tabStatusMap={tabStatusMap}
+              onVoiceInputTranscribed={handleVoiceInputTranscribed}
             />
           ) : (
             <div className="text-center py-8">
