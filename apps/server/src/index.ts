@@ -2,6 +2,7 @@ import net from 'node:net';
 
 import Fastify from 'fastify';
 import fastifyCors from '@fastify/cors';
+import fastifyMultipart from '@fastify/multipart';
 import httpProxy from '@fastify/http-proxy';
 import { Server as SocketIOServer } from 'socket.io';
 
@@ -17,6 +18,8 @@ import { hooksRoutes } from './routes/hooks.js';
 import { mcpRoutes } from './routes/mcp.js';
 import { terminalRoutes } from './routes/terminal.js';
 import { editorRoutes } from './routes/editor.js';
+import { whisperRoutes } from './routes/whisper.js';
+import { stopWhisperServerOnExit } from './lib/whisper-process.js';
 import { createBasicAuth } from './basic-auth.js';
 
 // Fastify は単一の公開エンドポイント。Next.js は内部ポートで動かしプロキシする。
@@ -44,6 +47,10 @@ async function start() {
   await fastify.register(fastifyCors, {
     origin: corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
+  await fastify.register(fastifyMultipart, {
+    limits: { fileSize: 25 * 1024 * 1024 },
   });
 
   // Basic 認証（有効時のみ）。CORS の後に登録することで preflight(OPTIONS) は
@@ -98,6 +105,7 @@ async function start() {
   await fastify.register(mcpRoutes, { prefix: '/api' });
   await fastify.register(terminalRoutes, { prefix: '/api' });
   await fastify.register(editorRoutes, { prefix: '/api' });
+  await fastify.register(whisperRoutes, { prefix: '/api' });
 
   // catch-all リバースプロキシ: /api・/socket.io・/health 以外を内部 Next.js へ転送。
   // - /api/* と /health は上で定義済みルートが wildcard より優先される。
@@ -150,12 +158,15 @@ async function start() {
 
   const shutdown = async (signal: string) => {
     console.log(`[server] Received ${signal}, shutting down...`);
+    stopWhisperServerOnExit();
     await fastify.close();
     process.exit(0);
   };
 
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  // SIGINT/SIGTERM を経由しない異常終了時の最後の砦（'exit' は同期処理のみ可能）。
+  process.on('exit', () => stopWhisperServerOnExit());
 }
 
 start().catch((err) => {

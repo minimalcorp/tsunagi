@@ -104,6 +104,14 @@ export function PlannerPanel() {
 
   const handleTabCreateClaude = useCallback(() => createTab('claude'), [createTab]);
 
+  const handleVoiceInputTranscribed = useCallback(
+    (text: string) => {
+      if (!activeTabId) return;
+      terminalRefs.current.get(activeTabId)?.sendInput(text);
+    },
+    [activeTabId]
+  );
+
   const handleTabChange = useCallback((tabId: string) => {
     setMountedTabIds((prev) => {
       if (prev.has(tabId)) return prev;
@@ -182,6 +190,7 @@ export function PlannerPanel() {
             onTabCreateClaude={handleTabCreateClaude}
             onTabDelete={handleTabDelete}
             tabStatusMap={tabStatusMap}
+            onVoiceInputTranscribed={handleVoiceInputTranscribed}
           />
         ) : (
           <div className="text-center py-8">

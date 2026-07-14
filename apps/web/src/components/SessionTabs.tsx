@@ -17,6 +17,7 @@ import {
 import type { TabStatusEntry } from '@/components/TerminalPanel';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
+import { VoiceInputButton } from '@/components/VoiceInputButton';
 
 interface SessionTabsProps {
   tabs: Tab[];
@@ -29,6 +30,8 @@ interface SessionTabsProps {
   onTabDelete: (tabId: string) => void;
   /** タブごとのリアルタイムステータス */
   tabStatusMap?: Map<string, TabStatusEntry>;
+  /** 音声入力の文字起こし結果（省略時は音声入力ボタン非表示） */
+  onVoiceInputTranscribed?: (text: string) => void;
 }
 
 /** タブのリアルタイムステータスに基づくアイコン＋ラベル */
@@ -119,6 +122,7 @@ export function SessionTabs({
   onTabCreateClaude,
   onTabDelete,
   tabStatusMap,
+  onVoiceInputTranscribed,
 }: SessionTabsProps) {
   const tabRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
@@ -221,8 +225,9 @@ export function SessionTabs({
           );
         })}
 
-        {/* divider + アクションボタン群 */}
+        {/* 音声入力 + divider + アクションボタン群 */}
         <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+          {onVoiceInputTranscribed && <VoiceInputButton onTranscribed={onVoiceInputTranscribed} />}
           <div className="w-px self-stretch bg-theme" />
           {onTabCreateTerminal && (
             <Button size="icon" onClick={onTabCreateTerminal} title="Open terminal">
