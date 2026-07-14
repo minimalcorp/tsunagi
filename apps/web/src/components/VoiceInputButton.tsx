@@ -14,6 +14,11 @@ const STORAGE_KEY = 'tsunagi:voice-input-enabled';
 // whisper-serverの起動状態を軽くポーリングし、未起動時はボタンを無効化する。
 const SERVER_STATUS_POLL_MS = 5000;
 
+// レベルメーターはRMS(実効値)をdBFSに変換し、この範囲で0〜1へ正規化する。
+// 通常の会話音量はこのレンジに収まりやすく、frequencyData平均より聴感に近い。
+const LEVEL_MIN_DB = -60;
+const LEVEL_MAX_DB = -10;
+
 type RecordingState = 'idle' | 'recording' | 'transcribing';
 type ServerStep =
   | 'not_running'
@@ -95,19 +100,28 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
     const audioCtx = new AudioContext();
     const source = audioCtx.createMediaStreamSource(stream);
     const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
+    analyser.fftSize = 2048;
     source.connect(analyser);
     audioCtxRef.current = audioCtx;
 
     smoothedLevelRef.current = 0;
-    const data = new Uint8Array(analyser.frequencyBinCount);
+    const data = new Float32Array(analyser.fftSize);
     levelIntervalRef.current = setInterval(() => {
-      analyser.getByteFrequencyData(data);
-      const avg = data.reduce((sum, v) => sum + v, 0) / data.length;
-      // 生の値は100msごとに飛ぶのでなめらかに追従させる
-      smoothedLevelRef.current = smoothedLevelRef.current * 0.6 + (avg / 255) * 0.4;
+      analyser.getFloatTimeDomainData(data);
+      let sumSquares = 0;
+      for (let i = 0; i < data.length; i++) {
+        sumSquares += data[i] * data[i];
+      }
+      const rms = Math.sqrt(sumSquares / data.length);
+      const db = rms > 0 ? 20 * Math.log10(rms) : LEVEL_MIN_DB;
+      const normalized = Math.min(
+        1,
+        Math.max(0, (db - LEVEL_MIN_DB) / (LEVEL_MAX_DB - LEVEL_MIN_DB))
+      );
+      // 平滑化は最小限（ジッター除去程度）に留め、実際の発声への追従を優先する
+      smoothedLevelRef.current = smoothedLevelRef.current * 0.3 + normalized * 0.7;
       setLevel(smoothedLevelRef.current);
-    }, 100);
+    }, 50);
   }, []);
 
   const transcribe = useCallback(
@@ -194,25 +208,19 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
         : '音声入力';
 
   return (
-    <div className="relative inline-flex">
-      {state === 'recording' && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-md bg-destructive"
-          style={{
-            transform: `scale(${1.3 + level * 1.6})`,
-            opacity: 0.12 + level * 0.35,
-            transition: 'transform 100ms ease-out, opacity 100ms ease-out',
-          }}
-        />
-      )}
+    <div
+      className={
+        state === 'recording'
+          ? 'inline-flex items-center gap-2 rounded-md bg-destructive/10 p-1'
+          : 'inline-flex'
+      }
+    >
       <Button
         size="icon"
         variant={state === 'recording' ? 'destructive' : 'default'}
         onClick={state === 'recording' ? stopRecording : () => void startRecording()}
         disabled={disabled}
         title={title}
-        className="relative"
       >
         {state === 'transcribing' ? (
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -222,6 +230,16 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
           <Mic className="w-4 h-4" />
         )}
       </Button>
+      {state === 'recording' && (
+        // ボタンと同じdestructive系の色で塗ることで、両者が同じ録音状態を
+        // 表す一体の情報であることが視覚的にわかるようにする
+        <div aria-hidden className="h-1.5 w-16 overflow-hidden rounded-full bg-background/60">
+          <div
+            className="h-full rounded-full bg-destructive"
+            style={{ width: `${Math.round(level * 100)}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
