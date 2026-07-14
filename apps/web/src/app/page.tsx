@@ -9,6 +9,7 @@ import { TaskDialog } from '@/components/TaskDialog';
 import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { TaskListPanel } from '@/components/planner/TaskListPanel';
+import { TaskListOverlay } from '@/components/planner/TaskListOverlay';
 import { PlannerPanel } from '@/components/planner/PlannerPanel';
 import { type FilterState } from '@/components/planner/FilterBar';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
@@ -64,6 +65,7 @@ export default function Home() {
   // Resizable panel
   const [leftPanelWidth, setLeftPanelWidth] = useState(380);
   const [isResizing, setIsResizing] = useState(false);
+  const [isTaskListOverlayOpen, setIsTaskListOverlayOpen] = useState(false);
 
   // 初回ユーザーフローの状態を検出
   const onboardingState = useMemo(() => {
@@ -372,6 +374,7 @@ export default function Home() {
         onCloneClick={() => setIsCloneDialogOpen(true)}
         onSettingsClick={() => router.push('/settings')}
         onReload={loadData}
+        onTaskListClick={() => setIsTaskListOverlayOpen(true)}
         nextStep={onboardingState.nextStep}
         isCloneDialogOpen={isCloneDialogOpen}
       />
@@ -440,6 +443,22 @@ export default function Home() {
         onClose={() => setIsBatchDeleteDialogOpen(false)}
         onConfirm={handleBatchDelete}
       />
+
+      {/* Task list overlay (narrow screens only) */}
+      <TaskListOverlay open={isTaskListOverlayOpen} onOpenChange={setIsTaskListOverlayOpen}>
+        <TaskListPanel
+          tasks={filteredTasks}
+          repositories={repositories}
+          filters={filterState}
+          onFilterChange={setFilterState}
+          onReorder={handleReorder}
+          onAddTask={() => {
+            setIsTaskListOverlayOpen(false);
+            setIsAddTaskDialogOpen(true);
+          }}
+          tabTodosMap={tabTodosMap}
+        />
+      </TaskListOverlay>
     </div>
   );
 }

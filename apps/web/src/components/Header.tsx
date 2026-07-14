@@ -1,6 +1,6 @@
 'use client';
 
-import { Settings, RefreshCw, FolderDown } from 'lucide-react';
+import { Settings, RefreshCw, FolderDown, PanelLeft } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from './ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ interface HeaderProps {
   onCloneClick: () => void;
   onSettingsClick: () => void;
   onReload: () => void;
+  onTaskListClick?: () => void;
   nextStep?: 'clone' | 'env' | 'task' | 'complete';
   isCloneDialogOpen?: boolean;
 }
@@ -18,6 +19,7 @@ export function Header({
   onCloneClick,
   onSettingsClick,
   onReload,
+  onTaskListClick,
   nextStep = 'complete',
   isCloneDialogOpen = false,
 }: HeaderProps) {
@@ -34,6 +36,19 @@ export function Header({
       <h1 className="flex-shrink-0 flex items-center">
         <Image src={logoIcon} alt="Tsunagi" width={32} height={32} priority />
       </h1>
+
+      {/* Task list toggle (narrow screens only) */}
+      {onTaskListClick && (
+        <Button
+          variant="outline"
+          size="icon-lg"
+          onClick={onTaskListClick}
+          className="lg:hidden active:scale-95"
+          title="Task List"
+        >
+          <PanelLeft />
+        </Button>
+      )}
 
       {/* Spacer */}
       <div className="flex-1" />
