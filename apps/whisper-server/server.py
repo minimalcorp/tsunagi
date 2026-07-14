@@ -3,13 +3,16 @@
 ユーザーが手動でセットアップ・起動する常駐プロセス。モデルをメモリに保持し続け
 リクエスト毎のロード待ちを避ける。tsunagi本体(Fastify)からHTTPでプロキシされる。
 
-音声はtsunagi側(ブラウザのWeb Audio API)で16kHzモノラルWAVに変換済みのものを
-受け取る想定。Pythonの標準ライブラリ`wave`で読み込みnumpy配列として直接
-mlx_whisper.transcribeに渡すため、ffmpeg等の外部バイナリは不要。
+音声はブラウザのMediaRecorderが生成する元のwebm/opusをそのまま受け取る
+（クライアント側でのWAV再エンコードは行わない。Opus圧縮は録音時点で既に
+発生しているため、無圧縮WAVへ変換し直しても音質は改善せず転送量が増えるだけ）。
+デコードにはPyAV(`av`)を使う。ffmpegの内部コーデックをホイールに同梱しており、
+システムにffmpegバイナリをインストールする必要はない。
 """
 
-import wave
+import io
 
+import av
 import numpy as np
 from fastapi import FastAPI, File, UploadFile
 import mlx_whisper
@@ -24,23 +27,26 @@ async def health() -> dict:
     return {"status": "ok", "model": MODEL}
 
 
-def read_wav_as_float32(data: bytes) -> np.ndarray:
-    import io
+def decode_to_16k_mono(data: bytes) -> np.ndarray:
+    container = av.open(io.BytesIO(data))
+    stream = container.streams.audio[0]
+    resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
 
-    with wave.open(io.BytesIO(data), "rb") as wf:
-        if wf.getframerate() != 16000:
-            raise ValueError(f"expected 16kHz WAV, got {wf.getframerate()}Hz")
-        if wf.getnchannels() != 1:
-            raise ValueError("expected mono WAV")
-        if wf.getsampwidth() != 2:
-            raise ValueError("expected 16-bit PCM WAV")
-        frames = wf.readframes(wf.getnframes())
-    return np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+    chunks = []
+    for frame in container.decode(stream):
+        for resampled in resampler.resample(frame):
+            chunks.append(resampled.to_ndarray().reshape(-1))
+    container.close()
+
+    if not chunks:
+        return np.zeros(0, dtype=np.float32)
+    samples = np.concatenate(chunks).astype(np.float32) / 32768.0
+    return samples
 
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...)) -> dict:
     data = await file.read()
-    audio = read_wav_as_float32(data)
+    audio = decode_to_16k_mono(data)
     result = mlx_whisper.transcribe(audio, path_or_hf_repo=MODEL, language="ja")
     return {"text": result["text"].strip()}

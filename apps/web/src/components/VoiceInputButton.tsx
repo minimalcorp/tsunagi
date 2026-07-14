@@ -5,11 +5,26 @@ import { Loader2, Mic, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
-import { decodeTo16kMono, encodeWav } from '@/lib/wav-encoder';
+
+// MediaRecorderのOpusは十分な品質を保ちつつ低容量（128kbpsで8秒≒150KB程度）。
+// ブラウザ既定のビットレートは低めに倒れることがあるため明示的に指定する。
+const AUDIO_BITS_PER_SECOND = 128_000;
 
 const STORAGE_KEY = 'tsunagi:voice-input-enabled';
+// whisper-serverの起動状態を軽くポーリングし、未起動時はボタンを無効化する。
+const SERVER_STATUS_POLL_MS = 5000;
 
 type RecordingState = 'idle' | 'recording' | 'transcribing';
+type ServerStep =
+  | 'not_running'
+  | 'installing_deps'
+  | 'downloading_model'
+  | 'starting_server'
+  | 'running'
+  | 'running_external'
+  | 'error';
+
+const SERVER_UP_STEPS: ServerStep[] = ['running', 'running_external'];
 
 interface VoiceInputButtonProps {
   /** 文字起こし結果を受け取るコールバック（対象タブへの入力注入は呼び出し側の責務） */
@@ -24,6 +39,7 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
   const [enabled, setEnabled] = useState(false);
   const [state, setState] = useState<RecordingState>('idle');
   const [level, setLevel] = useState(0);
+  const [serverStep, setServerStep] = useState<ServerStep | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -35,6 +51,29 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
   useEffect(() => {
     setEnabled(localStorage.getItem(STORAGE_KEY) === 'true');
   }, []);
+
+  // whisper-serverの起動状態を定期的に確認し、未起動ならボタンを無効化する。
+  useEffect(() => {
+    if (!enabled) return;
+
+    let cancelled = false;
+    const fetchServerStatus = async () => {
+      try {
+        const res = await fetch(apiUrl('/api/whisper/server/status'));
+        const data = (await res.json()) as { step: ServerStep };
+        if (!cancelled) setServerStep(data.step);
+      } catch {
+        if (!cancelled) setServerStep('not_running');
+      }
+    };
+
+    void fetchServerStatus();
+    const interval = setInterval(fetchServerStatus, SERVER_STATUS_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [enabled]);
 
   const stopLevelMeter = useCallback(() => {
     if (levelIntervalRef.current) {
@@ -75,9 +114,11 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
     async (blob: Blob) => {
       setState('transcribing');
       try {
-        const wavBlob = encodeWav(await decodeTo16kMono(blob), 16000);
+        // サーバー側(PyAV)がwebm/opusを直接デコードできるため、クライアント側で
+        // WAVへ再変換しない（Opus圧縮は録音時点で既に発生しており、無圧縮WAVへ
+        // 変換し直しても音質は改善せず転送量が増えるだけ）。
         const formData = new FormData();
-        formData.append('file', wavBlob, 'recording.wav');
+        formData.append('file', blob, 'recording.webm');
 
         const response = await fetch(apiUrl('/api/whisper/transcribe'), {
           method: 'POST',
@@ -111,7 +152,9 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
       chunksRef.current = [];
       startLevelMeter(stream);
 
-      const recorder = new MediaRecorder(stream);
+      const recorder = new MediaRecorder(stream, {
+        audioBitsPerSecond: AUDIO_BITS_PER_SECOND,
+      });
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
@@ -141,6 +184,15 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
 
   if (!enabled) return null;
 
+  const serverReady = serverStep !== null && SERVER_UP_STEPS.includes(serverStep);
+  const disabled = state === 'transcribing' || (state === 'idle' && !serverReady);
+  const title =
+    state === 'recording'
+      ? '停止して入力'
+      : state === 'idle' && !serverReady
+        ? 'Whisperサーバーが起動していません（Settingsから起動してください）'
+        : '音声入力';
+
   return (
     <div className="relative inline-flex">
       {state === 'recording' && (
@@ -158,8 +210,8 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
         size="icon"
         variant={state === 'recording' ? 'destructive' : 'default'}
         onClick={state === 'recording' ? stopRecording : () => void startRecording()}
-        disabled={state === 'transcribing'}
-        title={state === 'recording' ? '停止して入力' : '音声入力'}
+        disabled={disabled}
+        title={title}
         className="relative"
       >
         {state === 'transcribing' ? (
