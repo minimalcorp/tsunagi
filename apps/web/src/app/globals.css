@@ -273,14 +273,6 @@ select:hover:not(:focus):not(:disabled) {
   border-color: var(--error);
 }
 
-/* iPad等タッチデバイスでxtermのタッチスクロールがページ全体のスクロールに
-   吸われてしまう問題への対処。viewport要素にタッチジェスチャーを委譲させる */
-.xterm-viewport {
-  touch-action: pan-y;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
 .form-input-error:focus-visible {
   outline: none;
   border-color: var(--error);

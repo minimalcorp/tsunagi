@@ -265,6 +265,32 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     };
     container.addEventListener('compositionend', onCompositionEndCapture, true);
 
+    // xterm.js のスクロールはネイティブDOMのoverflow-scrollではなく、VS Codeのエディタから
+    // 移植した独自スクロールエンジン(Viewport + Scrollable)がcanvasの再描画で表示行を切り替える
+    // 方式（本体ソース確認済み）。この仕組みはホイール/スクロールバードラッグ/キーボードのみを
+    // 入力として扱い、touchstart/touchmoveを一切考慮しないため、iPad等でドラッグしても
+    // スクロール位置が変化しない。ドラッグ量を公開API term.scrollToLine() に変換して呼び出す
+    // ことで、ホイール操作と同じ正規の経路からスクロール位置を更新する。
+    let touchStartY: number | null = null;
+    let touchStartViewportY = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) {
+        touchStartY = null;
+        return;
+      }
+      touchStartY = e.touches[0].clientY;
+      touchStartViewportY = term.buffer.active.viewportY;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (touchStartY === null || e.touches.length !== 1) return;
+      const rowHeightPx = container.clientHeight / term.rows;
+      if (rowHeightPx <= 0) return;
+      const deltaLines = (touchStartY - e.touches[0].clientY) / rowHeightPx;
+      term.scrollToLine(Math.round(touchStartViewportY + deltaLines));
+    };
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove', onTouchMove, { passive: true });
+
     const observer = new ResizeObserver(() => {
       // editor session (Ctrl+G Monaco modal) 中は fit / sendResize を一切行わない。
       // Base UI Dialog が body に scrollbar-gutter 等を付与して viewport 幅が変わっても
@@ -289,6 +315,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       abortController.abort();
       observer.disconnect();
       container.removeEventListener('compositionend', onCompositionEndCapture, true);
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
       onDataDisposeRef.current?.dispose();
       onDataDisposeRef.current = null;
       term.dispose();
