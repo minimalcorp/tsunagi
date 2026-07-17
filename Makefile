@@ -62,3 +62,13 @@ ps-prd: ## サービス状態表示
 
 whisper: ## ローカルWhisperサーバーをセットアップ・起動 (ホスト上で直接実行、要Apple Silicon Mac)
 	cd apps/whisper-server && ./run.sh
+
+# ---------------------------------------------------------------------------
+# llm-server (ローカルLLM対話デモ)
+# mlx-lmはApple Silicon Mac専用でDocker(Linux)上では動作しないため、
+# これだけはコンテナ経由ではなくホストマシン上で直接実行する。
+# ---------------------------------------------------------------------------
+.PHONY: llm
+
+llm: ## ローカルLLMサーバーをセットアップ・起動 (ホスト上で直接実行、要Apple Silicon Mac)
+	cd apps/llm-server && ./run.sh
