@@ -3,8 +3,12 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { killProcessOnPort } from './process-port.js';
 
 const WHISPER_SERVER_URL = process.env.TSUNAGI_WHISPER_SERVER_URL || 'http://127.0.0.1:8765';
+// run.shが待受けるポート固定値(host.docker.internal経由URLと違い、停止処理は
+// 必ずこのNodeプロセスと同じホスト上のポートを対象にする必要があるため分けて持つ)。
+const WHISPER_PORT = 8765;
 
 // venv・モデルキャッシュとも ~/.tsunagi/whisper 配下にまとめる(run.shと同じ場所)。
 const TSUNAGI_WHISPER_DIR = path.join(os.homedir(), '.tsunagi', 'whisper');
@@ -225,12 +229,23 @@ export function startWhisperServer(): { started: boolean; error?: string } {
   return { started: true };
 }
 
-export function stopWhisperServer(): { stopped: boolean; error?: string } {
-  if (!managedProcess) {
-    return { stopped: false, error: 'Not started by tsunagi (nothing to stop)' };
+export async function stopWhisperServer(): Promise<{ stopped: boolean; error?: string }> {
+  if (managedProcess) {
+    managedProcess.kill();
+    managedProcess = null;
+    currentStep = 'not_running';
+    return { stopped: true };
   }
-  managedProcess.kill();
-  managedProcess = null;
+
+  // tsunagi外(make whisper等)で起動された場合はchild_processのハンドルを
+  // 持たないため、ポート番号を手がかりにOS側から見つけて停止する。
+  const killed = await killProcessOnPort(WHISPER_PORT);
+  if (!killed) {
+    return {
+      stopped: false,
+      error: `ポート${WHISPER_PORT}で待ち受けているプロセスが見つかりませんでした`,
+    };
+  }
   currentStep = 'not_running';
   return { stopped: true };
 }

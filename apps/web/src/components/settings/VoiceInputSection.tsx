@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/Dialog';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
+import { WHISPER_PROMPT_STORAGE_KEY } from '@/components/VoiceInputButton';
 
 const STORAGE_KEY = 'tsunagi:voice-input-enabled';
 
@@ -64,11 +66,17 @@ export function VoiceInputSection() {
   const [enabled, setEnabledState] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
+  const [prompt, setPrompt] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const setEnabled = useCallback((next: boolean) => {
     setEnabledState(next);
     localStorage.setItem(STORAGE_KEY, String(next));
+  }, []);
+
+  const handlePromptChange = useCallback((next: string) => {
+    setPrompt(next);
+    localStorage.setItem(WHISPER_PROMPT_STORAGE_KEY, next);
   }, []);
 
   const fetchStatus = useCallback(async (): Promise<ServerInfo> => {
@@ -80,6 +88,7 @@ export function VoiceInputSection() {
 
   useEffect(() => {
     setEnabledState(localStorage.getItem(STORAGE_KEY) === 'true');
+    setPrompt(localStorage.getItem(WHISPER_PROMPT_STORAGE_KEY) ?? '');
     void fetchStatus();
   }, [fetchStatus]);
 
@@ -167,7 +176,10 @@ export function VoiceInputSection() {
             <CircleHelp />
           </Button>
         </div>
-        <CardDescription>ローカルで動作するWhisperを使って音声入力を行います。</CardDescription>
+        <CardDescription>
+          ローカルで動作するWhisperを使って音声入力を行います。下記のローカルLLMも有効にすると、
+          文字起こし結果がLLMで自動整形されます(無効時は文字起こし結果をそのまま使用)。
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {!enabled ? (
@@ -176,20 +188,36 @@ export function VoiceInputSection() {
             音声入力を有効化する
           </Button>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-2 text-success">
-              <CheckCircle2 className="size-4" />
-              音声入力: 有効
-            </span>
-            {serverInfo && (
-              <span className="text-xs/relaxed text-muted-foreground">
-                ({STEP_LABEL[serverInfo.step]})
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-2 text-success">
+                <CheckCircle2 className="size-4" />
+                音声入力: 有効
               </span>
-            )}
-            <Button size="default" variant="outline" onClick={handleDisable}>
-              無効にする
-            </Button>
-          </div>
+              {serverInfo && (
+                <span className="text-xs/relaxed text-muted-foreground">
+                  ({STEP_LABEL[serverInfo.step]})
+                </span>
+              )}
+              <Button size="default" variant="outline" onClick={handleDisable}>
+                無効にする
+              </Button>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                文字起こしプロンプト (任意)
+              </label>
+              <Textarea
+                value={prompt}
+                onChange={(e) => handlePromptChange(e.target.value)}
+                placeholder="例: 句読点を適切に打ってください。固有名詞は正確に表記してください。"
+                className="min-h-16 text-xs"
+              />
+              <p className="mt-1 text-[0.65rem] text-muted-foreground">
+                Whisperの文字起こしスタイル(表記ゆれ・句読点・固有名詞など)を誘導するヒントです。空でも構いません。
+              </p>
+            </div>
+          </>
         )}
       </CardContent>
 
@@ -294,12 +322,12 @@ export function VoiceInputSection() {
                   <CheckCircle2 className="size-4" />
                   サーバーは起動しています
                 </span>
-                {serverInfo.step === 'running' && (
-                  <Button size="default" variant="outline" onClick={() => void handleStop()}>
-                    <Square />
-                    サーバーを停止
-                  </Button>
-                )}
+                {/* tsunagi外(make whisper等)で起動された場合(running_external)も、
+                    ポート番号を手がかりに停止できるため、起動中は常に停止ボタンを出す。 */}
+                <Button size="default" variant="outline" onClick={() => void handleStop()}>
+                  <Square />
+                  サーバーを停止
+                </Button>
               </div>
             )}
           </div>

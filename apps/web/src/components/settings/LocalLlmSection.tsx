@@ -11,6 +11,11 @@ import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
 
 const STORAGE_KEY = 'tsunagi:local-llm-enabled';
+// 音声入力(VoiceInputButton)から、文字起こし結果をLLMで整形するかどうかの
+// 判定にも使う共有フラグ。
+export const LOCAL_LLM_ENABLED_STORAGE_KEY = STORAGE_KEY;
+
+type LlmProfile = 'instruct' | 'thinking';
 
 type ServerStep =
   | 'not_running'
@@ -47,6 +52,11 @@ const STEP_LABEL: Record<ServerStep, string> = {
 const IN_PROGRESS_STEPS: ServerStep[] = ['installing_deps', 'downloading_model', 'starting_server'];
 const SERVER_UP_STEPS: ServerStep[] = ['running', 'running_external'];
 
+const PROFILE_LABEL: Record<LlmProfile, string> = {
+  instruct: '通常モード (Instruct)',
+  thinking: 'シンキングモード (Thinking)',
+};
+
 function formatBytes(bytes: number): string {
   const gb = bytes / 1024 ** 3;
   if (gb >= 0.1) return `${gb.toFixed(2)} GB`;
@@ -61,38 +71,23 @@ function formatEta(seconds: number | null): string {
   return `残り約${min}分${sec}秒`;
 }
 
-export function LocalLlmSection() {
-  const router = useRouter();
-  const [enabled, setEnabledState] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
+// 1つのprofile(instruct/thinking)のサーバー状態取得・ポーリング・起動/停止を管理する。
+// LocalLlmSectionの直下でprofileごとに1回だけ呼び出し、結果をUIへpropsとして渡す
+// (Dialogの開閉に関わらずポーリングを継続させ、かつ二重ポーリングを避けるため)。
+function useLlmProfileStatus(profile: LlmProfile) {
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const setEnabled = useCallback((next: boolean) => {
-    setEnabledState(next);
-    localStorage.setItem(STORAGE_KEY, String(next));
-  }, []);
-
   const fetchStatus = useCallback(async (): Promise<ServerInfo> => {
-    const res = await fetch(apiUrl('/api/llm/server/status'));
+    const res = await fetch(apiUrl(`/api/llm/server/${profile}/status`));
     const data = (await res.json()) as ServerInfo;
     setServerInfo(data);
     return data;
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
-    setEnabledState(localStorage.getItem(STORAGE_KEY) === 'true');
     void fetchStatus();
   }, [fetchStatus]);
-
-  // サーバーが起動状態になったら、ローカルLLMを自動で有効化して通知する。
-  // 起動ボタンから待機した場合・モーダルを開いた時点で既に起動していた場合の両方をカバーする。
-  useEffect(() => {
-    if (serverInfo && SERVER_UP_STEPS.includes(serverInfo.step) && !enabled) {
-      setEnabled(true);
-      toaster.create({ type: 'success', title: 'ローカルLLMが有効化されました' });
-    }
-  }, [serverInfo, enabled, setEnabled]);
 
   useEffect(() => {
     if (serverInfo && IN_PROGRESS_STEPS.includes(serverInfo.step) && !pollRef.current) {
@@ -113,14 +108,9 @@ export function LocalLlmSection() {
     };
   }, [serverInfo, fetchStatus]);
 
-  const openModal = useCallback(() => {
-    void fetchStatus();
-    setModalOpen(true);
-  }, [fetchStatus]);
-
   const handleStart = useCallback(async () => {
     try {
-      const res = await fetch(apiUrl('/api/llm/server/start'), { method: 'POST' });
+      const res = await fetch(apiUrl(`/api/llm/server/${profile}/start`), { method: 'POST' });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || `HTTPエラー: ${res.status}`);
@@ -133,11 +123,11 @@ export function LocalLlmSection() {
         description: error instanceof Error ? error.message : String(error),
       });
     }
-  }, []);
+  }, [profile]);
 
   const handleStop = useCallback(async () => {
     try {
-      const res = await fetch(apiUrl('/api/llm/server/stop'), { method: 'POST' });
+      const res = await fetch(apiUrl(`/api/llm/server/${profile}/stop`), { method: 'POST' });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || `HTTPエラー: ${res.status}`);
@@ -150,32 +140,159 @@ export function LocalLlmSection() {
         description: error instanceof Error ? error.message : String(error),
       });
     }
+  }, [profile]);
+
+  return { serverInfo, handleStart, handleStop };
+}
+
+interface LlmProfileControlProps {
+  profile: LlmProfile;
+  serverInfo: ServerInfo | null;
+  onStart: () => void;
+  onStop: () => void;
+}
+
+// 表示専用コンポーネント。状態取得はuseLlmProfileStatusが担い、ここではpropsを描画するだけ。
+function LlmProfileControl({ profile, serverInfo, onStart, onStop }: LlmProfileControlProps) {
+  const progress = serverInfo?.downloadProgress;
+  const progressPercent = progress ? (progress.downloadedBytes / progress.totalBytes) * 100 : 0;
+
+  return (
+    <div className="rounded-md border border-border p-3">
+      <p className="mb-2 font-medium text-foreground">{PROFILE_LABEL[profile]}</p>
+
+      {(!serverInfo || serverInfo.step === 'not_running' || serverInfo.step === 'error') && (
+        <div className="flex flex-col gap-2">
+          <Button size="default" onClick={onStart} disabled={!serverInfo}>
+            {serverInfo ? <Bot /> : <Loader2 className="animate-spin" />}
+            起動
+          </Button>
+          {serverInfo?.step === 'error' && serverInfo.error && (
+            <p className="text-xs/relaxed text-destructive">{serverInfo.error}</p>
+          )}
+          {serverInfo && !serverInfo.serverDir && (
+            <p className="text-xs/relaxed text-destructive">
+              llm-serverが見つかりませんでした。インストールが壊れている可能性があります。
+            </p>
+          )}
+        </div>
+      )}
+
+      {serverInfo?.step === 'installing_deps' && (
+        <Button size="default" disabled>
+          <Loader2 className="animate-spin" />
+          依存関係をインストール中... (数分かかる場合があります)
+        </Button>
+      )}
+
+      {serverInfo?.step === 'downloading_model' && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-xs/relaxed text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            モデルをダウンロード中... (約17GB)
+          </div>
+          {progress && (
+            <>
+              <Progress value={progressPercent} />
+              <p className="text-xs/relaxed text-muted-foreground">
+                {formatBytes(progress.downloadedBytes)} / {formatBytes(progress.totalBytes)} (
+                {progressPercent.toFixed(0)}%) ・ {formatEta(progress.etaSeconds)}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {serverInfo?.step === 'starting_server' && (
+        <Button size="default" disabled>
+          <Loader2 className="animate-spin" />
+          サーバーを起動中...
+        </Button>
+      )}
+
+      {serverInfo && SERVER_UP_STEPS.includes(serverInfo.step) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-2 text-success">
+            <CheckCircle2 className="size-4" />
+            {STEP_LABEL[serverInfo.step]}
+          </span>
+          {/* tsunagi外(make llm等)で起動された場合(running_external)も、
+              ポート番号を手がかりに停止できるため、起動中は常に停止ボタンを出す。 */}
+          <Button size="default" variant="outline" onClick={onStop}>
+            <Square />
+            停止
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function LocalLlmSection() {
+  const router = useRouter();
+  const [enabled, setEnabledState] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const notifiedRef = useRef(false);
+
+  const instruct = useLlmProfileStatus('instruct');
+  const thinking = useLlmProfileStatus('thinking');
+
+  const setEnabled = useCallback((next: boolean) => {
+    setEnabledState(next);
+    localStorage.setItem(STORAGE_KEY, String(next));
   }, []);
+
+  useEffect(() => {
+    // SSR時はlocalStorageが存在しないため、hydration後にこのeffectで実際の値を反映する。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEnabledState(localStorage.getItem(STORAGE_KEY) === 'true');
+  }, []);
+
+  const anyRunning = [instruct.serverInfo, thinking.serverInfo].some(
+    (info) => info && SERVER_UP_STEPS.includes(info.step)
+  );
+
+  // どちらかのサーバーが起動状態になったら、ローカルLLMを自動で有効化して通知する。
+  useEffect(() => {
+    if (anyRunning && !enabled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEnabled(true);
+      if (!notifiedRef.current) {
+        notifiedRef.current = true;
+        toaster.create({ type: 'success', title: 'ローカルLLMが有効化されました' });
+      }
+    }
+  }, [anyRunning, enabled, setEnabled]);
 
   const handleDisable = useCallback(() => {
     setEnabled(false);
   }, [setEnabled]);
-
-  const serverDir = serverInfo?.serverDir;
-  const progress = serverInfo?.downloadProgress;
-  const progressPercent = progress ? (progress.downloadedBytes / progress.totalBytes) * 100 : 0;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-1">
           <CardTitle>ローカルLLM対話デモ (実験的機能)</CardTitle>
-          <Button variant="ghost" size="icon-sm" onClick={openModal} title="ローカルLLMについて">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setModalOpen(true)}
+            title="ローカルLLMについて"
+          >
             <CircleHelp />
           </Button>
         </div>
         <CardDescription>
-          ローカルで動作するLLM(Qwen3-30B-A3B, MoE)とチャットできるデモを利用します。
+          ローカルで動作するLLM(Qwen3-30B-A3B, MoE)を利用します。
+          <strong className="font-medium text-foreground">
+            有効にすると、音声入力の文字起こし結果がこのLLMで自動整形されるようになります
+          </strong>
+          (無効時は文字起こし結果をそのまま使用)。対話デモで通常モード・シンキングモードの2種類を試すこともできます。
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {!enabled ? (
-          <Button size="default" onClick={openModal}>
+          <Button size="default" onClick={() => setModalOpen(true)}>
             <Bot />
             ローカルLLMを有効化する
           </Button>
@@ -185,17 +302,15 @@ export function LocalLlmSection() {
               <CheckCircle2 className="size-4" />
               ローカルLLM: 有効
             </span>
-            {serverInfo && (
-              <span className="text-xs/relaxed text-muted-foreground">
-                ({STEP_LABEL[serverInfo.step]})
-              </span>
-            )}
-            {serverInfo && SERVER_UP_STEPS.includes(serverInfo.step) && (
+            {anyRunning && (
               <Button size="default" variant="outline" onClick={() => router.push('/local-llm')}>
                 <Bot />
                 デモを試す
               </Button>
             )}
+            <Button size="default" variant="outline" onClick={() => setModalOpen(true)}>
+              サーバー管理
+            </Button>
             <Button size="default" variant="outline" onClick={handleDisable}>
               無効にする
             </Button>
@@ -216,7 +331,8 @@ export function LocalLlmSection() {
               音声入力の文字起こし結果をローカルLLMで整形する機能の前段検証として、ローカルで動作するLLM
               (mlx-lm / Qwen3-30B-A3B, MoE構成) と対話できるデモページ(
               <code className="rounded bg-muted px-1">/local-llm</code>
-              )を提供します。MoE構成のため実計算に使うアクティブパラメータは約3Bで、denseな同規模モデルより高速に動作します。精度・速度は環境に依存し、今後変更される可能性があります。
+              )を提供します。MoE構成のため実計算に使うアクティブパラメータは約3Bで、denseな同規模モデルより高速に動作します。通常モード(Instruct)とシンキングモード(Thinking,
+              回答前に推論する)の2種類があり、それぞれ別プロセス・別モデルとして動作します。精度・速度は環境に依存し、今後変更される可能性があります。
             </p>
           </div>
 
@@ -224,7 +340,7 @@ export function LocalLlmSection() {
             <p className="font-medium text-foreground">対応環境</p>
             <p className="text-muted-foreground">
               Apple Silicon Mac (M1/M2/M3/M4)
-              のみ対応。Windows/Linuxでは利用できません。メモリ32GB以上を推奨します。
+              のみ対応。Windows/Linuxでは利用できません。メモリ32GB以上を推奨します(両モード同時起動時は約35GB消費するため64GB推奨)。
             </p>
           </div>
 
@@ -236,89 +352,28 @@ export function LocalLlmSection() {
           </div>
 
           <div>
-            <p className="mb-1 font-medium text-foreground">セットアップ・起動</p>
-            <p className="text-muted-foreground">
-              下のボタンから、依存関係のインストール・モデルのダウンロード・サーバー起動まで自動で行われます（初回はモデルサイズが大きく数分〜数十分かかります）。
-            </p>
-            {serverInfo && !serverDir && (
-              <p className="mt-1 text-destructive">
-                llm-serverが見つかりませんでした。インストールが壊れている可能性があります。
-              </p>
-            )}
-          </div>
-
-          <div>
             <p className="mb-1 font-medium text-foreground">アンインストール</p>
             <p className="text-muted-foreground">
-              ローカルLLMのためにダウンロードされるもの（Pythonの依存関係・LLMモデル、合計約17GB）は全て
+              ローカルLLMのためにダウンロードされるもの（Pythonの依存関係・LLMモデル、1モデルあたり約17GB）は全て
               <code className="rounded bg-muted px-1">~/.tsunagi/llm</code>
               に保存されます。不要になった場合はこのディレクトリを削除するだけで、関連リソースを完全に削除できます。
             </p>
           </div>
 
-          <div className="border-t border-border pt-4">
-            {(!serverInfo || serverInfo.step === 'not_running' || serverInfo.step === 'error') && (
-              <div className="flex flex-col gap-2">
-                <Button size="default" onClick={() => void handleStart()} disabled={!serverInfo}>
-                  {serverInfo ? <Bot /> : <Loader2 className="animate-spin" />}
-                  LLMサーバーを起動
-                </Button>
-                {serverInfo?.step === 'error' && serverInfo.error && (
-                  <p className="text-xs/relaxed text-destructive">{serverInfo.error}</p>
-                )}
-              </div>
-            )}
-
-            {serverInfo?.step === 'installing_deps' && (
-              <Button size="default" disabled>
-                <Loader2 className="animate-spin" />
-                依存関係をインストール中... (数分かかる場合があります)
-              </Button>
-            )}
-
-            {serverInfo?.step === 'downloading_model' && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-xs/relaxed text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  モデルをダウンロード中... (約17GB)
-                </div>
-                {progress && (
-                  <>
-                    <Progress value={progressPercent} />
-                    <p className="text-xs/relaxed text-muted-foreground">
-                      {formatBytes(progress.downloadedBytes)} / {formatBytes(progress.totalBytes)} (
-                      {progressPercent.toFixed(0)}%) ・ {formatEta(progress.etaSeconds)}
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-
-            {serverInfo?.step === 'starting_server' && (
-              <Button size="default" disabled>
-                <Loader2 className="animate-spin" />
-                サーバーを起動中... (モデルのロードに数十秒かかる場合があります)
-              </Button>
-            )}
-
-            {serverInfo && SERVER_UP_STEPS.includes(serverInfo.step) && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center gap-2 text-success">
-                  <CheckCircle2 className="size-4" />
-                  サーバーは起動しています
-                </span>
-                <Button size="default" variant="outline" onClick={() => router.push('/local-llm')}>
-                  <Bot />
-                  デモを試す
-                </Button>
-                {serverInfo.step === 'running' && (
-                  <Button size="default" variant="outline" onClick={() => void handleStop()}>
-                    <Square />
-                    サーバーを停止
-                  </Button>
-                )}
-              </div>
-            )}
+          <div className="space-y-3 border-t border-border pt-4">
+            <p className="font-medium text-foreground">サーバー管理</p>
+            <LlmProfileControl
+              profile="instruct"
+              serverInfo={instruct.serverInfo}
+              onStart={() => void instruct.handleStart()}
+              onStop={() => void instruct.handleStop()}
+            />
+            <LlmProfileControl
+              profile="thinking"
+              serverInfo={thinking.serverInfo}
+              onStart={() => void thinking.handleStart()}
+              onStop={() => void thinking.handleStop()}
+            />
           </div>
         </div>
       </Dialog>
