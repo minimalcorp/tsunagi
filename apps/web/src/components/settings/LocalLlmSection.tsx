@@ -155,7 +155,14 @@ export function LocalLlmSection() {
 
   const handleDisable = useCallback(() => {
     setEnabled(false);
-  }, [setEnabled]);
+    // 無効化は機能フラグを消すだけでなく、実際に起動中のサーバープロセスも
+    // 停止する(tsunagi管理・tsunagi外起動のどちらでもstopLlmServer側で対応)。
+    // 元々停止していた場合にまで停止リクエストを送ると無駄なエラートーストが
+    // 出てしまうため、起動中と分かっている場合のみ呼ぶ。
+    if (serverInfo && SERVER_UP_STEPS.includes(serverInfo.step)) {
+      void handleStop();
+    }
+  }, [setEnabled, handleStop, serverInfo]);
 
   const serverDir = serverInfo?.serverDir;
   const progress = serverInfo?.downloadProgress;
