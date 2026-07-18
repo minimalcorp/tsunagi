@@ -20,6 +20,8 @@ import { terminalRoutes } from './routes/terminal.js';
 import { editorRoutes } from './routes/editor.js';
 import { whisperRoutes } from './routes/whisper.js';
 import { stopWhisperServerOnExit } from './lib/whisper-process.js';
+import { llmRoutes } from './routes/llm.js';
+import { stopLlmServerOnExit } from './lib/llm-process.js';
 import { createBasicAuth } from './basic-auth.js';
 
 // Fastify は単一の公開エンドポイント。Next.js は内部ポートで動かしプロキシする。
@@ -106,6 +108,7 @@ async function start() {
   await fastify.register(terminalRoutes, { prefix: '/api' });
   await fastify.register(editorRoutes, { prefix: '/api' });
   await fastify.register(whisperRoutes, { prefix: '/api' });
+  await fastify.register(llmRoutes, { prefix: '/api' });
 
   // catch-all リバースプロキシ: /api・/socket.io・/health 以外を内部 Next.js へ転送。
   // - /api/* と /health は上で定義済みルートが wildcard より優先される。
@@ -159,6 +162,7 @@ async function start() {
   const shutdown = async (signal: string) => {
     console.log(`[server] Received ${signal}, shutting down...`);
     stopWhisperServerOnExit();
+    stopLlmServerOnExit();
     await fastify.close();
     process.exit(0);
   };
@@ -166,7 +170,10 @@ async function start() {
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   // SIGINT/SIGTERM を経由しない異常終了時の最後の砦（'exit' は同期処理のみ可能）。
-  process.on('exit', () => stopWhisperServerOnExit());
+  process.on('exit', () => {
+    stopWhisperServerOnExit();
+    stopLlmServerOnExit();
+  });
 }
 
 start().catch((err) => {

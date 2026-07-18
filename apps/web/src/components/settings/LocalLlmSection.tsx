@@ -1,17 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, CircleHelp, Loader2, Mic, Square } from 'lucide-react';
+import { Bot, CheckCircle2, CircleHelp, Loader2, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/Dialog';
 import { Progress } from '@/components/ui/progress';
-import { Textarea } from '@/components/ui/textarea';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
-import { WHISPER_PROMPT_STORAGE_KEY } from '@/components/VoiceInputButton';
 
-const STORAGE_KEY = 'tsunagi:voice-input-enabled';
+const STORAGE_KEY = 'tsunagi:local-llm-enabled';
+// 音声入力(VoiceInputButton)から、文字起こし結果をLLMで整形するかどうかの
+// 判定にも使う共有フラグ。
+export const LOCAL_LLM_ENABLED_STORAGE_KEY = STORAGE_KEY;
 
 type ServerStep =
   | 'not_running'
@@ -39,7 +40,7 @@ const STEP_LABEL: Record<ServerStep, string> = {
   not_running: '停止中',
   installing_deps: '依存関係をインストール中...',
   downloading_model: 'モデルをダウンロード中...',
-  starting_server: 'サーバーを起動中...',
+  starting_server: 'サーバーを起動中... (モデルのロードに数十秒かかる場合があります)',
   running: '実行中',
   running_external: '実行中 (tsunagi外で起動)',
   error: 'エラー',
@@ -62,11 +63,10 @@ function formatEta(seconds: number | null): string {
   return `残り約${min}分${sec}秒`;
 }
 
-export function VoiceInputSection() {
+export function LocalLlmSection() {
   const [enabled, setEnabledState] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
-  const [prompt, setPrompt] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const setEnabled = useCallback((next: boolean) => {
@@ -74,13 +74,8 @@ export function VoiceInputSection() {
     localStorage.setItem(STORAGE_KEY, String(next));
   }, []);
 
-  const handlePromptChange = useCallback((next: string) => {
-    setPrompt(next);
-    localStorage.setItem(WHISPER_PROMPT_STORAGE_KEY, next);
-  }, []);
-
   const fetchStatus = useCallback(async (): Promise<ServerInfo> => {
-    const res = await fetch(apiUrl('/api/whisper/server/status'));
+    const res = await fetch(apiUrl('/api/llm/server/status'));
     const data = (await res.json()) as ServerInfo;
     setServerInfo(data);
     return data;
@@ -88,16 +83,15 @@ export function VoiceInputSection() {
 
   useEffect(() => {
     setEnabledState(localStorage.getItem(STORAGE_KEY) === 'true');
-    setPrompt(localStorage.getItem(WHISPER_PROMPT_STORAGE_KEY) ?? '');
     void fetchStatus();
   }, [fetchStatus]);
 
-  // サーバーが起動状態になったら、音声入力を自動で有効化して通知する。
+  // サーバーが起動状態になったら、ローカルLLMを自動で有効化して通知する。
   // 起動ボタンから待機した場合・モーダルを開いた時点で既に起動していた場合の両方をカバーする。
   useEffect(() => {
     if (serverInfo && SERVER_UP_STEPS.includes(serverInfo.step) && !enabled) {
       setEnabled(true);
-      toaster.create({ type: 'success', title: '音声入力が有効化されました' });
+      toaster.create({ type: 'success', title: 'ローカルLLMが有効化されました' });
     }
   }, [serverInfo, enabled, setEnabled]);
 
@@ -127,7 +121,7 @@ export function VoiceInputSection() {
 
   const handleStart = useCallback(async () => {
     try {
-      const res = await fetch(apiUrl('/api/whisper/server/start'), { method: 'POST' });
+      const res = await fetch(apiUrl('/api/llm/server/start'), { method: 'POST' });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || `HTTPエラー: ${res.status}`);
@@ -144,7 +138,7 @@ export function VoiceInputSection() {
 
   const handleStop = useCallback(async () => {
     try {
-      const res = await fetch(apiUrl('/api/whisper/server/stop'), { method: 'POST' });
+      const res = await fetch(apiUrl('/api/llm/server/stop'), { method: 'POST' });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || `HTTPエラー: ${res.status}`);
@@ -162,7 +156,7 @@ export function VoiceInputSection() {
   const handleDisable = useCallback(() => {
     setEnabled(false);
     // 無効化は機能フラグを消すだけでなく、実際に起動中のサーバープロセスも
-    // 停止する(tsunagi管理・tsunagi外起動のどちらでもstopWhisperServer側で対応)。
+    // 停止する(tsunagi管理・tsunagi外起動のどちらでもstopLlmServer側で対応)。
     // 元々停止していた場合にまで停止リクエストを送ると無駄なエラートーストが
     // 出てしまうため、起動中と分かっている場合のみ呼ぶ。
     if (serverInfo && SERVER_UP_STEPS.includes(serverInfo.step)) {
@@ -178,75 +172,63 @@ export function VoiceInputSection() {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-1">
-          <CardTitle>音声入力 (実験的機能)</CardTitle>
-          <Button variant="ghost" size="icon-sm" onClick={openModal} title="音声入力について">
+          <CardTitle>ローカルLLM (実験的機能)</CardTitle>
+          <Button variant="ghost" size="icon-sm" onClick={openModal} title="ローカルLLMについて">
             <CircleHelp />
           </Button>
         </div>
         <CardDescription>
-          ローカルで動作するWhisperを使って音声入力を行います。下記のローカルLLMも有効にすると、
-          文字起こし結果がLLMで自動整形されます(無効時は文字起こし結果をそのまま使用)。
+          ローカルで動作するLLM(Qwen3-30B-A3B, MoE)を利用します。
+          <strong className="font-medium text-foreground">
+            有効にすると、音声入力の文字起こし結果がこのLLMで自動整形されるようになります
+          </strong>
+          (無効時は文字起こし結果をそのまま使用)。
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {!enabled ? (
           <Button size="default" onClick={openModal}>
-            <Mic />
-            音声入力を有効化する
+            <Bot />
+            ローカルLLMを有効化する
           </Button>
         ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-2 text-success">
-                <CheckCircle2 className="size-4" />
-                音声入力: 有効
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-2 text-success">
+              <CheckCircle2 className="size-4" />
+              ローカルLLM: 有効
+            </span>
+            {serverInfo && (
+              <span className="text-xs/relaxed text-muted-foreground">
+                ({STEP_LABEL[serverInfo.step]})
               </span>
-              {serverInfo && (
-                <span className="text-xs/relaxed text-muted-foreground">
-                  ({STEP_LABEL[serverInfo.step]})
-                </span>
-              )}
-              <Button size="default" variant="outline" onClick={handleDisable}>
-                無効にする
-              </Button>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                文字起こしプロンプト (任意)
-              </label>
-              <Textarea
-                value={prompt}
-                onChange={(e) => handlePromptChange(e.target.value)}
-                placeholder="例: 句読点を適切に打ってください。固有名詞は正確に表記してください。"
-                className="min-h-16 text-xs"
-              />
-              <p className="mt-1 text-[0.65rem] text-muted-foreground">
-                Whisperの文字起こしスタイル(表記ゆれ・句読点・固有名詞など)を誘導するヒントです。空でも構いません。
-              </p>
-            </div>
-          </>
+            )}
+            <Button size="default" variant="outline" onClick={handleDisable}>
+              無効にする
+            </Button>
+          </div>
         )}
       </CardContent>
 
       <Dialog
         open={modalOpen}
         onOpenChange={({ open }) => setModalOpen(open)}
-        title="音声入力について"
+        title="ローカルLLMについて"
         maxWidth="2xl"
       >
         <div className="space-y-4 text-sm">
           <div>
             <p className="font-medium text-foreground">実験的機能です</p>
             <p className="text-muted-foreground">
-              音声入力はローカルで動作するWhisper (mlx-whisper)
-              を利用します。精度・速度は環境に依存し、今後変更される可能性があります。
+              音声入力の文字起こし結果を、ローカルで動作するLLM(mlx-lm / Qwen3-30B-A3B,
+              MoE構成)で整形します。MoE構成のため実計算に使うアクティブパラメータは約3Bで、denseな同規模モデルより高速に動作します。精度・速度は環境に依存し、今後変更される可能性があります。
             </p>
           </div>
 
           <div>
             <p className="font-medium text-foreground">対応環境</p>
             <p className="text-muted-foreground">
-              Apple Silicon Mac (M1/M2/M3/M4) のみ対応。Windows/Linuxでは利用できません。
+              Apple Silicon Mac (M1/M2/M3/M4)
+              のみ対応。Windows/Linuxでは利用できません。メモリ32GB以上を推奨します。
             </p>
           </div>
 
@@ -260,11 +242,11 @@ export function VoiceInputSection() {
           <div>
             <p className="mb-1 font-medium text-foreground">セットアップ・起動</p>
             <p className="text-muted-foreground">
-              下のボタンから、依存関係のインストール・モデルのダウンロード・サーバー起動まで自動で行われます（初回は数分かかります）。
+              下のボタンから、依存関係のインストール・モデルのダウンロード・サーバー起動まで自動で行われます（初回はモデルサイズが大きく数分〜数十分かかります）。
             </p>
             {serverInfo && !serverDir && (
               <p className="mt-1 text-destructive">
-                whisper-serverが見つかりませんでした。インストールが壊れている可能性があります。
+                llm-serverが見つかりませんでした。インストールが壊れている可能性があります。
               </p>
             )}
           </div>
@@ -272,8 +254,8 @@ export function VoiceInputSection() {
           <div>
             <p className="mb-1 font-medium text-foreground">アンインストール</p>
             <p className="text-muted-foreground">
-              音声入力のためにダウンロードされるもの（Pythonの依存関係・Whisperモデル、合計約2.6GB）は全て
-              <code className="rounded bg-muted px-1">~/.tsunagi/whisper</code>
+              ローカルLLMのためにダウンロードされるもの（Pythonの依存関係・LLMモデル、合計約17GB）は全て
+              <code className="rounded bg-muted px-1">~/.tsunagi/llm</code>
               に保存されます。不要になった場合はこのディレクトリを削除するだけで、関連リソースを完全に削除できます。
             </p>
           </div>
@@ -282,8 +264,8 @@ export function VoiceInputSection() {
             {(!serverInfo || serverInfo.step === 'not_running' || serverInfo.step === 'error') && (
               <div className="flex flex-col gap-2">
                 <Button size="default" onClick={() => void handleStart()} disabled={!serverInfo}>
-                  {serverInfo ? <Mic /> : <Loader2 className="animate-spin" />}
-                  Whisperサーバーを起動
+                  {serverInfo ? <Bot /> : <Loader2 className="animate-spin" />}
+                  LLMサーバーを起動
                 </Button>
                 {serverInfo?.step === 'error' && serverInfo.error && (
                   <p className="text-xs/relaxed text-destructive">{serverInfo.error}</p>
@@ -302,7 +284,7 @@ export function VoiceInputSection() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-xs/relaxed text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
-                  モデルをダウンロード中...
+                  モデルをダウンロード中... (約17GB)
                 </div>
                 {progress && (
                   <>
@@ -319,7 +301,7 @@ export function VoiceInputSection() {
             {serverInfo?.step === 'starting_server' && (
               <Button size="default" disabled>
                 <Loader2 className="animate-spin" />
-                サーバーを起動中...
+                サーバーを起動中... (モデルのロードに数十秒かかる場合があります)
               </Button>
             )}
 
@@ -329,7 +311,7 @@ export function VoiceInputSection() {
                   <CheckCircle2 className="size-4" />
                   サーバーは起動しています
                 </span>
-                {/* tsunagi外(make whisper等)で起動された場合(running_external)も、
+                {/* tsunagi外(make llm等)で起動された場合(running_external)も、
                     ポート番号を手がかりに停止できるため、起動中は常に停止ボタンを出す。 */}
                 <Button size="default" variant="outline" onClick={() => void handleStop()}>
                   <Square />

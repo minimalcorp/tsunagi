@@ -5,12 +5,15 @@ import { Loader2, Mic, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
+import { LOCAL_LLM_ENABLED_STORAGE_KEY } from '@/components/settings/LocalLlmSection';
 
 // MediaRecorderのOpusは十分な品質を保ちつつ低容量（128kbpsで8秒≒150KB程度）。
 // ブラウザ既定のビットレートは低めに倒れることがあるため明示的に指定する。
 const AUDIO_BITS_PER_SECOND = 128_000;
 
 const STORAGE_KEY = 'tsunagi:voice-input-enabled';
+// Settings画面で編集できる、whisperのinitial_prompt(表記ゆれ・句読点等のヒント)。
+export const WHISPER_PROMPT_STORAGE_KEY = 'tsunagi:whisper-prompt';
 // whisper-serverの起動状態を軽くポーリングし、未起動時はボタンを無効化する。
 const SERVER_STATUS_POLL_MS = 5000;
 
@@ -18,6 +21,12 @@ const SERVER_STATUS_POLL_MS = 5000;
 // 通常の会話音量はこのレンジに収まりやすく、frequencyData平均より聴感に近い。
 const LEVEL_MIN_DB = -60;
 const LEVEL_MAX_DB = -10;
+
+// 録音全体を通してこの正規化レベル(0〜1)を一度も超えなかった場合は「実質無音」と
+// みなし、Whisperへ送らずに済ませる。無音・雑音のみの区間をWhisperに投げると、
+// 自信満々に無関係な文章を生成する(ハルシネーション)ことがあるため、そもそも
+// 呼び出さないのが最も確実な対策。
+const SILENCE_PEAK_THRESHOLD = 0.15;
 
 type RecordingState = 'idle' | 'recording' | 'transcribing';
 type ServerStep =
@@ -52,6 +61,7 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const levelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const smoothedLevelRef = useRef(0);
+  const peakLevelRef = useRef(0);
 
   useEffect(() => {
     setEnabled(localStorage.getItem(STORAGE_KEY) === 'true');
@@ -105,6 +115,7 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
     audioCtxRef.current = audioCtx;
 
     smoothedLevelRef.current = 0;
+    peakLevelRef.current = 0;
     const data = new Float32Array(analyser.fftSize);
     levelIntervalRef.current = setInterval(() => {
       analyser.getFloatTimeDomainData(data);
@@ -118,6 +129,8 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
         1,
         Math.max(0, (db - LEVEL_MIN_DB) / (LEVEL_MAX_DB - LEVEL_MIN_DB))
       );
+      // 平滑化前の瞬間値でピークを見る(平滑化後だと短い発声の山がなまってしまうため)。
+      peakLevelRef.current = Math.max(peakLevelRef.current, normalized);
       // 平滑化は最小限（ジッター除去程度）に留め、実際の発声への追従を優先する
       smoothedLevelRef.current = smoothedLevelRef.current * 0.3 + normalized * 0.7;
       setLevel(smoothedLevelRef.current);
@@ -131,7 +144,15 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
         // サーバー側(PyAV)がwebm/opusを直接デコードできるため、クライアント側で
         // WAVへ再変換しない（Opus圧縮は録音時点で既に発生しており、無圧縮WAVへ
         // 変換し直しても音質は改善せず転送量が増えるだけ）。
+        //
+        // @fastify/multipartのrequest.file()は、fileパートより前に現れたフィールド
+        // しか file.fields に含めない。そのため他のフィールドは必ずfileより前に
+        // appendする(この順序を間違えるとフィールドがサーバー側で無視される)。
         const formData = new FormData();
+        const prompt = localStorage.getItem(WHISPER_PROMPT_STORAGE_KEY);
+        if (prompt) formData.append('prompt', prompt);
+        const useLlm = localStorage.getItem(LOCAL_LLM_ENABLED_STORAGE_KEY) === 'true';
+        formData.append('useLlm', String(useLlm));
         formData.append('file', blob, 'recording.webm');
 
         const response = await fetch(apiUrl('/api/whisper/transcribe'), {
@@ -144,7 +165,14 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
           throw new Error(body?.error || `HTTPエラー: ${response.status}`);
         }
 
-        const data = (await response.json()) as { text: string };
+        const data = (await response.json()) as { text: string; warning?: string };
+        if (data.warning) {
+          toaster.create({
+            type: 'error',
+            title: 'LLM整形をスキップしました',
+            description: data.warning,
+          });
+        }
         if (data.text) onTranscribed(data.text);
       } catch (error) {
         toaster.create({
@@ -175,7 +203,19 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
       recorder.onstop = () => {
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
+        const peakLevel = peakLevelRef.current;
         stopLevelMeter();
+
+        if (peakLevel < SILENCE_PEAK_THRESHOLD) {
+          toaster.create({
+            type: 'error',
+            title: '音声が検出されませんでした',
+            description: 'マイクに向かって話してから、もう一度お試しください。',
+          });
+          setState('idle');
+          return;
+        }
+
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         void transcribe(blob);
       };

@@ -14,10 +14,14 @@ import io
 
 import av
 import numpy as np
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile
 import mlx_whisper
 
 MODEL = "mlx-community/whisper-large-v3-turbo"
+# 無音・雑音区間で「ご視聴ありがとうございました」等の無関係な文章を自信満々に
+# 生成してしまう(Whisper系モデルで知られたハルシネーション挙動)ことがあるため、
+# no_speech_prob(無音である確率)がこの値を超えるセグメントは出力から除外する。
+NO_SPEECH_THRESHOLD = 0.6
 
 app = FastAPI()
 
@@ -45,8 +49,25 @@ def decode_to_16k_mono(data: bytes) -> np.ndarray:
 
 
 @app.post("/transcribe")
-async def transcribe(file: UploadFile = File(...)) -> dict:
+async def transcribe(file: UploadFile = File(...), prompt: str | None = Form(None)) -> dict:
     data = await file.read()
     audio = decode_to_16k_mono(data)
-    result = mlx_whisper.transcribe(audio, path_or_hf_repo=MODEL, language="ja")
-    return {"text": result["text"].strip()}
+    # initial_promptは文字起こしのスタイル(表記ゆれ・句読点・固有名詞など)を
+    # 誘導するヒントで、tsunagiのSettingsからユーザーが自由に設定できる。
+    result = mlx_whisper.transcribe(
+        audio, path_or_hf_repo=MODEL, language="ja", initial_prompt=prompt or None
+    )
+
+    # result["text"]はno_speech_prob等のフィルタを経ずに全セグメントを結合した
+    # ものなので使わず、セグメント単位でno_speech_probを見て自前で組み立て直す。
+    segments = result.get("segments")
+    if segments:
+        text = "".join(
+            seg["text"]
+            for seg in segments
+            if seg.get("no_speech_prob", 0.0) <= NO_SPEECH_THRESHOLD
+        )
+    else:
+        text = result.get("text", "")
+
+    return {"text": text.strip()}

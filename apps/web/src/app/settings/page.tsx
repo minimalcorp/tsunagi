@@ -10,6 +10,7 @@ import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
 import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
 import { VoiceInputSection } from '@/components/settings/VoiceInputSection';
+import { LocalLlmSection } from '@/components/settings/LocalLlmSection';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
@@ -138,6 +139,9 @@ export default function SettingsPage() {
 
               {/* Voice Input (Global scope only, device-wide feature) */}
               {selectedNode.scope === 'global' && <VoiceInputSection />}
+
+              {/* Local LLM (Global scope only, device-wide feature) */}
+              {selectedNode.scope === 'global' && <LocalLlmSection />}
 
               {/* Remove Repository (Repo scope only) */}
               {selectedNode.scope === 'repo' && selectedNode.owner && selectedNode.repo && (

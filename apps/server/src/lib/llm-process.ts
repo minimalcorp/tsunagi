@@ -5,31 +5,37 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { killProcessOnPort } from './process-port.js';
 
-const WHISPER_SERVER_URL = process.env.TSUNAGI_WHISPER_SERVER_URL || 'http://127.0.0.1:8765';
+const MODEL = 'mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit';
+
+const LLM_SERVER_URL = process.env.TSUNAGI_LLM_SERVER_URL || 'http://127.0.0.1:8766';
 // run.shが待受けるポート固定値(host.docker.internal経由URLと違い、停止処理は
 // 必ずこのNodeプロセスと同じホスト上のポートを対象にする必要があるため分けて持つ)。
-const WHISPER_PORT = 8765;
+const LLM_PORT = 8766;
 
-// venv・モデルキャッシュとも ~/.tsunagi/whisper 配下にまとめる(run.shと同じ場所)。
-const TSUNAGI_WHISPER_DIR = path.join(os.homedir(), '.tsunagi', 'whisper');
-const VENV_DIR = path.join(TSUNAGI_WHISPER_DIR, 'venv');
-const HF_CACHE_DIR = path.join(TSUNAGI_WHISPER_DIR, 'cache');
+export function getLlmServerUrl(): string {
+  return LLM_SERVER_URL;
+}
+
+// venv・モデルキャッシュとも ~/.tsunagi/llm 配下にまとめる(run.shと同じ場所)。
+const TSUNAGI_LLM_DIR = path.join(os.homedir(), '.tsunagi', 'llm');
+const VENV_DIR = path.join(TSUNAGI_LLM_DIR, 'venv');
+const HF_CACHE_DIR = path.join(TSUNAGI_LLM_DIR, 'cache');
 const MODEL_CACHE_DIR = path.join(
   HF_CACHE_DIR,
   'hub',
-  'models--mlx-community--whisper-large-v3-turbo'
+  'models--mlx-community--Qwen3-30B-A3B-Instruct-2507-4bit'
 );
-// 実測値(2026-07時点、encoder+decoder等の合計)。多少の変動はあるがETA計算の目安として使う。
-const EXPECTED_MODEL_BYTES = 1_614_000_000;
+// 実測値(2026-07時点、4bit量子化された重み一式の合計)。多少の変動はあるがETA計算の目安として使う。
+const EXPECTED_MODEL_BYTES = 17_200_000_000;
 
 // このファイルは apps/server/src/lib (dev) または apps/cli/dist/server/lib
-// (npm配布物) のいずれかにいる。どちらの場合も3階層上に whisper-server が
+// (npm配布物) のいずれかにいる。どちらの場合も3階層上に llm-server が
 // 兄弟ディレクトリとして存在するようレイアウトを揃えている
-// (apps/server/dist/lib → apps/server → apps → apps/whisper-server,
-//  apps/cli/dist/server/lib → apps/cli/dist → apps/cli → apps/cli/whisper-server)。
-export function findWhisperServerDir(): string | null {
+// (apps/server/dist/lib → apps/server → apps → apps/llm-server,
+//  apps/cli/dist/server/lib → apps/cli/dist → apps/cli → apps/cli/llm-server)。
+export function findLlmServerDir(): string | null {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const candidate = path.join(here, '..', '..', '..', 'whisper-server');
+  const candidate = path.join(here, '..', '..', '..', 'llm-server');
   return fs.existsSync(path.join(candidate, 'run.sh')) ? candidate : null;
 }
 
@@ -47,7 +53,7 @@ function isModelReady(): boolean {
   return fs.readdirSync(snapshotsDir).length > 0;
 }
 
-export type WhisperServerStep =
+export type LlmServerStep =
   | 'not_running'
   | 'installing_deps'
   | 'downloading_model'
@@ -62,14 +68,14 @@ export interface DownloadProgress {
   etaSeconds: number | null;
 }
 
-export interface WhisperServerInfo {
-  step: WhisperServerStep;
+export interface LlmServerInfo {
+  step: LlmServerStep;
   serverDir: string | null;
   downloadProgress?: DownloadProgress;
   error?: string;
 }
 
-let currentStep: WhisperServerStep = 'not_running';
+let currentStep: LlmServerStep = 'not_running';
 let downloadProgress: DownloadProgress | undefined;
 let lastError: string | undefined;
 let managedProcess: ChildProcess | null = null;
@@ -81,7 +87,7 @@ function sleep(ms: number): Promise<void> {
 
 async function checkHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${WHISPER_SERVER_URL}/health`, {
+    const response = await fetch(`${LLM_SERVER_URL}/health`, {
       signal: AbortSignal.timeout(2000),
     });
     return response.ok;
@@ -90,8 +96,8 @@ async function checkHealth(): Promise<boolean> {
   }
 }
 
-export async function getWhisperServerStatus(): Promise<WhisperServerInfo> {
-  const serverDir = findWhisperServerDir();
+export async function getLlmServerStatus(): Promise<LlmServerInfo> {
+  const serverDir = findLlmServerDir();
 
   // セットアップ/起動フロー進行中はそのステップをそのまま報告する。
   if (setupPromise) {
@@ -160,7 +166,7 @@ async function runSetupAndStart(dir: string): Promise<void> {
 
   if (!isVenvReady()) {
     currentStep = 'installing_deps';
-    fs.mkdirSync(TSUNAGI_WHISPER_DIR, { recursive: true });
+    fs.mkdirSync(TSUNAGI_LLM_DIR, { recursive: true });
     await runStep('python3', ['-m', 'venv', VENV_DIR], dir);
     await runStep(venvPython(), ['-m', 'pip', 'install', '-r', 'requirements.txt'], dir);
   }
@@ -187,7 +193,7 @@ async function runSetupAndStart(dir: string): Promise<void> {
   currentStep = 'starting_server';
   const child = spawn(
     venvPython(),
-    ['-m', 'uvicorn', 'server:app', '--host', '127.0.0.1', '--port', '8765'],
+    ['-m', 'mlx_lm.server', '--model', MODEL, '--host', '127.0.0.1', '--port', String(LLM_PORT)],
     { cwd: dir, stdio: 'ignore', env: hfEnv }
   );
   child.on('exit', () => {
@@ -198,22 +204,24 @@ async function runSetupAndStart(dir: string): Promise<void> {
   });
   managedProcess = child;
 
+  // MoEで実計算はアクティブパラメータ(~3B)分のみだが、4bit量子化でも~17GBの
+  // 重みファイル自体はメモリへ展開する必要があるため、whisperより長めに待つ。
   const start = Date.now();
-  while (Date.now() - start < 30000) {
+  while (Date.now() - start < 90000) {
     if (await checkHealth()) return;
     await sleep(1000);
   }
-  throw new Error('Server did not become healthy within 30s of starting');
+  throw new Error('Server did not become healthy within 90s of starting');
 }
 
-export function startWhisperServer(): { started: boolean; error?: string } {
+export function startLlmServer(): { started: boolean; error?: string } {
   if (setupPromise || managedProcess) {
     return { started: false, error: 'Already starting/running' };
   }
 
-  const dir = findWhisperServerDir();
+  const dir = findLlmServerDir();
   if (!dir) {
-    return { started: false, error: 'whisper-server directory not found' };
+    return { started: false, error: 'llm-server directory not found' };
   }
 
   lastError = undefined;
@@ -229,7 +237,7 @@ export function startWhisperServer(): { started: boolean; error?: string } {
   return { started: true };
 }
 
-export async function stopWhisperServer(): Promise<{ stopped: boolean; error?: string }> {
+export async function stopLlmServer(): Promise<{ stopped: boolean; error?: string }> {
   if (managedProcess) {
     managedProcess.kill();
     managedProcess = null;
@@ -237,22 +245,54 @@ export async function stopWhisperServer(): Promise<{ stopped: boolean; error?: s
     return { stopped: true };
   }
 
-  // tsunagi外(make whisper等)で起動された場合はchild_processのハンドルを
+  // tsunagi外(make llm等)で起動された場合はchild_processのハンドルを
   // 持たないため、ポート番号を手がかりにOS側から見つけて停止する。
-  const killed = await killProcessOnPort(WHISPER_PORT);
+  const killed = await killProcessOnPort(LLM_PORT);
   if (!killed) {
     return {
       stopped: false,
-      error: `ポート${WHISPER_PORT}で待ち受けているプロセスが見つかりませんでした`,
+      error: `ポート${LLM_PORT}で待ち受けているプロセスが見つかりませんでした`,
     };
   }
   currentStep = 'not_running';
   return { stopped: true };
 }
 
-// tsunagi本体プロセスの終了時(Ctrl+C等)に、自分が起動したwhisper-serverも
+// tsunagi本体プロセスの終了時(Ctrl+C等)に、自分が起動したllm-serverも
 // 道連れで停止する。ユーザーが手動で起動したもの(running_external)には触れない。
-export function stopWhisperServerOnExit(): void {
+export function stopLlmServerOnExit(): void {
   managedProcess?.kill();
   managedProcess = null;
+}
+
+export interface LlmChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+// mlx_lm.serverへストリーミングなしで1回だけ問い合わせ、最終テキストのみを返す。
+// 音声入力の文字起こし結果の整形など、対話UIを介さずLLMの出力だけ欲しい場面で使う。
+export async function generateLlmCompletion(
+  messages: LlmChatMessage[],
+  maxTokens: number
+): Promise<string> {
+  const response = await fetch(`${LLM_SERVER_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ messages, stream: false, max_tokens: maxTokens }),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`llm-server responded with ${response.status}`);
+  }
+
+  const data = (await response.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content !== 'string') {
+    throw new Error('Unexpected response shape from llm-server');
+  }
+  return content;
 }

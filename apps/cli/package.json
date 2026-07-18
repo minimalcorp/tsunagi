@@ -46,6 +46,7 @@
     "scripts/monaco-editor.sh",
     "tsunagi-marketplace/**/*",
     "whisper-server/**/*",
+    "llm-server/**/*",
     "LICENSE",
     "README.md"
   ],
