@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Bot, CheckCircle2, CircleHelp, Loader2, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -229,7 +228,6 @@ function LlmProfileControl({ profile, serverInfo, onStart, onStop }: LlmProfileC
 }
 
 export function LocalLlmSection() {
-  const router = useRouter();
   const [enabled, setEnabledState] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const notifiedRef = useRef(false);
@@ -272,7 +270,7 @@ export function LocalLlmSection() {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-1">
-          <CardTitle>ローカルLLM対話デモ (実験的機能)</CardTitle>
+          <CardTitle>ローカルLLM (実験的機能)</CardTitle>
           <Button
             variant="ghost"
             size="icon-sm"
@@ -287,7 +285,7 @@ export function LocalLlmSection() {
           <strong className="font-medium text-foreground">
             有効にすると、音声入力の文字起こし結果がこのLLMで自動整形されるようになります
           </strong>
-          (無効時は文字起こし結果をそのまま使用)。対話デモで通常モード・シンキングモードの2種類を試すこともできます。
+          (無効時は文字起こし結果をそのまま使用)。通常モード・シンキングモードの2つのモデルを個別に起動・停止できます。
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -302,12 +300,6 @@ export function LocalLlmSection() {
               <CheckCircle2 className="size-4" />
               ローカルLLM: 有効
             </span>
-            {anyRunning && (
-              <Button size="default" variant="outline" onClick={() => router.push('/local-llm')}>
-                <Bot />
-                デモを試す
-              </Button>
-            )}
             <Button size="default" variant="outline" onClick={() => setModalOpen(true)}>
               サーバー管理
             </Button>
@@ -321,17 +313,15 @@ export function LocalLlmSection() {
       <Dialog
         open={modalOpen}
         onOpenChange={({ open }) => setModalOpen(open)}
-        title="ローカルLLM対話デモについて"
+        title="ローカルLLMについて"
         maxWidth="2xl"
       >
         <div className="space-y-4 text-sm">
           <div>
             <p className="font-medium text-foreground">実験的機能です</p>
             <p className="text-muted-foreground">
-              音声入力の文字起こし結果をローカルLLMで整形する機能の前段検証として、ローカルで動作するLLM
-              (mlx-lm / Qwen3-30B-A3B, MoE構成) と対話できるデモページ(
-              <code className="rounded bg-muted px-1">/local-llm</code>
-              )を提供します。MoE構成のため実計算に使うアクティブパラメータは約3Bで、denseな同規模モデルより高速に動作します。通常モード(Instruct)とシンキングモード(Thinking,
+              音声入力の文字起こし結果を、ローカルで動作するLLM(mlx-lm / Qwen3-30B-A3B,
+              MoE構成)で整形します。MoE構成のため実計算に使うアクティブパラメータは約3Bで、denseな同規模モデルより高速に動作します。通常モード(Instruct、実際の整形に使用)とシンキングモード(Thinking,
               回答前に推論する)の2種類があり、それぞれ別プロセス・別モデルとして動作します。精度・速度は環境に依存し、今後変更される可能性があります。
             </p>
           </div>
