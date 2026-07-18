@@ -6,6 +6,7 @@ import * as path from 'path';
 import { ptyManager } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
 import { getEnv } from '../lib/repositories/environment.js';
+import { ensureClaudeOnboardingCompleted } from '../lib/claude-config-guard.js';
 
 // サーバーはプロジェクトルートから起動されるため process.cwd() でルートを取得
 const TSUNAGI_EDITOR_PATH = path.resolve(process.cwd(), 'scripts/monaco-editor.sh');
@@ -287,6 +288,10 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       // コマンドが指定されていればPTY起動後にシェルへ書き込む
       if (command) {
         const cmd = command.endsWith('\n') ? command : command + '\n';
+        // claude logout で ~/.claude.json の hasCompletedOnboarding がリセットされて
+        // いると、次回 claude 起動時にオンボーディングウィザードが表示され --resume/
+        // --session-id を前提にした自動起動フローが止まるため、起動前に補正する。
+        await ensureClaudeOnboardingCompleted();
         // シェルの初期化（プロンプト表示）を待つため少し遅延させて書き込む
         setTimeout(() => {
           session.pty.write(cmd);
