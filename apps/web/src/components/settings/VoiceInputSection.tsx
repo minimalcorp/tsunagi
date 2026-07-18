@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, CircleHelp, Loader2, Mic, Square } from 'lucide-react';
+import { AlertCircle, CheckCircle2, CircleHelp, Loader2, Mic, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/Dialog';
@@ -173,6 +173,10 @@ export function VoiceInputSection() {
   const serverDir = serverInfo?.serverDir;
   const progress = serverInfo?.downloadProgress;
   const progressPercent = progress ? (progress.downloadedBytes / progress.totalBytes) * 100 : 0;
+  // 「有効」表示は、フラグ(enabled)とサーバー実起動状態の両方が揃って初めて成立する。
+  // フラグのみで「有効」と表示すると、サーバーが落ちていても有効に見えてしまうため。
+  const serverKnown = serverInfo !== null;
+  const serverReady = serverKnown && SERVER_UP_STEPS.includes(serverInfo.step);
 
   return (
     <Card>
@@ -197,14 +201,32 @@ export function VoiceInputSection() {
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex items-center gap-2 text-success">
-                <CheckCircle2 className="size-4" />
-                音声入力: 有効
-              </span>
+              {!serverKnown ? (
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  状態を確認中...
+                </span>
+              ) : serverReady ? (
+                <span className="flex items-center gap-2 text-success">
+                  <CheckCircle2 className="size-4" />
+                  音声入力: 有効
+                </span>
+              ) : (
+                <span className="flex items-center gap-2 text-warning">
+                  <AlertCircle className="size-4" />
+                  音声入力: 有効化済み（サーバー停止中）
+                </span>
+              )}
               {serverInfo && (
                 <span className="text-xs/relaxed text-muted-foreground">
                   ({STEP_LABEL[serverInfo.step]})
                 </span>
+              )}
+              {serverKnown && !serverReady && (
+                <Button size="default" onClick={openModal}>
+                  <Mic />
+                  サーバーを起動
+                </Button>
               )}
               <Button size="default" variant="outline" onClick={handleDisable}>
                 無効にする
