@@ -23,10 +23,8 @@ services:
       # apps/whisper-server はユーザーがホスト側で手動起動する前提のため、
       # container からは host.docker.internal 経由でアクセスする。
       - TSUNAGI_WHISPER_SERVER_URL=http://host.docker.internal:8765
-      # apps/llm-server も同様にホスト側で手動起動する前提。instruct/thinkingの
-      # 2モードをそれぞれ別ポートで起動できるため、URLも2本用意する。
-      - TSUNAGI_LLM_SERVER_URL_INSTRUCT=http://host.docker.internal:8766
-      - TSUNAGI_LLM_SERVER_URL_THINKING=http://host.docker.internal:8767
+      # apps/llm-server も同様にホスト側で手動起動する前提。
+      - TSUNAGI_LLM_SERVER_URL=http://host.docker.internal:8766
     ports:
       - '2891:2791'
       - '2892:2792'

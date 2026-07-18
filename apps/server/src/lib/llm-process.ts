@@ -5,48 +5,28 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { killProcessOnPort } from './process-port.js';
 
-export type LlmProfile = 'instruct' | 'thinking';
+const MODEL = 'mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit';
 
-interface ProfileConfig {
-  model: string;
-  port: number;
-  cacheDirName: string;
-  expectedModelBytes: number;
-  envUrlKey: string;
-}
+const LLM_SERVER_URL = process.env.TSUNAGI_LLM_SERVER_URL || 'http://127.0.0.1:8766';
+// run.shが待受けるポート固定値(host.docker.internal経由URLと違い、停止処理は
+// 必ずこのNodeプロセスと同じホスト上のポートを対象にする必要があるため分けて持つ)。
+const LLM_PORT = 8766;
 
-// 実測値(2026-07時点、4bit量子化された重み一式の合計)。多少の変動はあるがETA計算の目安として使う。
-const PROFILE_CONFIG: Record<LlmProfile, ProfileConfig> = {
-  instruct: {
-    model: 'mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit',
-    port: 8766,
-    cacheDirName: 'models--mlx-community--Qwen3-30B-A3B-Instruct-2507-4bit',
-    expectedModelBytes: 17_200_000_000,
-    envUrlKey: 'TSUNAGI_LLM_SERVER_URL_INSTRUCT',
-  },
-  thinking: {
-    model: 'mlx-community/Qwen3-30B-A3B-Thinking-2507-4bit',
-    port: 8767,
-    cacheDirName: 'models--mlx-community--Qwen3-30B-A3B-Thinking-2507-4bit',
-    expectedModelBytes: 17_200_000_000,
-    envUrlKey: 'TSUNAGI_LLM_SERVER_URL_THINKING',
-  },
-};
-
-export function getLlmServerUrl(profile: LlmProfile): string {
-  const cfg = PROFILE_CONFIG[profile];
-  return process.env[cfg.envUrlKey] || `http://127.0.0.1:${cfg.port}`;
+export function getLlmServerUrl(): string {
+  return LLM_SERVER_URL;
 }
 
 // venv・モデルキャッシュとも ~/.tsunagi/llm 配下にまとめる(run.shと同じ場所)。
-// venvはinstruct/thinkingで共有する(同じmlx-lmパッケージを使うため)。
 const TSUNAGI_LLM_DIR = path.join(os.homedir(), '.tsunagi', 'llm');
 const VENV_DIR = path.join(TSUNAGI_LLM_DIR, 'venv');
 const HF_CACHE_DIR = path.join(TSUNAGI_LLM_DIR, 'cache');
-
-function modelCacheDir(profile: LlmProfile): string {
-  return path.join(HF_CACHE_DIR, 'hub', PROFILE_CONFIG[profile].cacheDirName);
-}
+const MODEL_CACHE_DIR = path.join(
+  HF_CACHE_DIR,
+  'hub',
+  'models--mlx-community--Qwen3-30B-A3B-Instruct-2507-4bit'
+);
+// 実測値(2026-07時点、4bit量子化された重み一式の合計)。多少の変動はあるがETA計算の目安として使う。
+const EXPECTED_MODEL_BYTES = 17_200_000_000;
 
 // このファイルは apps/server/src/lib (dev) または apps/cli/dist/server/lib
 // (npm配布物) のいずれかにいる。どちらの場合も3階層上に llm-server が
@@ -67,8 +47,8 @@ function isVenvReady(): boolean {
   return fs.existsSync(venvPython());
 }
 
-function isModelReady(profile: LlmProfile): boolean {
-  const snapshotsDir = path.join(modelCacheDir(profile), 'snapshots');
+function isModelReady(): boolean {
+  const snapshotsDir = path.join(MODEL_CACHE_DIR, 'snapshots');
   if (!fs.existsSync(snapshotsDir)) return false;
   return fs.readdirSync(snapshotsDir).length > 0;
 }
@@ -95,30 +75,19 @@ export interface LlmServerInfo {
   error?: string;
 }
 
-interface ProfileState {
-  currentStep: LlmServerStep;
-  downloadProgress?: DownloadProgress;
-  lastError?: string;
-  managedProcess: ChildProcess | null;
-  setupPromise: Promise<void> | null;
-}
-
-function createProfileState(): ProfileState {
-  return { currentStep: 'not_running', managedProcess: null, setupPromise: null };
-}
-
-const STATE: Record<LlmProfile, ProfileState> = {
-  instruct: createProfileState(),
-  thinking: createProfileState(),
-};
+let currentStep: LlmServerStep = 'not_running';
+let downloadProgress: DownloadProgress | undefined;
+let lastError: string | undefined;
+let managedProcess: ChildProcess | null = null;
+let setupPromise: Promise<void> | null = null;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function checkHealth(profile: LlmProfile): Promise<boolean> {
+async function checkHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${getLlmServerUrl(profile)}/health`, {
+    const response = await fetch(`${LLM_SERVER_URL}/health`, {
       signal: AbortSignal.timeout(2000),
     });
     return response.ok;
@@ -127,25 +96,19 @@ async function checkHealth(profile: LlmProfile): Promise<boolean> {
   }
 }
 
-export async function getLlmServerStatus(profile: LlmProfile): Promise<LlmServerInfo> {
-  const state = STATE[profile];
+export async function getLlmServerStatus(): Promise<LlmServerInfo> {
   const serverDir = findLlmServerDir();
 
   // セットアップ/起動フロー進行中はそのステップをそのまま報告する。
-  if (state.setupPromise) {
-    return {
-      step: state.currentStep,
-      serverDir,
-      downloadProgress: state.downloadProgress,
-      error: state.lastError,
-    };
+  if (setupPromise) {
+    return { step: currentStep, serverDir, downloadProgress, error: lastError };
   }
 
-  const healthy = await checkHealth(profile);
+  const healthy = await checkHealth();
   if (healthy) {
-    return { step: state.managedProcess ? 'running' : 'running_external', serverDir };
+    return { step: managedProcess ? 'running' : 'running_external', serverDir };
   }
-  return { step: state.lastError ? 'error' : 'not_running', serverDir, error: state.lastError };
+  return { step: lastError ? 'error' : 'not_running', serverDir, error: lastError };
 }
 
 function runStep(cmd: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<void> {
@@ -161,10 +124,8 @@ function runStep(cmd: string, args: string[], cwd: string, env?: NodeJS.ProcessE
 
 // モデルDL中(huggingface_hubがblobs/配下に *.incomplete を書き続ける)のファイルサイズを
 // 定期的にポーリングし、進捗(%)と直近の転送速度からのETAを算出する。
-async function trackModelDownload(profile: LlmProfile, child: ChildProcess): Promise<void> {
-  const state = STATE[profile];
-  const expectedBytes = PROFILE_CONFIG[profile].expectedModelBytes;
-  const blobsDir = path.join(modelCacheDir(profile), 'blobs');
+async function trackModelDownload(child: ChildProcess): Promise<void> {
+  const blobsDir = path.join(MODEL_CACHE_DIR, 'blobs');
   let lastBytes = 0;
   let lastTime = Date.now();
   let stopped = false;
@@ -187,12 +148,12 @@ async function trackModelDownload(profile: LlmProfile, child: ChildProcess): Pro
     const now = Date.now();
     const elapsedSec = (now - lastTime) / 1000;
     const bytesPerSec = elapsedSec > 0 ? (downloaded - lastBytes) / elapsedSec : 0;
-    const remaining = expectedBytes - downloaded;
+    const remaining = EXPECTED_MODEL_BYTES - downloaded;
     const etaSeconds = bytesPerSec > 0 ? Math.max(0, Math.round(remaining / bytesPerSec)) : null;
 
-    state.downloadProgress = {
+    downloadProgress = {
       downloadedBytes: downloaded,
-      totalBytes: expectedBytes,
+      totalBytes: EXPECTED_MODEL_BYTES,
       etaSeconds,
     };
     lastBytes = downloaded;
@@ -200,77 +161,61 @@ async function trackModelDownload(profile: LlmProfile, child: ChildProcess): Pro
   }
 }
 
-async function runSetupAndStart(profile: LlmProfile, dir: string): Promise<void> {
-  const state = STATE[profile];
-  const cfg = PROFILE_CONFIG[profile];
+async function runSetupAndStart(dir: string): Promise<void> {
   const hfEnv = { ...process.env, HF_HOME: HF_CACHE_DIR, HF_HUB_DISABLE_XET: '1' };
 
   if (!isVenvReady()) {
-    state.currentStep = 'installing_deps';
+    currentStep = 'installing_deps';
     fs.mkdirSync(TSUNAGI_LLM_DIR, { recursive: true });
     await runStep('python3', ['-m', 'venv', VENV_DIR], dir);
     await runStep(venvPython(), ['-m', 'pip', 'install', '-r', 'requirements.txt'], dir);
   }
 
-  if (!isModelReady(profile)) {
-    state.currentStep = 'downloading_model';
-    state.downloadProgress = {
-      downloadedBytes: 0,
-      totalBytes: cfg.expectedModelBytes,
-      etaSeconds: null,
-    };
+  if (!isModelReady()) {
+    currentStep = 'downloading_model';
+    downloadProgress = { downloadedBytes: 0, totalBytes: EXPECTED_MODEL_BYTES, etaSeconds: null };
     await new Promise<void>((resolve, reject) => {
-      const child = spawn(venvPython(), ['download_model.py', cfg.model], {
+      const child = spawn(venvPython(), ['download_model.py'], {
         cwd: dir,
         stdio: 'ignore',
         env: hfEnv,
       });
-      void trackModelDownload(profile, child);
+      void trackModelDownload(child);
       child.on('exit', (code) => {
         if (code === 0) resolve();
         else reject(new Error(`download_model.py exited with code ${code}`));
       });
       child.on('error', reject);
     });
-    state.downloadProgress = undefined;
+    downloadProgress = undefined;
   }
 
-  state.currentStep = 'starting_server';
+  currentStep = 'starting_server';
   const child = spawn(
     venvPython(),
-    [
-      '-m',
-      'mlx_lm.server',
-      '--model',
-      cfg.model,
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(cfg.port),
-    ],
+    ['-m', 'mlx_lm.server', '--model', MODEL, '--host', '127.0.0.1', '--port', String(LLM_PORT)],
     { cwd: dir, stdio: 'ignore', env: hfEnv }
   );
   child.on('exit', () => {
-    if (state.managedProcess === child) state.managedProcess = null;
+    if (managedProcess === child) managedProcess = null;
   });
   child.on('error', () => {
-    if (state.managedProcess === child) state.managedProcess = null;
+    if (managedProcess === child) managedProcess = null;
   });
-  state.managedProcess = child;
+  managedProcess = child;
 
   // MoEで実計算はアクティブパラメータ(~3B)分のみだが、4bit量子化でも~17GBの
   // 重みファイル自体はメモリへ展開する必要があるため、whisperより長めに待つ。
   const start = Date.now();
   while (Date.now() - start < 90000) {
-    if (await checkHealth(profile)) return;
+    if (await checkHealth()) return;
     await sleep(1000);
   }
   throw new Error('Server did not become healthy within 90s of starting');
 }
 
-export function startLlmServer(profile: LlmProfile): { started: boolean; error?: string } {
-  const state = STATE[profile];
-  if (state.setupPromise || state.managedProcess) {
+export function startLlmServer(): { started: boolean; error?: string } {
+  if (setupPromise || managedProcess) {
     return { started: false, error: 'Already starting/running' };
   }
 
@@ -279,39 +224,45 @@ export function startLlmServer(profile: LlmProfile): { started: boolean; error?:
     return { started: false, error: 'llm-server directory not found' };
   }
 
-  state.lastError = undefined;
-  state.setupPromise = runSetupAndStart(profile, dir)
+  lastError = undefined;
+  setupPromise = runSetupAndStart(dir)
     .catch((error) => {
-      state.currentStep = 'error';
-      state.lastError = error instanceof Error ? error.message : String(error);
+      currentStep = 'error';
+      lastError = error instanceof Error ? error.message : String(error);
     })
     .finally(() => {
-      state.setupPromise = null;
+      setupPromise = null;
     });
 
   return { started: true };
 }
 
-export async function stopLlmServer(
-  profile: LlmProfile
-): Promise<{ stopped: boolean; error?: string }> {
-  const state = STATE[profile];
-  if (state.managedProcess) {
-    state.managedProcess.kill();
-    state.managedProcess = null;
-    state.currentStep = 'not_running';
+export async function stopLlmServer(): Promise<{ stopped: boolean; error?: string }> {
+  if (managedProcess) {
+    managedProcess.kill();
+    managedProcess = null;
+    currentStep = 'not_running';
     return { stopped: true };
   }
 
-  // tsunagi外(make llm/make llm-thinking等)で起動された場合はchild_processの
-  // ハンドルを持たないため、ポート番号を手がかりにOS側から見つけて停止する。
-  const port = PROFILE_CONFIG[profile].port;
-  const killed = await killProcessOnPort(port);
+  // tsunagi外(make llm等)で起動された場合はchild_processのハンドルを
+  // 持たないため、ポート番号を手がかりにOS側から見つけて停止する。
+  const killed = await killProcessOnPort(LLM_PORT);
   if (!killed) {
-    return { stopped: false, error: `ポート${port}で待ち受けているプロセスが見つかりませんでした` };
+    return {
+      stopped: false,
+      error: `ポート${LLM_PORT}で待ち受けているプロセスが見つかりませんでした`,
+    };
   }
-  state.currentStep = 'not_running';
+  currentStep = 'not_running';
   return { stopped: true };
+}
+
+// tsunagi本体プロセスの終了時(Ctrl+C等)に、自分が起動したllm-serverも
+// 道連れで停止する。ユーザーが手動で起動したもの(running_external)には触れない。
+export function stopLlmServerOnExit(): void {
+  managedProcess?.kill();
+  managedProcess = null;
 }
 
 export interface LlmChatMessage {
@@ -322,11 +273,10 @@ export interface LlmChatMessage {
 // mlx_lm.serverへストリーミングなしで1回だけ問い合わせ、最終テキストのみを返す。
 // 音声入力の文字起こし結果の整形など、対話UIを介さずLLMの出力だけ欲しい場面で使う。
 export async function generateLlmCompletion(
-  profile: LlmProfile,
   messages: LlmChatMessage[],
   maxTokens: number
 ): Promise<string> {
-  const response = await fetch(`${getLlmServerUrl(profile)}/v1/chat/completions`, {
+  const response = await fetch(`${LLM_SERVER_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ messages, stream: false, max_tokens: maxTokens }),
@@ -345,14 +295,4 @@ export async function generateLlmCompletion(
     throw new Error('Unexpected response shape from llm-server');
   }
   return content;
-}
-
-// tsunagi本体プロセスの終了時(Ctrl+C等)に、自分が起動したllm-serverも
-// 道連れで停止する。ユーザーが手動で起動したもの(running_external)には触れない。
-export function stopLlmServerOnExit(): void {
-  for (const profile of Object.keys(STATE) as LlmProfile[]) {
-    const state = STATE[profile];
-    state.managedProcess?.kill();
-    state.managedProcess = null;
-  }
 }

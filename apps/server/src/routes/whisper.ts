@@ -11,9 +11,8 @@ import { generateLlmCompletion } from '../lib/llm-process.js';
 // プロセスの起動・停止のみ管理する。
 const WHISPER_SERVER_URL = process.env.TSUNAGI_WHISPER_SERVER_URL || 'http://127.0.0.1:8765';
 
-// 文字起こし結果のLLM整形に使うシステムプロンプト。/local-llmデモでの検証で
+// 文字起こし結果のLLM整形に使うシステムプロンプト。検証で
 // 「原文の言葉遣いを維持しつつ句読点・誤字だけ直す」設定が有効と確認できたもの。
-// 応答速度が重要なため、常にinstructプロファイル(非シンキング)を使う。
 const TRANSCRIPTION_CORRECTION_SYSTEM_PROMPT =
   '以下は音声認識による文字起こし結果です。元の言葉遣いや言い回し、文章構成はできるだけそのまま維持してください。行ってよいのは句読点の追加と、明らかな誤字(音声認識の誤変換)の修正のみです。要約・言い換え・フィラーの除去・文の並び替えなどは行わないでください。修正後の文章のみを出力し、前置きや説明は不要です。';
 
@@ -94,7 +93,6 @@ export async function whisperRoutes(fastify: FastifyInstance) {
     // (ユーザーの発話内容を無駄にしないことを、整形の成否より優先する)。
     try {
       const corrected = await generateLlmCompletion(
-        'instruct',
         [
           { role: 'system', content: TRANSCRIPTION_CORRECTION_SYSTEM_PROMPT },
           { role: 'user', content: whisperText },
