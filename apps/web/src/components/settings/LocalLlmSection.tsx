@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/Dialog';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
+import { LLM_SYSTEM_PROMPT_STORAGE_KEY } from '@/components/VoiceInputButton';
 
 const STORAGE_KEY = 'tsunagi:local-llm-enabled';
 // 音声入力(VoiceInputButton)から、文字起こし結果をLLMで整形するかどうかの
@@ -67,11 +69,17 @@ export function LocalLlmSection() {
   const [enabled, setEnabledState] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
+  const [systemPrompt, setSystemPrompt] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const setEnabled = useCallback((next: boolean) => {
     setEnabledState(next);
     localStorage.setItem(STORAGE_KEY, String(next));
+  }, []);
+
+  const handleSystemPromptChange = useCallback((next: string) => {
+    setSystemPrompt(next);
+    localStorage.setItem(LLM_SYSTEM_PROMPT_STORAGE_KEY, next);
   }, []);
 
   const fetchStatus = useCallback(async (): Promise<ServerInfo> => {
@@ -83,6 +91,7 @@ export function LocalLlmSection() {
 
   useEffect(() => {
     setEnabledState(localStorage.getItem(STORAGE_KEY) === 'true');
+    setSystemPrompt(localStorage.getItem(LLM_SYSTEM_PROMPT_STORAGE_KEY) ?? '');
     void fetchStatus();
   }, [fetchStatus]);
 
@@ -196,38 +205,54 @@ export function LocalLlmSection() {
             ローカルLLMを有効化する
           </Button>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            {!serverKnown ? (
-              <span className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                状態を確認中...
-              </span>
-            ) : serverReady ? (
-              <span className="flex items-center gap-2 text-success">
-                <CheckCircle2 className="size-4" />
-                ローカルLLM: 有効
-              </span>
-            ) : (
-              <span className="flex items-center gap-2 text-warning">
-                <AlertCircle className="size-4" />
-                ローカルLLM: 有効化済み（サーバー停止中）
-              </span>
-            )}
-            {serverInfo && (
-              <span className="text-xs/relaxed text-muted-foreground">
-                ({STEP_LABEL[serverInfo.step]})
-              </span>
-            )}
-            {serverKnown && !serverReady && (
-              <Button size="default" onClick={openModal}>
-                <Bot />
-                サーバーを起動
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              {!serverKnown ? (
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  状態を確認中...
+                </span>
+              ) : serverReady ? (
+                <span className="flex items-center gap-2 text-success">
+                  <CheckCircle2 className="size-4" />
+                  ローカルLLM: 有効
+                </span>
+              ) : (
+                <span className="flex items-center gap-2 text-warning">
+                  <AlertCircle className="size-4" />
+                  ローカルLLM: 有効化済み（サーバー停止中）
+                </span>
+              )}
+              {serverInfo && (
+                <span className="text-xs/relaxed text-muted-foreground">
+                  ({STEP_LABEL[serverInfo.step]})
+                </span>
+              )}
+              {serverKnown && !serverReady && (
+                <Button size="default" onClick={openModal}>
+                  <Bot />
+                  サーバーを起動
+                </Button>
+              )}
+              <Button size="default" variant="outline" onClick={handleDisable}>
+                無効にする
               </Button>
-            )}
-            <Button size="default" variant="outline" onClick={handleDisable}>
-              無効にする
-            </Button>
-          </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                整形システムプロンプト (任意)
+              </label>
+              <Textarea
+                value={systemPrompt}
+                onChange={(e) => handleSystemPromptChange(e.target.value)}
+                placeholder="例: 句読点の追加と誤字修正のみ行い、言い回しは変えないでください。"
+                className="min-h-16 text-xs"
+              />
+              <p className="mt-1 text-[0.65rem] text-muted-foreground">
+                文字起こし結果をLLMで整形する際の指示です。空欄の場合は既定のプロンプト(句読点の追加・誤字修正のみを行う指示)を使用します。
+              </p>
+            </div>
+          </>
         )}
       </CardContent>
 
