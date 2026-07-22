@@ -64,3 +64,6 @@ apps/server/src/generated/
 .venv/
 __pycache__/
 *.pyc
+
+# 音声入力のwhisper生テキスト/LLM整形結果デバッグログ(voice-debug-log.ts)
+apps/server/logs/

@@ -239,11 +239,12 @@ export function VoiceInputSection() {
               <Textarea
                 value={prompt}
                 onChange={(e) => handlePromptChange(e.target.value)}
-                placeholder="例: 句読点を適切に打ってください。固有名詞は正確に表記してください。"
+                placeholder="例: 誤字、句読点、音声入力、Whisper、固有名詞や専門用語など"
                 className="min-h-16 text-xs"
               />
               <p className="mt-1 text-[0.65rem] text-muted-foreground">
-                Whisperの文字起こしスタイル(表記ゆれ・句読点・固有名詞など)を誘導するヒントです。空でも構いません。
+                よく使う単語(固有名詞・専門用語・同音異義語で誤変換されやすい単語など)を列挙すると、
+                Whisperがその表記を優先しやすくなり誤変換が減ります。文章でなく単語の羅列でも構いません。空でも可。
               </p>
             </div>
           </>

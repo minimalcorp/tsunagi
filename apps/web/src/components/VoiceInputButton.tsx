@@ -14,6 +14,8 @@ const AUDIO_BITS_PER_SECOND = 128_000;
 const STORAGE_KEY = 'tsunagi:voice-input-enabled';
 // Settings画面で編集できる、whisperのinitial_prompt(表記ゆれ・句読点等のヒント)。
 export const WHISPER_PROMPT_STORAGE_KEY = 'tsunagi:whisper-prompt';
+// Settings画面で編集できる、LLM整形時のシステムプロンプト(空ならサーバー側の既定値を使う)。
+export const LLM_SYSTEM_PROMPT_STORAGE_KEY = 'tsunagi:llm-system-prompt';
 // whisper-serverの起動状態を軽くポーリングし、未起動時はボタンを無効化する。
 const SERVER_STATUS_POLL_MS = 5000;
 
@@ -153,6 +155,8 @@ export function VoiceInputButton({ onTranscribed }: VoiceInputButtonProps) {
         if (prompt) formData.append('prompt', prompt);
         const useLlm = localStorage.getItem(LOCAL_LLM_ENABLED_STORAGE_KEY) === 'true';
         formData.append('useLlm', String(useLlm));
+        const systemPrompt = localStorage.getItem(LLM_SYSTEM_PROMPT_STORAGE_KEY);
+        if (systemPrompt) formData.append('systemPrompt', systemPrompt);
         formData.append('file', blob, 'recording.webm');
 
         const response = await fetch(apiUrl('/api/whisper/transcribe'), {
