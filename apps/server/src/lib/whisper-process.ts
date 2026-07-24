@@ -143,7 +143,12 @@ async function trackModelDownload(child: ChildProcess): Promise<void> {
     const elapsedSec = (now - lastTime) / 1000;
     const bytesPerSec = elapsedSec > 0 ? (downloaded - lastBytes) / elapsedSec : 0;
     const remaining = EXPECTED_MODEL_BYTES - downloaded;
-    const etaSeconds = bytesPerSec > 0 ? Math.max(0, Math.round(remaining / bytesPerSec)) : null;
+    // 転送が一時的に止まって見える(ポーリング間隔とディスク書き込みのタイミングがずれる)だけで
+    // 速度0になることがあるため、その場合は直前のETAを維持し「計算中...」への逆戻りを防ぐ。
+    const etaSeconds =
+      bytesPerSec > 0
+        ? Math.max(0, Math.round(remaining / bytesPerSec))
+        : (downloadProgress?.etaSeconds ?? null);
 
     downloadProgress = {
       downloadedBytes: downloaded,
