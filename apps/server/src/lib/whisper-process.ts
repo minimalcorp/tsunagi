@@ -22,6 +22,13 @@ const MODEL_CACHE_DIR = path.join(
 // 実測値(2026-07時点、encoder+decoder等の合計)。多少の変動はあるがETA計算の目安として使う。
 const EXPECTED_MODEL_BYTES = 1_614_000_000;
 
+// starting_serverフェーズ(spawn後にhealthyになるまで待つ時間)の上限。
+// 遅いマシンでのPython起動/import/Metal初期化のばらつきを吸収するため60秒に設定。
+// プロセスが起動途中でクラッシュした場合はこのタイムアウトを待たず即座に検知する。
+const STARTUP_TIMEOUT_MS = 60_000;
+// クラッシュ時にエラーメッセージへ含めるstderrの上限文字数。
+const STDERR_TAIL_MAX_CHARS = 4000;
+
 // このファイルは apps/server/src/lib (dev) または apps/cli/dist/server/lib
 // (npm配布物) のいずれかにいる。どちらの場合も3階層上に whisper-server が
 // 兄弟ディレクトリとして存在するようレイアウトを揃えている
@@ -193,22 +200,35 @@ async function runSetupAndStart(dir: string): Promise<void> {
   const child = spawn(
     venvPython(),
     ['-m', 'uvicorn', 'server:app', '--host', '127.0.0.1', '--port', '8765'],
-    { cwd: dir, stdio: 'ignore', env: hfEnv }
+    { cwd: dir, stdio: ['ignore', 'ignore', 'pipe'], env: hfEnv }
   );
-  child.on('exit', () => {
+  let stderrTail = '';
+  child.stderr?.on('data', (chunk: Buffer) => {
+    stderrTail = (stderrTail + chunk.toString()).slice(-STDERR_TAIL_MAX_CHARS);
+  });
+  // healthポーリングとは別に、プロセスが起動途中で終了したことをタイムアウトを待たず検知する。
+  let exitInfo: string | null = null;
+  child.on('exit', (code, signal) => {
+    exitInfo = `exit code=${code} signal=${signal}`;
     if (managedProcess === child) managedProcess = null;
   });
-  child.on('error', () => {
+  child.on('error', (err) => {
+    exitInfo = `spawn error: ${err.message}`;
     if (managedProcess === child) managedProcess = null;
   });
   managedProcess = child;
 
   const start = Date.now();
-  while (Date.now() - start < 30000) {
+  while (Date.now() - start < STARTUP_TIMEOUT_MS) {
+    if (exitInfo) {
+      throw new Error(
+        `whisper-server crashed while starting (${exitInfo})${stderrTail ? `\n${stderrTail}` : ''}`
+      );
+    }
     if (await checkHealth()) return;
     await sleep(1000);
   }
-  throw new Error('Server did not become healthy within 30s of starting');
+  throw new Error(`Server did not become healthy within ${STARTUP_TIMEOUT_MS / 1000}s of starting`);
 }
 
 export function startWhisperServer(): { started: boolean; error?: string } {

@@ -11,6 +11,7 @@
 """
 
 import io
+from typing import Optional
 
 import av
 import numpy as np
@@ -49,7 +50,7 @@ def decode_to_16k_mono(data: bytes) -> np.ndarray:
 
 
 @app.post("/transcribe")
-async def transcribe(file: UploadFile = File(...), prompt: str | None = Form(None)) -> dict:
+async def transcribe(file: UploadFile = File(...), prompt: Optional[str] = Form(None)) -> dict:
     data = await file.read()
     audio = decode_to_16k_mono(data)
     # initial_promptは文字起こしのスタイル(表記ゆれ・句読点・固有名詞など)を
