@@ -28,6 +28,15 @@ const MODEL_CACHE_DIR = path.join(
 // 実測値(2026-07時点、4bit量子化された重み一式の合計)。多少の変動はあるがETA計算の目安として使う。
 const EXPECTED_MODEL_BYTES = 17_200_000_000;
 
+// starting_serverフェーズ(spawn後にhealthyになるまで待つ時間)の上限。
+// mlx_lm.serverは/healthをモデル本体のロード完了を待たずに返す(ロードはバックグラウンド
+// スレッドで進む)ため、この待ち時間の大半はPython起動/import初期化のばらつきに対する
+// マージン。whisperより依存関係が重いぶん長めの90秒を維持する。
+// プロセスが起動途中でクラッシュした場合はこのタイムアウトを待たず即座に検知する。
+const STARTUP_TIMEOUT_MS = 90_000;
+// クラッシュ時にエラーメッセージへ含めるstderrの上限文字数。
+const STDERR_TAIL_MAX_CHARS = 4000;
+
 // このファイルは apps/server/src/lib (dev) または apps/cli/dist/server/lib
 // (npm配布物) のいずれかにいる。どちらの場合も3階層上に llm-server が
 // 兄弟ディレクトリとして存在するようレイアウトを揃えている
@@ -194,24 +203,35 @@ async function runSetupAndStart(dir: string): Promise<void> {
   const child = spawn(
     venvPython(),
     ['-m', 'mlx_lm.server', '--model', MODEL, '--host', '127.0.0.1', '--port', String(LLM_PORT)],
-    { cwd: dir, stdio: 'ignore', env: hfEnv }
+    { cwd: dir, stdio: ['ignore', 'ignore', 'pipe'], env: hfEnv }
   );
-  child.on('exit', () => {
+  let stderrTail = '';
+  child.stderr?.on('data', (chunk: Buffer) => {
+    stderrTail = (stderrTail + chunk.toString()).slice(-STDERR_TAIL_MAX_CHARS);
+  });
+  // healthポーリングとは別に、プロセスが起動途中で終了したことをタイムアウトを待たず検知する。
+  let exitInfo: string | null = null;
+  child.on('exit', (code, signal) => {
+    exitInfo = `exit code=${code} signal=${signal}`;
     if (managedProcess === child) managedProcess = null;
   });
-  child.on('error', () => {
+  child.on('error', (err) => {
+    exitInfo = `spawn error: ${err.message}`;
     if (managedProcess === child) managedProcess = null;
   });
   managedProcess = child;
 
-  // MoEで実計算はアクティブパラメータ(~3B)分のみだが、4bit量子化でも~17GBの
-  // 重みファイル自体はメモリへ展開する必要があるため、whisperより長めに待つ。
   const start = Date.now();
-  while (Date.now() - start < 90000) {
+  while (Date.now() - start < STARTUP_TIMEOUT_MS) {
+    if (exitInfo) {
+      throw new Error(
+        `llm-server crashed while starting (${exitInfo})${stderrTail ? `\n${stderrTail}` : ''}`
+      );
+    }
     if (await checkHealth()) return;
     await sleep(1000);
   }
-  throw new Error('Server did not become healthy within 90s of starting');
+  throw new Error(`Server did not become healthy within ${STARTUP_TIMEOUT_MS / 1000}s of starting`);
 }
 
 export function startLlmServer(): { started: boolean; error?: string } {
