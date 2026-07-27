@@ -1,4 +1,5 @@
-mlx-whisper
+mlx-whisper==0.4.3
+mlx==0.32.0
 fastapi
 uvicorn[standard]
 python-multipart
