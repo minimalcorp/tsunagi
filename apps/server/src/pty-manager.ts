@@ -45,13 +45,21 @@ class PtyManager {
 
     const shell = process.env.SHELL || (os.platform() === 'win32' ? 'cmd.exe' : 'bash');
 
+    // PORT は Fastify サーバー自身の待受ポート専用の環境変数（apps/cli が起動時に注入する）。
+    // ベースとして process.env をそのまま継承すると、ユーザーの shell で起動するアプリの
+    // PORT までサーバーのポートに固定されてしまうため、継承元から除外する。
+    // /settings で明示的に PORT を設定した場合は env（dbEnv 経由）が後勝ちで上書きするため、
+    // カスケードの優先順位・挙動は変わらない。
+    const baseEnv = { ...process.env };
+    delete baseEnv.PORT;
+
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd,
       env: {
-        ...process.env,
+        ...baseEnv,
         ...env,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
