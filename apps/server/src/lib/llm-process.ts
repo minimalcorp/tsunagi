@@ -4,6 +4,12 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { killProcessOnPort } from './process-port.js';
+import {
+  findPython,
+  isVenvUpToDate,
+  PYTHON_NOT_FOUND_MESSAGE,
+  writeVenvMarker,
+} from './python-venv.js';
 
 const MODEL = 'mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit';
 
@@ -50,10 +56,6 @@ export function findLlmServerDir(): string | null {
 
 function venvPython(): string {
   return path.join(VENV_DIR, 'bin', 'python3');
-}
-
-function isVenvReady(): boolean {
-  return fs.existsSync(venvPython());
 }
 
 function isModelReady(): boolean {
@@ -177,12 +179,17 @@ async function trackModelDownload(child: ChildProcess): Promise<void> {
 
 async function runSetupAndStart(dir: string): Promise<void> {
   const hfEnv = { ...process.env, HF_HOME: HF_CACHE_DIR, HF_HUB_DISABLE_XET: '1' };
+  const requirementsFile = path.join(dir, 'requirements.txt');
 
-  if (!isVenvReady()) {
+  if (!isVenvUpToDate(VENV_DIR, requirementsFile)) {
     currentStep = 'installing_deps';
+    const pythonBin = findPython();
+    if (!pythonBin) throw new Error(PYTHON_NOT_FOUND_MESSAGE);
     fs.mkdirSync(TSUNAGI_LLM_DIR, { recursive: true });
-    await runStep('python3', ['-m', 'venv', VENV_DIR], dir);
+    fs.rmSync(VENV_DIR, { recursive: true, force: true });
+    await runStep(pythonBin, ['-m', 'venv', VENV_DIR], dir);
     await runStep(venvPython(), ['-m', 'pip', 'install', '-r', 'requirements.txt'], dir);
+    writeVenvMarker(VENV_DIR, requirementsFile);
   }
 
   if (!isModelReady()) {
