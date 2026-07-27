@@ -10,14 +10,41 @@ export HF_HOME="${TSUNAGI_WHISPER_DIR}/cache"
 # xet転送は進捗の観測が難しい独自プロトコルのため無効化し、素直なHTTPダウンロードに固定する。
 export HF_HUB_DISABLE_XET=1
 
-# requirements.txt の内容が変わった(= バージョン指定を更新した)場合、既存venvがあっても
-# 再インストールする。venvは一度作られると中身が古いバージョンのまま固定され続けてしまうため。
+# requirements.txtでpinしているmlxがrequires-python >=3.10のため、venv作成に使うpython3自体も
+# 3.10以上でなければpip installがそもそも失敗する。`python3`という名前がPATH上のどのバージョンを
+# 指すかは環境依存(古いmacOS付属Python等)なため、候補を新しい順に探して最初に見つかった
+# 3.10以上を使う。
+MIN_PYTHON_VERSION="3.10"
+
+find_python() {
+  for cand in python3.14 python3.13 python3.12 python3.11 python3.10 python3; do
+    if command -v "$cand" >/dev/null 2>&1; then
+      ver="$("$cand" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
+      [ -z "$ver" ] && continue
+      if [ "$(printf '%s\n%s\n' "$MIN_PYTHON_VERSION" "$ver" | sort -V | head -n1)" = "$MIN_PYTHON_VERSION" ]; then
+        echo "$cand"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
+if ! PYTHON_BIN="$(find_python)"; then
+  echo "音声入力(Whisper)サーバーの起動に失敗: Python ${MIN_PYTHON_VERSION}以上が見つかりません。" >&2
+  echo "'brew install python@3.12' 等でインストールしてください。" >&2
+  exit 1
+fi
+
+# requirements.txtの内容、または使用するpython3のバージョンが変わった場合は既存venvごと作り直す。
+# venvは作成時のpythonバイナリに紐づくため、pip installだけでは古いバージョンのまま更新できない。
 REQUIREMENTS_HASH_FILE="${VENV_DIR}/.requirements.sha256"
-CURRENT_HASH="$(shasum -a 256 requirements.txt | awk '{print $1}')"
+CURRENT_HASH="$( { cat requirements.txt; "$PYTHON_BIN" --version; } | shasum -a 256 | awk '{print $1}')"
 
 if [ ! -d "$VENV_DIR" ] || [ "$(cat "$REQUIREMENTS_HASH_FILE" 2>/dev/null)" != "$CURRENT_HASH" ]; then
   mkdir -p "$TSUNAGI_WHISPER_DIR"
-  [ -d "$VENV_DIR" ] || python3 -m venv "$VENV_DIR"
+  rm -rf "$VENV_DIR"
+  "$PYTHON_BIN" -m venv "$VENV_DIR"
   "$VENV_DIR/bin/python3" -m pip install -r requirements.txt
   echo "$CURRENT_HASH" > "$REQUIREMENTS_HASH_FILE"
 fi
