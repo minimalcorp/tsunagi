@@ -4,6 +4,27 @@ import * as os from 'os';
 const SCROLLBACK_MAX_BYTES = 256 * 1024; // 256KB
 const SESSION_GC_INTERVAL_MS = 30 * 60 * 1000; // 30分
 
+/**
+ * apps/cli が Fastify サーバー起動時に自分で注入する環境変数
+ * （TSUNAGI_SERVER_PORT, NODE_ENV, TSUNAGI_NEXT_PORT, TSUNAGI_OUTER_NODE_ENV）。
+ * サーバープロセス自身の制御用に後から足された値のため、内部ターミナルには継承しない。
+ * 外側 Terminal 由来の環境変数はこのリストと無関係に、これまで通り全て継承する
+ * （PORT はここでは扱わない。apps/cli は generic な PORT を上書きせず、専用キー
+ * TSUNAGI_SERVER_PORT で自身の待受ポートを伝えるため、ユーザーが Terminal で明示した
+ * PORT はそのまま内部ターミナルまで届く）。
+ *
+ * NODE_ENV は Fastify/Next 等が直接参照するため、PORT と違って専用キーへ逃がせず、
+ * サーバープロセス自身には強制的に 'production' が入る。apps/cli はサーバー起動前の
+ * 元の値（外側 Terminal 由来、未設定なら undefined）を TSUNAGI_OUTER_NODE_ENV に退避して
+ * 渡してくるので、ここで NODE_ENV を一旦除外した後、退避値があれば NODE_ENV として復元する。
+ */
+const TSUNAGI_INJECTED_ENV_KEYS = [
+  'TSUNAGI_SERVER_PORT',
+  'NODE_ENV',
+  'TSUNAGI_NEXT_PORT',
+  'TSUNAGI_OUTER_NODE_ENV',
+];
+
 export interface PtySession {
   pty: pty.IPty;
   sessionId: string;
@@ -45,13 +66,26 @@ class PtyManager {
 
     const shell = process.env.SHELL || (os.platform() === 'win32' ? 'cmd.exe' : 'bash');
 
+    // tsunagi 自身が注入した環境変数は内部ターミナルに継承しない（TSUNAGI_INJECTED_ENV_KEYS 参照）。
+    // /settings 等で明示的に同名キーを設定した場合は env（dbEnv 経由）が後勝ちで上書きするため、
+    // カスケードの優先順位・挙動は変わらない。
+    const baseEnv = { ...process.env };
+    for (const key of TSUNAGI_INJECTED_ENV_KEYS) {
+      delete baseEnv[key];
+    }
+    // 外側 Terminal に元々 NODE_ENV があった場合は復元する。なければ未設定のままにする
+    // （tsunagi が強制した 'production' を内部ターミナルに漏らさないため）。
+    if (process.env.TSUNAGI_OUTER_NODE_ENV !== undefined) {
+      baseEnv.NODE_ENV = process.env.TSUNAGI_OUTER_NODE_ENV;
+    }
+
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd,
       env: {
-        ...process.env,
+        ...baseEnv,
         ...env,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',

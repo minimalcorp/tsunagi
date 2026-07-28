@@ -210,10 +210,26 @@ verifyArtifact(NEXT_STANDALONE_ENTRY, 'Next.js standalone artifact');
 const PORT = process.env.PORT ?? '2791';
 const NEXT_PORT = '2792';
 
+// Fastify サーバー自身の待受ポートは TSUNAGI_SERVER_PORT で伝える（generic な PORT は上書きしない）。
+// PORT を直接上書きすると、ユーザーが Terminal で明示的に PORT=xxxx と指定していた場合でも
+// tsunagi 内部ターミナル側でその値と tsunagi 自身の値を区別できなくなるため。
+//
+// NODE_ENV は Fastify/Next 等が直接参照するため PORT と同じ専用キー方式が使えず、サーバー
+// プロセス自身には強制的に 'production' を渡す必要がある。上書きする前に外側 Terminal 由来の
+// 元の値（未設定なら undefined）を TSUNAGI_OUTER_NODE_ENV に退避し、tsunagi 内部ターミナル側
+// （apps/server/src/pty-manager.ts）で復元できるようにする。
+const outerNodeEnv = process.env.NODE_ENV;
+
 const fastifyChild: ChildProcess = spawn(process.execPath, [FASTIFY_ENTRY_JS], {
   stdio: ['inherit', 'pipe', 'pipe'],
   cwd: PACKAGE_ROOT,
-  env: { ...process.env, NODE_ENV: 'production', PORT, TSUNAGI_NEXT_PORT: NEXT_PORT },
+  env: {
+    ...process.env,
+    NODE_ENV: 'production',
+    ...(outerNodeEnv !== undefined ? { TSUNAGI_OUTER_NODE_ENV: outerNodeEnv } : {}),
+    TSUNAGI_SERVER_PORT: PORT,
+    TSUNAGI_NEXT_PORT: NEXT_PORT,
+  },
 });
 
 const nextChild: ChildProcess = spawn(process.execPath, [NEXT_STANDALONE_ENTRY], {

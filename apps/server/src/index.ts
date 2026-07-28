@@ -25,7 +25,10 @@ import { stopLlmServerOnExit } from './lib/llm-process.js';
 import { createBasicAuth } from './basic-auth.js';
 
 // Fastify は単一の公開エンドポイント。Next.js は内部ポートで動かしプロキシする。
-const PORT = Number(process.env.PORT) || 2791;
+// PORT ではなく TSUNAGI_SERVER_PORT を見る（apps/cli が注入する専用キー）。generic な PORT を
+// 使うと、ユーザーが Terminal で明示的に設定した PORT と衝突し、内部ターミナルへの伝播を
+// 区別できなくなるため（pty-manager.ts 参照）。
+const PORT = Number(process.env.TSUNAGI_SERVER_PORT) || 2791;
 const NEXT_PORT = Number(process.env.TSUNAGI_NEXT_PORT) || 2792;
 
 const extraOrigins = (process.env.TSUNAGI_EXTRA_CORS_ORIGINS ?? '')
