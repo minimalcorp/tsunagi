@@ -11,9 +11,9 @@ import { ensureClaudeOnboardingCompleted } from '../lib/claude-config-guard.js';
 // サーバーはプロジェクトルートから起動されるため process.cwd() でルートを取得
 const TSUNAGI_EDITOR_PATH = path.resolve(process.cwd(), 'scripts/monaco-editor.sh');
 
-// Fastify(API) の公開ポート。index.ts と同じ既定値。monaco-editor.sh など PTY 内の
-// プロセスが API を叩く際の同一ホスト向けベース URL に使う。
-const SERVER_PORT = Number(process.env.PORT) || 2791;
+// Fastify(API) の公開ポート。index.ts と同じ既定値・同じ環境変数(TSUNAGI_SERVER_PORT)を見る。
+// monaco-editor.sh など PTY 内のプロセスが API を叩く際の同一ホスト向けベース URL に使う。
+const SERVER_PORT = Number(process.env.TSUNAGI_SERVER_PORT) || 2791;
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
