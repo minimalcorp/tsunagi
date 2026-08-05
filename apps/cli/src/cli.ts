@@ -7,6 +7,20 @@ import { fileURLToPath } from 'node:url';
 import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle.js';
 import { acquireSingleInstanceLock } from './single-instance-lock.js';
 
+// ---------------------------------------------------------------------------
+// Subcommands: `tsunagi whisper` / `tsunagi llm`
+//
+// リモート推論サーバー(Windows + WSL2上でOllama/faster-whisperをネイティブ起動し、
+// LAN経由でMac側のtsunagi本体から使う)専用のサブコマンド。tsunagi本体(DB
+// マイグレーション・Fastify・Next.js等)は一切起動せず、ここで完結して終了する。
+// ---------------------------------------------------------------------------
+const subcommand = process.argv[2];
+if (subcommand === 'whisper' || subcommand === 'llm') {
+  const { runInferenceCommand } = await import('./inference/inference-command.js');
+  await runInferenceCommand(subcommand);
+  process.exit(process.exitCode ?? 0);
+}
+
 /**
  * Production CLI entrypoint shipped as `bin` in @minimalcorp/tsunagi.
  *

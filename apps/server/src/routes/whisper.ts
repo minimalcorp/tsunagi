@@ -1,16 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import {
   getWhisperServerStatus,
+  getWhisperServerUrl,
   startWhisperServer,
   stopWhisperServer,
 } from '../lib/whisper-process.js';
 import { generateLlmCompletion } from '../lib/llm-process.js';
 import { appendVoiceDebugLog } from '../lib/voice-debug-log.js';
-
-// ユーザーが依存関係(pipパッケージ)をセットアップ済みのローカル常駐サーバー
-// (apps/whisper-server)を指す。依存関係のインストール自体はtsunagi側では行わず、
-// プロセスの起動・停止のみ管理する。
-const WHISPER_SERVER_URL = process.env.TSUNAGI_WHISPER_SERVER_URL || 'http://127.0.0.1:8765';
+import {
+  getInferenceServiceConfig,
+  setInferenceServiceConfig,
+  validateInferenceServiceConfigBody,
+} from '../lib/inference-config.js';
 
 // 文字起こし結果のLLM整形に使うシステムプロンプト(既定値)。Settings画面で
 // 上書きされなかった場合に使う。同音異義語の誤変換(例:「句読点」→「句頭点」、
@@ -40,6 +41,24 @@ export async function whisperRoutes(fastify: FastifyInstance) {
     if (!result.stopped) {
       return reply.status(409).send({ error: result.error });
     }
+    return reply.status(200).send(await getWhisperServerStatus());
+  });
+
+  // POST /whisper/server/config
+  fastify.post('/whisper/server/config', async (request, reply) => {
+    const result = validateInferenceServiceConfigBody(request.body);
+    if ('error' in result) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    const previousMode = getInferenceServiceConfig('whisper').mode;
+    setInferenceServiceConfig('whisper', result.config);
+    // ローカル→リモート切替時は、動いているローカルサーバーを止める。URL解決は
+    // 既にリモートを向いているため、停止処理の完了を待たずレスポンスを返してよい。
+    if (previousMode === 'local' && result.config.mode === 'remote') {
+      void stopWhisperServer();
+    }
+
     return reply.status(200).send(await getWhisperServerStatus());
   });
 
@@ -74,7 +93,7 @@ export async function whisperRoutes(fastify: FastifyInstance) {
 
     let whisperText: string;
     try {
-      const response = await fetch(`${WHISPER_SERVER_URL}/transcribe`, {
+      const response = await fetch(`${getWhisperServerUrl()}/transcribe`, {
         method: 'POST',
         body,
       });

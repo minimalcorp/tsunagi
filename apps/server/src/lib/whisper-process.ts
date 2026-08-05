@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { killProcessOnPort } from './process-port.js';
+import { getInferenceServiceConfig, resolveServiceUrl } from './inference-config.js';
 import {
   findPython,
   isVenvUpToDate,
@@ -11,7 +12,13 @@ import {
   writeVenvMarker,
 } from './python-venv.js';
 
-const WHISPER_SERVER_URL = process.env.TSUNAGI_WHISPER_SERVER_URL || 'http://127.0.0.1:8765';
+const WHISPER_DEFAULT_URL = 'http://127.0.0.1:8765';
+// URL解決の優先順位(ランタイム設定 > 環境変数 > デフォルト)に従うため、モジュール
+// ロード時の定数ではなく都度解決する関数にしている(remoteモードへの切替を
+// プロセス再起動なしで反映するため)。
+export function getWhisperServerUrl(): string {
+  return resolveServiceUrl('whisper', process.env.TSUNAGI_WHISPER_SERVER_URL, WHISPER_DEFAULT_URL);
+}
 // run.shが待受けるポート固定値(host.docker.internal経由URLと違い、停止処理は
 // 必ずこのNodeプロセスと同じホスト上のポートを対象にする必要があるため分けて持つ)。
 const WHISPER_PORT = 8765;
@@ -71,12 +78,15 @@ export interface DownloadProgress {
   etaSeconds: number | null;
 }
 
-export interface WhisperServerInfo {
-  step: WhisperServerStep;
-  serverDir: string | null;
-  downloadProgress?: DownloadProgress;
-  error?: string;
-}
+export type WhisperServerInfo =
+  | {
+      mode: 'local';
+      step: WhisperServerStep;
+      serverDir: string | null;
+      downloadProgress?: DownloadProgress;
+      error?: string;
+    }
+  | { mode: 'remote'; url: string; healthy: boolean };
 
 let currentStep: WhisperServerStep = 'not_running';
 let downloadProgress: DownloadProgress | undefined;
@@ -90,7 +100,7 @@ function sleep(ms: number): Promise<void> {
 
 async function checkHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${WHISPER_SERVER_URL}/health`, {
+    const response = await fetch(`${getWhisperServerUrl()}/health`, {
       signal: AbortSignal.timeout(2000),
     });
     return response.ok;
@@ -100,18 +110,28 @@ async function checkHealth(): Promise<boolean> {
 }
 
 export async function getWhisperServerStatus(): Promise<WhisperServerInfo> {
+  const config = getInferenceServiceConfig('whisper');
+  if (config.mode === 'remote') {
+    return { mode: 'remote', url: config.remoteUrl ?? '', healthy: await checkHealth() };
+  }
+
   const serverDir = findWhisperServerDir();
 
   // セットアップ/起動フロー進行中はそのステップをそのまま報告する。
   if (setupPromise) {
-    return { step: currentStep, serverDir, downloadProgress, error: lastError };
+    return { mode: 'local', step: currentStep, serverDir, downloadProgress, error: lastError };
   }
 
   const healthy = await checkHealth();
   if (healthy) {
-    return { step: managedProcess ? 'running' : 'running_external', serverDir };
+    return { mode: 'local', step: managedProcess ? 'running' : 'running_external', serverDir };
   }
-  return { step: lastError ? 'error' : 'not_running', serverDir, error: lastError };
+  return {
+    mode: 'local',
+    step: lastError ? 'error' : 'not_running',
+    serverDir,
+    error: lastError,
+  };
 }
 
 function runStep(cmd: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<void> {
@@ -239,6 +259,9 @@ async function runSetupAndStart(dir: string): Promise<void> {
 }
 
 export function startWhisperServer(): { started: boolean; error?: string } {
+  if (getInferenceServiceConfig('whisper').mode === 'remote') {
+    return { started: false, error: 'リモートモードではローカルサーバーを起動できません' };
+  }
   if (setupPromise || managedProcess) {
     return { started: false, error: 'Already starting/running' };
   }

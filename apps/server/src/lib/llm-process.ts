@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { killProcessOnPort } from './process-port.js';
+import { getInferenceServiceConfig, resolveServiceUrl } from './inference-config.js';
 import {
   findPython,
   isVenvUpToDate,
@@ -13,13 +14,16 @@ import {
 
 const MODEL = 'mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit';
 
-const LLM_SERVER_URL = process.env.TSUNAGI_LLM_SERVER_URL || 'http://127.0.0.1:8766';
+const LLM_DEFAULT_URL = 'http://127.0.0.1:8766';
 // run.shが待受けるポート固定値(host.docker.internal経由URLと違い、停止処理は
 // 必ずこのNodeプロセスと同じホスト上のポートを対象にする必要があるため分けて持つ)。
 const LLM_PORT = 8766;
 
+// URL解決の優先順位(ランタイム設定 > 環境変数 > デフォルト)に従うため、モジュール
+// ロード時の定数ではなく都度解決する関数にしている(remoteモードへの切替を
+// プロセス再起動なしで反映するため)。
 export function getLlmServerUrl(): string {
-  return LLM_SERVER_URL;
+  return resolveServiceUrl('llm', process.env.TSUNAGI_LLM_SERVER_URL, LLM_DEFAULT_URL);
 }
 
 // venv・モデルキャッシュとも ~/.tsunagi/llm 配下にまとめる(run.shと同じ場所)。
@@ -79,12 +83,15 @@ export interface DownloadProgress {
   etaSeconds: number | null;
 }
 
-export interface LlmServerInfo {
-  step: LlmServerStep;
-  serverDir: string | null;
-  downloadProgress?: DownloadProgress;
-  error?: string;
-}
+export type LlmServerInfo =
+  | {
+      mode: 'local';
+      step: LlmServerStep;
+      serverDir: string | null;
+      downloadProgress?: DownloadProgress;
+      error?: string;
+    }
+  | { mode: 'remote'; url: string; healthy: boolean };
 
 let currentStep: LlmServerStep = 'not_running';
 let downloadProgress: DownloadProgress | undefined;
@@ -98,7 +105,7 @@ function sleep(ms: number): Promise<void> {
 
 async function checkHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${LLM_SERVER_URL}/health`, {
+    const response = await fetch(`${getLlmServerUrl()}/health`, {
       signal: AbortSignal.timeout(2000),
     });
     return response.ok;
@@ -108,18 +115,28 @@ async function checkHealth(): Promise<boolean> {
 }
 
 export async function getLlmServerStatus(): Promise<LlmServerInfo> {
+  const config = getInferenceServiceConfig('llm');
+  if (config.mode === 'remote') {
+    return { mode: 'remote', url: config.remoteUrl ?? '', healthy: await checkHealth() };
+  }
+
   const serverDir = findLlmServerDir();
 
   // セットアップ/起動フロー進行中はそのステップをそのまま報告する。
   if (setupPromise) {
-    return { step: currentStep, serverDir, downloadProgress, error: lastError };
+    return { mode: 'local', step: currentStep, serverDir, downloadProgress, error: lastError };
   }
 
   const healthy = await checkHealth();
   if (healthy) {
-    return { step: managedProcess ? 'running' : 'running_external', serverDir };
+    return { mode: 'local', step: managedProcess ? 'running' : 'running_external', serverDir };
   }
-  return { step: lastError ? 'error' : 'not_running', serverDir, error: lastError };
+  return {
+    mode: 'local',
+    step: lastError ? 'error' : 'not_running',
+    serverDir,
+    error: lastError,
+  };
 }
 
 function runStep(cmd: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): Promise<void> {
@@ -247,6 +264,9 @@ async function runSetupAndStart(dir: string): Promise<void> {
 }
 
 export function startLlmServer(): { started: boolean; error?: string } {
+  if (getInferenceServiceConfig('llm').mode === 'remote') {
+    return { started: false, error: 'リモートモードではローカルサーバーを起動できません' };
+  }
   if (setupPromise || managedProcess) {
     return { started: false, error: 'Already starting/running' };
   }
@@ -308,7 +328,7 @@ export async function generateLlmCompletion(
   messages: LlmChatMessage[],
   maxTokens: number
 ): Promise<string> {
-  const response = await fetch(`${LLM_SERVER_URL}/v1/chat/completions`, {
+  const response = await fetch(`${getLlmServerUrl()}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ messages, stream: false, max_tokens: maxTokens }),

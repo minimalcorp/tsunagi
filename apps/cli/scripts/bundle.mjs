@@ -27,6 +27,7 @@ const REPO_ROOT = path.resolve(CLI_DIR, '..', '..');
 const SERVER_DIR = path.join(REPO_ROOT, 'apps/server');
 const WEB_DIR = path.join(REPO_ROOT, 'apps/web');
 const WHISPER_SERVER_DIR = path.join(REPO_ROOT, 'apps/whisper-server');
+const WHISPER_SERVER_WINDOWS_DIR = path.join(REPO_ROOT, 'apps/whisper-server-windows');
 const LLM_SERVER_DIR = path.join(REPO_ROOT, 'apps/llm-server');
 
 function log(msg) {
@@ -125,6 +126,13 @@ async function main() {
   log('copying apps/whisper-server → apps/cli/whisper-server');
   await fs.mkdir(path.join(CLI_DIR, 'whisper-server'), { recursive: true });
   await fs.cp(WHISPER_SERVER_DIR, path.join(CLI_DIR, 'whisper-server'), {
+    recursive: true,
+    filter: (src) => !/\/(\.venv|__pycache__)(\/|$)/.test(src),
+  });
+
+  log('copying apps/whisper-server-windows → apps/cli/whisper-server-windows');
+  await fs.mkdir(path.join(CLI_DIR, 'whisper-server-windows'), { recursive: true });
+  await fs.cp(WHISPER_SERVER_WINDOWS_DIR, path.join(CLI_DIR, 'whisper-server-windows'), {
     recursive: true,
     filter: (src) => !/\/(\.venv|__pycache__)(\/|$)/.test(src),
   });
