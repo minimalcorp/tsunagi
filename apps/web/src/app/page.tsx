@@ -326,7 +326,7 @@ export default function Home() {
     [repositories]
   );
 
-  const handleCloneRepository = async (cloneData: { gitUrl: string; authToken?: string }) => {
+  const handleCloneRepository = async (cloneData: { gitUrl: string }) => {
     try {
       const response = await fetch(apiUrl('/api/clone'), {
         method: 'POST',
@@ -334,7 +334,14 @@ export default function Home() {
         body: JSON.stringify(cloneData),
       });
 
-      if (!response.ok) throw new Error('Failed to clone repository');
+      if (!response.ok) {
+        // サーバーが返した原因（認証エラー・URL形式など）をそのまま通知に出す
+        const detail = await response
+          .json()
+          .then((body) => body?.error)
+          .catch(() => undefined);
+        throw new Error(detail || `Failed to clone repository (HTTP ${response.status})`);
+      }
 
       const data = await response.json();
       setRepositories((prev) => [...prev, data.data.repository]);

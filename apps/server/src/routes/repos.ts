@@ -10,18 +10,44 @@ import { createRepo } from '../lib/repositories/repository.js';
 
 const WORKSPACES_ROOT = path.join(os.homedir(), '.tsunagi', 'workspaces');
 
-// Git URLからowner/repoを抽出
-function parseGitUrl(gitUrl: string): { owner: string; repo: string } | null {
-  const httpsMatch = gitUrl.match(/https?:\/\/github\.com\/([^/]+)\/([^/]+?)(\.git)?$/);
-  const sshMatch = gitUrl.match(/git@github\.com:([^/]+)\/([^/]+?)(\.git)?$/);
+/**
+ * Git URLからowner/repoを抽出する。
+ * 前後の空白・末尾のスラッシュ・www. など、コピペで紛れ込みがちな差異は吸収する。
+ * 対応形式:
+ *   https://github.com/owner/repo(.git)
+ *   git@github.com:owner/repo(.git)
+ *   ssh://git@github.com/owner/repo(.git)
+ */
+function parseGitUrl(gitUrl: string): { owner: string; repo: string; url: string } | null {
+  const normalized = gitUrl.trim().replace(/\/+$/, '');
 
-  const match = httpsMatch || sshMatch;
-  if (!match) return null;
+  const patterns = [
+    /^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/,
+    /^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/,
+    /^ssh:\/\/git@github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/,
+  ];
 
-  return {
-    owner: match[1],
-    repo: match[2],
-  };
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (match) return { owner: match[1], repo: match[2], url: normalized };
+  }
+
+  return null;
+}
+
+/** 認証が無くて失敗したときに出る git のメッセージ */
+function isGitAuthError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    message.includes('could not read username') ||
+    message.includes('could not read password') ||
+    message.includes('authentication failed') ||
+    message.includes('terminal prompts disabled') ||
+    message.includes('permission denied') ||
+    // private repository に未認証でアクセスすると GitHub は 404 を返す
+    message.includes('repository not found') ||
+    message.includes('not found')
+  );
 }
 
 export async function reposRoutes(fastify: FastifyInstance) {
@@ -207,10 +233,13 @@ export async function reposRoutes(fastify: FastifyInstance) {
 
       const parsed = parseGitUrl(gitUrl);
       if (!parsed) {
-        return reply.status(400).send({ error: 'Invalid Git URL format' });
+        return reply.status(400).send({
+          error:
+            'Invalid Git URL format. Expected https://github.com/owner/repo or git@github.com:owner/repo',
+        });
       }
 
-      const { owner, repo } = parsed;
+      const { owner, repo, url: normalizedUrl } = parsed;
 
       const envVars = await getEnv('global');
       if (envVars.GITHUB_PAT) {
@@ -223,18 +252,49 @@ export async function reposRoutes(fastify: FastifyInstance) {
 
       const bareRepoPath = path.join(os.homedir(), '.tsunagi', 'workspaces', owner, repo, '.bare');
 
-      try {
-        await worktreeManager.initBareRepository(owner, repo, gitUrl);
-      } catch (error) {
+      const cleanupBareRepo = async () => {
         try {
           await fs.rm(bareRepoPath, { recursive: true, force: true });
         } catch (cleanupError) {
           fastify.log.warn(cleanupError, 'Failed to cleanup bare repository after clone failure');
         }
-        throw error;
+      };
+
+      const sshUrl = `git@github.com:${owner}/${repo}.git`;
+      const isHttpsUrl = normalizedUrl.startsWith('http');
+      let clonedUrl = normalizedUrl;
+
+      try {
+        await worktreeManager.initBareRepository(owner, repo, normalizedUrl);
+      } catch (error) {
+        await cleanupBareRepo();
+
+        // private repository を HTTPS で clone するには認証が必要。
+        // tsunagi は SSH agent 前提で動くため、認証エラーなら SSH で自動的に試し直す。
+        if (!isHttpsUrl || !isGitAuthError(error)) throw error;
+
+        fastify.log.info(
+          { owner, repo },
+          'HTTPS clone failed with an auth error, retrying over SSH'
+        );
+
+        try {
+          await worktreeManager.initBareRepository(owner, repo, sshUrl);
+          clonedUrl = sshUrl;
+        } catch (sshError) {
+          await cleanupBareRepo();
+          const httpsMessage = error instanceof Error ? error.message : String(error);
+          const sshMessage = sshError instanceof Error ? sshError.message : String(sshError);
+          throw new Error(
+            `Failed to clone ${owner}/${repo}. ` +
+              `HTTPS では認証情報が無いため失敗し、SSH でも失敗しました。` +
+              `SSH鍵(ssh-agent)を設定するか、リポジトリへのアクセス権を確認してください。\n` +
+              `HTTPS: ${httpsMessage.trim()}\nSSH: ${sshMessage.trim()}`
+          );
+        }
       }
 
-      const newRepo = await createRepo({ owner, repo, cloneUrl: gitUrl });
+      const newRepo = await createRepo({ owner, repo, cloneUrl: clonedUrl });
 
       return reply.status(200).send({ data: { repository: { ...newRepo, bareRepoPath } } });
     } catch (error) {
