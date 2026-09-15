@@ -21,6 +21,8 @@ interface RepositoryBoardProps {
   filtersByRepo: Record<string, FilterState>;
   onFilterChange: (repoKey: string, filters: FilterState) => void;
   onReorder: (reorderedTasks: Task[]) => void;
+  /** 指定リポジトリの列を先頭に移動する */
+  onMoveRepositoryToFront: (repositoryId: string) => void;
   onAddTask: (repository: { owner: string; repo: string }) => void;
   onCloneClick: () => void;
   isCloneOnboarding?: boolean;
@@ -39,6 +41,7 @@ export function RepositoryBoard({
   filtersByRepo,
   onFilterChange,
   onReorder,
+  onMoveRepositoryToFront,
   onAddTask,
   onCloneClick,
   isCloneOnboarding = false,
@@ -48,11 +51,9 @@ export function RepositoryBoard({
   // ドラッグ中はスナップを外す（縦ドラッグ中に横スクロールが吸着するのを防ぐ）
   const [isDragging, setIsDragging] = useState(false);
 
+  // 列の並び順は settings ページで変更する（Repository.order）
   const sortedRepositories = useMemo(
-    () =>
-      [...repositories].sort((a, b) =>
-        repoKeyOf(a.owner, a.repo).localeCompare(repoKeyOf(b.owner, b.repo))
-      ),
+    () => [...repositories].sort((a, b) => a.order - b.order),
     [repositories]
   );
 
@@ -63,7 +64,7 @@ export function RepositoryBoard({
         !isDragging && 'snap-x snap-mandatory'
       )}
     >
-      {sortedRepositories.map((repository) => {
+      {sortedRepositories.map((repository, index) => {
         const key = repoKeyOf(repository.owner, repository.repo);
         return (
           <div key={repository.id} className={COLUMN_CLASS}>
@@ -75,6 +76,7 @@ export function RepositoryBoard({
               onFilterChange={(filters) => onFilterChange(key, filters)}
               onReorder={onReorder}
               onAddTask={() => onAddTask({ owner: repository.owner, repo: repository.repo })}
+              onMoveToFront={index === 0 ? undefined : () => onMoveRepositoryToFront(repository.id)}
               onDragStateChange={setIsDragging}
               tabTodosMap={tabTodosMap}
             />

@@ -49,6 +49,8 @@ export interface Repository {
   owner: string;
   repo: string;
   cloneUrl: string;
+  /** トップページでの列の表示順（昇順） */
+  order: number;
   createdAt: string;
 }
 

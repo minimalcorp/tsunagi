@@ -10,6 +10,20 @@ const execAsync = promisify(exec);
 
 const WORKSPACES_ROOT = path.join(os.homedir(), '.tsunagi', 'workspaces');
 
+/**
+ * サーバープロセスにはTTYが無いため、git/sshが認証情報を対話的に要求すると
+ * リクエストがハングしてしまう。プロンプトを禁止して即座に失敗させる。
+ */
+const NON_INTERACTIVE_GIT_ENV: Record<string, string> = {
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
+};
+
+function nonInteractiveGit(baseDir?: string): SimpleGit {
+  const git = baseDir ? simpleGit(baseDir) : simpleGit();
+  return git.env({ ...process.env, ...NON_INTERACTIVE_GIT_ENV });
+}
+
 export interface WorktreeInfo {
   branch: string;
   path: string;
@@ -70,11 +84,11 @@ export async function initBareRepository(
   await fs.mkdir(path.dirname(bareRepoPath), { recursive: true });
 
   // bare repositoryとしてクローン
-  const git = simpleGit();
+  const git = nonInteractiveGit();
   await git.clone(cloneUrl, bareRepoPath, ['--bare']);
 
   // 標準的なfetch refspecを設定
-  const bareGit = simpleGit(bareRepoPath);
+  const bareGit = nonInteractiveGit(bareRepoPath);
   await bareGit.addConfig('remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*');
 
   // Remote tracking branchesを作成

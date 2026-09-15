@@ -6,7 +6,7 @@ import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
 import { Header } from '@/components/Header';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
 import { TaskDialog } from '@/components/TaskDialog';
-import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
+import { CloneRepositoryDialog, type CloneResult } from '@/components/CloneRepositoryDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { RepositoryBoard, repoKeyOf } from '@/components/planner/RepositoryBoard';
 import { type FilterState } from '@/components/planner/FilterBar';
@@ -299,7 +299,34 @@ export default function Home() {
     }
   }, []);
 
-  const handleCloneRepository = async (cloneData: { gitUrl: string; authToken?: string }) => {
+  /** 指定した列を先頭に移動する。細かい並び替えは settings ページで行う */
+  const handleMoveRepositoryToFront = useCallback(
+    async (repositoryId: string) => {
+      const target = repositories.find((r) => r.id === repositoryId);
+      if (!target) return;
+
+      const rest = repositories
+        .filter((r) => r.id !== repositoryId)
+        .sort((a, b) => a.order - b.order);
+      const next = [target, ...rest].map((repo, index) => ({ ...repo, order: index }));
+
+      // Optimistic UI update
+      setRepositories(next);
+
+      try {
+        await fetch(apiUrl('/api/repos/reorder'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoIds: next.map((r) => r.id) }),
+        });
+      } catch (error) {
+        console.error('Failed to update repository order:', error);
+      }
+    },
+    [repositories]
+  );
+
+  const handleCloneRepository = async (cloneData: { gitUrl: string }): Promise<CloneResult> => {
     try {
       const response = await fetch(apiUrl('/api/clone'), {
         method: 'POST',
@@ -307,11 +334,23 @@ export default function Home() {
         body: JSON.stringify(cloneData),
       });
 
-      if (!response.ok) throw new Error('Failed to clone repository');
+      if (!response.ok) {
+        // サーバーが返した原因（認証エラー・URL形式など）をそのまま通知に出す
+        const detail = await response
+          .json()
+          .then((body) => body?.error)
+          .catch(() => undefined);
+        throw new Error(detail || `Failed to clone repository (HTTP ${response.status})`);
+      }
 
       const data = await response.json();
       setRepositories((prev) => [...prev, data.data.repository]);
       await loadData();
+
+      return {
+        cloneUrl: data.data.repository.cloneUrl,
+        fallbackToSsh: Boolean(data.data.fallbackToSsh),
+      };
     } catch (error) {
       console.error('Failed to clone repository:', error);
       throw error;
@@ -376,6 +415,7 @@ export default function Home() {
           filtersByRepo={columnFilters}
           onFilterChange={handleFilterChange}
           onReorder={handleReorder}
+          onMoveRepositoryToFront={handleMoveRepositoryToFront}
           onAddTask={setAddTaskRepo}
           onCloneClick={() => setIsCloneDialogOpen(true)}
           isCloneOnboarding={onboardingState.nextStep === 'clone'}

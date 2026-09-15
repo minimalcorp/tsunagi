@@ -1,8 +1,10 @@
 'use client';
 
+import { ChevronsLeft } from 'lucide-react';
 import type { Task } from '@minimalcorp/tsunagi-shared';
 import { SearchAndFilterBar, type FilterState } from '@/components/planner/FilterBar';
 import { TaskList } from '@/components/planner/TaskList';
+import { Button } from '@/components/ui/button';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import type { TabTodosMap } from '@/hooks/useTerminalTodos';
@@ -16,6 +18,8 @@ interface RepositoryColumnProps {
   onFilterChange: (filters: FilterState) => void;
   onReorder: (reorderedTasks: Task[]) => void;
   onAddTask: () => void;
+  /** この列を先頭に移動する。先頭の列では undefined */
+  onMoveToFront?: () => void;
   /** ドラッグ中かどうかを親（ボード）に伝える */
   onDragStateChange?: (isDragging: boolean) => void;
   tabTodosMap: TabTodosMap;
@@ -29,6 +33,7 @@ export function RepositoryColumn({
   onFilterChange,
   onReorder,
   onAddTask,
+  onMoveToFront,
   onDragStateChange,
   tabTodosMap,
 }: RepositoryColumnProps) {
@@ -45,12 +50,26 @@ export function RepositoryColumn({
             repoColor.text
           )}
           title={`${owner}/${repo}`}
+          data-repo={`${owner}/${repo}`}
         >
           <span className="truncate">
             {owner}/{repo}
           </span>
         </span>
         <span className="text-xs tabular-nums text-muted-foreground">{tasks.length}</span>
+
+        {/* 並び順の細かい変更は settings ページ。ここは「先頭に持ってくる」だけ */}
+        {onMoveToFront && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMoveToFront}
+            className="ml-auto size-6 flex-shrink-0 text-muted-foreground"
+            title="Move to front"
+          >
+            <ChevronsLeft className="size-3.5" />
+          </Button>
+        )}
       </div>
 
       {/* Search + Filter + Add task (このリポジトリに対して作用する) */}
