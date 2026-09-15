@@ -7,14 +7,29 @@ import { TaskCard } from '@/components/planner/TaskCard';
 import type { TabTodosMap } from '@/hooks/useTerminalTodos';
 
 interface TaskListProps {
+  /** 複数リストを同一画面に並べるため、リストごとに一意なIDを渡す */
+  droppableId: string;
   tasks: Task[];
   onReorder: (reorderedTasks: Task[]) => void;
+  /** ドラッグ中かどうかを親に伝える（横スクロールのスナップ制御に使う） */
+  onDragStateChange?: (isDragging: boolean) => void;
   tabTodosMap: TabTodosMap;
 }
 
-export function TaskList({ tasks, onReorder, tabTodosMap }: TaskListProps) {
+export function TaskList({
+  droppableId,
+  tasks,
+  onReorder,
+  onDragStateChange,
+  tabTodosMap,
+}: TaskListProps) {
+  const handleDragStart = useCallback(() => {
+    onDragStateChange?.(true);
+  }, [onDragStateChange]);
+
   const handleDragEnd = useCallback(
     (result: DropResult) => {
+      onDragStateChange?.(false);
       if (!result.destination) return;
       const { source, destination } = result;
       if (source.index === destination.index) return;
@@ -28,12 +43,12 @@ export function TaskList({ tasks, onReorder, tabTodosMap }: TaskListProps) {
       const withNewOrder = reordered.map((task, index) => ({ ...task, order: index }));
       onReorder(withNewOrder);
     },
-    [tasks, onReorder]
+    [tasks, onReorder, onDragStateChange]
   );
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
-      <Droppable droppableId="planner-task-list">
+    <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <Droppable droppableId={droppableId}>
         {(droppableProvided) => (
           <div
             ref={droppableProvided.innerRef}

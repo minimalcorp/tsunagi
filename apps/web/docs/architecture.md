@@ -124,8 +124,8 @@ Tsunagiでは、ヘッドレスUIライブラリとして**Ark UI**を採用し�
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │          React UI (Next.js App Router)               │   │
 │  │  ┌────────────┐  ┌──────────────┐  ┌─────────────┐  │   │
-│  │  │  Task List │  │ Task Detail  │  │   Filters   │  │   │
-│  │  │  + Planner │  │    Panel     │  │             │  │   │
+│  │  │ Repository │  │ Task Detail  │  │   Filters   │  │   │
+│  │  │   Columns  │  │    Panel     │  │             │  │   │
 │  │  └────────────┘  └──────────────┘  └─────────────┘  │   │
 │  │         ▲                 ▲                ▲          │   │
 │  │         │    REST API     │                │          │   │
@@ -251,16 +251,19 @@ tsunagi/
 │   │   │   └── ws/             # WebSocket（Phase 5）
 │   │   │       └── route.ts           # WebSocket connection
 │   │   │
-│   │   ├── page.tsx            # メインページ（タスク一覧 + プランナー）
+│   │   ├── page.tsx            # メインページ（リポジトリごとのタスク列）
 │   │   ├── layout.tsx          # ルートレイアウト
 │   │   ├── globals.css         # グローバルスタイル
 │   │   └── favicon.ico
 │   │
 │   ├── components/             # Reactコンポーネント
 │   │   ├── planner/
-│   │   │   ├── TaskListPanel.tsx  # タスク一覧パネル
-│   │   │   ├── PlannerPanel.tsx   # プランナー詳細パネル
-│   │   │   └── TaskCard.tsx       # タスクカード (planner用)
+│   │   │   ├── RepositoryBoard.tsx  # リポジトリ列を横に並べるボード（scroll-snap）
+│   │   │   ├── RepositoryColumn.tsx # リポジトリ1件分の列（フィルタ + タスク一覧）
+│   │   │   ├── CloneColumn.tsx      # 末尾のリポジトリClone列
+│   │   │   ├── FilterBar.tsx        # 検索・フィルタバー
+│   │   │   ├── TaskList.tsx         # ドラッグ&ドロップ可能なタスク一覧
+│   │   │   └── TaskCard.tsx         # タスクカード (planner用)
 │   │   ├── TaskCard.tsx        # タスクカード (legacy)
 │   │   ├── TaskDialog.tsx      # タスク作成・編集ダイアログ
 │   │   └── ...

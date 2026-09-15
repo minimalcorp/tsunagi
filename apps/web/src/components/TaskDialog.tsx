@@ -47,6 +47,8 @@ interface TaskDialogProps {
 
   // Create mode用
   repositories?: Repository[];
+  /** Create mode: リポジトリを固定する（列ごとのタスク作成で使用）。指定時は選択不可 */
+  defaultRepo?: { owner: string; repo: string };
 
   // Edit mode用
   task?: Task;
@@ -166,6 +168,7 @@ export function TaskDialog({
   isOpen,
   onClose,
   repositories = [],
+  defaultRepo,
   task,
   onUpdate,
 }: TaskDialogProps) {
@@ -214,6 +217,22 @@ export function TaskDialog({
       });
     }
   }, [mode, task, isOpen]);
+
+  // Create modeの初期化: defaultRepo が指定されていればリポジトリを固定する
+  const defaultOwner = defaultRepo?.owner;
+  const defaultRepoName = defaultRepo?.repo;
+
+  useEffect(() => {
+    if (mode !== 'create' || !isOpen) return;
+    const nextRepo = defaultOwner && defaultRepoName ? `${defaultOwner}/${defaultRepoName}` : '';
+    setCombinedRepo(nextRepo);
+    setFormData((prev) => ({
+      ...prev,
+      owner: defaultOwner ?? '',
+      repo: defaultRepoName ?? '',
+      baseBranch: '',
+    }));
+  }, [mode, isOpen, defaultOwner, defaultRepoName]);
 
   const repoOptions = useMemo(() => {
     return repositories.map((repo) => ({
@@ -440,17 +459,23 @@ export function TaskDialog({
           isCreateMode ? 'space-y-4' : 'flex flex-col gap-4 flex-1 min-h-0 overflow-hidden'
         }
       >
-        {/* Create mode: Repository選択 */}
+        {/* Create mode: Repository選択（defaultRepo指定時は固定表示） */}
         {isCreateMode && (
           <div>
             <label className="block text-sm font-medium mb-1 text-foreground">Repository *</label>
-            <Combobox
-              options={repoOptions}
-              value={combinedRepo}
-              onChange={handleRepositoryChange}
-              placeholder="Select repository"
-              disabled={isLoading}
-            />
+            {defaultRepo ? (
+              <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                {defaultRepo.owner}/{defaultRepo.repo}
+              </p>
+            ) : (
+              <Combobox
+                options={repoOptions}
+                value={combinedRepo}
+                onChange={handleRepositoryChange}
+                placeholder="Select repository"
+                disabled={isLoading}
+              />
+            )}
           </div>
         )}
 
