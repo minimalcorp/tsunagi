@@ -299,6 +299,22 @@ export default function Home() {
     }
   }, []);
 
+  const handleRepositoryReorder = useCallback(async (reorderedRepositories: Repository[]) => {
+    // Optimistic UI update
+    setRepositories(reorderedRepositories);
+
+    // Persist order to server
+    try {
+      await fetch(apiUrl('/api/repos/reorder'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoIds: reorderedRepositories.map((r) => r.id) }),
+      });
+    } catch (error) {
+      console.error('Failed to update repository order:', error);
+    }
+  }, []);
+
   const handleCloneRepository = async (cloneData: { gitUrl: string; authToken?: string }) => {
     try {
       const response = await fetch(apiUrl('/api/clone'), {
@@ -376,6 +392,7 @@ export default function Home() {
           filtersByRepo={columnFilters}
           onFilterChange={handleFilterChange}
           onReorder={handleReorder}
+          onRepositoryReorder={handleRepositoryReorder}
           onAddTask={setAddTaskRepo}
           onCloneClick={() => setIsCloneDialogOpen(true)}
           isCloneOnboarding={onboardingState.nextStep === 'clone'}

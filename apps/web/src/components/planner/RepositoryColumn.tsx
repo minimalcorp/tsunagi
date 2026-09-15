@@ -1,5 +1,7 @@
 'use client';
 
+import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
+import { GripVertical } from 'lucide-react';
 import type { Task } from '@minimalcorp/tsunagi-shared';
 import { SearchAndFilterBar, type FilterState } from '@/components/planner/FilterBar';
 import { TaskList } from '@/components/planner/TaskList';
@@ -12,12 +14,12 @@ interface RepositoryColumnProps {
   repo: string;
   /** そのリポジトリのタスク（フィルタ適用・order昇順ソート済み） */
   tasks: Task[];
+  droppableId: string;
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
-  onReorder: (reorderedTasks: Task[]) => void;
   onAddTask: () => void;
-  /** ドラッグ中かどうかを親（ボード）に伝える */
-  onDragStateChange?: (isDragging: boolean) => void;
+  /** 列ヘッダーを掴んで列自体を並び替えるためのハンドル */
+  dragHandleProps?: DraggableProvidedDragHandleProps | null;
   tabTodosMap: TabTodosMap;
 }
 
@@ -25,26 +27,31 @@ export function RepositoryColumn({
   owner,
   repo,
   tasks,
+  droppableId,
   filters,
   onFilterChange,
-  onReorder,
   onAddTask,
-  onDragStateChange,
+  dragHandleProps,
   tabTodosMap,
 }: RepositoryColumnProps) {
   const repoColor = getRepoColor(owner, repo);
 
   return (
     <div className="flex h-full flex-col">
-      {/* Column header: repository + task count */}
-      <div className="flex-shrink-0 flex items-center gap-2 px-4 pt-4">
+      {/* Column header: 掴んで列を並び替えられる */}
+      <div
+        {...dragHandleProps}
+        className="flex-shrink-0 flex items-center gap-1.5 px-4 pt-4 cursor-grab active:cursor-grabbing"
+        title={`${owner}/${repo} — drag to reorder`}
+      >
+        <GripVertical className="size-3.5 flex-shrink-0 text-muted-foreground" />
         <span
           className={cn(
             'inline-flex h-6 min-w-0 items-center rounded-full px-2.5 text-xs font-medium',
             repoColor.bg,
             repoColor.text
           )}
-          title={`${owner}/${repo}`}
+          data-repo={`${owner}/${repo}`}
         >
           <span className="truncate">
             {owner}/{repo}
@@ -65,15 +72,9 @@ export function RepositoryColumn({
 
       {/* Scrollable task list */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        {tasks.length > 0 ? (
-          <TaskList
-            droppableId={`planner-task-list-${owner}/${repo}`}
-            tasks={tasks}
-            onReorder={onReorder}
-            onDragStateChange={onDragStateChange}
-            tabTodosMap={tabTodosMap}
-          />
-        ) : (
+        {/* タスクが0件でも Droppable は常にマウントしておく */}
+        <TaskList droppableId={droppableId} tasks={tasks} tabTodosMap={tabTodosMap} />
+        {tasks.length === 0 && (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
             No tasks found
           </div>

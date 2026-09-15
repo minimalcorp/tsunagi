@@ -13,6 +13,7 @@ model Repository {
   owner     String
   repo      String
   cloneUrl  String   @map("clone_url")
+  order     Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
 
   tasks           Task[]

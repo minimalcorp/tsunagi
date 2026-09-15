@@ -61,6 +61,31 @@ export async function reposRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // PUT /repos/reorder - トップページの列の並び順を一括更新
+  fastify.put<{ Body: { repoIds: string[] } }>('/repos/reorder', async (request, reply) => {
+    try {
+      const { repoIds } = request.body;
+
+      if (!Array.isArray(repoIds) || repoIds.length === 0) {
+        return reply.status(400).send({ error: 'Missing required field: repoIds' });
+      }
+
+      const existing = await repoRepo.getRepos();
+      const existingIds = new Set(existing.map((r) => r.id));
+      const unknown = repoIds.filter((id) => !existingIds.has(id));
+
+      if (unknown.length > 0) {
+        return reply.status(404).send({ error: `Unknown repository ids: ${unknown.join(', ')}` });
+      }
+
+      const repos = await repoRepo.reorderRepos(repoIds);
+      return reply.status(200).send({ data: repos });
+    } catch (error) {
+      fastify.log.error(error, 'PUT /repos/reorder error');
+      return reply.status(500).send({ error: 'Failed to reorder repositories' });
+    }
+  });
+
   // GET /repos/:owner/:repo
   fastify.get<{ Params: { owner: string; repo: string } }>(
     '/repos/:owner/:repo',
