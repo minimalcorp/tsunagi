@@ -8,9 +8,7 @@ import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOv
 import { TaskDialog } from '@/components/TaskDialog';
 import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
-import { TaskListPanel } from '@/components/planner/TaskListPanel';
-import { TaskListOverlay } from '@/components/planner/TaskListOverlay';
-import { PlannerPanel } from '@/components/planner/PlannerPanel';
+import { RepositoryBoard, repoKeyOf } from '@/components/planner/RepositoryBoard';
 import { type FilterState } from '@/components/planner/FilterBar';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { useTerminalTodos } from '@/hooks/useTerminalTodos';
@@ -20,12 +18,27 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { toaster } from '@/lib/toaster';
 import { apiUrl } from '@/lib/api-url';
 
-function buildFilterSummary(f: FilterState): string | undefined {
-  const parts: string[] = [];
-  if (f.search.trim()) parts.push(`"${f.search.trim()}"`);
-  if (f.statuses.length) parts.push(f.statuses.join(', '));
-  if (f.repos.length) parts.push(f.repos.map((r) => r.split('/').pop() ?? r).join(', '));
-  return parts.length ? parts.join(' / ') : undefined;
+/** 列ごとのフィルタ。sessionStorageに repoKey -> FilterState のマップで保存する */
+type ColumnFilters = Record<string, FilterState>;
+
+const COLUMN_FILTERS_STORAGE_KEY = 'tsunagi:column-filters';
+const EMPTY_FILTERS: FilterState = { statuses: [], repos: [], search: '' };
+
+function hasActiveFilter(f: FilterState): boolean {
+  return f.statuses.length > 0 || Boolean(f.search.trim());
+}
+
+/** フィルタが効いている列だけをタイトルに要約する */
+function buildFilterSummary(filters: ColumnFilters): string | undefined {
+  const parts = Object.entries(filters)
+    .filter(([, f]) => hasActiveFilter(f))
+    .map(([repoKey, f]) => {
+      const detail: string[] = [];
+      if (f.search.trim()) detail.push(`"${f.search.trim()}"`);
+      if (f.statuses.length) detail.push(f.statuses.join(', '));
+      return `${repoKey.split('/').pop() ?? repoKey}: ${detail.join(' / ')}`;
+    });
+  return parts.length ? parts.join(' | ') : undefined;
 }
 
 export default function Home() {
@@ -36,36 +49,35 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   // Dialog states
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
-  const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
+  const [addTaskRepo, setAddTaskRepo] = useState<{ owner: string; repo: string } | null>(null);
   const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
 
-  // Filter state (driven by TaskListPanel's SearchAndFilterBar, persisted in sessionStorage)
-  const [filterState, setFilterState] = useState<FilterState>(() => {
-    if (typeof window === 'undefined') return { statuses: [], repos: [], search: '' };
+  // 列ごとのフィルタ（各列のSearchAndFilterBarが駆動、sessionStorageに永続化）
+  const [columnFilters, setColumnFilters] = useState<ColumnFilters>(() => {
+    if (typeof window === 'undefined') return {};
     try {
-      const saved = sessionStorage.getItem('tsunagi:task-filters');
-      if (saved) return JSON.parse(saved) as FilterState;
+      const saved = sessionStorage.getItem(COLUMN_FILTERS_STORAGE_KEY);
+      if (saved) return JSON.parse(saved) as ColumnFilters;
     } catch {
       // ignore
     }
-    return { statuses: [], repos: [], search: '' };
+    return {};
   });
 
-  useDocumentTitle(buildFilterSummary(filterState));
+  useDocumentTitle(buildFilterSummary(columnFilters));
 
   // Persist filter state to sessionStorage
   useEffect(() => {
     try {
-      sessionStorage.setItem('tsunagi:task-filters', JSON.stringify(filterState));
+      sessionStorage.setItem(COLUMN_FILTERS_STORAGE_KEY, JSON.stringify(columnFilters));
     } catch {
       // ignore
     }
-  }, [filterState]);
+  }, [columnFilters]);
 
-  // Resizable panel
-  const [leftPanelWidth, setLeftPanelWidth] = useState(380);
-  const [isResizing, setIsResizing] = useState(false);
-  const [isTaskListOverlayOpen, setIsTaskListOverlayOpen] = useState(false);
+  const handleFilterChange = useCallback((repoKey: string, filters: FilterState) => {
+    setColumnFilters((prev) => ({ ...prev, [repoKey]: filters }));
+  }, []);
 
   // 初回ユーザーフローの状態を検出
   const onboardingState = useMemo(() => {
@@ -91,28 +103,34 @@ export default function Home() {
     return { state, nextStep };
   }, [repositories, globalEnv, tasks]);
 
-  // Filter tasks
-  const filteredTasks = useMemo(() => {
-    return tasks
-      .filter((task) => {
-        // Status filter
-        if (filterState.statuses.length > 0 && !filterState.statuses.includes(task.status))
-          return false;
-        // Repo filter
-        if (filterState.repos.length > 0) {
-          const taskRepo = `${task.owner}/${task.repo}`;
-          if (!filterState.repos.includes(taskRepo)) return false;
-        }
-        // Search filter
-        if (
-          filterState.search &&
-          !task.title.toLowerCase().includes(filterState.search.toLowerCase())
-        )
-          return false;
-        return true;
-      })
-      .sort((a, b) => a.order - b.order);
-  }, [tasks, filterState]);
+  // リポジトリごとにタスクを分け、その列のフィルタを適用してorder昇順に並べる
+  const tasksByRepo = useMemo(() => {
+    const grouped = new Map<string, Task[]>();
+
+    for (const task of tasks) {
+      const key = repoKeyOf(task.owner, task.repo);
+      const filters = columnFilters[key] ?? EMPTY_FILTERS;
+
+      // Status filter
+      if (filters.statuses.length > 0 && !filters.statuses.includes(task.status)) continue;
+      // Search filter
+      if (filters.search && !task.title.toLowerCase().includes(filters.search.toLowerCase()))
+        continue;
+
+      const list = grouped.get(key);
+      if (list) {
+        list.push(task);
+      } else {
+        grouped.set(key, [task]);
+      }
+    }
+
+    for (const list of grouped.values()) {
+      list.sort((a, b) => a.order - b.order);
+    }
+
+    return grouped;
+  }, [tasks, columnFilters]);
 
   // 初回データロード
   const loadData = async () => {
@@ -261,9 +279,8 @@ export default function Home() {
   const handleReorder = useCallback(async (reorderedTasks: Task[]) => {
     // Optimistic UI update
     setTasks((prev) => {
-      const reorderedIds = new Set(reorderedTasks.map((t) => t.id));
-      const unchanged = prev.filter((t) => !reorderedIds.has(t.id));
-      return [...reorderedTasks, ...unchanged];
+      const reorderedById = new Map(reorderedTasks.map((t) => [t.id, t]));
+      return prev.map((t) => reorderedById.get(t.id) ?? t);
     });
 
     // Persist order to server
@@ -333,31 +350,6 @@ export default function Home() {
     }
   };
 
-  // Resize handler
-  const handleMouseDown = useCallback(() => {
-    setIsResizing(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = Math.max(280, Math.min(600, e.clientX));
-      setLeftPanelWidth(newWidth);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing]);
-
   if (isLoading && tasks.length === 0) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
@@ -371,45 +363,25 @@ export default function Home() {
   return (
     <div className="h-screen flex flex-col">
       <Header
-        onCloneClick={() => setIsCloneDialogOpen(true)}
         onSettingsClick={() => router.push('/settings')}
         onReload={loadData}
-        onTaskListClick={() => setIsTaskListOverlayOpen(true)}
         nextStep={onboardingState.nextStep}
-        isCloneDialogOpen={isCloneDialogOpen}
       />
 
-      {/* Main content: 2-column layout (≥1024px) / single column (<1024px) */}
+      {/* Main content: リポジトリごとの列を横に並べる（列境界でスナップする横スクロール） */}
       <div className="relative flex-1 overflow-hidden flex">
-        {/* Left: Task List Panel (PC) */}
-        <div
-          className="hidden lg:flex flex-col border-r border-border flex-shrink-0"
-          style={{ width: leftPanelWidth }}
-        >
-          <TaskListPanel
-            tasks={filteredTasks}
-            repositories={repositories}
-            filters={filterState}
-            onFilterChange={setFilterState}
-            onReorder={handleReorder}
-            onAddTask={() => setIsAddTaskDialogOpen(true)}
-            tabTodosMap={tabTodosMap}
-          />
-        </div>
-
-        {/* Resize handle (PC only) */}
-        <div
-          className="hidden lg:flex w-1 cursor-col-resize items-center justify-center hover:bg-accent active:bg-accent flex-shrink-0"
-          onMouseDown={handleMouseDown}
-          style={{ userSelect: isResizing ? 'none' : undefined }}
-        >
-          <div className="w-px h-8 bg-border" />
-        </div>
-
-        {/* Right: Planner Panel */}
-        <div className="flex-1 min-w-0 h-full flex flex-col">
-          <PlannerPanel />
-        </div>
+        <RepositoryBoard
+          repositories={repositories}
+          tasksByRepo={tasksByRepo}
+          filtersByRepo={columnFilters}
+          onFilterChange={handleFilterChange}
+          onReorder={handleReorder}
+          onAddTask={setAddTaskRepo}
+          onCloneClick={() => setIsCloneDialogOpen(true)}
+          isCloneOnboarding={onboardingState.nextStep === 'clone'}
+          isCloneDialogOpen={isCloneDialogOpen}
+          tabTodosMap={tabTodosMap}
+        />
 
         {/* Onboarding overlay */}
         {onboardingState.nextStep === 'env' && (
@@ -433,9 +405,10 @@ export default function Home() {
 
       <TaskDialog
         mode="create"
-        isOpen={isAddTaskDialogOpen}
-        onClose={() => setIsAddTaskDialogOpen(false)}
+        isOpen={addTaskRepo !== null}
+        onClose={() => setAddTaskRepo(null)}
         repositories={repositories}
+        defaultRepo={addTaskRepo ?? undefined}
       />
 
       <BatchDeleteDialog
@@ -443,22 +416,6 @@ export default function Home() {
         onClose={() => setIsBatchDeleteDialogOpen(false)}
         onConfirm={handleBatchDelete}
       />
-
-      {/* Task list overlay (narrow screens only) */}
-      <TaskListOverlay open={isTaskListOverlayOpen} onOpenChange={setIsTaskListOverlayOpen}>
-        <TaskListPanel
-          tasks={filteredTasks}
-          repositories={repositories}
-          filters={filterState}
-          onFilterChange={setFilterState}
-          onReorder={handleReorder}
-          onAddTask={() => {
-            setIsTaskListOverlayOpen(false);
-            setIsAddTaskDialogOpen(true);
-          }}
-          tabTodosMap={tabTodosMap}
-        />
-      </TaskListOverlay>
     </div>
   );
 }

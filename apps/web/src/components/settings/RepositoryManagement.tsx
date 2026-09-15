@@ -21,7 +21,7 @@ export function RepositoryManagement() {
         fetch(apiUrl('/api/tasks')).then((r) => r.json()),
       ]);
 
-      setRepositories(reposRes.data?.repos ?? []);
+      setRepositories(reposRes.data ?? []);
 
       // Count tasks per repo
       const counts: Record<string, number> = {};

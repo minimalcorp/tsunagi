@@ -10,7 +10,6 @@ import { tasksRoutes } from './routes/tasks.js';
 import { reposRoutes } from './routes/repos.js';
 import { envRoutes } from './routes/env.js';
 import { worktreesRoutes } from './routes/worktrees.js';
-import { plannerRoutes } from './routes/planner.js';
 import { commandsRoutes } from './routes/commands.js';
 import { onboardingRoutes } from './routes/onboarding.js';
 import { internalRoutes } from './routes/internal.js';
@@ -102,7 +101,6 @@ async function start() {
   await fastify.register(reposRoutes, { prefix: '/api' });
   await fastify.register(envRoutes, { prefix: '/api' });
   await fastify.register(worktreesRoutes, { prefix: '/api' });
-  await fastify.register(plannerRoutes, { prefix: '/api' });
   await fastify.register(commandsRoutes, { prefix: '/api' });
   await fastify.register(onboardingRoutes, { prefix: '/api' });
   await fastify.register(internalRoutes, { prefix: '/api' });
