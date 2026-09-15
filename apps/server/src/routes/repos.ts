@@ -296,7 +296,13 @@ export async function reposRoutes(fastify: FastifyInstance) {
 
       const newRepo = await createRepo({ owner, repo, cloneUrl: clonedUrl });
 
-      return reply.status(200).send({ data: { repository: { ...newRepo, bareRepoPath } } });
+      return reply.status(200).send({
+        data: {
+          repository: { ...newRepo, bareRepoPath },
+          // HTTPSで認証できずSSHで clone し直した場合、UI側で利用者に知らせる
+          fallbackToSsh: clonedUrl !== normalizedUrl,
+        },
+      });
     } catch (error) {
       fastify.log.error(error, 'Failed to clone repository');
       return reply.status(500).send({

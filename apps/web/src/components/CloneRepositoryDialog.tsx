@@ -6,10 +6,16 @@ import { Dialog } from './ui/Dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+export interface CloneResult {
+  /** 実際に clone に使われたURL。HTTPSが認証エラーになった場合はSSH URLになる */
+  cloneUrl: string;
+  fallbackToSsh: boolean;
+}
+
 interface CloneRepositoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onClone: (data: { gitUrl: string }) => Promise<void>;
+  onClone: (data: { gitUrl: string }) => Promise<CloneResult>;
   isOnboarding?: boolean;
 }
 
@@ -34,8 +40,16 @@ export function CloneRepositoryDialog({
     const notificationId = toast.loading('Cloning repository...', url);
 
     try {
-      await onClone({ gitUrl: url });
-      toast.success(notificationId, 'Successfully cloned repository', url);
+      const result = await onClone({ gitUrl: url });
+
+      // HTTPSで認証できずSSHで clone し直した場合は、その旨を明示する
+      toast.success(
+        notificationId,
+        'Successfully cloned repository',
+        result.fallbackToSsh
+          ? `HTTPSでは認証できなかったため、SSHでcloneしました: ${result.cloneUrl}`
+          : url
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast.error(notificationId, 'Failed to clone repository', errorMessage);

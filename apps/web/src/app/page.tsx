@@ -6,7 +6,7 @@ import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
 import { Header } from '@/components/Header';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
 import { TaskDialog } from '@/components/TaskDialog';
-import { CloneRepositoryDialog } from '@/components/CloneRepositoryDialog';
+import { CloneRepositoryDialog, type CloneResult } from '@/components/CloneRepositoryDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { RepositoryBoard, repoKeyOf } from '@/components/planner/RepositoryBoard';
 import { type FilterState } from '@/components/planner/FilterBar';
@@ -326,7 +326,7 @@ export default function Home() {
     [repositories]
   );
 
-  const handleCloneRepository = async (cloneData: { gitUrl: string }) => {
+  const handleCloneRepository = async (cloneData: { gitUrl: string }): Promise<CloneResult> => {
     try {
       const response = await fetch(apiUrl('/api/clone'), {
         method: 'POST',
@@ -346,6 +346,11 @@ export default function Home() {
       const data = await response.json();
       setRepositories((prev) => [...prev, data.data.repository]);
       await loadData();
+
+      return {
+        cloneUrl: data.data.repository.cloneUrl,
+        fallbackToSsh: Boolean(data.data.fallbackToSsh),
+      };
     } catch (error) {
       console.error('Failed to clone repository:', error);
       throw error;
