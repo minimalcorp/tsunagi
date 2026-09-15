@@ -299,21 +299,32 @@ export default function Home() {
     }
   }, []);
 
-  const handleRepositoryReorder = useCallback(async (reorderedRepositories: Repository[]) => {
-    // Optimistic UI update
-    setRepositories(reorderedRepositories);
+  /** 指定した列を先頭に移動する。細かい並び替えは settings ページで行う */
+  const handleMoveRepositoryToFront = useCallback(
+    async (repositoryId: string) => {
+      const target = repositories.find((r) => r.id === repositoryId);
+      if (!target) return;
 
-    // Persist order to server
-    try {
-      await fetch(apiUrl('/api/repos/reorder'), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoIds: reorderedRepositories.map((r) => r.id) }),
-      });
-    } catch (error) {
-      console.error('Failed to update repository order:', error);
-    }
-  }, []);
+      const rest = repositories
+        .filter((r) => r.id !== repositoryId)
+        .sort((a, b) => a.order - b.order);
+      const next = [target, ...rest].map((repo, index) => ({ ...repo, order: index }));
+
+      // Optimistic UI update
+      setRepositories(next);
+
+      try {
+        await fetch(apiUrl('/api/repos/reorder'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoIds: next.map((r) => r.id) }),
+        });
+      } catch (error) {
+        console.error('Failed to update repository order:', error);
+      }
+    },
+    [repositories]
+  );
 
   const handleCloneRepository = async (cloneData: { gitUrl: string; authToken?: string }) => {
     try {
@@ -392,7 +403,7 @@ export default function Home() {
           filtersByRepo={columnFilters}
           onFilterChange={handleFilterChange}
           onReorder={handleReorder}
-          onRepositoryReorder={handleRepositoryReorder}
+          onMoveRepositoryToFront={handleMoveRepositoryToFront}
           onAddTask={setAddTaskRepo}
           onCloneClick={() => setIsCloneDialogOpen(true)}
           isCloneOnboarding={onboardingState.nextStep === 'clone'}

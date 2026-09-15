@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import type { Repository } from '@minimalcorp/tsunagi-shared';
 import { getRepoColor } from '@/lib/repo-colors';
 import { apiUrl } from '@/lib/api-url';
@@ -13,6 +13,7 @@ export function RepositoryManagement() {
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
   const [deleteTarget, setDeleteTarget] = useState<Repository | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -59,6 +60,37 @@ export function RepositoryManagement() {
     }
   };
 
+  /** トップページの列の並び順を1つ入れ替える */
+  const handleMove = useCallback(
+    async (index: number, direction: -1 | 1) => {
+      const swapWith = index + direction;
+      if (swapWith < 0 || swapWith >= repositories.length) return;
+
+      const reordered = [...repositories];
+      [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
+
+      // Optimistic UI update
+      setRepositories(reordered.map((repo, i) => ({ ...repo, order: i })));
+      setIsReordering(true);
+
+      try {
+        const res = await fetch(apiUrl('/api/repos/reorder'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repoIds: reordered.map((repo) => repo.id) }),
+        });
+        if (!res.ok) throw new Error('Failed to reorder repositories');
+      } catch (error) {
+        console.error('Failed to reorder repositories:', error);
+        // 失敗したらサーバーの状態に戻す
+        await loadData();
+      } finally {
+        setIsReordering(false);
+      }
+    },
+    [repositories, loadData]
+  );
+
   if (repositories.length === 0) {
     return <div className="text-sm text-muted-foreground">No repositories cloned yet.</div>;
   }
@@ -82,8 +114,12 @@ export function RepositoryManagement() {
         variant="danger"
       />
 
+      <p className="text-xs text-muted-foreground">
+        この並び順がトップページの列の並び順になります
+      </p>
+
       <div className="space-y-2">
-        {repositories.map((repo) => {
+        {repositories.map((repo, index) => {
           const repoKey = `${repo.owner}/${repo.repo}`;
           const color = getRepoColor(repo.owner, repo.repo);
           const count = taskCounts[repoKey] ?? 0;
@@ -91,27 +127,50 @@ export function RepositoryManagement() {
           return (
             <div
               key={repo.id}
-              className="flex items-center justify-between rounded-md border border-border p-3"
+              className="flex items-center justify-between gap-2 rounded-md border border-border p-3"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <span
                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${color.bg} ${color.text}`}
                 >
                   {repoKey}
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
                   {count} task{count !== 1 ? 's' : ''}
                 </span>
               </div>
 
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setDeleteTarget(repo)}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="size-4" />
-              </Button>
+              <div className="flex flex-shrink-0 items-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleMove(index, -1)}
+                  disabled={index === 0 || isReordering}
+                  className="text-muted-foreground"
+                  title="Move up"
+                >
+                  <ChevronUp className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleMove(index, 1)}
+                  disabled={index === repositories.length - 1 || isReordering}
+                  className="text-muted-foreground"
+                  title="Move down"
+                >
+                  <ChevronDown className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setDeleteTarget(repo)}
+                  className="text-muted-foreground hover:text-destructive"
+                  title="Delete repository"
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
             </div>
           );
         })}
