@@ -5,6 +5,7 @@ import type { Task } from '@minimalcorp/tsunagi-shared';
 import { SearchAndFilterBar, type FilterState } from '@/components/planner/FilterBar';
 import { TaskList } from '@/components/planner/TaskList';
 import { Button } from '@/components/ui/button';
+import { hasUnreadResult } from '@/lib/claude-status';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import type { TabTodosMap } from '@/hooks/useTerminalTodos';
@@ -38,6 +39,8 @@ export function RepositoryColumn({
   tabTodosMap,
 }: RepositoryColumnProps) {
   const repoColor = getRepoColor(owner, repo);
+  // 列を畳んでいても未確認の完了があることに気付けるようにヘッダーに件数を出す
+  const unreadCount = tasks.filter(hasUnreadResult).length;
 
   return (
     <div className="flex h-full flex-col">
@@ -57,6 +60,14 @@ export function RepositoryColumn({
           </span>
         </span>
         <span className="text-xs tabular-nums text-muted-foreground">{tasks.length}</span>
+        {unreadCount > 0 && (
+          <span
+            className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[0.625rem] font-medium tabular-nums text-primary-foreground"
+            title={`${unreadCount} unopened result${unreadCount > 1 ? 's' : ''}`}
+          >
+            {unreadCount}
+          </span>
+        )}
 
         {/* 並び順の細かい変更は settings ページ。ここは「先頭に持ってくる」だけ */}
         {onMoveToFront && (

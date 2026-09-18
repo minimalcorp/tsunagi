@@ -37,6 +37,8 @@ export interface Tab {
   order: number; // タブ表示用の連番
   status: 'idle' | 'running' | 'waiting' | 'success' | 'error';
   mode: 'terminal' | 'claude'; // タブの起動モード（terminal: claude自動起動なし）
+  /** success/error で完了したがタスク詳細でまだ確認していない（未読）か */
+  unread: boolean;
   todos?: Todo[];
   startedAt: string;
   completedAt?: string;

@@ -14,6 +14,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { Task } from '@minimalcorp/tsunagi-shared';
+import { unreadKind, type UnreadKind } from '@/lib/claude-status';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -31,6 +32,13 @@ const STATUS_STYLES: Record<Task['status'], string> = {
   coding: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   reviewing: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
   done: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+};
+
+/** 未確認マーカー（カード左端のバー）の色とラベル */
+const UNREAD_MARKER: Record<UnreadKind, { className: string; label: string }> = {
+  success: { className: 'bg-unread-success', label: 'Finished, not opened yet' },
+  error: { className: 'bg-unread-error', label: 'Failed, not opened yet' },
+  waiting: { className: 'bg-unread-waiting', label: 'Waiting for your input' },
 };
 
 function ClaudeStatusIndicator({ tabs }: { tabs: Task['tabs'] }) {
@@ -78,6 +86,7 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
   const repoColor = getRepoColor(task.owner, task.repo);
   const tabs = task.tabs ?? [];
   const isClaudeRunning = tabs.some((t) => t.status === 'running');
+  const marker = unreadKind(task);
 
   // リアルタイムのtabTodosMapがあればそちらを優先、なければDB todosにフォールバック。'deleted' は表示層で除外
   // running → success 遷移後もMapにデータが残るため、全タブを確認する
@@ -107,10 +116,23 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
       {...dragHandleProps}
       onClick={() => router.push(`/tasks/${task.id}`)}
       className={cn(
-        'rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md cursor-pointer',
+        'relative rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md cursor-pointer',
         isClaudeRunning && 'opacity-50'
       )}
     >
+      {/* 未確認マーカー: カード上下から10px内側に入れた左端のバー */}
+      {marker && (
+        <span
+          role="img"
+          aria-label={UNREAD_MARKER[marker].label}
+          title={UNREAD_MARKER[marker].label}
+          className={cn(
+            'absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-r-[3px]',
+            UNREAD_MARKER[marker].className
+          )}
+        />
+      )}
+
       <div className="space-y-2">
         {/* ID + Status */}
         <div className="flex items-center justify-between gap-2">

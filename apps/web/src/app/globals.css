@@ -38,6 +38,13 @@
   --info: oklch(0.55 0.15 250);
   --info-foreground: oklch(1 0 0);
 
+  /* 未確認マーカー（タスクカード左端のバー）
+     明度・彩度を揃えてhueだけ振った三色。--destructive 等をそのまま使うと
+     赤(chroma 0.245)だけが緑(0.15)より強く出て、三色が同じ調子に見えないため */
+  --unread-success: oklch(0.55 0.15 150);
+  --unread-error: oklch(0.55 0.15 27);
+  --unread-waiting: oklch(0.55 0.15 85);
+
   /* Primary variants (purple-adjusted) */
   --primary-hover: oklch(0.39 0.22 277);
   --primary-light: oklch(0.55 0.24 277);
@@ -109,6 +116,11 @@
   --info: oklch(0.65 0.18 250);
   --info-foreground: oklch(0.15 0 0);
 
+  /* 未確認マーカー（暗い card の上で沈まないよう明度を上げる） */
+  --unread-success: oklch(0.79 0.14 150);
+  --unread-error: oklch(0.79 0.14 27);
+  --unread-waiting: oklch(0.79 0.14 85);
+
   /* Primary variants (purple-adjusted, brightened for dark mode) */
   --primary-hover: oklch(0.72 0.22 277);
   --primary-light: oklch(0.75 0.2 277);
@@ -168,6 +180,11 @@
   --color-error: var(--error);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+
+  /* 未確認マーカー */
+  --color-unread-success: var(--unread-success);
+  --color-unread-error: var(--unread-error);
+  --color-unread-waiting: var(--unread-waiting);
 
   /* Primary variants */
   --color-primary-hover: var(--primary-hover);

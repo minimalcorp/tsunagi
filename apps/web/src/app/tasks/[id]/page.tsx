@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/useToast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
+import type { ClaudeStatus } from '@/components/TerminalView';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import {
@@ -59,6 +60,24 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     },
   });
 
+  // 「詳細を開いた = 実行結果を確認した」とみなし、タスク配下の全タブを既読にする。
+  // ボード側の未読バッジはこの API の結果（task:updated）で消える
+  const markAsRead = useCallback(() => {
+    fetch(apiUrl(`/api/tasks/${id}/read`), { method: 'POST' }).catch(() => {
+      // 既読化の失敗はユーザー操作を妨げないので握りつぶす（次回開いた時に再試行される）
+    });
+  }, [id]);
+
+  // 詳細を開いたまま Claude が完了した場合も、その場で既読にする
+  const handleClaudeStatusChange = useCallback(
+    (_tabId: string, claude: ClaudeStatus) => {
+      if (claude === 'success' || claude === 'failure' || claude === 'error') {
+        markAsRead();
+      }
+    },
+    [markAsRead]
+  );
+
   // データロード（初回ロード時のみ、またはIDが変わった時）
   const prevIdRef = useRef<string | null>(null);
 
@@ -103,13 +122,15 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       if (loadedTabs.length > 0) {
         setActiveTabId(loadedTabs[0].tab_id);
       }
+
+      markAsRead();
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
       setIsLoading(false);
       setIsInitialLoad(false);
     }
-  }, [id, isInitialLoad]);
+  }, [id, isInitialLoad, markAsRead]);
 
   useEffect(() => {
     loadData();
@@ -343,6 +364,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             onTabChange={setActiveTabId}
             onTabCreate={handleTabCreate}
             onTabDelete={handleTabDelete}
+            onClaudeStatusChange={handleClaudeStatusChange}
           />
         </div>
       </div>

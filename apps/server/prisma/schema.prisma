@@ -65,6 +65,8 @@ model Tab {
   startedAt    DateTime  @map("started_at")
   completedAt  DateTime? @map("completed_at")
   todos        String?   @default("[]") // JSON: Todo[]
+  // 完了(success/error)したがタスク詳細で未確認であることを示す。詳細を開くとfalseになる
+  unread       Boolean   @default(false)
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
