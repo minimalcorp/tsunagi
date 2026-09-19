@@ -57,18 +57,39 @@ function tasksToTodos(tasks: Map<string, TaskEntry>) {
   }));
 }
 
-/** DBでタブのステータス（+ todos）を直接更新する */
+/**
+ * status から未読フラグを導出する。
+ * 完了(success/error)で未読を立て、再実行・セッション終了で落とす。
+ * web 側 (apps/web/src/lib/claude-status.ts の unreadForStatus) と同じルール。
+ */
+function unreadForStatus(status: string): boolean | undefined {
+  switch (status) {
+    case 'success':
+    case 'error':
+      return true;
+    case 'running':
+    case 'idle':
+      return false;
+    default:
+      // waiting 等は未読状態を変えない
+      return undefined;
+  }
+}
+
+/** DBでタブのステータス（+ todos / 未読フラグ）を直接更新する */
 async function updateTabStatus(
   sessionId: string,
   status: string,
   todos?: unknown[]
 ): Promise<{ count: number }> {
   try {
+    const unread = unreadForStatus(status);
     const result = await prisma.tab.updateMany({
       where: { tabId: sessionId },
       data: {
         status,
         ...(todos !== undefined && { todos: JSON.stringify(todos) }),
+        ...(unread !== undefined && { unread }),
       },
     });
     return { count: result.count };

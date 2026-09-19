@@ -405,6 +405,30 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // POST /tasks/:id/read - タスク配下の全タブを既読にする（詳細画面を開いた = 確認した）
+  fastify.post<{ Params: { id: string } }>('/tasks/:id/read', async (request, reply) => {
+    try {
+      const { id: taskId } = request.params;
+
+      const markedCount = await taskRepo.markTaskTabsRead(taskId);
+
+      const task = await taskRepo.getTask(taskId);
+      if (!task) {
+        return reply.status(404).send({ error: 'Task not found' });
+      }
+
+      // 既読化を他の画面（ボード等）にも反映する。変化が無いときは通知不要
+      if (markedCount > 0) {
+        io.emit('task:updated', { task });
+      }
+
+      return reply.status(200).send({ data: { task } });
+    } catch (error) {
+      fastify.log.error(error, 'POST /tasks/:id/read error');
+      return reply.status(500).send({ error: 'Failed to mark task as read' });
+    }
+  });
+
   // GET /tasks/:id/tabs
   fastify.get<{ Params: { id: string } }>('/tasks/:id/tabs', async (request, reply) => {
     try {

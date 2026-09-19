@@ -198,6 +198,7 @@ export async function updateTab(
     where: { tabId: tab_id },
     data: {
       ...(updates.status && { status: updates.status }),
+      ...(updates.unread !== undefined && { unread: updates.unread }),
       ...(updates.completedAt !== undefined && {
         completedAt: updates.completedAt ? new Date(updates.completedAt) : null,
       }),
@@ -222,6 +223,18 @@ export async function deleteTab(taskId: string, tab_id: string): Promise<boolean
   } catch {
     return false;
   }
+}
+
+/**
+ * タスク配下の全タブを既読にする。
+ * 「タスク詳細を開く = 確認した」とみなすため、タブ単位ではなくタスク単位で落とす。
+ */
+export async function markTaskTabsRead(taskId: string): Promise<number> {
+  const result = await prisma.tab.updateMany({
+    where: { taskId, unread: true },
+    data: { unread: false },
+  });
+  return result.count;
 }
 
 // ============================================
@@ -287,6 +300,7 @@ type PrismaTab = {
   status: string;
   mode: string;
   todos: string | null;
+  unread: boolean;
   startedAt: Date;
   completedAt: Date | null;
   updatedAt: Date;
@@ -320,6 +334,7 @@ function mapTab(tab: PrismaTab): Tab {
     order: tab.order,
     status: tab.status as Tab['status'],
     mode: tab.mode as Tab['mode'],
+    unread: tab.unread,
     todos: tab.todos ? JSON.parse(tab.todos) : [],
     startedAt: tab.startedAt.toISOString(),
     completedAt: tab.completedAt?.toISOString(),

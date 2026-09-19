@@ -26,6 +26,8 @@ interface TerminalPanelProps {
   onTabDelete: (tabId: string) => void;
   /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
+  /** Claudeステータス変化時のコールバック（詳細を開いたまま完了したときの既読化用） */
+  onClaudeStatusChange?: (tabId: string, claude: ClaudeStatus) => void;
 }
 
 /** タブ追加モード */
@@ -44,7 +46,16 @@ export interface TerminalPanelHandle {
  */
 export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(
   function TerminalPanel(
-    { task, tabs, activeTabId, onTabChange, onTabCreate, onTabDelete, onTodosUpdated },
+    {
+      task,
+      tabs,
+      activeTabId,
+      onTabChange,
+      onTabCreate,
+      onTabDelete,
+      onTodosUpdated,
+      onClaudeStatusChange,
+    },
     ref
   ) {
     // 一度でも表示されたタブのみTerminalViewをマウントする（遅延初期化）
@@ -113,8 +124,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           next.set(tabId, { terminal, claude });
           return next;
         });
+        onClaudeStatusChange?.(tabId, claude);
       },
-      []
+      [onClaudeStatusChange]
     );
 
     useImperativeHandle(ref, () => ({

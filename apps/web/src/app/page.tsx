@@ -15,6 +15,7 @@ import { useTerminalTodos } from '@/hooks/useTerminalTodos';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { hasUnreadResult, unreadForStatus } from '@/lib/claude-status';
 import { toaster } from '@/lib/toaster';
 import { apiUrl } from '@/lib/api-url';
 
@@ -64,7 +65,10 @@ export default function Home() {
     return {};
   });
 
-  useDocumentTitle(buildFilterSummary(columnFilters));
+  // フィルタで隠れているタスクの完了にも気付けるよう、未読数は全タスクから数える
+  const unreadTaskCount = useMemo(() => tasks.filter(hasUnreadResult).length, [tasks]);
+
+  useDocumentTitle(buildFilterSummary(columnFilters), unreadTaskCount);
 
   // Persist filter state to sessionStorage
   useEffect(() => {
@@ -182,10 +186,15 @@ export default function Home() {
   const tabTodosMap = useTerminalTodos(runningTabIds);
 
   useTabStatusEvents(allTabIds, (tabId, status) => {
+    // 未読フラグはDBにもあるがリアルタイムでは status しか流れてこないため、
+    // サーバー(hooks.ts)と同じルールでここでも導出する
+    const unread = unreadForStatus(status);
     setTasks((prev) =>
       prev.map((task) => ({
         ...task,
-        tabs: (task.tabs ?? []).map((tab) => (tab.tab_id === tabId ? { ...tab, status } : tab)),
+        tabs: (task.tabs ?? []).map((tab) =>
+          tab.tab_id === tabId ? { ...tab, status, ...(unread !== undefined && { unread }) } : tab
+        ),
       }))
     );
   });
