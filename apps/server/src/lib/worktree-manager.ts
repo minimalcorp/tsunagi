@@ -19,9 +19,27 @@ const NON_INTERACTIVE_GIT_ENV: Record<string, string> = {
   GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
 };
 
+/**
+ * simple-git は env に任意コマンドを実行しうる変数が含まれていると spawn を拒否する
+ * (`Use of "GIT_SSH_COMMAND" is not permitted without enabling allowUnsafeSshCommand`)。
+ * 親プロセスから継承した GIT_* / EDITOR 等はサーバーのgit操作には不要なため除去し、
+ * 意図して設定する GIT_SSH_COMMAND のみ allowUnsafeSshCommand で許可する。
+ */
+const BLOCKED_INHERITED_ENV = /^(GIT_|SSH_ASKPASS$|EDITOR$|PAGER$|PREFIX$)/i;
+
+function nonInteractiveGitEnv(): Record<string, string> {
+  const inherited = Object.entries(process.env).filter(
+    ([key, value]) => value !== undefined && !BLOCKED_INHERITED_ENV.test(key)
+  ) as [string, string][];
+  return { ...Object.fromEntries(inherited), ...NON_INTERACTIVE_GIT_ENV };
+}
+
 function nonInteractiveGit(baseDir?: string): SimpleGit {
-  const git = baseDir ? simpleGit(baseDir) : simpleGit();
-  return git.env({ ...process.env, ...NON_INTERACTIVE_GIT_ENV });
+  const git = simpleGit({
+    ...(baseDir ? { baseDir } : {}),
+    unsafe: { allowUnsafeSshCommand: true },
+  });
+  return git.env(nonInteractiveGitEnv());
 }
 
 export interface WorktreeInfo {
