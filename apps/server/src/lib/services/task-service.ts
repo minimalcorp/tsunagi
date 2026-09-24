@@ -144,9 +144,7 @@ export async function getTask(identifier: TaskIdentifier): Promise<Task> {
     throw new TaskServiceError('Task not found', 'TASK_NOT_FOUND');
   }
 
-  // worktreePathを付与
-  const worktreePath = worktreeManager.getWorktreePath(task.owner, task.repo, task.branch);
-  return { ...task, worktreePath };
+  return task;
 }
 
 /**

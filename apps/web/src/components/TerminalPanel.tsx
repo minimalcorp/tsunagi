@@ -253,7 +253,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   tabId={tab.tab_id}
                   isActive={isActive}
                   cwd={task.worktreePath}
-                  worktreePath={task.worktreePath}
                   command={
                     tab.mode === 'terminal'
                       ? undefined
