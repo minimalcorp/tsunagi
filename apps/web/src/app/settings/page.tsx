@@ -11,6 +11,7 @@ import { RepositoryManagement } from '@/components/settings/RepositoryManagement
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
 import { VoiceInputSection } from '@/components/settings/VoiceInputSection';
 import { LocalLlmSection } from '@/components/settings/LocalLlmSection';
+import { OllamaSection } from '@/components/settings/OllamaSection';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
@@ -142,6 +143,9 @@ export default function SettingsPage() {
 
               {/* Local LLM (Global scope only, device-wide feature) */}
               {selectedNode.scope === 'global' && <LocalLlmSection />}
+
+              {/* Ollama (Global scope only, 実験的機能) */}
+              {selectedNode.scope === 'global' && <OllamaSection />}
 
               {/* Remove Repository (Repo scope only) */}
               {selectedNode.scope === 'repo' && selectedNode.owner && selectedNode.repo && (

@@ -59,7 +59,16 @@ class PtyManager {
     }
   }
 
-  createSession(sessionId: string, cwd: string, env?: Record<string, string>): PtySession {
+  /**
+   * @param unsetKeys 外側 Terminal や DB 由来でも内部ターミナルに渡さない環境変数キー
+   *   （例: Ollama タブでは Anthropic の認証トークンを取り除く）
+   */
+  createSession(
+    sessionId: string,
+    cwd: string,
+    env?: Record<string, string>,
+    unsetKeys: string[] = []
+  ): PtySession {
     if (this.sessions.has(sessionId)) {
       throw new Error(`Session already exists: ${sessionId}`);
     }
@@ -79,17 +88,22 @@ class PtyManager {
       baseEnv.NODE_ENV = process.env.TSUNAGI_OUTER_NODE_ENV;
     }
 
+    const spawnEnv: Record<string, string | undefined> = {
+      ...baseEnv,
+      ...env,
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+    };
+    for (const key of unsetKeys) {
+      delete spawnEnv[key];
+    }
+
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd,
-      env: {
-        ...baseEnv,
-        ...env,
-        TERM: 'xterm-256color',
-        COLORTERM: 'truecolor',
-      } as Record<string, string>,
+      env: spawnEnv as Record<string, string>,
     });
 
     const now = Date.now();

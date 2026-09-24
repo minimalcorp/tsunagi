@@ -60,7 +60,7 @@ model Tab {
   taskId       String    @map("task_id")
   order        Int       // タブ表示用の連番
   status       String    // 'idle' | 'running' | 'success' | 'error'
-  mode         String    @default("claude") // 'terminal' | 'claude'
+  mode         String    @default("claude") // 'terminal' | 'claude' | 'ollama'（ollama: ローカルLLM(Ollama)で起動するclaude）
   createdAt    DateTime  @default(now()) @map("created_at")
   startedAt    DateTime  @map("started_at")
   completedAt  DateTime? @map("completed_at")
@@ -94,3 +94,11 @@ model EnvironmentVariable {
   @@map("environment_variables")
 }
 
+// AppSetting - アプリ全体の設定（key単位でJSONを保存）
+model AppSetting {
+  key       String   @id
+  value     String   // JSON
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}

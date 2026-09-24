@@ -6,7 +6,6 @@ import {
   X,
   Loader2,
   CirclePause,
-  Bot,
   Terminal,
   AlertCircle,
   WifiOff,
@@ -18,6 +17,7 @@ import type { TabStatusEntry } from '@/components/TerminalPanel';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
 import { VoiceInputButton } from '@/components/VoiceInputButton';
+import { ClaudeIcon, OllamaIcon } from '@/components/icons/BrandIcons';
 
 interface SessionTabsProps {
   tabs: Tab[];
@@ -27,6 +27,10 @@ interface SessionTabsProps {
   onTabCreateTerminal?: () => void;
   /** Terminalを追加してClaudeを起動するタブ追加 */
   onTabCreateClaude: () => void;
+  /** Ollama(ローカルLLM)でClaudeを起動するタブ追加（省略時はボタン非表示） */
+  onTabCreateOllama?: () => void;
+  /** Ollama で使うモデル名（未設定ならOllamaボタンを無効化） */
+  ollamaModel?: string;
   onTabDelete: (tabId: string) => void;
   /** タブごとのリアルタイムステータス */
   tabStatusMap?: Map<string, TabStatusEntry>;
@@ -120,6 +124,8 @@ export function SessionTabs({
   onTabChange,
   onTabCreateTerminal,
   onTabCreateClaude,
+  onTabCreateOllama,
+  ollamaModel,
   onTabDelete,
   tabStatusMap,
   onVoiceInputTranscribed,
@@ -206,21 +212,26 @@ export function SessionTabs({
                 {tab.mode === 'terminal' ? (
                   <span className="text-xs">terminal {terminalNumbers.get(tab.tab_id)}</span>
                 ) : (
-                  <TabStatusIndicator entry={entry} />
+                  <>
+                    {tab.mode === 'ollama' && (
+                      <span title="Claude Code (Ollama)">
+                        <OllamaIcon className="w-3 h-3" />
+                      </span>
+                    )}
+                    <TabStatusIndicator entry={entry} />
+                  </>
                 )}
               </div>
-              {tabs.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteTarget({ tabId: tab.tab_id, isRunning });
-                  }}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget({ tabId: tab.tab_id, isRunning });
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
             </div>
           );
         })}
@@ -234,9 +245,23 @@ export function SessionTabs({
               <Terminal className="w-4 h-4" />
             </Button>
           )}
-          <Button size="icon" onClick={onTabCreateClaude} title="Open terminal with Claude">
-            <Bot className="w-4 h-4" />
+          <Button size="icon" onClick={onTabCreateClaude} title="Claude Code (Anthropic)">
+            <ClaudeIcon className="w-4 h-4" />
           </Button>
+          {onTabCreateOllama && (
+            // disabled の Button は pointer-events:none で title が出ないため span に付ける
+            <span
+              title={
+                ollamaModel
+                  ? `Claude Code (Ollama: ${ollamaModel})`
+                  : 'Ollama のモデルが未設定です（Settings で設定）'
+              }
+            >
+              <Button size="icon" onClick={onTabCreateOllama} disabled={!ollamaModel}>
+                <OllamaIcon className="w-4 h-4" />
+              </Button>
+            </span>
+          )}
         </div>
 
         {/* Material Design Indicator */}

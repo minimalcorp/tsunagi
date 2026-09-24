@@ -7,6 +7,11 @@ import { ptyManager } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
 import { getEnv } from '../lib/repositories/environment.js';
 import { ensureClaudeOnboardingCompleted } from '../lib/claude-config-guard.js';
+import {
+  OLLAMA_UNSET_ENV_KEYS,
+  buildOllamaEnv,
+  getOllamaSettings,
+} from '../lib/ollama-settings.js';
 
 // サーバーはプロジェクトルートから起動されるため process.cwd() でルートを取得
 const TSUNAGI_EDITOR_PATH = path.resolve(process.cwd(), 'scripts/monaco-editor.sh');
@@ -257,11 +262,13 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       // 環境変数を取得する（global → owner → repo、後勝ちで上書き）。
       // Plannerタブ等、Taskに紐づかないタブは Tab レコードが存在しないため global のみになる。
       let dbEnv: Record<string, string> = {};
+      let tabMode: string | undefined;
       try {
         const tab = await prisma.tab.findUnique({
           where: { tabId: sessionId },
           include: { task: true },
         });
+        tabMode = tab?.mode;
         dbEnv = tab ? await getEnv('repo', tab.task.owner, tab.task.repo) : await getEnv('global');
         fastify.log.info(
           { count: Object.keys(dbEnv).length, owner: tab?.task.owner, repo: tab?.task.repo },
@@ -271,7 +278,22 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         fastify.log.warn({ err }, 'Failed to load env vars');
       }
 
-      // 優先順位: リクエストで渡されたenv > DB env(global/owner/repo) > tsunagi独自のEDITOR設定
+      // Ollama タブ: Anthropic の代わりに Ollama の Anthropic 互換 API で claude を動かす。
+      // DB の環境変数より後に適用し、Anthropic の認証トークンは環境変数ごと取り除く。
+      let providerEnv: Record<string, string> = {};
+      let unsetKeys: string[] = [];
+      if (tabMode === 'ollama') {
+        const ollama = await getOllamaSettings();
+        if (!ollama.model) {
+          return reply
+            .status(400)
+            .send({ error: 'Ollama のモデルが未設定です。Settings で設定してください' });
+        }
+        providerEnv = buildOllamaEnv(ollama);
+        unsetKeys = OLLAMA_UNSET_ENV_KEYS;
+      }
+
+      // 優先順位: リクエストで渡されたenv > Ollama等のprovider env > DB env(global/owner/repo) > tsunagi独自のEDITOR設定
       // tsunagi-editor.sh をデフォルトにすることで Ctrl+G が Monaco Modal を開く。
       // DB / リクエストで EDITOR が明示設定されている場合はそちらが優先される。
       const tsunagiDefaultEnv: Record<string, string> = {
@@ -281,9 +303,9 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         // ホストなので localhost。単一ポート化で API は SERVER_PORT(既定 2791)。
         TSUNAGI_API_BASE: `http://localhost:${SERVER_PORT}`,
       };
-      const mergedEnv = { ...tsunagiDefaultEnv, ...dbEnv, ...env };
+      const mergedEnv = { ...tsunagiDefaultEnv, ...dbEnv, ...providerEnv, ...env };
 
-      const session = ptyManager.createSession(sessionId, workingDir, mergedEnv);
+      const session = ptyManager.createSession(sessionId, workingDir, mergedEnv, unsetKeys);
 
       // コマンドが指定されていればPTY起動後にシェルへ書き込む
       if (command) {

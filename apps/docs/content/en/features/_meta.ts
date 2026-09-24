@@ -3,5 +3,6 @@ export default {
   'task-management': 'Task Management',
   plugin: 'Tsunagi Plugin',
   'environment-variables': 'Environment Variables',
+  ollama: 'Ollama (Experimental)',
   'remote-access': 'Remote Access',
 };

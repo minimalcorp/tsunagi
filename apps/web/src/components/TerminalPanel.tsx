@@ -10,7 +10,10 @@ import {
   type TerminalStatus,
   type ClaudeStatus,
 } from '@/components/TerminalView';
+import { Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ClaudeIcon, OllamaIcon } from '@/components/icons/BrandIcons';
+import { useOllamaSettings } from '@/hooks/useOllamaSettings';
 
 export interface TabStatusEntry {
   terminal: TerminalStatus;
@@ -31,7 +34,7 @@ interface TerminalPanelProps {
 }
 
 /** タブ追加モード */
-type TabCreateMode = 'terminal' | 'claude';
+export type TabCreateMode = Tab['mode'];
 
 /** TerminalPanelの外部からアクセス可能なハンドル */
 export interface TerminalPanelHandle {
@@ -171,6 +174,12 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     const handleTabCreateClaude = useCallback(() => handleTabCreate('claude'), [handleTabCreate]);
 
+    const handleTabCreateOllama = useCallback(() => handleTabCreate('ollama'), [handleTabCreate]);
+
+    // 実験的機能 Ollama が有効なときだけ Ollama タブの作成ボタンを出す
+    const { settings: ollamaSettings } = useOllamaSettings();
+    const ollamaEnabled = ollamaSettings?.enabled === true;
+
     const handleVoiceInputTranscribed = useCallback(
       (text: string) => {
         if (!activeTabId) return;
@@ -201,25 +210,18 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       <div className="flex flex-col flex-1 min-h-0">
         {/* タブナビゲーション */}
         <div className="px-4 pt-4 flex-shrink-0">
-          {tabs.length > 0 ? (
-            <SessionTabs
-              tabs={tabs}
-              activeTabId={activeTabId}
-              onTabChange={handleTabChange}
-              onTabCreateTerminal={handleTabCreateTerminal}
-              onTabCreateClaude={handleTabCreateClaude}
-              onTabDelete={handleTabDelete}
-              tabStatusMap={tabStatusMap}
-              onVoiceInputTranscribed={handleVoiceInputTranscribed}
-            />
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">No tabs yet</p>
-              <Button size="lg" onClick={handleTabCreateClaude}>
-                + Create First Tab
-              </Button>
-            </div>
-          )}
+          <SessionTabs
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onTabChange={handleTabChange}
+            onTabCreateTerminal={handleTabCreateTerminal}
+            onTabCreateClaude={handleTabCreateClaude}
+            onTabCreateOllama={ollamaEnabled ? handleTabCreateOllama : undefined}
+            ollamaModel={ollamaSettings?.model}
+            onTabDelete={handleTabDelete}
+            tabStatusMap={tabStatusMap}
+            onVoiceInputTranscribed={tabs.length > 0 ? handleVoiceInputTranscribed : undefined}
+          />
         </div>
 
         {/* TerminalViewエリア（visibility:hidden方式で複数を保持） */}
@@ -266,6 +268,40 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               </div>
             );
           })}
+
+          {tabs.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center gap-4 px-4">
+              <p className="text-sm text-muted-foreground">起動するタブを選んでください</p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button onClick={handleTabCreateClaude}>
+                  <ClaudeIcon className="w-4 h-4" />
+                  Claude Code
+                </Button>
+                {ollamaEnabled && (
+                  <span
+                    title={
+                      ollamaSettings?.model
+                        ? `Claude Code (Ollama: ${ollamaSettings.model})`
+                        : 'Ollama のモデルが未設定です（Settings で設定）'
+                    }
+                  >
+                    <Button
+                      variant="outline"
+                      onClick={handleTabCreateOllama}
+                      disabled={!ollamaSettings?.model}
+                    >
+                      <OllamaIcon className="w-4 h-4" />
+                      Claude Code (Ollama)
+                    </Button>
+                  </span>
+                )}
+                <Button variant="outline" onClick={handleTabCreateTerminal}>
+                  <Terminal className="w-4 h-4" />
+                  Terminal
+                </Button>
+              </div>
+            </div>
+          )}
 
           {tabs.length > 0 && !activeTabId && (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">

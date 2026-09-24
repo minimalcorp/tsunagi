@@ -46,7 +46,9 @@ export default function Home() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [globalEnv, setGlobalEnv] = useState<Record<string, string>>({});
+  // 認証設定済みか（Global の Anthropic トークン、または実験的機能 Ollama の設定）。
+  // 判定はサーバー(/api/onboarding/status)に一本化する
+  const [hasAuth, setHasAuth] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   // Dialog states
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
@@ -87,14 +89,13 @@ export default function Home() {
   const onboardingState = useMemo(() => {
     const state = {
       hasRepositories: repositories.length > 0,
-      hasAnthropicApiKey: Boolean(globalEnv.ANTHROPIC_API_KEY),
-      hasClaudeCodeToken: Boolean(globalEnv.CLAUDE_CODE_OAUTH_TOKEN),
+      hasAuth,
       hasTasks: tasks.length > 0,
     };
 
     let nextStep: 'clone' | 'env' | 'task' | 'complete';
 
-    if (!state.hasAnthropicApiKey && !state.hasClaudeCodeToken) {
+    if (!state.hasAuth) {
       nextStep = 'env';
     } else if (!state.hasRepositories) {
       nextStep = 'clone';
@@ -105,7 +106,7 @@ export default function Home() {
     }
 
     return { state, nextStep };
-  }, [repositories, globalEnv, tasks]);
+  }, [repositories, hasAuth, tasks]);
 
   // リポジトリごとにタスクを分け、その列のフィルタを適用してorder昇順に並べる
   const tasksByRepo = useMemo(() => {
@@ -140,10 +141,10 @@ export default function Home() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [tasksData, ownersData, envData] = await Promise.all([
+      const [tasksData, ownersData, onboardingData] = await Promise.all([
         fetch(apiUrl('/api/tasks')).then((r) => r.json()),
         fetch(apiUrl('/api/owners')).then((r) => r.json()),
-        fetch(apiUrl('/api/env')).then((r) => r.json()),
+        fetch(apiUrl('/api/onboarding/status')).then((r) => r.json()),
       ]);
 
       setTasks(tasksData.data.tasks);
@@ -151,7 +152,7 @@ export default function Home() {
         (o: { repositories: Repository[] }) => o.repositories
       );
       setRepositories(allRepos);
-      setGlobalEnv(envData.data.env);
+      setHasAuth(Boolean(onboardingData.data?.completed));
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -436,9 +437,7 @@ export default function Home() {
         {onboardingState.nextStep === 'env' && (
           <RepositoryOnboardingOverlay
             hasRepositories={onboardingState.state.hasRepositories}
-            hasEnvVars={
-              onboardingState.state.hasAnthropicApiKey || onboardingState.state.hasClaudeCodeToken
-            }
+            hasEnvVars={onboardingState.state.hasAuth}
             hasTasks={onboardingState.state.hasTasks}
           />
         )}

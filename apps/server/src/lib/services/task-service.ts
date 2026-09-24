@@ -236,20 +236,15 @@ export async function createTask(
     await taskRepo.updateTask(newTask.id, { worktreeStatus: 'error' });
   }
 
-  // 4. 初期Tab作成
-  try {
-    await taskRepo.createTab(newTask.id);
-  } catch (error) {
-    console.error('Failed to create initial tab:', error);
-  }
+  // 初期Tabは作らない。タブはユーザーがタスク詳細で起動先（Claude / Ollama 等）を選んで作る
 
-  // 5. 更新後のタスクを取得
+  // 4. 更新後のタスクを取得
   const updatedTask = await taskRepo.getTask(newTask.id);
   if (!updatedTask) {
     throw new TaskServiceError('Failed to retrieve created task', 'INTERNAL_ERROR');
   }
 
-  // 6. Socket.IO通知
+  // 5. Socket.IO通知
   options?.io?.emit('task:created', { task: updatedTask });
 
   return { task: updatedTask };

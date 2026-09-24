@@ -98,21 +98,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       const taskData = await taskResponse.json();
       const loadedTask = taskData.data.task;
 
-      // タスクからタブを取得（既にpromptCountを含む）
-      let loadedTabs = loadedTask.tabs || [];
-
-      // タブが0個の場合、自動的に1個作成
-      if (loadedTabs.length === 0) {
-        const createResponse = await fetch(apiUrl(`/api/tasks/${id}/tabs`), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        if (createResponse.ok) {
-          const createData = await createResponse.json();
-          loadedTabs = [createData.data.tab];
-        }
-      }
+      // タスクからタブを取得（既にpromptCountを含む）。
+      // タブ0個でも自動作成はしない（ユーザーが起動先を選んでタブを作る）
+      const loadedTabs = loadedTask.tabs || [];
 
       // 全 await 完了後にまとめて state 更新（中間レンダリングを防ぐ）
       setTask(loadedTask);
@@ -163,9 +151,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   };
 
   // タブ作成（新規tab_idを返す）
-  const handleTabCreate = async (
-    mode: 'terminal' | 'claude' = 'claude'
-  ): Promise<string | undefined> => {
+  const handleTabCreate = async (mode: Tab['mode'] = 'claude'): Promise<string | undefined> => {
     try {
       const response = await fetch(apiUrl(`/api/tasks/${id}/tabs`), {
         method: 'POST',
