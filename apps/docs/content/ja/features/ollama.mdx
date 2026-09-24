@@ -10,8 +10,7 @@ import { Callout } from 'nextra/components';
 Claude Code の接続先を [Ollama](https://ollama.com) の Anthropic 互換 API に切り替え、ローカルLLMで Claude Code を動かすタブを作成できます。Claude Code 自体はそのまま使うため、hooks・プラグイン・MCP・todo 表示は通常の Claude タブと同様に動作します。
 
 <Callout type="warning">
-  Anthropic は Claude 以外のモデルへの接続をサポートしていないため、動作は保証されません。WebSearch
-  は利用できません。
+  Anthropic は Claude 以外のモデルへの接続をサポートしていないため、動作は保証されません。
 </Callout>
 
 ## セットアップ
@@ -23,7 +22,8 @@ Ollama のインストール・モデルの pull・起動はご自身で行っ�
 3. コンテキスト長を 64k 以上にする
    - アプリ: 設定画面のスライダー
    - CLI: `OLLAMA_CONTEXT_LENGTH=65536 ollama serve`
-4. Tsunagi の設定画面（Global）の **Ollama (実験的機能)** で有効化し、モデルとコンテキスト長を設定して保存する
+4. WebSearch を使う場合は `ollama signin` で ollama.com にサインインする（[WebSearch / WebFetch](#websearch--webfetch)）
+5. Tsunagi の設定画面（Global）の **Ollama (実験的機能)** で有効化し、モデルとコンテキスト長を設定して保存する
 
 有効化すると、タスク詳細画面に Ollama アイコンのボタンが表示されます。
 
@@ -39,6 +39,17 @@ Ollama のインストール・モデルの pull・起動はご自身で行っ�
 Ollama タブでは、Anthropic の認証情報（`ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`）を取り除いたうえで、`ANTHROPIC_BASE_URL`・`ANTHROPIC_MODEL` などを注入して Claude Code を起動します。設定の変更は新しく作成したタブから反映されます。
 
 Ollama を設定すれば、Anthropic のトークンを登録しなくてもセットアップを完了できます。
+
+## WebSearch / WebFetch
+
+| ツール    | 仕組み                                                                                   | 必要なもの                             |
+| --------- | ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| WebSearch | Ollama が `web_search` サーバーツールを受け取り、ollama.com の Web 検索 API で検索を代行 | Ollama 実行マシンでの `ollama signin`  |
+| WebFetch  | Claude Code がページを直接取得し、Ollama のモデルで要約                                  | なし（要約はローカルモデルのため低速） |
+
+- 未サインインだと WebSearch は `Web search error: unavailable` になります。設定画面の **WebSearch** 欄でサインイン状態を確認できます。
+- 検索クエリは ollama.com に送信されます。無料アカウントで利用できますが、利用量の上限があります。
+- `OLLAMA_NO_CLOUD=1`（またはアプリの設定でクラウドを無効化）していると WebSearch は利用できません。
 
 ## 注意
 

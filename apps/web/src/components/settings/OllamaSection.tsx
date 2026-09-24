@@ -1,9 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, CircleHelp, Loader2, RefreshCw } from 'lucide-react';
-import type { OllamaSettings } from '@minimalcorp/tsunagi-shared';
-import { Button } from '@/components/ui/button';
+import {
+  CheckCircle2,
+  CircleHelp,
+  ExternalLink,
+  Globe,
+  Loader2,
+  RefreshCw,
+  TriangleAlert,
+} from 'lucide-react';
+import type { OllamaAccountStatus, OllamaSettings } from '@minimalcorp/tsunagi-shared';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/input';
@@ -59,6 +67,9 @@ export function OllamaSection() {
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
+  const [account, setAccount] = useState<OllamaAccountStatus | null>(null);
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
 
   // 取得した設定でフォームを初期化する（保存後もサーバーの正規化結果に揃える）
   useEffect(() => {
@@ -116,12 +127,37 @@ export function OllamaSection() {
     }
   }, []);
 
-  // 有効化済みなら、pull 済みモデルの候補を一度取得しておく
+  // WebSearch は Ollama が ollama.com の Web 検索 API で代行するため、サインイン状態で可否が決まる
+  const fetchAccount = useCallback(async (baseUrl: string) => {
+    setAccountLoading(true);
+    setAccountError(null);
+    try {
+      const res = await fetch(
+        apiUrl(`/api/settings/ollama/account?baseUrl=${encodeURIComponent(baseUrl)}`)
+      );
+      const body = (await res.json().catch(() => null)) as {
+        data?: OllamaAccountStatus;
+        error?: string;
+      } | null;
+      if (!res.ok || !body?.data) throw new Error(body?.error || `HTTPエラー: ${res.status}`);
+      setAccount(body.data);
+    } catch (error) {
+      setAccount(null);
+      setAccountError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAccountLoading(false);
+    }
+  }, []);
+
+  // 有効化済みなら、pull 済みモデルの候補とサインイン状態を一度取得しておく
   const enabled = settings?.enabled === true;
   const savedBaseUrl = settings?.baseUrl;
   useEffect(() => {
-    if (enabled && savedBaseUrl) void fetchModels(savedBaseUrl);
-  }, [enabled, savedBaseUrl, fetchModels]);
+    if (enabled && savedBaseUrl) {
+      void fetchModels(savedBaseUrl);
+      void fetchAccount(savedBaseUrl);
+    }
+  }, [enabled, savedBaseUrl, fetchModels, fetchAccount]);
 
   const handleEnable = useCallback(async () => {
     if (!settings) return;
@@ -243,6 +279,59 @@ export function OllamaSection() {
 
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                WebSearch
+              </label>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                {accountLoading ? (
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" />
+                    確認中...
+                  </span>
+                ) : account?.signedIn ? (
+                  <span className="flex items-center gap-2 text-success">
+                    <Globe className="size-4" />
+                    利用可能（ollama.com: {account.name}）
+                  </span>
+                ) : account ? (
+                  <>
+                    <span className="flex items-center gap-2 text-warning">
+                      <TriangleAlert className="size-4" />
+                      ollama.com 未サインイン
+                    </span>
+                    {account.signinUrl && (
+                      <a
+                        href={account.signinUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                      >
+                        <ExternalLink />
+                        サインイン
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-xs text-destructive">{accountError}</span>
+                )}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => void fetchAccount(form.baseUrl)}
+                  disabled={accountLoading}
+                  title="サインイン状態を再確認"
+                >
+                  <RefreshCw className={accountLoading ? 'animate-spin' : undefined} />
+                </Button>
+              </div>
+              <p className="mt-1 text-[0.65rem] text-muted-foreground">
+                Ollama が ollama.com の Web 検索 API で代行します。Ollama を動かしているマシンで{' '}
+                <code className="rounded bg-muted px-1">ollama signin</code>{' '}
+                を実行してください（無料アカウントで可、検索クエリは ollama.com に送信されます）。
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 コンテキスト長 (tokens)
               </label>
               <Input
@@ -294,8 +383,17 @@ export function OllamaSection() {
             <p className="text-muted-foreground">
               Claude Code の接続先を Ollama の Anthropic 互換 API (Ollama v0.14.0以降)
               に切り替えて起動します。Anthropic
-              はClaude以外のモデルへの接続をサポートしていないため、動作は保証されません。WebSearch
-              は利用できません。
+              はClaude以外のモデルへの接続をサポートしていないため、動作は保証されません。
+            </p>
+          </div>
+
+          <div>
+            <p className="font-medium text-foreground">WebSearch / WebFetch</p>
+            <p className="text-muted-foreground">
+              WebSearch は Ollama が ollama.com の Web 検索 API で代行するため、Ollama
+              を動かしているマシンで <code className="rounded bg-muted px-1">ollama signin</code>{' '}
+              が必要です（未サインインだと「Web search error: unavailable」になります）。WebFetch
+              はサインイン不要で、取得したページの要約も Ollama のモデルで行います。
             </p>
           </div>
 

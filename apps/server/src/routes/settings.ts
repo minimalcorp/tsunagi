@@ -1,10 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  getOllamaAccount,
   getOllamaSettings,
   listOllamaModels,
   parseOllamaSettings,
   saveOllamaSettings,
 } from '../lib/ollama-settings.js';
+
+/** クエリの baseUrl（未指定なら保存済みの値）を正規化する。不正なら null */
+async function resolveBaseUrl(baseUrl: string | undefined): Promise<string | null> {
+  const url = (baseUrl || (await getOllamaSettings()).baseUrl).replace(/\/+$/, '');
+  return /^https?:\/\//.test(url) ? url : null;
+}
 
 export async function settingsRoutes(fastify: FastifyInstance) {
   // GET /settings/ollama
@@ -36,11 +43,8 @@ export async function settingsRoutes(fastify: FastifyInstance) {
   fastify.get<{ Querystring: { baseUrl?: string } }>(
     '/settings/ollama/models',
     async (request, reply) => {
-      const baseUrl = (request.query.baseUrl || (await getOllamaSettings()).baseUrl).replace(
-        /\/+$/,
-        ''
-      );
-      if (!/^https?:\/\//.test(baseUrl)) {
+      const baseUrl = await resolveBaseUrl(request.query.baseUrl);
+      if (!baseUrl) {
         return reply.status(400).send({ error: 'baseUrl must be a valid http(s) URL' });
       }
       try {
@@ -50,6 +54,25 @@ export async function settingsRoutes(fastify: FastifyInstance) {
         return reply
           .status(502)
           .send({ error: `Ollama に接続できません (${baseUrl}): ${message}` });
+      }
+    }
+  );
+
+  // GET /settings/ollama/account - ollama.com のサインイン状態（WebSearch の利用可否）
+  fastify.get<{ Querystring: { baseUrl?: string } }>(
+    '/settings/ollama/account',
+    async (request, reply) => {
+      const baseUrl = await resolveBaseUrl(request.query.baseUrl);
+      if (!baseUrl) {
+        return reply.status(400).send({ error: 'baseUrl must be a valid http(s) URL' });
+      }
+      try {
+        return reply.status(200).send({ data: await getOllamaAccount(baseUrl) });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return reply
+          .status(502)
+          .send({ error: `Ollama のサインイン状態を取得できません (${baseUrl}): ${message}` });
       }
     }
   );
