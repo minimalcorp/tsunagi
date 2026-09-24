@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { ptyManager } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
+import { getWorktreePath } from '../lib/worktree-manager.js';
 import { getEnv } from '../lib/repositories/environment.js';
 import { ensureClaudeOnboardingCompleted } from '../lib/claude-config-guard.js';
 import {
@@ -53,8 +54,6 @@ interface CreateSessionBody {
   env?: Record<string, string>;
   /** 指定した場合そのIDをセッションIDとして使用する（tab_idと一致させる） */
   sessionId?: string;
-  /** settings.local.json を生成するworktreeパス */
-  worktreePath?: string;
   /**
    * PTY起動後にシェルへ書き込むコマンド文字列。
    * 例: "claude --session-id <uuid>\n"
@@ -237,18 +236,6 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     const { cwd, env, sessionId: requestedSessionId, command } = request.body ?? {};
 
     const sessionId = requestedSessionId ?? crypto.randomUUID();
-    const defaultDir = path.join(os.homedir(), '.tsunagi', 'workspaces');
-    let workingDir = cwd ?? defaultDir;
-
-    // cwd が存在するか確認、なければデフォルトにフォールバック
-    try {
-      await fs.access(workingDir);
-    } catch {
-      fastify.log.warn({ workingDir }, 'cwd does not exist, falling back to default');
-      workingDir = defaultDir;
-    }
-    // デフォルトディレクトリが存在しない場合も作成する
-    await fs.mkdir(workingDir, { recursive: true });
 
     // 既存セッションが生きていれば再利用
     const existing = ptyManager.getSession(sessionId);
@@ -257,18 +244,38 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(200).send({ sessionId, reused: true });
     }
 
+    // sessionId(=tab_id) から Task を解決する。cwd / env の決定に使う。
+    // Taskに紐づかないタブは Tab レコードが存在しないため null になる。
+    const tab = await prisma.tab
+      .findUnique({ where: { tabId: sessionId }, include: { task: true } })
+      .catch((err: unknown) => {
+        fastify.log.warn({ err, sessionId }, 'Failed to load tab');
+        return null;
+      });
+
+    // cwd は Task があればサーバー側で worktree パスを導出する（クライアントの state に依存しない）。
+    // クライアント指定の cwd は Task に紐づかないタブのフォールバックとしてのみ使う。
+    const defaultDir = path.join(os.homedir(), '.tsunagi', 'workspaces');
+    let workingDir = tab
+      ? getWorktreePath(tab.task.owner, tab.task.repo, tab.task.branch)
+      : (cwd ?? defaultDir);
+
+    // cwd が存在するか確認、なければデフォルトにフォールバック
     try {
-      // sessionId(=tab_id) から Task(owner/repo) を解決し、repo スコープまで階層マージした
-      // 環境変数を取得する（global → owner → repo、後勝ちで上書き）。
-      // Plannerタブ等、Taskに紐づかないタブは Tab レコードが存在しないため global のみになる。
+      await fs.access(workingDir);
+    } catch {
+      fastify.log.warn({ sessionId, workingDir }, 'cwd does not exist, falling back to default');
+      workingDir = defaultDir;
+    }
+    // デフォルトディレクトリが存在しない場合も作成する
+    await fs.mkdir(workingDir, { recursive: true });
+
+    try {
+      // repo スコープまで階層マージした環境変数を取得する（global → owner → repo、後勝ちで上書き）。
+      // Taskに紐づかないタブは global のみになる。
       let dbEnv: Record<string, string> = {};
-      let tabMode: string | undefined;
+      const tabMode = tab?.mode;
       try {
-        const tab = await prisma.tab.findUnique({
-          where: { tabId: sessionId },
-          include: { task: true },
-        });
-        tabMode = tab?.mode;
         dbEnv = tab ? await getEnv('repo', tab.task.owner, tab.task.repo) : await getEnv('global');
         fastify.log.info(
           { count: Object.keys(dbEnv).length, owner: tab?.task.owner, repo: tab?.task.repo },

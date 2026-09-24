@@ -41,8 +41,6 @@ interface TerminalViewProps {
   cwd?: string;
   /** PTYに渡す環境変数 */
   env?: Record<string, string>;
-  /** settings.local.json を生成するworktreeパス */
-  worktreePath?: string;
   /**
    * PTY起動後にシェルへ自動入力するコマンド。
    * 例: "claude --session-id <uuid>"
@@ -79,7 +77,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     tabId,
     cwd,
     env,
-    worktreePath,
     command,
     className = '',
     initialTodos,
@@ -527,7 +524,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       const res = await fetch(apiUrl('/api/terminal/sessions'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cwd, env, worktreePath, sessionId, command }),
+        body: JSON.stringify({ cwd, env, sessionId, command }),
         signal,
       });
 

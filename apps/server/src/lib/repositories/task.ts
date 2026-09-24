@@ -1,5 +1,6 @@
 import { prisma } from '../db.js';
 import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
+import { getWorktreePath } from '../worktree-manager.js';
 
 export type TxClient = Parameters<Parameters<(typeof prisma)['$transaction']>[0]>[0];
 
@@ -318,6 +319,8 @@ function mapTask(task: PrismaTask): Task {
     baseBranch: task.baseBranch,
     repoId: task.repoId,
     worktreeStatus: task.worktreeStatus as Task['worktreeStatus'],
+    // 派生値。REST / Socket.IO の全経路で必ず含める（欠けるとタブの cwd が既定ディレクトリに化ける）
+    worktreePath: getWorktreePath(task.owner, task.repo, task.branch),
     pullRequestUrl: task.pullRequestUrl ?? undefined,
     effort: task.effort ?? undefined,
     order: task.order,
