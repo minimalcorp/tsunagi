@@ -20,6 +20,7 @@ import { editorRoutes } from './routes/editor.js';
 import { whisperRoutes } from './routes/whisper.js';
 import { stopWhisperServerOnExit } from './lib/whisper-process.js';
 import { llmRoutes } from './routes/llm.js';
+import { settingsRoutes } from './routes/settings.js';
 import { stopLlmServerOnExit } from './lib/llm-process.js';
 import { createBasicAuth } from './basic-auth.js';
 
@@ -110,6 +111,7 @@ async function start() {
   await fastify.register(editorRoutes, { prefix: '/api' });
   await fastify.register(whisperRoutes, { prefix: '/api' });
   await fastify.register(llmRoutes, { prefix: '/api' });
+  await fastify.register(settingsRoutes, { prefix: '/api' });
 
   // catch-all リバースプロキシ: /api・/socket.io・/health 以外を内部 Next.js へ転送。
   // - /api/* と /health は上で定義済みルートが wildcard より優先される。

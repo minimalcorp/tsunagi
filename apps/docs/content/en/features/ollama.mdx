@@ -1,0 +1,56 @@
+---
+title: Ollama (Experimental)
+description: Run Claude Code with a local LLM served by Ollama.
+---
+
+import { Callout } from 'nextra/components';
+
+# Ollama (Experimental)
+
+You can create tabs that run Claude Code against a local LLM by pointing
+it at [Ollama](https://ollama.com)'s Anthropic-compatible API. Because
+the tab still runs Claude Code itself, hooks, the plugin, MCP and todo
+tracking work the same as in a regular Claude tab.
+
+<Callout type="warning">
+  Anthropic does not support connecting Claude Code to non-Claude models, so this is not guaranteed
+  to work. WebSearch is unavailable.
+</Callout>
+
+## Setup
+
+You install Ollama, pull models and start the server yourself.
+
+1. Install Ollama v0.14.0 or later (the official app, or `brew install ollama`)
+2. Pull a model (e.g. `ollama pull qwen3.8:27b`)
+3. Set the context length to 64k or more
+   - App: the slider in its settings
+   - CLI: `OLLAMA_CONTEXT_LENGTH=65536 ollama serve`
+4. In Tsunagi settings (Global), enable **Ollama (実験的機能)**, set the
+   model and context length, and save
+
+Once enabled, an Ollama icon button appears in the task detail view.
+
+## Settings
+
+| Field          | Description                                                                         |
+| -------------- | ----------------------------------------------------------------------------------- |
+| Base URL       | Ollama URL. Defaults to `http://localhost:11434` (`host.docker.internal` in Docker) |
+| Model          | Model name. Pulled models are offered as suggestions                                |
+| Context length | Must match Ollama's value. Used by Claude Code to decide when to auto-compact       |
+| Extra env vars | Environment variables injected only into Ollama tabs (`KEY=VALUE`)                  |
+
+Ollama tabs launch Claude Code with Anthropic credentials
+(`ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`) removed and
+`ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL` and related variables injected.
+Changes apply to newly created tabs.
+
+With Ollama configured, you can finish setup without an Anthropic token.
+
+## Caveats
+
+- If `~/.claude/settings.json` sets `ANTHROPIC_*` under `env`, it takes
+  precedence and Claude Code will not connect to Ollama.
+- Tool calls break when the context length is too small. Ollama defaults
+  to 4k on machines with less than 24 GiB of VRAM.
+- Response speed depends heavily on your hardware and model.

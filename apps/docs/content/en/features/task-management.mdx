@@ -143,7 +143,16 @@ can use any Claude Code feature inside a tab.
 
 ### How a tab is launched
 
-When you click **+ New Tab** in the task detail view, Tsunagi:
+Creating a task does not create a tab. Use the buttons on the right of
+the tab bar (or in the center of the screen when there are no tabs) to
+choose what to launch:
+
+- **Claude icon**: Claude Code with Anthropic (default)
+- **Ollama icon**: Claude Code with a local LLM served by Ollama (shown
+  only when [Ollama (experimental)](/en/features/ollama/) is enabled)
+- **Terminal icon**: a plain shell without Claude
+
+When you create a Claude tab, Tsunagi:
 
 1. Spawns a PTY-backed shell inside the task's worktree using `node-pty`
 2. Injects the environment variables defined in the Tsunagi settings

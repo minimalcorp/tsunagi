@@ -115,6 +115,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   // サーバ側セッションが GC 済みで join に失敗した際の自動再生成回数（無限ループ防止）
   const sessionRecreateRef = useRef(0);
   const [status, setStatus] = useState<TerminalStatus>('idle');
+  // セッション作成APIが返したエラー（例: Ollama のモデル未設定）。error オーバーレイに表示する
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>(initialClaudeStatus ?? 'idle');
   // ESC中断検知（term.onData のクロージャから最新値を読むためのref）
   const claudeStatusRef = useRef<ClaudeStatus>(initialClaudeStatus ?? 'idle');
@@ -519,6 +521,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
   async function connectSession(sessionId: string, term: Terminal, signal: AbortSignal) {
     setStatus('connecting');
+    setSessionError(null);
 
     try {
       const res = await fetch(apiUrl('/api/terminal/sessions'), {
@@ -530,6 +533,13 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
       if (!res.ok) {
         const errorText = await res.text().catch(() => '');
+        let serverError: string | undefined;
+        try {
+          serverError = (JSON.parse(errorText) as { error?: string }).error;
+        } catch {
+          // JSON でなければ表示用メッセージは出さない
+        }
+        if (serverError) setSessionError(serverError);
         throw new Error(`Failed to create session: ${res.status} ${errorText}`);
       }
 
@@ -808,7 +818,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
             <div className="absolute inset-0 flex items-center justify-center bg-background/90">
               <div className="text-center space-y-2">
                 {status === 'error' && (
-                  <p className="text-xs text-destructive">Connection failed</p>
+                  <p className="text-xs text-destructive">{sessionError ?? 'Connection failed'}</p>
                 )}
                 {status === 'exited' && (
                   <p className="text-xs text-muted-foreground">Session ended</p>

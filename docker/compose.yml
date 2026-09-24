@@ -25,6 +25,8 @@ services:
       - TSUNAGI_WHISPER_SERVER_URL=http://host.docker.internal:8765
       # apps/llm-server も同様にホスト側で手動起動する前提。
       - TSUNAGI_LLM_SERVER_URL=http://host.docker.internal:8766
+      # 実験的機能 Ollama もホスト側で起動する前提（Settings の Base URL の既定値になる）。
+      - TSUNAGI_OLLAMA_URL=http://host.docker.internal:11434
     ports:
       - '2891:2791'
       - '2892:2792'

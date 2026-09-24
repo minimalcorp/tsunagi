@@ -1,0 +1,47 @@
+---
+title: Ollama（実験的機能）
+description: Ollama のローカルLLMで Claude Code を起動する。
+---
+
+import { Callout } from 'nextra/components';
+
+# Ollama（実験的機能）
+
+Claude Code の接続先を [Ollama](https://ollama.com) の Anthropic 互換 API に切り替え、ローカルLLMで Claude Code を動かすタブを作成できます。Claude Code 自体はそのまま使うため、hooks・プラグイン・MCP・todo 表示は通常の Claude タブと同様に動作します。
+
+<Callout type="warning">
+  Anthropic は Claude 以外のモデルへの接続をサポートしていないため、動作は保証されません。WebSearch
+  は利用できません。
+</Callout>
+
+## セットアップ
+
+Ollama のインストール・モデルの pull・起動はご自身で行ってください。
+
+1. Ollama v0.14.0 以降をインストールする（公式アプリ、または `brew install ollama`）
+2. モデルを pull する（例: `ollama pull qwen3.8:27b`）
+3. コンテキスト長を 64k 以上にする
+   - アプリ: 設定画面のスライダー
+   - CLI: `OLLAMA_CONTEXT_LENGTH=65536 ollama serve`
+4. Tsunagi の設定画面（Global）の **Ollama (実験的機能)** で有効化し、モデルとコンテキスト長を設定して保存する
+
+有効化すると、タスク詳細画面に Ollama アイコンのボタンが表示されます。
+
+## 設定項目
+
+| 項目           | 説明                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------ |
+| Base URL       | Ollama の URL。既定は `http://localhost:11434`（Docker では `host.docker.internal`） |
+| モデル         | 使用するモデル名。pull 済みのモデルは候補から選べる                                  |
+| コンテキスト長 | Ollama 側と同じ値にする。Claude Code の自動 compact の判定に使う                     |
+| 追加の環境変数 | Ollama タブにのみ注入する環境変数（`KEY=VALUE`）                                     |
+
+Ollama タブでは、Anthropic の認証情報（`ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`）を取り除いたうえで、`ANTHROPIC_BASE_URL`・`ANTHROPIC_MODEL` などを注入して Claude Code を起動します。設定の変更は新しく作成したタブから反映されます。
+
+Ollama を設定すれば、Anthropic のトークンを登録しなくてもセットアップを完了できます。
+
+## 注意
+
+- `~/.claude/settings.json` の `env` に `ANTHROPIC_*` を設定している場合、そちらが優先され Ollama に接続されません。
+- コンテキスト長が不足すると tool call が壊れます。Ollama の既定値は VRAM 24GiB 未満だと 4k です。
+- 応答速度はマシン性能とモデルに大きく依存します。

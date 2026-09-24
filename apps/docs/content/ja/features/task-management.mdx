@@ -114,7 +114,13 @@ bare リポジトリと `.default` worktree はタスク削除の影響を **一
 
 ### タブの起動方法
 
-タスク詳細画面で **+ New Tab** をクリックすると、Tsunagi は以下を実行します:
+タスクを作成してもタブは自動では作られません。タスク詳細画面のタブバー右側（タブが無い場合は画面中央）のボタンから、起動先を選んでタブを作成します:
+
+- **Claude アイコン**: Anthropic の Claude Code を起動（既定）
+- **Ollama アイコン**: Ollama のローカルLLMで Claude Code を起動（[Ollama（実験的機能）](/ja/features/ollama/) を有効化した場合のみ表示）
+- **Terminal アイコン**: Claude を起動しないシェルのみ
+
+Claude のタブを作成すると、Tsunagi は以下を実行します:
 
 1. `node-pty` を使って、タスクの worktree 内で PTY バックエンドのシェルを起動
 2. Tsunagi 設定画面で定義された環境変数を注入 ([環境変数管理](/ja/features/environment-variables/) 参照)

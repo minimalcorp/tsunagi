@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
-import type { Task } from '@minimalcorp/tsunagi-shared';
+import type { Tab, Task } from '@minimalcorp/tsunagi-shared';
 import * as taskRepo from '../lib/repositories/task.js';
 import * as worktreeManager from '../lib/worktree-manager.js';
+import { ptyManager } from '../pty-manager.js';
 import {
   listTasks,
   createTask,
@@ -447,12 +448,14 @@ export async function tasksRoutes(fastify: FastifyInstance) {
   });
 
   // POST /tasks/:id/tabs
-  fastify.post<{ Params: { id: string }; Body: { mode?: 'terminal' | 'claude' } }>(
+  fastify.post<{ Params: { id: string }; Body: { mode?: Tab['mode'] } }>(
     '/tasks/:id/tabs',
     async (request, reply) => {
       try {
         const { id: taskId } = request.params;
-        const mode = request.body?.mode === 'terminal' ? 'terminal' : 'claude';
+        const requested = request.body?.mode;
+        const mode: Tab['mode'] =
+          requested === 'terminal' || requested === 'ollama' ? requested : 'claude';
 
         const task = await taskRepo.getTask(taskId);
         if (!task) {
@@ -500,6 +503,8 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         if (!success) {
           return reply.status(404).send({ error: 'Tab not found' });
         }
+        // タブの PTY(=claude プロセス) も止める。残すと GC(30分) まで動き続けるため
+        ptyManager.deleteSession(tab_id);
         return reply.status(200).send({ data: { success: true } });
       } catch (error) {
         fastify.log.error(error, 'DELETE /tasks/:id/tabs/:tab_id error');
