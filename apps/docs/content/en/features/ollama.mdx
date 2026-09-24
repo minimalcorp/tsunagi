@@ -14,7 +14,7 @@ tracking work the same as in a regular Claude tab.
 
 <Callout type="warning">
   Anthropic does not support connecting Claude Code to non-Claude models, so this is not guaranteed
-  to work. WebSearch is unavailable.
+  to work.
 </Callout>
 
 ## Setup
@@ -26,7 +26,9 @@ You install Ollama, pull models and start the server yourself.
 3. Set the context length to 64k or more
    - App: the slider in its settings
    - CLI: `OLLAMA_CONTEXT_LENGTH=65536 ollama serve`
-4. In Tsunagi settings (Global), enable **Ollama (実験的機能)**, set the
+4. To use WebSearch, sign in to ollama.com with `ollama signin`
+   (see [WebSearch / WebFetch](#websearch--webfetch))
+5. In Tsunagi settings (Global), enable **Ollama (実験的機能)**, set the
    model and context length, and save
 
 Once enabled, an Ollama icon button appears in the task detail view.
@@ -46,6 +48,20 @@ Ollama tabs launch Claude Code with Anthropic credentials
 Changes apply to newly created tabs.
 
 With Ollama configured, you can finish setup without an Anthropic token.
+
+## WebSearch / WebFetch
+
+| Tool      | How it works                                                                             | Requirement                                   |
+| --------- | ---------------------------------------------------------------------------------------- | --------------------------------------------- |
+| WebSearch | Ollama handles the `web_search` server tool and searches via ollama.com's web search API | `ollama signin` on the machine running Ollama |
+| WebFetch  | Claude Code fetches the page itself and summarizes it with the Ollama model              | None (summarizing on a local model is slow)   |
+
+- Without sign-in, WebSearch fails with `Web search error: unavailable`.
+  The **WebSearch** row in settings shows the sign-in status.
+- Search queries are sent to ollama.com. A free account works, subject to
+  usage limits.
+- WebSearch is unavailable when cloud features are disabled
+  (`OLLAMA_NO_CLOUD=1` or the app setting).
 
 ## Caveats
 

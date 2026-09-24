@@ -1,4 +1,4 @@
-import type { OllamaSettings } from '@minimalcorp/tsunagi-shared';
+import type { OllamaAccountStatus, OllamaSettings } from '@minimalcorp/tsunagi-shared';
 import { prisma } from './db.js';
 
 const SETTING_KEY = 'ollama';
@@ -116,6 +116,22 @@ export function buildOllamaEnv(settings: OllamaSettings): Record<string, string>
     API_TIMEOUT_MS: '3600000',
     ...extraEnv,
   };
+}
+
+/**
+ * Ollama の ollama.com サインイン状態を取得する。
+ * Claude Code の WebSearch（web_search サーバーツール）は Ollama が ollama.com の Web 検索 API で
+ * 代行するが、未サインインだと 401 になり `web_search_tool_result_error: unavailable` が返る。
+ */
+export async function getOllamaAccount(baseUrl: string): Promise<OllamaAccountStatus> {
+  const res = await fetch(`${baseUrl}/api/me`, {
+    method: 'POST',
+    signal: AbortSignal.timeout(10000),
+  });
+  const json = (await res.json().catch(() => ({}))) as { name?: string; signin_url?: string };
+  if (res.ok && json.name) return { signedIn: true, name: json.name };
+  if (res.status === 401) return { signedIn: false, signinUrl: json.signin_url };
+  throw new Error(`Ollama responded ${res.status}`);
 }
 
 /** Ollama に pull 済みのモデル名一覧を取得する */

@@ -80,6 +80,14 @@ export interface OllamaSettings {
   extraEnv: Record<string, string>;
 }
 
+/**
+ * Ollama の ollama.com サインイン状態。
+ * Ollama タブの WebSearch は Ollama が ollama.com の Web 検索 API で代行するため、サインインが必要。
+ */
+export type OllamaAccountStatus =
+  | { signedIn: true; name: string }
+  | { signedIn: false; signinUrl?: string };
+
 // API Request/Response型
 export interface ApiResponse<T> {
   data: T;
