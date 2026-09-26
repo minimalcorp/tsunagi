@@ -1,58 +1,34 @@
 ---
-title: Ollama（実験的機能）
-description: Ollama のローカルLLMで Claude Code を起動する。
+title: Ollama
+description: ローカルLLMのプロバイダーとして Ollama を使う。
 ---
 
-import { Callout } from 'nextra/components';
+# Ollama
 
-# Ollama（実験的機能）
-
-Claude Code の接続先を [Ollama](https://ollama.com) の Anthropic 互換 API に切り替え、ローカルLLMで Claude Code を動かすタブを作成できます。Claude Code 自体はそのまま使うため、hooks・プラグイン・MCP・todo 表示は通常の Claude タブと同様に動作します。
-
-<Callout type="warning">
-  Anthropic は Claude 以外のモデルへの接続をサポートしていないため、動作は保証されません。
-</Callout>
+[ローカルLLM（実験的機能）](/ja/features/local-llm/) のプロバイダーとして [Ollama](https://ollama.com) を使えます。
 
 ## セットアップ
 
 Ollama のインストール・モデルの pull・起動はご自身で行ってください。
 
 1. Ollama v0.14.0 以降をインストールする（公式アプリ、または `brew install ollama`）
-2. モデルを pull する（例: `ollama pull qwen3.8:27b`）
-3. コンテキスト長を 64k 以上にする
-   - アプリ: 設定画面のスライダー
-   - CLI: `OLLAMA_CONTEXT_LENGTH=65536 ollama serve`
-4. WebSearch を使う場合は `ollama signin` で ollama.com にサインインする（[WebSearch / WebFetch](#websearch--webfetch)）
-5. Tsunagi の設定画面（Global）の **Ollama (実験的機能)** で有効化し、モデルとコンテキスト長を設定して保存する
+2. モデルを pull する（例: `ollama pull qwen3.6:35b-a3b-coding-nvfp4`。[推奨モデル](/ja/features/local-llm/#推奨モデル)）
+3. 設定画面（Global）の **Ollama** で有効化する
+4. **Claude Code のローカルLLM (実験的機能)** で Ollama のモデルを選んで保存する
 
-有効化すると、タスク詳細画面に Ollama アイコンのボタンが表示されます。
+設定画面の Ollama 欄には、接続状態・バージョン・読み込み中のモデルが表示されます。Base URL（既定 `http://localhost:11434`、Docker では `host.docker.internal`）は詳細設定で変更できます。
 
-## 設定項目
+## コンテキスト長
 
-| 項目           | 説明                                                                                 |
-| -------------- | ------------------------------------------------------------------------------------ |
-| Base URL       | Ollama の URL。既定は `http://localhost:11434`（Docker では `host.docker.internal`） |
-| モデル         | 使用するモデル名。pull 済みのモデルは候補から選べる                                  |
-| コンテキスト長 | Ollama 側と同じ値にする。Claude Code の自動 compact の判定に使う                     |
-| 追加の環境変数 | Ollama タブにのみ注入する環境変数（`KEY=VALUE`）                                     |
+Ollama の Anthropic 互換 API ではリクエスト毎にコンテキスト長を指定できず、Ollama 全体の既定値（VRAM 24GiB 未満は 4k、24〜48GiB は 32k、48GiB 以上は 256k）が使われます。そのため Tsunagi は、設定したコンテキスト長を固定した派生モデル（`<モデル>-tsunagi-ctx<長さ>`）を作成して使います。重みは元のモデルと共有されるため、ディスクは増えません。
 
-Ollama タブでは、Anthropic の認証情報（`ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`）を取り除いたうえで、`ANTHROPIC_BASE_URL`・`ANTHROPIC_MODEL` などを注入して Claude Code を起動します。設定の変更は新しく作成したタブから反映されます。
+## WebSearch を ollama.com で代行する
 
-Ollama を設定すれば、Anthropic のトークンを登録しなくてもセットアップを完了できます。
+「Claude Code のローカルLLM」欄の WebSearch を「ollama.com」にし、使用中のモデルが Ollama の場合、Claude Code の WebSearch を Ollama が ollama.com の Web 検索 API で代行します。
 
-## WebSearch / WebFetch
+- Ollama を動かしているマシンで `ollama signin` が必要です（Ollama 欄でサインイン状態を確認できます）
+- 未サインインだと `Web search error: unavailable` になります
+- 検索クエリは ollama.com に送信されます
+- `OLLAMA_NO_CLOUD=1`（またはアプリの設定でクラウドを無効化）していると使えません
 
-| ツール    | 仕組み                                                                                   | 必要なもの                             |
-| --------- | ---------------------------------------------------------------------------------------- | -------------------------------------- |
-| WebSearch | Ollama が `web_search` サーバーツールを受け取り、ollama.com の Web 検索 API で検索を代行 | Ollama 実行マシンでの `ollama signin`  |
-| WebFetch  | Claude Code がページを直接取得し、Ollama のモデルで要約                                  | なし（要約はローカルモデルのため低速） |
-
-- 未サインインだと WebSearch は `Web search error: unavailable` になります。設定画面の **WebSearch** 欄でサインイン状態を確認できます。
-- 検索クエリは ollama.com に送信されます。無料アカウントで利用できますが、利用量の上限があります。
-- `OLLAMA_NO_CLOUD=1`（またはアプリの設定でクラウドを無効化）していると WebSearch は利用できません。
-
-## 注意
-
-- `~/.claude/settings.json` の `env` に `ANTHROPIC_*` を設定している場合、そちらが優先され Ollama に接続されません。
-- コンテキスト長が不足すると tool call が壊れます。Ollama の既定値は VRAM 24GiB 未満だと 4k です。
-- 応答速度はマシン性能とモデルに大きく依存します。
+既定の「ローカル検索（SearXNG）」なら、サインインなしでローカルで検索できます（[ローカル検索](/ja/features/local-search/)）。

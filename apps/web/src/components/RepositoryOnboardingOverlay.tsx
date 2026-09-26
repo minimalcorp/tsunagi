@@ -36,7 +36,7 @@ export function RepositoryOnboardingOverlay({
               {hasEnvVars ? <Check className="w-3 h-3" /> : '1'}
             </span>
             <span className={hasEnvVars ? 'text-success' : 'font-medium text-muted-foreground'}>
-              認証設定（トークン or Ollama）
+              認証設定（トークン or ローカルLLM）
             </span>
           </div>
 

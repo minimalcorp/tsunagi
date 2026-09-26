@@ -18,7 +18,15 @@ import type { IncomingHttpHeaders } from 'node:http';
 //   localhost 経由で叩く。これを免除しないと Basic 認証有効時に 401 となり
 //   Monaco Editor が開かない。外部ブラウザからの /complete は cf ヘッダが付くため
 //   引き続き認証必須。
-const LOCAL_EXEMPT_PREFIXES = ['/health', '/api/hooks', '/api/internal', '/api/mcp', '/api/editor'];
+const LOCAL_EXEMPT_PREFIXES = [
+  '/health',
+  '/api/hooks',
+  '/api/internal',
+  '/api/mcp',
+  '/api/editor',
+  // ローカルLLMタブの Claude Code が接続する中継口
+  '/api/local-llm/proxy',
+];
 
 const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 

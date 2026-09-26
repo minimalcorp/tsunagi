@@ -1,0 +1,83 @@
+---
+title: ローカルLLM（実験的機能）
+description: Ollama / LM Studio のローカルLLMで Claude Code を起動する。
+---
+
+import { Callout } from 'nextra/components';
+
+# ローカルLLM（実験的機能）
+
+[Ollama](/ja/features/ollama/) / [LM Studio](/ja/features/lm-studio/) のローカルLLMで Claude Code を動かすタブを作成できます。Claude Code 自体はそのまま使うため、hooks・プラグイン・todo 表示は通常の Claude タブと同様に動作します。
+
+<Callout type="warning">
+  Anthropic は Claude 以外のモデルへの接続をサポートしていないため、動作は保証されません。
+</Callout>
+
+## セットアップ
+
+1. 設定画面（Global）の **Ollama** / **LM Studio** のどちらか（両方でも可）を有効にする
+2. **Claude Code のローカルLLM (実験的機能)** で使用するモデルとコンテキスト長を選んで保存する
+3. タスク詳細画面の「ローカルLLM」ボタン（使用中のプロバイダーのアイコン）でタブを作成する
+
+ローカルLLMを設定すれば、Anthropic のトークンを登録しなくてもセットアップを完了できます。
+
+## 使用するモデルは1つ
+
+20〜30GB 級のモデルを2つ同時にメモリへ載せられるマシンは少ないため、使用するモデルは Ollama / LM Studio をまたいで1つだけにし、全てのローカルLLMタブで共有します。
+
+- ローカルLLMタブの Claude Code は Tsunagi の中継口（`/api/local-llm/proxy`）に接続し、Tsunagi がモデル名を使用中のモデルに書き換えて Ollama / LM Studio に転送します
+- 使用中のモデルがメモリになければ、他のモデルを解放してから読み込みます
+- 切り替えは設定画面でだけ行い、既存のタブも次の発言から新しいモデルを使います（会話全体を読み直すため、数十秒〜数分かかります）
+- 応答を生成中のタブがあるときは切り替えられません
+
+### /model
+
+ローカルLLMタブでは `/model` による切り替えを無効にしています。Claude Code は `/model` で選んだモデルを `~/.claude/settings.json` に既定モデルとして保存し、通常の Claude タブにも影響するためです。
+
+- `/model` の一覧には「ローカルLLM」だけが表示されます
+- 別のモデルへの切り替えは PreModelSwitch フックで拒否されます
+- 一覧で「ローカルLLM」を Enter で選ぶと、Claude Code が既定モデルとして保存しますが、Tsunagi がすぐに取り除きます
+- 一覧の **Default** を選ぶと、`~/.claude/settings.json` に保存していた既定モデルが消えます（Claude Code の仕様）
+
+## メモリの解放
+
+| タイミング                                     | 動作                               |
+| ---------------------------------------------- | ---------------------------------- |
+| 最後のリクエストから一定時間（既定 15 分）     | モデルを解放する（0 で無効）       |
+| 設定画面の **解放** ボタン                     | モデルを解放する                   |
+| Tsunagi の終了時                               | モデルを解放する（設定で無効化可） |
+| 使用するモデルの切り替え・プロバイダーの無効化 | 使わなくなったモデルを解放する     |
+
+解放後も、次の発言で自動的に読み込み直します。
+
+## 設定項目
+
+| 項目           | 説明                                                                                                           |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| 使用するモデル | 有効なプロバイダーにダウンロード済みのモデルから選ぶ                                                           |
+| コンテキスト長 | `64k` / `128k` / `1m` または整数（k = 1024）。Claude Code の自動 compact の判定にも使う                        |
+| 自動解放（分） | 最後のリクエストからこの時間がたったらモデルを解放する                                                         |
+| WebSearch      | [ローカル検索（SearXNG）](/ja/features/local-search/) / ollama.com（使用中が Ollama のときのみ・要サインイン） |
+| 追加の環境変数 | ローカルLLMタブにのみ注入する環境変数（`KEY=VALUE`）                                                           |
+
+WebSearch と追加の環境変数は、この後に作成・起動したタブから反映されます。
+
+## 推奨モデル
+
+MoE モデル（有効パラメータが少ない）を推奨します。M1 Max（64GB）で約2.5万トークン（Claude Code の初回リクエスト相当）を送った計測値です。
+
+| プロバイダー | モデル                                    | 初回の読み込み（prefill） | 2回目以降（キャッシュ） | 生成     |
+| ------------ | ----------------------------------------- | ------------------------- | ----------------------- | -------- |
+| Ollama       | `qwen3.6:35b-a3b-coding-nvfp4`            | 42 秒（588 tok/s）        | 0.6 秒                  | 61 tok/s |
+| LM Studio    | `mlx-community/Qwen3.6-35B-A3B-4bit`      | 49 秒（512 tok/s）        | 0.7 秒                  | 55 tok/s |
+| Ollama       | `qwen3.8:27b-mlx`（dense）                | 314 秒（79 tok/s）        | 3.6 秒                  | 15 tok/s |
+| LM Studio    | `mlx-community/Qwen3.8-27B-4bit`（dense） | 319 秒（78 tok/s）        | 2.5 秒                  | 12 tok/s |
+
+同じ世代・同程度の量子化なら、Ollama（MLX）と LM Studio（MLX）の速度はほぼ同じでした。
+
+計測スクリプト: `node apps/server/scripts/bench-local-llm.mjs --provider ollama|lmstudio --model <モデル>`
+
+## 注意
+
+- `~/.claude/settings.json` の `env` に `ANTHROPIC_*` を設定している場合、そちらが優先され中継口に接続されません。
+- ローカルLLMタブの MCP は Tsunagi のタスク管理と `web_search` だけに絞られます（[MCP の絞り込み](/ja/features/local-search/#mcp-の絞り込み)）。

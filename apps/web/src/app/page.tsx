@@ -46,7 +46,7 @@ export default function Home() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
-  // 認証設定済みか（Global の Anthropic トークン、または実験的機能 Ollama の設定）。
+  // 認証設定済みか（Global の Anthropic トークン、または実験的機能のローカルLLM（Ollama / LM Studio）の設定）。
   // 判定はサーバー(/api/onboarding/status)に一本化する
   const [hasAuth, setHasAuth] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

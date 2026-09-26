@@ -1,0 +1,54 @@
+---
+title: LM Studio
+description: Use LM Studio as a provider for local LLM tabs.
+---
+
+# LM Studio
+
+You can use [LM Studio](https://lmstudio.ai) (0.4.1 or later, with its
+Anthropic-compatible API) as a provider for
+[Local LLM (experimental)](/en/features/local-llm/). It downloads MLX /
+GGUF models straight from Hugging Face, which makes it handy for trying new
+models.
+
+## Setup
+
+1. Install LM Studio from [lmstudio.ai/download](https://lmstudio.ai/download)
+   and launch it once (this installs the `lms` CLI into `~/.lmstudio/bin`)
+2. Download a model from the Discover tab (e.g.
+   `mlx-community/Qwen3.6-35B-A3B-4bit`; see
+   [Recommended models](/en/features/local-llm/#recommended-models))
+3. Enable **LM Studio** in Tsunagi's settings (Global) and start the server
+4. Pick an LM Studio model under **Claude Code のローカルLLM (実験的機能)** and save
+
+## What the settings page does
+
+| Item     | Description                                                                         |
+| -------- | ----------------------------------------------------------------------------------- |
+| Server   | Shows the status and loaded models; starts / stops it (`lms server start` / `stop`) |
+| Advanced | Base URL (default `http://localhost:1234`), API token, `lms` path                   |
+
+The API token is needed only when "Require Authentication" is enabled in
+LM Studio. Starting and stopping the server uses the `lms` CLI, so Tsunagi
+and LM Studio must run on the same machine.
+
+## Loading and unloading
+
+LM Studio keeps manually loaded models in memory until you unload them.
+Tsunagi loads the model in use with the configured context length and
+unloads it when it is no longer needed (see
+[Freeing memory](/en/features/local-llm/#freeing-memory)).
+
+- Leaving it to LM Studio's just-in-time loading uses LM Studio's default
+  context length, which can truncate Claude Code's long prompts and break
+  tool calls, so Tsunagi loads the model itself
+- MLX models are always loaded with the model's maximum context length (the
+  KV cache grows on demand, so memory grows with use)
+- When you pick an LM Studio model under "Claude Code のローカルLLM", a memory estimate
+  (`lms load --estimate-only`) is shown
+
+## WebSearch
+
+LM Studio ignores Claude Code's WebSearch (an Anthropic server tool), so
+LM Studio always uses the `web_search` tool of
+[Local search](/en/features/local-search/).

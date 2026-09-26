@@ -11,7 +11,10 @@ import { RepositoryManagement } from '@/components/settings/RepositoryManagement
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
 import { VoiceInputSection } from '@/components/settings/VoiceInputSection';
 import { LocalLlmSection } from '@/components/settings/LocalLlmSection';
+import { LocalModelSection } from '@/components/settings/LocalModelSection';
 import { OllamaSection } from '@/components/settings/OllamaSection';
+import { LmStudioSection } from '@/components/settings/LmStudioSection';
+import { SearxngSection } from '@/components/settings/SearxngSection';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
@@ -144,8 +147,12 @@ export default function SettingsPage() {
               {/* Local LLM (Global scope only, device-wide feature) */}
               {selectedNode.scope === 'global' && <LocalLlmSection />}
 
-              {/* Ollama (Global scope only, 実験的機能) */}
+              {/* ローカルLLMで Claude Code を動かす (Global scope only, 実験的機能) */}
+              {selectedNode.scope === 'global' && <LocalModelSection />}
               {selectedNode.scope === 'global' && <OllamaSection />}
+              {selectedNode.scope === 'global' && <LmStudioSection />}
+              {/* ローカル検索 (Ollama / LM Studio のどちらかが有効なときだけ表示) */}
+              {selectedNode.scope === 'global' && <SearxngSection />}
 
               {/* Remove Repository (Repo scope only) */}
               {selectedNode.scope === 'repo' && selectedNode.owner && selectedNode.repo && (

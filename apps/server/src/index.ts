@@ -15,6 +15,11 @@ import { onboardingRoutes } from './routes/onboarding.js';
 import { internalRoutes } from './routes/internal.js';
 import { hooksRoutes } from './routes/hooks.js';
 import { mcpRoutes } from './routes/mcp.js';
+import { mcpWebRoutes } from './routes/mcp-web.js';
+import { localLlmRoutes } from './routes/local-llm.js';
+import { unloadOnShutdown } from './lib/local-llm.js';
+import { watchUserSettingsForLocalModel } from './lib/claude-config-guard.js';
+import { LOCAL_MODEL_ALIAS } from './lib/local-llm-env.js';
 import { terminalRoutes } from './routes/terminal.js';
 import { editorRoutes } from './routes/editor.js';
 import { whisperRoutes } from './routes/whisper.js';
@@ -22,6 +27,7 @@ import { stopWhisperServerOnExit } from './lib/whisper-process.js';
 import { llmRoutes } from './routes/llm.js';
 import { settingsRoutes } from './routes/settings.js';
 import { stopLlmServerOnExit } from './lib/llm-process.js';
+import { stopSearxngOnExit, syncSearxng } from './lib/searxng.js';
 import { createBasicAuth } from './basic-auth.js';
 
 // Fastify は単一の公開エンドポイント。Next.js は内部ポートで動かしプロキシする。
@@ -107,11 +113,13 @@ async function start() {
   await fastify.register(internalRoutes, { prefix: '/api' });
   await fastify.register(hooksRoutes, { prefix: '/api' });
   await fastify.register(mcpRoutes, { prefix: '/api' });
+  await fastify.register(mcpWebRoutes, { prefix: '/api' });
   await fastify.register(terminalRoutes, { prefix: '/api' });
   await fastify.register(editorRoutes, { prefix: '/api' });
   await fastify.register(whisperRoutes, { prefix: '/api' });
   await fastify.register(llmRoutes, { prefix: '/api' });
   await fastify.register(settingsRoutes, { prefix: '/api' });
+  await fastify.register(localLlmRoutes, { prefix: '/api' });
 
   // catch-all リバースプロキシ: /api・/socket.io・/health 以外を内部 Next.js へ転送。
   // - /api/* と /health は上で定義済みルートが wildcard より優先される。
@@ -162,10 +170,22 @@ async function start() {
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
   console.log(`Fastify server running on port ${PORT}`);
 
+  // ローカルLLM（Ollama / LM Studio）が有効ならローカル検索用の SearXNG を起動する。
+  // 完了は待たず、失敗しても状態として記録するだけで tsunagi の起動は妨げない
+  void syncSearxng();
+  // ローカルLLMタブの /model で中継口の名前が既定モデルに保存されたら取り除く
+  watchUserSettingsForLocalModel(LOCAL_MODEL_ALIAS);
+
   const shutdown = async (signal: string) => {
     console.log(`[server] Received ${signal}, shutting down...`);
     stopWhisperServerOnExit();
     stopLlmServerOnExit();
+    stopSearxngOnExit();
+    // 設定で有効なら、ローカルLLMのモデルをメモリから外す（バッテリー・メモリ節約）。
+    // 開発時の tsx watch はファイル変更のたびに SIGTERM で再起動するため、その場合は外さない
+    if (signal === 'SIGINT' || process.env.NODE_ENV === 'production') {
+      await unloadOnShutdown();
+    }
     await fastify.close();
     process.exit(0);
   };
@@ -176,6 +196,7 @@ async function start() {
   process.on('exit', () => {
     stopWhisperServerOnExit();
     stopLlmServerOnExit();
+    stopSearxngOnExit();
   });
 }
 

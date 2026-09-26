@@ -1,46 +1,33 @@
-import type { OllamaAccountStatus, OllamaSettings } from '@minimalcorp/tsunagi-shared';
-import { prisma } from './db.js';
+import type {
+  LocalLlmModel,
+  OllamaAccountStatus,
+  OllamaSettings,
+  OllamaStatus,
+} from '@minimalcorp/tsunagi-shared';
+import { normalizeBaseUrl, readAppSetting, writeAppSetting } from './local-llm-env.js';
 
-const SETTING_KEY = 'ollama';
+export const OLLAMA_SETTING_KEY = 'ollama';
 
-const DEFAULT_CONTEXT_TOKENS = 65536;
-
-// Docker 内から host の Ollama に繋ぐ場合は compose で host.docker.internal を指定する
+// Docker 内から host の Ollama に繋ぐ場合は TSUNAGI_OLLAMA_URL で host.docker.internal を指定する
 const DEFAULT_BASE_URL = process.env.TSUNAGI_OLLAMA_URL || 'http://localhost:11434';
 
-const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** コンテキスト長を固定した派生モデルの tag に付ける目印 */
+const CONTEXT_MODEL_MARKER = '-tsunagi-ctx';
 
-/** Ollama タブでは Anthropic の認証情報を環境変数ごと取り除く（ANTHROPIC_AUTH_TOKEN と競合するため） */
-export const OLLAMA_UNSET_ENV_KEYS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
+// 20GB 級のモデルの読み込みは数十秒かかる
+const LOAD_TIMEOUT_MS = 10 * 60 * 1000;
 
 export function defaultOllamaSettings(): OllamaSettings {
-  return {
-    enabled: false,
-    baseUrl: DEFAULT_BASE_URL,
-    model: '',
-    contextTokens: DEFAULT_CONTEXT_TOKENS,
-    extraEnv: {},
-  };
+  return { enabled: false, baseUrl: DEFAULT_BASE_URL };
 }
 
 export async function getOllamaSettings(): Promise<OllamaSettings> {
-  const row = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY } });
-  if (!row) return defaultOllamaSettings();
-  try {
-    return { ...defaultOllamaSettings(), ...(JSON.parse(row.value) as Partial<OllamaSettings>) };
-  } catch {
-    return defaultOllamaSettings();
-  }
+  const { enabled, baseUrl } = await readAppSetting(OLLAMA_SETTING_KEY, defaultOllamaSettings());
+  return { enabled, baseUrl };
 }
 
 export async function saveOllamaSettings(settings: OllamaSettings): Promise<OllamaSettings> {
-  const value = JSON.stringify(settings);
-  await prisma.appSetting.upsert({
-    where: { key: SETTING_KEY },
-    create: { key: SETTING_KEY, value },
-    update: { value },
-  });
-  return settings;
+  return writeAppSetting(OLLAMA_SETTING_KEY, settings);
 }
 
 /** リクエストボディを検証して OllamaSettings に正規化する。不正ならエラーメッセージを返す */
@@ -49,73 +36,77 @@ export function parseOllamaSettings(
 ): { settings: OllamaSettings } | { error: string } {
   if (typeof body !== 'object' || body === null) return { error: 'Invalid body' };
   const b = body as Record<string, unknown>;
-
   if (typeof b.enabled !== 'boolean') return { error: 'enabled must be boolean' };
-
-  const baseUrl = typeof b.baseUrl === 'string' ? b.baseUrl.trim().replace(/\/+$/, '') : '';
-  try {
-    const url = new URL(baseUrl);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error();
-  } catch {
-    return { error: 'baseUrl must be a valid http(s) URL' };
-  }
-
-  if (typeof b.model !== 'string') return { error: 'model must be string' };
-
-  const contextTokens = Number(b.contextTokens);
-  if (!Number.isInteger(contextTokens) || contextTokens <= 0) {
-    return { error: 'contextTokens must be a positive integer' };
-  }
-
-  const extraEnv: Record<string, string> = {};
-  if (b.extraEnv !== undefined) {
-    if (typeof b.extraEnv !== 'object' || b.extraEnv === null || Array.isArray(b.extraEnv)) {
-      return { error: 'extraEnv must be an object' };
-    }
-    for (const [key, value] of Object.entries(b.extraEnv)) {
-      if (!ENV_KEY_PATTERN.test(key)) return { error: `Invalid env key: ${key}` };
-      if (typeof value !== 'string') return { error: `Env value must be string: ${key}` };
-      extraEnv[key] = value;
-    }
-  }
-
-  return {
-    settings: { enabled: b.enabled, baseUrl, model: b.model.trim(), contextTokens, extraEnv },
-  };
-}
-
-/** Ollama タブを起動できる状態か（オンボーディング完了判定にも使う） */
-export function isOllamaReady(settings: OllamaSettings): boolean {
-  return settings.enabled && settings.model !== '';
+  const baseUrl = normalizeBaseUrl(b.baseUrl);
+  if (!baseUrl) return { error: 'baseUrl must be a valid http(s) URL' };
+  return { settings: { enabled: b.enabled, baseUrl } };
 }
 
 /**
- * Ollama の Anthropic 互換 API で Claude Code を動かすための環境変数。
- * DB の環境変数より後に適用し、同名キーを上書きする。
+ * コンテキスト長を固定した派生モデルの名前（例: qwen3.6:35b-a3b → qwen3.6:35b-a3b-tsunagi-ctx65536）。
+ * Anthropic 互換 API ではリクエスト毎に num_ctx を渡せず、Ollama 全体の既定値（VRAM 24GiB 未満は 4k）
+ * が使われるため、num_ctx を焼き込んだモデルを作ってそれを使う。
  */
-export function buildOllamaEnv(settings: OllamaSettings): Record<string, string> {
-  const { baseUrl, model, contextTokens, extraEnv } = settings;
-  return {
-    ANTHROPIC_BASE_URL: baseUrl,
-    // Ollama は値を検証しないが、未設定だと Claude Code がログインを要求する
-    ANTHROPIC_AUTH_TOKEN: 'ollama',
-    ANTHROPIC_MODEL: model,
-    ANTHROPIC_DEFAULT_OPUS_MODEL: model,
-    ANTHROPIC_DEFAULT_SONNET_MODEL: model,
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: model,
-    CLAUDE_CODE_SUBAGENT_MODEL: model,
-    // 未知のモデルは 200k 扱いになり auto-compact が効かないため、Ollama 側の値に揃える
-    CLAUDE_CODE_MAX_CONTEXT_TOKENS: String(contextTokens),
-    // リクエスト毎に変わる attribution がローカル側の KV キャッシュを無効化するため外す
-    CLAUDE_CODE_ATTRIBUTION_HEADER: '0',
-    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
-    // ローカルLLMはプロンプト読み込み中(数分)にバイトを返さないため、既定の 5 分の
-    // 無通信タイムアウト / stream watchdog で打ち切られ再送される。上限(30分)まで延ばす
-    API_FORCE_IDLE_TIMEOUT: '0',
-    CLAUDE_STREAM_IDLE_TIMEOUT_MS: '1800000',
-    API_TIMEOUT_MS: '3600000',
-    ...extraEnv,
-  };
+export function ollamaContextModelName(model: string, contextTokens: number): string {
+  const withTag = model.includes(':') ? model : `${model}:latest`;
+  return `${withTag}${CONTEXT_MODEL_MARKER}${contextTokens}`;
+}
+
+/** 派生モデルがなければ作る（重みは元モデルの blob を共有するため数秒で終わる）。作ったモデル名を返す */
+export async function ensureOllamaContextModel(
+  baseUrl: string,
+  model: string,
+  contextTokens: number
+): Promise<string> {
+  const name = ollamaContextModelName(model, contextTokens);
+
+  const show = await fetch(`${baseUrl}/api/show`, {
+    method: 'POST',
+    body: JSON.stringify({ model: name }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (show.ok) return name;
+
+  const res = await fetch(`${baseUrl}/api/create`, {
+    method: 'POST',
+    body: JSON.stringify({
+      model: name,
+      from: model,
+      parameters: { num_ctx: contextTokens },
+      stream: false,
+    }),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(
+      `Ollama でコンテキスト長 ${contextTokens} のモデルを作成できません: ${body.error ?? res.status}`
+    );
+  }
+  return name;
+}
+
+/** モデルをメモリに読み込む（空のプロンプトで generate すると読み込みだけ行われる） */
+export async function loadOllamaModel(baseUrl: string, name: string): Promise<void> {
+  const res = await fetch(`${baseUrl}/api/generate`, {
+    method: 'POST',
+    body: JSON.stringify({ model: name }),
+    signal: AbortSignal.timeout(LOAD_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(`Ollama でモデルを読み込めません: ${body.error ?? res.status}`);
+  }
+}
+
+/** モデルをメモリから外す */
+export async function unloadOllamaModel(baseUrl: string, name: string): Promise<void> {
+  const res = await fetch(`${baseUrl}/api/generate`, {
+    method: 'POST',
+    body: JSON.stringify({ model: name, keep_alive: 0 }),
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) throw new Error(`Ollama の unload に失敗しました (${res.status})`);
 }
 
 /**
@@ -134,10 +125,52 @@ export async function getOllamaAccount(baseUrl: string): Promise<OllamaAccountSt
   throw new Error(`Ollama responded ${res.status}`);
 }
 
-/** Ollama に pull 済みのモデル名一覧を取得する */
-export async function listOllamaModels(baseUrl: string): Promise<string[]> {
+/** Ollama に pull 済みのモデル一覧を取得する（tsunagi が作った派生モデルは除く） */
+export async function listOllamaModels(baseUrl: string): Promise<LocalLlmModel[]> {
   const res = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`Ollama responded ${res.status}`);
-  const json = (await res.json()) as { models?: Array<{ name: string }> };
-  return (json.models ?? []).map((m) => m.name).sort();
+  const json = (await res.json()) as {
+    models?: Array<{
+      name: string;
+      size?: number;
+      details?: { format?: string; parameter_size?: string; quantization_level?: string };
+    }>;
+  };
+  return (json.models ?? [])
+    .filter((m) => !m.name.includes(CONTEXT_MODEL_MARKER))
+    .map((m) => ({
+      provider: 'ollama' as const,
+      model: m.name,
+      displayName: [m.name, m.details?.quantization_level].filter(Boolean).join(' '),
+      // Ollama の MLX モデルは format が safetensors になる
+      format: m.details?.format === 'safetensors' ? 'mlx' : (m.details?.format ?? ''),
+      sizeBytes: m.size ?? 0,
+      maxContextLength: null,
+    }))
+    .sort((a, b) => a.model.localeCompare(b.model));
+}
+
+/** Ollama サーバーの接続可否・バージョン・読み込み中のモデル */
+export async function getOllamaStatus(baseUrl: string): Promise<OllamaStatus> {
+  try {
+    const [versionRes, psRes] = await Promise.all([
+      fetch(`${baseUrl}/api/version`, { signal: AbortSignal.timeout(3000) }),
+      fetch(`${baseUrl}/api/ps`, { signal: AbortSignal.timeout(3000) }),
+    ]);
+    const version = ((await versionRes.json()) as { version?: string }).version;
+    const ps = (await psRes.json()) as {
+      models?: Array<{ name: string; context_length?: number }>;
+    };
+    return {
+      reachable: true,
+      version,
+      loaded: (ps.models ?? []).map((m) => ({ name: m.name, contextLength: m.context_length })),
+    };
+  } catch (error) {
+    return {
+      reachable: false,
+      loaded: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
