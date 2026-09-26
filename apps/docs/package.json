@@ -1,6 +1,6 @@
 {
   "name": "tsunagi-docs",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "description": "Tsunagi documentation site.",
   "scripts": {
