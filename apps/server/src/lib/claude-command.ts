@@ -71,6 +71,10 @@ async function localLlmArgs(): Promise<string[]> {
   }
 
   const args = [
+    // 会話記録には転送先の実モデル名が残り、再開時に Claude Code がそれを復元しうるため、
+    // 中継口の名前に固定する（--model は会話記録より優先され、settings.json にも保存されない）
+    '--model',
+    LOCAL_MODEL_ALIAS,
     '--settings',
     shellQuote(JSON.stringify(settings)),
     '--strict-mcp-config',
