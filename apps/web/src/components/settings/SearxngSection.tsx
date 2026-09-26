@@ -30,6 +30,7 @@ import {
 const STATUS_POLL_MS = 3000;
 
 const DOCS_URL = 'https://docs.searxng.org/admin/installation.html';
+const DOCKER_DOCS_URL = 'https://minimalcorp.github.io/tsunagi/ja/features/local-search/';
 
 interface FormState {
   port: string;
@@ -207,7 +208,13 @@ export function SearxngSection() {
             <a href={DOCS_URL} target="_blank" rel="noreferrer" className="underline">
               インストール方法
             </a>
-            ）。PATH にない場合は詳細設定でパスを指定できます。
+            ）。PATH にない場合は詳細設定でパスを指定できます。Docker で起動する場合は{' '}
+            <Code>{status.url}</Code> で公開し、settings.yml の search.formats に json
+            を含めてください（
+            <a href={DOCKER_DOCS_URL} target="_blank" rel="noreferrer" className="underline">
+              手順
+            </a>
+            ）。
           </p>
         )}
 

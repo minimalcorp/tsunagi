@@ -20,6 +20,27 @@ nix profile install nixpkgs#searxng
 
 nix 以外の方法は [SearXNG のインストール方法](https://docs.searxng.org/admin/installation.html) を参照してください。PATH にない場合は、設定画面の詳細設定で `searxng-run` のパスを指定できます。
 
+### Docker で起動する
+
+[公式の Docker イメージ](https://docs.searxng.org/admin/installation-docker.html) を使う場合は、Tsunagi のポート（既定 `7964`）で公開してください。Tsunagi は既に応答している SearXNG をそのまま使います（起動・停止はしません）。
+
+```bash
+mkdir -p ~/searxng/config ~/searxng/data && cd ~/searxng
+docker run --name searxng -d --restart unless-stopped \
+  -p 127.0.0.1:7964:8080 \
+  -v "./config/:/etc/searxng/" -v "./data/:/var/cache/searxng/" \
+  docker.io/searxng/searxng:latest
+```
+
+初回起動で `config/settings.yml` が生成されます。既定では JSON 形式が無効なため、次を追記して `docker restart searxng` してください。
+
+```yaml
+search:
+  formats:
+    - html
+    - json
+```
+
 Tsunagi を Docker で動かしている場合（`make up`）は、コンテナに SearXNG が入っているためインストールは不要です。
 
 ## 自動起動・停止
