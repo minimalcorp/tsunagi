@@ -28,6 +28,30 @@ For other methods, see the
 If it is not on your PATH, set the `searxng-run` path in the advanced
 settings.
 
+### Run with Docker
+
+To use the [official Docker image](https://docs.searxng.org/admin/installation-docker.html),
+publish it on Tsunagi's port (default `7964`). Tsunagi uses an already
+running SearXNG as-is (it does not start or stop it).
+
+```bash
+mkdir -p ~/searxng/config ~/searxng/data && cd ~/searxng
+docker run --name searxng -d --restart unless-stopped \
+  -p 127.0.0.1:7964:8080 \
+  -v "./config/:/etc/searxng/" -v "./data/:/var/cache/searxng/" \
+  docker.io/searxng/searxng:latest
+```
+
+The first run generates `config/settings.yml`. JSON output is disabled by
+default, so add the following and run `docker restart searxng`.
+
+```yaml
+search:
+  formats:
+    - html
+    - json
+```
+
 When Tsunagi runs in Docker (`make up`), the container already includes
 SearXNG, so no installation is needed.
 
