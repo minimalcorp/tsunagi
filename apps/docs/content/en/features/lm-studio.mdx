@@ -30,7 +30,12 @@ models.
 
 The API token is needed only when "Require Authentication" is enabled in
 LM Studio. Starting and stopping the server uses the `lms` CLI, so Tsunagi
-and LM Studio must run on the same machine.
+and LM Studio must run on the same machine. When Tsunagi runs in Docker
+(`make up`), the container has no `lms`, so the server is started on the
+host: `make up` also starts it when LM Studio is installed, and `make down`
+stops it (or run `make lmstudio-start` / `make lmstudio-stop`). You can also
+start it from LM Studio's Developer tab. Tsunagi
+connects through `host.docker.internal:1234`; no port setup is needed.
 
 ## Loading and unloading
 

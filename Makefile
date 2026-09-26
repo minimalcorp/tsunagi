@@ -13,16 +13,21 @@ endif
 SSH_SOCK_CONTAINER := /ssh-agent
 SSH_ENV := SSH_SOCK_HOST=$(SSH_SOCK_HOST) SSH_SOCK_CONTAINER=$(SSH_SOCK_CONTAINER)
 
+# LM Studio の CLI（PATH になければ LM Studio 初回起動時に置かれる場所）
+LMS := $(shell command -v lms 2>/dev/null || echo $(HOME)/.lmstudio/bin/lms)
+
 # ---------------------------------------------------------------------------
 # Dev environment
 # ---------------------------------------------------------------------------
 .PHONY: up down down-v logs ps
 
-up: ## 起動 (初回 or down後)
+up: ## 起動 (初回 or down後)。LM Studio が入っていればホストで LM Studio サーバーも起動
 	$(SSH_ENV) $(COMPOSE) up -d --build
+	@$(MAKE) --no-print-directory lmstudio-start
 
-down: ## 停止 & container削除 (DB/worktreeは保持)
+down: ## 停止 & container削除 (DB/worktreeは保持)。LM Studio サーバーも停止
 	$(SSH_ENV) $(COMPOSE) down
+	@$(MAKE) --no-print-directory lmstudio-stop
 
 down-v: ## 停止 & container削除 + 全volume削除 (完全リセット)
 	$(SSH_ENV) $(COMPOSE) down -v
@@ -72,3 +77,21 @@ whisper: ## ローカルWhisperサーバーをセットアップ・起動 (ホ�
 
 llm: ## ローカルLLMサーバーをセットアップ・起動 (ホスト上で直接実行、要Apple Silicon Mac)
 	cd apps/llm-server && ./run.sh
+
+# ---------------------------------------------------------------------------
+# LM Studio サーバー (ローカルLLMのプロバイダー)
+# tsunagi は Settings から lms CLI でサーバーを起動・停止するが、lms は macOS 用で
+# コンテナ内にはないため、Docker で動かす場合はホストで起動する。
+# LM Studio が入っていない環境でも失敗しないよう、見つからなければ何もしない。
+# ---------------------------------------------------------------------------
+.PHONY: lmstudio-start lmstudio-stop
+
+lmstudio-start: ## LM Studio サーバーをホストで起動 (lms がなければスキップ)
+	@if [ -x "$(LMS)" ]; then \
+		"$(LMS)" server start || echo "LM Studio サーバーを起動できませんでした（LM Studio を一度起動してから再実行してください）"; \
+	else \
+		echo "lms が見つからないため LM Studio サーバーの起動をスキップしました"; \
+	fi
+
+lmstudio-stop: ## LM Studio サーバーをホストで停止 (lms がなければスキップ)
+	@if [ -x "$(LMS)" ]; then "$(LMS)" server stop || true; fi

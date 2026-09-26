@@ -303,7 +303,9 @@ async function loadActive(active: LocalLlmModelRef): Promise<LocalLlmTarget> {
   if (!lmstudio.enabled) throw new Error('LM Studio が無効です。Settings で有効にしてください');
   const status = await getLmStudioStatus(lmstudio);
   if (!status.serverRunning) {
-    throw new Error('LM Studio のサーバーが起動していません。Settings から起動してください');
+    throw new Error(
+      'LM Studio のサーバーが起動していません。Settings（LM Studio）か LM Studio アプリの Developer タブから起動してください'
+    );
   }
   await unloadOthers(active);
   if (!(await findLoadedTarget(active))) {

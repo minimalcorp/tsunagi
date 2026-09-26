@@ -46,6 +46,18 @@ RUN ARCH=$(dpkg --print-architecture) && \
     rm "${TARBALL}" && \
     chmod 755 /usr/local/bin/github-mcp-server
 
+# SearXNG（ローカルLLMタブのローカル検索）。tsunagi が PATH 上の searxng-run を自動で起動・停止する。
+# PyPI では配布されていないため、固定したコミットのソースから入れる（setup.py が searx を import
+# するので依存を先に入れ、ビルド分離なしでインストールする）
+ARG SEARXNG_COMMIT=12f8b6515ca77c3c3bc1498584950ef5daca1433
+RUN git clone https://github.com/searxng/searxng.git /opt/searxng-src && \
+    git -C /opt/searxng-src checkout ${SEARXNG_COMMIT} && \
+    uv venv /opt/searxng --python python3 && \
+    uv pip install --python /opt/searxng/bin/python setuptools wheel && \
+    uv pip install --python /opt/searxng/bin/python -r /opt/searxng-src/requirements.txt && \
+    uv pip install --python /opt/searxng/bin/python --no-build-isolation -e /opt/searxng-src && \
+    ln -s /opt/searxng/bin/searxng-run /usr/local/bin/searxng-run
+
 # SSH: known_hosts 事前登録 + .ssh ディレクトリ作成
 RUN mkdir -p /home/node/.ssh && \
     ssh-keyscan github.com >> /home/node/.ssh/known_hosts && \

@@ -21,7 +21,9 @@ description: ローカルLLMのプロバイダーとして LM Studio を使う�
 | サーバー | 状態・読み込み中のモデルの表示、起動・停止（`lms server start` / `stop`） |
 | 詳細設定 | Base URL（既定 `http://localhost:1234`）・API トークン・`lms` のパス      |
 
-API トークンは LM Studio で「Require Authentication」を有効にしている場合のみ必要です。サーバーの起動・停止には `lms` CLI を使うため、Tsunagi と LM Studio が同じマシンで動いている必要があります。
+API トークンは LM Studio で「Require Authentication」を有効にしている場合のみ必要です。
+
+サーバーの起動・停止には `lms` CLI を使うため、Tsunagi と LM Studio が同じマシンで動いている必要があります。Tsunagi を Docker で動かしている場合（`make up`）はコンテナ内に `lms` がないため、ホストで起動します。`make up` は LM Studio が入っていればサーバーも起動し、`make down` で停止します（個別には `make lmstudio-start` / `make lmstudio-stop`）。LM Studio アプリの Developer タブから起動しても構いません。接続は `host.docker.internal:1234` 経由で行われ、ポートの設定は不要です。
 
 ## モデルの読み込みと解放
 

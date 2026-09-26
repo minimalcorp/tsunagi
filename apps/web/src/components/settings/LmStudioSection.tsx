@@ -193,13 +193,7 @@ export function LmStudioSection() {
                       起動
                     </Button>
                   )
-                ) : (
-                  status && (
-                    <span className="text-xs text-muted-foreground">
-                      lms CLI が見つかりません（詳細設定でパスを指定できます）
-                    </span>
-                  )
-                )}
+                ) : null}
                 <Button
                   variant="outline"
                   size="sm"
@@ -210,6 +204,15 @@ export function LmStudioSection() {
                 </Button>
               </div>
             </StatusRow>
+            {status && !status.lmsPath && !status.serverRunning && (
+              <p className="text-xs text-muted-foreground">
+                tsunagi から LM Studio のサーバーを起動するための lms CLI が見つかりません（tsunagi
+                を Docker で動かしている場合も同様です）。LM Studio アプリの Developer
+                タブでサーバーを起動するか、LM Studio を動かしているマシンで{' '}
+                <Code>lms server start</Code> を実行してください。lms
+                がある場合は詳細設定でパスを指定できます。
+              </p>
+            )}
 
             <AdvancedSettings>
               <Field label="Base URL">
