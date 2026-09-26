@@ -57,7 +57,7 @@ export function Header({ onSettingsClick, onReload, nextStep = 'complete' }: Hea
           </Button>
           {nextStep === 'env' && (
             <div className="absolute top-full mt-2 right-[-2px] bg-tooltip backdrop-blur-sm border-2 border-warning text-foreground px-4 py-2 rounded text-base whitespace-nowrap animate-subtle-bounce z-[60] shadow-lg">
-              Set up tokens or Ollama
+              Set up tokens or a local LLM
               <div className="absolute -top-1 right-[21px] w-2 h-2 bg-tooltip backdrop-blur-sm border-l-2 border-t-2 border-warning rotate-45" />
             </div>
           )}

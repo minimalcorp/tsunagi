@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
+import type { TabMode } from '@minimalcorp/tsunagi-shared';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
@@ -7,12 +8,17 @@ import { ptyManager } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
 import { getWorktreePath } from '../lib/worktree-manager.js';
 import { getEnv } from '../lib/repositories/environment.js';
-import { ensureClaudeOnboardingCompleted } from '../lib/claude-config-guard.js';
 import {
-  OLLAMA_UNSET_ENV_KEYS,
-  buildOllamaEnv,
-  getOllamaSettings,
-} from '../lib/ollama-settings.js';
+  ensureClaudeOnboardingCompleted,
+  removeLocalModelFromUserSettings,
+} from '../lib/claude-config-guard.js';
+import {
+  LOCAL_LLM_UNSET_ENV_KEYS,
+  LOCAL_MODEL_ALIAS,
+  buildLocalLlmEnv,
+} from '../lib/local-llm-env.js';
+import { ensureActiveLoaded, getLocalLlmSettings } from '../lib/local-llm.js';
+import { LOCAL_LLM_PROXY_URL, buildClaudeCommand, isLocalLlmMode } from '../lib/claude-command.js';
 
 // サーバーはプロジェクトルートから起動されるため process.cwd() でルートを取得
 const TSUNAGI_EDITOR_PATH = path.resolve(process.cwd(), 'scripts/monaco-editor.sh');
@@ -60,6 +66,28 @@ interface CreateSessionBody {
    * 末尾に \n がない場合は自動付加する。
    */
   command?: string;
+  /**
+   * true なら PTY 起動後に claude を起動する。コマンドはタブの mode に応じてサーバーで組み立てる
+   * （ローカルLLMタブは MCP の絞り込み等の引数が付く）。command より優先する。
+   */
+  claude?: boolean;
+}
+
+/**
+ * ローカルLLMタブで注入する環境変数を返す。Claude Code は tsunagi の中継口に接続し、
+ * 中継口が使用中のモデルへ転送する。最初の発言を待たせないよう、読み込みはここで始めておく（完了は待たない）
+ */
+async function prepareLocalLlm(): Promise<Record<string, string>> {
+  const { active, extraEnv } = await getLocalLlmSettings();
+  if (!active) {
+    throw new Error('ローカルLLMのモデルが未設定です。Settings で使用するモデルを選んでください');
+  }
+  ensureActiveLoaded().catch(() => undefined);
+  return buildLocalLlmEnv({
+    proxyUrl: LOCAL_LLM_PROXY_URL,
+    contextTokens: active.contextTokens,
+    extraEnv,
+  });
 }
 
 export async function terminalRoutes(fastify: FastifyInstance) {
@@ -233,7 +261,8 @@ export async function terminalRoutes(fastify: FastifyInstance) {
 
   // POST /terminal/sessions - セッション作成（または既存セッション再利用）
   fastify.post<{ Body: CreateSessionBody }>('/terminal/sessions', async (request, reply) => {
-    const { cwd, env, sessionId: requestedSessionId, command } = request.body ?? {};
+    const { cwd, env, sessionId: requestedSessionId, claude } = request.body ?? {};
+    let { command } = request.body ?? {};
 
     const sessionId = requestedSessionId ?? crypto.randomUUID();
 
@@ -285,22 +314,26 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         fastify.log.warn({ err }, 'Failed to load env vars');
       }
 
-      // Ollama タブ: Anthropic の代わりに Ollama の Anthropic 互換 API で claude を動かす。
+      // ローカルLLMタブ: Anthropic の代わりに tsunagi の中継口（→ Ollama / LM Studio）で claude を動かす。
       // DB の環境変数より後に適用し、Anthropic の認証トークンは環境変数ごと取り除く。
       let providerEnv: Record<string, string> = {};
       let unsetKeys: string[] = [];
-      if (tabMode === 'ollama') {
-        const ollama = await getOllamaSettings();
-        if (!ollama.model) {
+      if (isLocalLlmMode(tabMode as TabMode | undefined)) {
+        try {
+          providerEnv = await prepareLocalLlm();
+        } catch (err) {
           return reply
             .status(400)
-            .send({ error: 'Ollama のモデルが未設定です。Settings で設定してください' });
+            .send({ error: err instanceof Error ? err.message : String(err) });
         }
-        providerEnv = buildOllamaEnv(ollama);
-        unsetKeys = OLLAMA_UNSET_ENV_KEYS;
+        unsetKeys = LOCAL_LLM_UNSET_ENV_KEYS;
       }
 
-      // 優先順位: リクエストで渡されたenv > Ollama等のprovider env > DB env(global/owner/repo) > tsunagi独自のEDITOR設定
+      if (claude) {
+        command = await buildClaudeCommand(sessionId, (tabMode ?? 'claude') as TabMode);
+      }
+
+      // 優先順位: リクエストで渡されたenv > ローカルLLMのprovider env > DB env(global/owner/repo) > tsunagi独自のEDITOR設定
       // tsunagi-editor.sh をデフォルトにすることで Ctrl+G が Monaco Modal を開く。
       // DB / リクエストで EDITOR が明示設定されている場合はそちらが優先される。
       const tsunagiDefaultEnv: Record<string, string> = {
@@ -321,6 +354,8 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         // いると、次回 claude 起動時にオンボーディングウィザードが表示され --resume/
         // --session-id を前提にした自動起動フローが止まるため、起動前に補正する。
         await ensureClaudeOnboardingCompleted();
+        // 監視の取りこぼしに備え、起動前にも中継口の名前が既定モデルに残っていないか補正する
+        await removeLocalModelFromUserSettings(LOCAL_MODEL_ALIAS);
         // シェルの初期化（プロンプト表示）を待つため少し遅延させて書き込む
         setTimeout(() => {
           session.pty.write(cmd);
@@ -333,6 +368,27 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({ error: message });
     }
   });
+
+  // POST /terminal/sessions/:sessionId/claude - 既存 PTY で claude を（再）起動する
+  // コマンドはタブの mode に応じてサーバーで組み立てる（ローカルLLMタブは引数が付くため）
+  fastify.post<{ Params: { sessionId: string } }>(
+    '/terminal/sessions/:sessionId/claude',
+    async (request, reply) => {
+      const { sessionId } = request.params;
+      const session = ptyManager.getSession(sessionId);
+      if (!session) {
+        return reply.status(404).send({ error: 'Session not found' });
+      }
+      const tab = await prisma.tab.findUnique({ where: { tabId: sessionId } }).catch(() => null);
+      const mode = (tab?.mode ?? 'claude') as TabMode;
+      if (isLocalLlmMode(mode)) {
+        // 最初の発言を待たせないよう読み込みを始めておく（未設定等のエラーは中継口がタブに返す）
+        ensureActiveLoaded().catch(() => undefined);
+      }
+      session.pty.write(`${await buildClaudeCommand(sessionId, mode)}\n`);
+      return reply.status(204).send();
+    }
+  );
 
   // DELETE /terminal/sessions/:sessionId - セッション明示削除（PTY kill）
   fastify.delete<{ Params: { sessionId: string } }>(

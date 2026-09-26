@@ -1,72 +1,47 @@
 ---
-title: Ollama (Experimental)
-description: Run Claude Code with a local LLM served by Ollama.
+title: Ollama
+description: Use Ollama as a provider for local LLM tabs.
 ---
 
-import { Callout } from 'nextra/components';
+# Ollama
 
-# Ollama (Experimental)
-
-You can create tabs that run Claude Code against a local LLM by pointing
-it at [Ollama](https://ollama.com)'s Anthropic-compatible API. Because
-the tab still runs Claude Code itself, hooks, the plugin, MCP and todo
-tracking work the same as in a regular Claude tab.
-
-<Callout type="warning">
-  Anthropic does not support connecting Claude Code to non-Claude models, so this is not guaranteed
-  to work.
-</Callout>
+You can use [Ollama](https://ollama.com) as a provider for
+[Local LLM (experimental)](/en/features/local-llm/).
 
 ## Setup
 
 You install Ollama, pull models and start the server yourself.
 
 1. Install Ollama v0.14.0 or later (the official app, or `brew install ollama`)
-2. Pull a model (e.g. `ollama pull qwen3.8:27b`)
-3. Set the context length to 64k or more
-   - App: the slider in its settings
-   - CLI: `OLLAMA_CONTEXT_LENGTH=65536 ollama serve`
-4. To use WebSearch, sign in to ollama.com with `ollama signin`
-   (see [WebSearch / WebFetch](#websearch--webfetch))
-5. In Tsunagi settings (Global), enable **Ollama (実験的機能)**, set the
-   model and context length, and save
+2. Pull a model (e.g. `ollama pull qwen3.6:35b-a3b-coding-nvfp4`; see
+   [Recommended models](/en/features/local-llm/#recommended-models))
+3. Enable **Ollama** in Tsunagi's settings (Global)
+4. Pick an Ollama model under **Claude Code のローカルLLM (実験的機能)** and save
 
-Once enabled, an Ollama icon button appears in the task detail view.
+The Ollama section shows the connection status, version and loaded models.
+You can change the Base URL (default `http://localhost:11434`,
+`host.docker.internal` in Docker) in the advanced settings.
 
-## Settings
+## Context length
 
-| Field          | Description                                                                         |
-| -------------- | ----------------------------------------------------------------------------------- |
-| Base URL       | Ollama URL. Defaults to `http://localhost:11434` (`host.docker.internal` in Docker) |
-| Model          | Model name. Pulled models are offered as suggestions                                |
-| Context length | Must match Ollama's value. Used by Claude Code to decide when to auto-compact       |
-| Extra env vars | Environment variables injected only into Ollama tabs (`KEY=VALUE`)                  |
+Ollama's Anthropic-compatible API cannot take a context length per
+request, so Ollama's global default is used (4k below 24 GiB of VRAM, 32k
+for 24–48 GiB, 256k for 48 GiB or more). Tsunagi therefore creates a
+derived model with the configured context length baked in
+(`<model>-tsunagi-ctx<length>`) and uses it. It shares the weights with the
+original model, so it takes no extra disk space.
 
-Ollama tabs launch Claude Code with Anthropic credentials
-(`ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`) removed and
-`ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL` and related variables injected.
-Changes apply to newly created tabs.
+## WebSearch via ollama.com
 
-With Ollama configured, you can finish setup without an Anthropic token.
+If you set WebSearch to "ollama.com" under "Claude Code のローカルLLM" and the model in use
+is an Ollama model, Ollama runs Claude Code's WebSearch through
+ollama.com's web search API.
 
-## WebSearch / WebFetch
+- Requires `ollama signin` on the machine running Ollama (the Ollama
+  section shows the sign-in status)
+- Without sign-in, WebSearch fails with `Web search error: unavailable`
+- Queries are sent to ollama.com
+- Not available with `OLLAMA_NO_CLOUD=1` (or cloud disabled in the app)
 
-| Tool      | How it works                                                                             | Requirement                                   |
-| --------- | ---------------------------------------------------------------------------------------- | --------------------------------------------- |
-| WebSearch | Ollama handles the `web_search` server tool and searches via ollama.com's web search API | `ollama signin` on the machine running Ollama |
-| WebFetch  | Claude Code fetches the page itself and summarizes it with the Ollama model              | None (summarizing on a local model is slow)   |
-
-- Without sign-in, WebSearch fails with `Web search error: unavailable`.
-  The **WebSearch** row in settings shows the sign-in status.
-- Search queries are sent to ollama.com. A free account works, subject to
-  usage limits.
-- WebSearch is unavailable when cloud features are disabled
-  (`OLLAMA_NO_CLOUD=1` or the app setting).
-
-## Caveats
-
-- If `~/.claude/settings.json` sets `ANTHROPIC_*` under `env`, it takes
-  precedence and Claude Code will not connect to Ollama.
-- Tool calls break when the context length is too small. Ollama defaults
-  to 4k on machines with less than 24 GiB of VRAM.
-- Response speed depends heavily on your hardware and model.
+The default "local search (SearXNG)" searches locally without signing in
+(see [Local search](/en/features/local-search/)).

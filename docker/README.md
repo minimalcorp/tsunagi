@@ -45,6 +45,11 @@ make up
 - Web UI / API / WebSocket: http://localhost:2891 （すべてここ経由）
 - Docs: http://localhost:2893
 
+ローカルLLM（実験的機能）関連:
+
+- SearXNG（ローカル検索）は container に同梱。Ollama / LM Studio を有効にすると tsunagi が container 内で自動起動する
+- LM Studio のサーバーは container 内から起動できないため、`make up` がホストで起動し、`make down` で停止する（`lms` が無ければスキップ）
+
 ### Basic 認証付きで起動（cloudflared 等で外部公開する場合）
 
 外部公開時は認証なしだと脆弱なため、Basic 認証を有効化して起動する。

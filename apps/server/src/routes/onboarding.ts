@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getEnv } from '../lib/repositories/environment.js';
-import { getOllamaSettings, isOllamaReady } from '../lib/ollama-settings.js';
+import { isLocalLlmReady } from '../lib/local-llm.js';
 
 export async function onboardingRoutes(fastify: FastifyInstance) {
   // GET /onboarding/status
@@ -10,11 +10,11 @@ export async function onboardingRoutes(fastify: FastifyInstance) {
       const hasGlobalToken = Boolean(
         globalEnv.ANTHROPIC_API_KEY || globalEnv.CLAUDE_CODE_OAUTH_TOKEN
       );
-      // 実験的機能の Ollama を設定済みなら、Anthropic のトークンがなくても claude を起動できる
-      const ollamaReady = isOllamaReady(await getOllamaSettings());
+      // 実験的機能のローカルLLM（Ollama / LM Studio）を設定済みなら、Anthropic のトークンがなくても claude を起動できる
+      const localLlmReady = await isLocalLlmReady();
 
       return reply.status(200).send({
-        data: { completed: hasGlobalToken || ollamaReady, hasGlobalToken, ollamaReady },
+        data: { completed: hasGlobalToken || localLlmReady, hasGlobalToken, localLlmReady },
       });
     } catch (error) {
       fastify.log.error(error, 'GET /onboarding/status error');

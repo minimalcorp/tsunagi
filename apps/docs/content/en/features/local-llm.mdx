@@ -1,0 +1,103 @@
+---
+title: Local LLM (Experimental)
+description: Run Claude Code with a local LLM served by Ollama or LM Studio.
+---
+
+import { Callout } from 'nextra/components';
+
+# Local LLM (Experimental)
+
+You can create tabs that run Claude Code against a local LLM served by
+[Ollama](/en/features/ollama/) or [LM Studio](/en/features/lm-studio/).
+Because the tab still runs Claude Code itself, hooks, the plugin and todo
+tracking work the same as in a regular Claude tab.
+
+<Callout type="warning">
+  Anthropic does not support connecting Claude Code to non-Claude models, so this is not guaranteed
+  to work.
+</Callout>
+
+## Setup
+
+1. In Tsunagi's settings (Global), enable **Ollama** and/or **LM Studio**
+2. Under **Claude Code のローカルLLM (実験的機能)**, pick the model and context length to use, and save
+3. Create a tab with the local LLM button (the logo of the provider in use) on the task detail page
+
+Configuring a local LLM lets you finish setup without registering an
+Anthropic token.
+
+## One model at a time
+
+Few machines can hold two 20–30 GB models in memory at once, so Tsunagi
+uses a single model across Ollama and LM Studio and shares it among all
+local LLM tabs.
+
+- Claude Code in a local LLM tab connects to Tsunagi's relay
+  (`/api/local-llm/proxy`), which rewrites the model name to the model in
+  use and forwards the request to Ollama / LM Studio
+- If the model in use is not in memory, Tsunagi unloads every other model
+  first and then loads it
+- You switch models only in Settings; existing tabs use the new model from
+  their next message (re-reading the whole conversation takes tens of
+  seconds to minutes)
+- You cannot switch while a tab is generating a response
+
+### /model
+
+Local LLM tabs disable model switching with `/model`. Claude Code saves the
+model you pick with `/model` to `~/.claude/settings.json` as your default,
+which would also affect regular Claude tabs.
+
+- The `/model` picker lists only "ローカルLLM"
+- Switching to another model is refused by a PreModelSwitch hook
+- Pressing Enter on "ローカルLLM" makes Claude Code save it as your default,
+  but Tsunagi removes it right away
+- Picking **Default** removes the default model saved in
+  `~/.claude/settings.json` (Claude Code behavior)
+
+## Freeing memory
+
+| When                                               | What happens                          |
+| -------------------------------------------------- | ------------------------------------- |
+| A set time after the last request (15 min default) | Unloads the model (0 disables it)     |
+| The **解放** button in Settings                    | Unloads the model                     |
+| Tsunagi exits                                      | Unloads the model (can be turned off) |
+| Switching models or disabling a provider           | Unloads the models no longer in use   |
+
+After unloading, the model is loaded again automatically on the next message.
+
+## Settings
+
+| Setting        | Description                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------- |
+| Model          | Pick from the models downloaded to the enabled providers                                           |
+| Context length | `64k` / `128k` / `1m` or an integer (k = 1024). Also used for Claude Code's auto-compact threshold |
+| Auto unload    | Unloads the model this many minutes after the last request                                         |
+| WebSearch      | [Local search (SearXNG)](/en/features/local-search/) / ollama.com (Ollama only, requires sign-in)  |
+| Extra env vars | Environment variables injected only into local LLM tabs (`KEY=VALUE`)                              |
+
+WebSearch and extra env vars apply to tabs created or started afterwards.
+
+## Recommended models
+
+MoE models (few active parameters) are recommended. Measured on an M1 Max
+(64 GB) with about 25k tokens (roughly Claude Code's first request):
+
+| Provider  | Model                                    | First prefill    | Cached prefill | Generation |
+| --------- | ---------------------------------------- | ---------------- | -------------- | ---------- |
+| Ollama    | `qwen3.6:35b-a3b-coding-nvfp4`           | 42 s (588 tok/s) | 0.6 s          | 61 tok/s   |
+| LM Studio | `mlx-community/Qwen3.6-35B-A3B-4bit`     | 49 s (512 tok/s) | 0.7 s          | 55 tok/s   |
+| Ollama    | `qwen3.8:27b-mlx` (dense)                | 314 s (79 tok/s) | 3.6 s          | 15 tok/s   |
+| LM Studio | `mlx-community/Qwen3.8-27B-4bit` (dense) | 319 s (78 tok/s) | 2.5 s          | 12 tok/s   |
+
+For the same model generation and similar quantization, Ollama (MLX) and
+LM Studio (MLX) performed about the same.
+
+Benchmark script: `node apps/server/scripts/bench-local-llm.mjs --provider ollama|lmstudio --model <model>`
+
+## Notes
+
+- If `env` in `~/.claude/settings.json` sets `ANTHROPIC_*`, it takes
+  precedence and Claude Code will not connect to the relay.
+- MCP in local LLM tabs is narrowed down to Tsunagi's task management and
+  `web_search` (see [Narrowing MCP](/en/features/local-search/#narrowing-mcp)).

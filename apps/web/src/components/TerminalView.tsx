@@ -19,6 +19,7 @@ import { MonacoEditorModal } from '@/components/MonacoEditorModal';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { apiUrl, getServerUrl } from '@/lib/api-url';
+import { toaster } from '@/lib/toaster';
 
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
 export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
@@ -42,11 +43,10 @@ interface TerminalViewProps {
   /** PTYに渡す環境変数 */
   env?: Record<string, string>;
   /**
-   * PTY起動後にシェルへ自動入力するコマンド。
-   * 例: "claude --session-id <uuid>"
-   * 新規セッション作成時のみ有効（reused時は無視）。
+   * PTY起動後に claude を自動起動するか。コマンドはタブの mode に応じてサーバーが組み立てる
+   * （ローカルLLMタブは MCP の絞り込み等の引数が付く）。新規セッション作成時のみ有効（reused時は無視）。
    */
-  command?: string;
+  launchClaude?: boolean;
   className?: string;
   /** DBから読み込んだ初期Todoリスト */
   initialTodos?: Todo[];
@@ -77,7 +77,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     tabId,
     cwd,
     env,
-    command,
+    launchClaude = false,
     className = '',
     initialTodos,
     initialClaudeStatus,
@@ -524,7 +524,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       const res = await fetch(apiUrl('/api/terminal/sessions'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cwd, env, sessionId, command }),
+        body: JSON.stringify({ cwd, env, sessionId, claude: launchClaude }),
         signal,
       });
 
@@ -650,7 +650,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     socket.on('error', ({ message }: { message: string }) => {
       console.error('[TerminalView] Socket error message:', message);
       // サーバ側セッションが GC 済み等で存在しない場合、再接続では join が必ず失敗するため
-      // セッションを作り直す（POST /sessions で PTY を再起動し、command があれば claude を resume）。
+      // セッションを作り直す（POST /sessions で PTY を再起動し、launchClaude なら claude を resume）。
       // 無限ループ防止のため自動再生成は1回までに制限し、connect 成功でリセットする。
       if (message.startsWith('Session not found') && sessionRecreateRef.current < 1) {
         sessionRecreateRef.current += 1;
@@ -727,12 +727,23 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     });
   }, [tabId]);
 
-  function handleRunClaude() {
-    const socket = socketRef.current;
+  // コマンドはタブの mode に応じてサーバーが組み立てて PTY に書き込む
+  async function handleRunClaude() {
     const sid = sessionIdRef.current;
-    if (!socket || !socket.connected || !sid) return;
-    const claudeCmd = `claude --dangerously-skip-permissions --resume ${sid} 2>/dev/null || claude --dangerously-skip-permissions --session-id ${sid}\n`;
-    socket.emit('input', { sessionId: sid, data: claudeCmd });
+    if (!sid) return;
+    try {
+      const res = await fetch(apiUrl(`/api/terminal/sessions/${sid}/claude`), { method: 'POST' });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || `HTTPエラー: ${res.status}`);
+      }
+    } catch (error) {
+      toaster.create({
+        type: 'error',
+        title: 'Claude を起動できません',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   const isConnecting = status === 'connecting';
@@ -764,7 +775,12 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
           >
             {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
           </Button>
-          <Button size="xs" onClick={handleRunClaude} disabled={!isConnected} title="Run Claude">
+          <Button
+            size="xs"
+            onClick={() => void handleRunClaude()}
+            disabled={!isConnected}
+            title="Run Claude"
+          >
             <Play className="w-3 h-3" />
             Run Claude
           </Button>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useImperativeHandle, forwardRef, useEffect } from 'react';
-import type { Tab, Task } from '@minimalcorp/tsunagi-shared';
+import type { LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
 import {
   TerminalView,
@@ -12,8 +12,12 @@ import {
 } from '@/components/TerminalView';
 import { Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ClaudeIcon, OllamaIcon } from '@/components/icons/BrandIcons';
-import { useOllamaSettings } from '@/hooks/useOllamaSettings';
+import { ClaudeIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
+import {
+  useLmStudioSettings,
+  useLocalLlmSettings,
+  useOllamaSettings,
+} from '@/hooks/useLocalLlmSettings';
 
 export interface TabStatusEntry {
   terminal: TerminalStatus;
@@ -35,6 +39,14 @@ interface TerminalPanelProps {
 
 /** タブ追加モード */
 export type TabCreateMode = Tab['mode'];
+
+/** ローカルLLMタブの作成ボタン（Ollama / LM Studio のどちらかが有効なときだけ出す） */
+export interface LocalLlmTabOption {
+  /** 使用中のモデルのプロバイダー（アイコン用）。未設定なら null */
+  provider: LocalLlmProvider | null;
+  /** 使用中のモデル。未設定（空）ならボタンを無効化する */
+  model: string;
+}
 
 /** TerminalPanelの外部からアクセス可能なハンドル */
 export interface TerminalPanelHandle {
@@ -174,11 +186,19 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     const handleTabCreateClaude = useCallback(() => handleTabCreate('claude'), [handleTabCreate]);
 
-    const handleTabCreateOllama = useCallback(() => handleTabCreate('ollama'), [handleTabCreate]);
+    const handleTabCreateLocalLlm = useCallback(() => handleTabCreate('local'), [handleTabCreate]);
 
-    // 実験的機能 Ollama が有効なときだけ Ollama タブの作成ボタンを出す
+    // 実験的機能のローカルLLMは、プロバイダーが有効なときだけタブの作成ボタンを出す
     const { settings: ollamaSettings } = useOllamaSettings();
-    const ollamaEnabled = ollamaSettings?.enabled === true;
+    const { settings: lmStudioSettings } = useLmStudioSettings();
+    const { settings: localLlmSettings } = useLocalLlmSettings();
+    const localLlmOption: LocalLlmTabOption | undefined =
+      ollamaSettings?.enabled || lmStudioSettings?.enabled
+        ? {
+            provider: localLlmSettings?.active?.provider ?? null,
+            model: localLlmSettings?.active?.model ?? '',
+          }
+        : undefined;
 
     const handleVoiceInputTranscribed = useCallback(
       (text: string) => {
@@ -216,8 +236,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             onTabChange={handleTabChange}
             onTabCreateTerminal={handleTabCreateTerminal}
             onTabCreateClaude={handleTabCreateClaude}
-            onTabCreateOllama={ollamaEnabled ? handleTabCreateOllama : undefined}
-            ollamaModel={ollamaSettings?.model}
+            localLlmOption={localLlmOption}
+            onTabCreateLocalLlm={handleTabCreateLocalLlm}
             onTabDelete={handleTabDelete}
             tabStatusMap={tabStatusMap}
             onVoiceInputTranscribed={tabs.length > 0 ? handleVoiceInputTranscribed : undefined}
@@ -253,11 +273,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   tabId={tab.tab_id}
                   isActive={isActive}
                   cwd={task.worktreePath}
-                  command={
-                    tab.mode === 'terminal'
-                      ? undefined
-                      : `claude --dangerously-skip-permissions --resume ${tab.tab_id} 2>/dev/null || claude --dangerously-skip-permissions --session-id ${tab.tab_id}`
-                  }
+                  launchClaude={tab.mode !== 'terminal'}
                   className="h-full"
                   initialTodos={tab.todos}
                   initialClaudeStatus={tab.status as ClaudeStatus}
@@ -276,21 +292,21 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   <ClaudeIcon className="w-4 h-4" />
                   Claude Code
                 </Button>
-                {ollamaEnabled && (
+                {localLlmOption && (
                   <span
                     title={
-                      ollamaSettings?.model
-                        ? `Claude Code (Ollama: ${ollamaSettings.model})`
-                        : 'Ollama のモデルが未設定です（Settings で設定）'
+                      localLlmOption.model
+                        ? `Claude Code (ローカルLLM: ${localLlmOption.model})`
+                        : 'ローカルLLMのモデルが未設定です（Settings で設定）'
                     }
                   >
                     <Button
                       variant="outline"
-                      onClick={handleTabCreateOllama}
-                      disabled={!ollamaSettings?.model}
+                      onClick={() => void handleTabCreateLocalLlm()}
+                      disabled={!localLlmOption.model}
                     >
-                      <OllamaIcon className="w-4 h-4" />
-                      Claude Code (Ollama)
+                      <LocalLlmTabIcon provider={localLlmOption.provider} className="w-4 h-4" />
+                      Claude Code (ローカルLLM)
                     </Button>
                   </span>
                 )}

@@ -13,11 +13,11 @@ import {
   XCircle,
   MessageSquare,
 } from 'lucide-react';
-import type { TabStatusEntry } from '@/components/TerminalPanel';
+import type { LocalLlmTabOption, TabStatusEntry } from '@/components/TerminalPanel';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
 import { VoiceInputButton } from '@/components/VoiceInputButton';
-import { ClaudeIcon, OllamaIcon } from '@/components/icons/BrandIcons';
+import { ClaudeIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
 
 interface SessionTabsProps {
   tabs: Tab[];
@@ -27,10 +27,9 @@ interface SessionTabsProps {
   onTabCreateTerminal?: () => void;
   /** Terminalを追加してClaudeを起動するタブ追加 */
   onTabCreateClaude: () => void;
-  /** Ollama(ローカルLLM)でClaudeを起動するタブ追加（省略時はボタン非表示） */
-  onTabCreateOllama?: () => void;
-  /** Ollama で使うモデル名（未設定ならOllamaボタンを無効化） */
-  ollamaModel?: string;
+  /** ローカルLLM（Settings で選んだ使用中のモデル）でClaudeを起動するタブ追加（省略時はボタン非表示） */
+  localLlmOption?: LocalLlmTabOption;
+  onTabCreateLocalLlm?: () => void;
   onTabDelete: (tabId: string) => void;
   /** タブごとのリアルタイムステータス */
   tabStatusMap?: Map<string, TabStatusEntry>;
@@ -124,8 +123,8 @@ export function SessionTabs({
   onTabChange,
   onTabCreateTerminal,
   onTabCreateClaude,
-  onTabCreateOllama,
-  ollamaModel,
+  localLlmOption,
+  onTabCreateLocalLlm,
   onTabDelete,
   tabStatusMap,
   onVoiceInputTranscribed,
@@ -213,9 +212,12 @@ export function SessionTabs({
                   <span className="text-xs">terminal {terminalNumbers.get(tab.tab_id)}</span>
                 ) : (
                   <>
-                    {tab.mode === 'ollama' && (
-                      <span title="Claude Code (Ollama)">
-                        <OllamaIcon className="w-3 h-3" />
+                    {(tab.mode === 'local' || tab.mode === 'ollama' || tab.mode === 'lmstudio') && (
+                      <span title="Claude Code (ローカルLLM)">
+                        <LocalLlmTabIcon
+                          provider={localLlmOption?.provider ?? null}
+                          className="w-3 h-3"
+                        />
                       </span>
                     )}
                     <TabStatusIndicator entry={entry} />
@@ -248,17 +250,17 @@ export function SessionTabs({
           <Button size="icon" onClick={onTabCreateClaude} title="Claude Code (Anthropic)">
             <ClaudeIcon className="w-4 h-4" />
           </Button>
-          {onTabCreateOllama && (
+          {localLlmOption && (
             // disabled の Button は pointer-events:none で title が出ないため span に付ける
             <span
               title={
-                ollamaModel
-                  ? `Claude Code (Ollama: ${ollamaModel})`
-                  : 'Ollama のモデルが未設定です（Settings で設定）'
+                localLlmOption.model
+                  ? `Claude Code (ローカルLLM: ${localLlmOption.model})`
+                  : 'ローカルLLMのモデルが未設定です（Settings で設定）'
               }
             >
-              <Button size="icon" onClick={onTabCreateOllama} disabled={!ollamaModel}>
-                <OllamaIcon className="w-4 h-4" />
+              <Button size="icon" onClick={onTabCreateLocalLlm} disabled={!localLlmOption.model}>
+                <LocalLlmTabIcon provider={localLlmOption.provider} className="w-4 h-4" />
               </Button>
             </span>
           )}

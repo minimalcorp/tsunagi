@@ -27,6 +27,8 @@ services:
       - TSUNAGI_LLM_SERVER_URL=http://host.docker.internal:8766
       # 実験的機能 Ollama もホスト側で起動する前提（Settings の Base URL の既定値になる）。
       - TSUNAGI_OLLAMA_URL=http://host.docker.internal:11434
+      # LM Studio も同様（サーバー起動・見積もりの lms CLI は container 内にないため使えない）。
+      - TSUNAGI_LMSTUDIO_URL=http://host.docker.internal:1234
     ports:
       - '2891:2791'
       - '2892:2792'

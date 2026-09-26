@@ -1,0 +1,38 @@
+---
+title: LM Studio
+description: ローカルLLMのプロバイダーとして LM Studio を使う。
+---
+
+# LM Studio
+
+[ローカルLLM（実験的機能）](/ja/features/local-llm/) のプロバイダーとして [LM Studio](https://lmstudio.ai)（0.4.1 以降、Anthropic 互換 API）を使えます。MLX / GGUF のモデルを Hugging Face から直接ダウンロードできるため、新しいモデルを試すのに向いています。
+
+## セットアップ
+
+1. [lmstudio.ai/download](https://lmstudio.ai/download) から LM Studio をインストールし、一度起動する（`lms` CLI が `~/.lmstudio/bin` に入ります）
+2. Discover タブでモデルをダウンロードする（例: `mlx-community/Qwen3.6-35B-A3B-4bit`。[推奨モデル](/ja/features/local-llm/#推奨モデル)）
+3. 設定画面（Global）の **LM Studio** で有効化し、サーバーを起動する
+4. **Claude Code のローカルLLM (実験的機能)** で LM Studio のモデルを選んで保存する
+
+## 設定画面でできること
+
+| 項目     | 説明                                                                      |
+| -------- | ------------------------------------------------------------------------- |
+| サーバー | 状態・読み込み中のモデルの表示、起動・停止（`lms server start` / `stop`） |
+| 詳細設定 | Base URL（既定 `http://localhost:1234`）・API トークン・`lms` のパス      |
+
+API トークンは LM Studio で「Require Authentication」を有効にしている場合のみ必要です。
+
+サーバーの起動・停止には `lms` CLI を使うため、Tsunagi と LM Studio が同じマシンで動いている必要があります。Tsunagi を Docker で動かしている場合（`make up`）はコンテナ内に `lms` がないため、ホストで起動します。`make up` は LM Studio が入っていればサーバーも起動し、`make down` で停止します（個別には `make lmstudio-start` / `make lmstudio-stop`）。LM Studio アプリの Developer タブから起動しても構いません。接続は `host.docker.internal:1234` 経由で行われ、ポートの設定は不要です。
+
+## モデルの読み込みと解放
+
+LM Studio は、手動で読み込んだモデルを明示的に解放するまでメモリに残します。Tsunagi は使用中のモデルを設定のコンテキスト長で読み込み、使わなくなったら解放します（[メモリの解放](/ja/features/local-llm/#メモリの解放)）。
+
+- LM Studio の自動読み込み（JIT）に任せるとコンテキスト長が LM Studio 側の既定値になり、長いプロンプトが切り詰められて tool call が壊れることがあるため、Tsunagi が読み込みます
+- MLX モデルは指定に関わらずモデルの最大値で読み込まれます（KV キャッシュが動的に確保されるため、メモリは使った分だけ増えます）
+- 「Claude Code のローカルLLM」欄で LM Studio のモデルを選ぶと、必要メモリの見積もり（`lms load --estimate-only`）が表示されます
+
+## WebSearch
+
+LM Studio は Claude Code の WebSearch（Anthropic のサーバーツール）を無視するため、常に [ローカル検索](/ja/features/local-search/) の `web_search` ツールを使います。

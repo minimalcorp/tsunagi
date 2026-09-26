@@ -1,0 +1,64 @@
+---
+title: Local Search (Experimental)
+description: Web search with SearXNG in local LLM tabs.
+---
+
+import { Callout } from 'nextra/components';
+
+# Local Search (Experimental)
+
+Claude Code's WebSearch is an Anthropic server tool, so it does not work
+as-is in [local LLM](/en/features/local-llm/) tabs (LM Studio ignores it, and
+Ollama requires signing in to ollama.com). Tabs that use local search disable WebSearch and instead use the
+`web_search` tool provided by Tsunagi's MCP, which queries a
+[SearXNG](https://docs.searxng.org/) instance on your machine.
+
+## Setup
+
+You install SearXNG yourself. If `searxng-run` is on your PATH, nothing
+else is needed.
+
+```bash
+# nix
+nix profile install nixpkgs#searxng
+```
+
+For other methods, see the
+[SearXNG installation guide](https://docs.searxng.org/admin/installation.html).
+If it is not on your PATH, set the `searxng-run` path in the advanced
+settings.
+
+When Tsunagi runs in Docker (`make up`), the container already includes
+SearXNG, so no installation is needed.
+
+## Automatic start / stop
+
+| When                                             | What happens                           |
+| ------------------------------------------------ | -------------------------------------- |
+| Tsunagi starts, or Ollama / LM Studio is enabled | Starts SearXNG (default port `7964`)   |
+| Both Ollama and LM Studio are disabled           | Stops the SearXNG that Tsunagi started |
+| Tsunagi exits                                    | Stops the SearXNG that Tsunagi started |
+
+- If SearXNG already responds on the port, Tsunagi uses it (and never
+  stops it).
+- Tsunagi starts normally even without SearXNG installed. The status is
+  shown under **ローカル検索 (SearXNG)** in the settings.
+- Tsunagi starts SearXNG with a generated settings file
+  (`~/.tsunagi/searxng/settings.yml`, with JSON results enabled). If you
+  use your own settings file, include `json` in `search.formats`.
+
+## Narrowing MCP
+
+With a custom `ANTHROPIC_BASE_URL`, Claude Code's MCP tool search is
+disabled and every MCP tool definition is sent with every request. On a
+local LLM this slows down prefill and lowers tool-selection accuracy, so
+tabs with local search start Claude Code with:
+
+- `--strict-mcp-config`: only Tsunagi's task management and `web_search`
+- `--disallowedTools WebSearch`: disable the built-in WebSearch
+- `--append-system-prompt`: tell the model to use `web_search` for web searches
+
+<Callout type="info">
+  SearXNG queries search engines such as Google, Bing and DuckDuckGo. Searching heavily in a short
+  time may get you temporarily blocked by those engines.
+</Callout>
