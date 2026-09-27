@@ -1,16 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
   CircleHelp,
+  Container,
   Loader2,
   PackageX,
   RotateCw,
   Square,
+  SquareTerminal,
 } from 'lucide-react';
-import type { SearxngSettings, SearxngStatus } from '@minimalcorp/tsunagi-shared';
+import type { SearxngMethod, SearxngSettings, SearxngStatus } from '@minimalcorp/tsunagi-shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/Dialog';
@@ -34,8 +36,68 @@ const DOCKER_DOCS_URL = 'https://minimalcorp.github.io/tsunagi/ja/features/local
 
 interface FormState {
   port: string;
+  method: SearxngMethod;
   binPath: string;
   settingsPath: string;
+  dockerContainer: string;
+}
+
+const METHOD_LABELS: Record<SearxngMethod, string> = {
+  auto: '自動（searxng-run → Docker の順）',
+  process: 'searxng-run',
+  docker: 'Docker',
+};
+
+/**
+ * tsunagi が把握している（または次に使う）起動・停止の方法を1行で表す。
+ * 停止するかどうかは tsunagi が起動したものだけ
+ */
+function RunnerInfo({ status }: { status: SearxngStatus }) {
+  const { state, runner, docker } = status;
+  if (state === 'not-installed') return null;
+
+  const container = <Code>{docker.container}</Code>;
+  const bin = <Code>{status.binPath ?? 'searxng-run'}</Code>;
+  let text: ReactNode;
+  if (state === 'external') {
+    text =
+      runner === 'docker' ? (
+        <>Docker コンテナ {container}（tsunagi 外で起動したため、tsunagi は停止しません）</>
+      ) : (
+        <>tsunagi 外で起動した SearXNG（起動方法は不明。tsunagi は停止しません）</>
+      );
+  } else if (state === 'running') {
+    text =
+      runner === 'docker' ? (
+        <>Docker コンテナ {container} を tsunagi が起動しました（停止時・終了時に停止します）</>
+      ) : (
+        <>{bin} を tsunagi が起動しました（停止時・終了時に停止します）</>
+      );
+  } else if (runner === 'docker') {
+    text =
+      docker.containerExists === null ? (
+        <>
+          Docker コンテナ {container} を起動します（Docker が応答しません。Docker Desktop
+          を起動してください）
+        </>
+      ) : docker.containerExists ? (
+        <>Docker コンテナ {container} を起動します</>
+      ) : (
+        <>
+          Docker コンテナ {container} を作成して起動します（初回はイメージの取得に数分かかります）
+        </>
+      );
+  } else {
+    text = <>{bin} を起動します</>;
+  }
+
+  const Icon = runner === 'docker' ? Container : SquareTerminal;
+  return (
+    <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+      <Icon className="mt-px size-3.5 shrink-0" aria-label="起動方法" />
+      <span>{text}</span>
+    </p>
+  );
 }
 
 /**
@@ -70,8 +132,10 @@ export function SearxngSection() {
     if (settings) {
       setForm({
         port: String(settings.port),
+        method: settings.method,
         binPath: settings.binPath,
         settingsPath: settings.settingsPath,
+        dockerContainer: settings.dockerContainer,
       });
     }
   }, [settings]);
@@ -94,8 +158,10 @@ export function SearxngSection() {
       setSettings(
         await putJson<SearxngSettings>('/api/settings/searxng', {
           port: Number(form.port),
+          method: form.method,
           binPath: form.binPath,
           settingsPath: form.settingsPath,
+          dockerContainer: form.dockerContainer,
         })
       );
     } catch (error) {
@@ -136,7 +202,7 @@ export function SearxngSection() {
           <strong className="font-medium text-foreground">
             Ollama か LM Studio が有効な間、tsunagi が自動で起動・停止します
           </strong>
-          。SearXNG のインストールはご自身で行ってください。
+          。searxng-run が無ければ Docker で起動します（コンテナが無ければ作成します）。
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -152,12 +218,13 @@ export function SearxngSection() {
           ) : status.state === 'starting' ? (
             <span className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
-              起動中...
+              {status.message ?? '起動中'}...
             </span>
           ) : status.state === 'not-installed' ? (
             <span className="flex items-center gap-2 text-warning">
               <PackageX className="size-4" />
-              SearXNG が見つかりません（<Code>searxng-run</Code>）
+              SearXNG を起動できません（<Code>searxng-run</Code> も <Code>docker</Code>{' '}
+              も見つかりません）
             </span>
           ) : status.state === 'error' ? (
             <span className="flex items-center gap-2 text-destructive">
@@ -195,6 +262,8 @@ export function SearxngSection() {
           </div>
         </StatusRow>
 
+        <RunnerInfo status={status} />
+
         {status.state === 'error' && status.error && (
           <pre className="max-h-40 overflow-auto rounded-md bg-muted p-2 text-[0.65rem] whitespace-pre-wrap text-destructive">
             {status.error}
@@ -203,18 +272,17 @@ export function SearxngSection() {
 
         {status.state === 'not-installed' && (
           <p className="text-xs text-muted-foreground">
-            nix なら <Code>nix profile install nixpkgs#searxng</Code> などで{' '}
-            <Code>searxng-run</Code> を PATH に入れてください（
-            <a href={DOCS_URL} target="_blank" rel="noreferrer" className="underline">
-              インストール方法
-            </a>
-            ）。PATH にない場合は詳細設定でパスを指定できます。Docker で起動する場合は{' '}
-            <Code>{status.url}</Code> で公開し、settings.yml の search.formats に json
-            を含めてください（
+            Docker Desktop を入れると、tsunagi がコンテナを作成して起動します（
             <a href={DOCKER_DOCS_URL} target="_blank" rel="noreferrer" className="underline">
               手順
             </a>
-            ）。
+            ）。Docker を使わない場合は、nix なら <Code>nix profile install nixpkgs#searxng</Code>{' '}
+            などで <Code>searxng-run</Code> を PATH に入れてください（
+            <a href={DOCS_URL} target="_blank" rel="noreferrer" className="underline">
+              インストール方法
+            </a>
+            ）。PATH
+            にない場合は詳細設定でパスを指定できます。起動方法を固定したい場合も詳細設定で選べます。
           </p>
         )}
 
@@ -230,6 +298,30 @@ export function SearxngSection() {
                 className="font-mono"
               />
             </Field>
+            <Field label="起動方法">
+              <select
+                value={form.method}
+                onChange={(e) => updateForm({ method: e.target.value as SearxngMethod })}
+                className="h-9 w-full rounded-md border border-input bg-transparent pl-3 pr-10 text-sm text-foreground shadow-xs"
+              >
+                {(Object.keys(METHOD_LABELS) as SearxngMethod[]).map((method) => (
+                  <option key={method} value={method}>
+                    {METHOD_LABELS[method]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field
+              label="Docker のコンテナ名"
+              hint="無ければ tsunagi が公式イメージで作成します（設定は ~/.tsunagi/searxng/docker/<コンテナ名>/）"
+            >
+              <Input
+                value={form.dockerContainer}
+                onChange={(e) => updateForm({ dockerContainer: e.target.value })}
+                placeholder="searxng"
+                className="font-mono"
+              />
+            </Field>
             <Field label="searxng-run のパス (任意)" hint="空欄なら PATH から探します">
               <Input
                 value={form.binPath}
@@ -240,7 +332,7 @@ export function SearxngSection() {
             </Field>
             <Field
               label="settings.yml のパス (任意)"
-              hint="空欄なら tsunagi が生成したもの（~/.tsunagi/searxng/settings.yml）を使います。独自のものを使う場合は search.formats に json を含めてください"
+              hint="searxng-run で起動するときのみ。空欄なら tsunagi が生成したもの（~/.tsunagi/searxng/settings.yml）を使います。独自のものを使う場合は search.formats に json を含めてください"
             >
               <Input
                 value={form.settingsPath}
@@ -279,7 +371,9 @@ export function SearxngSection() {
             <p className="font-medium text-foreground">自動起動・停止</p>
             <p className="text-muted-foreground">
               Ollama か LM Studio が有効なら、tsunagi の起動時・有効化時に SearXNG
-              を起動し、両方を無効にしたときと tsunagi の終了時に停止します。既にポートで SearXNG
+              を起動し、両方を無効にしたときと tsunagi の終了時に停止します。起動方法は{' '}
+              <Code>searxng-run</Code> があればそれを、なければ
+              Docker（コンテナが無ければ作成）を使います。既にポートで SearXNG
               が動いていればそれを使います（tsunagi は止めません）。SearXNG がなくても tsunagi
               自体は通常どおり動きます。
             </p>
