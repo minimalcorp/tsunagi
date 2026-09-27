@@ -1,4 +1,8 @@
+import { randomUUID } from 'crypto';
+import { mkdir, rename, writeFile } from 'fs/promises';
+import * as path from 'path';
 import type { TabMode } from '@minimalcorp/tsunagi-shared';
+import { getStateDir } from './data-path.js';
 import { LOCAL_MODEL_ALIAS } from './local-llm-env.js';
 import { getLocalLlmSettings } from './local-llm.js';
 
@@ -92,10 +96,29 @@ async function localLlmArgs(): Promise<string[]> {
   return args;
 }
 
+/**
+ * ローカルLLMタブの claude を起動するスクリプトを書き出し、そのパスを返す。
+ * 起動コマンドは PTY に1行で書き込むため、macOS の端末入力の1行上限（MAX_CANON = 1024 バイト）を
+ * 超えると後ろが切り捨てられる。引数の JSON をコマンドに直接載せると上限を超え、
+ * `|| claude ... --session-id` 側が途中で切れてタブと別のセッションIDで起動してしまう
+ * （hooks がタブに紐づかず、--settings / --mcp-config も効かない）。そのため引数はスクリプトに閉じ込める
+ */
+async function writeLocalLlmLauncher(args: string[]): Promise<string> {
+  const dir = path.join(getStateDir(), 'local-llm');
+  await mkdir(dir, { recursive: true });
+  const file = path.join(dir, 'claude.sh');
+  // 複数タブの同時起動で書きかけのファイルを読まないよう、書き終えてから置き換える
+  const tmp = `${file}.${randomUUID()}.tmp`;
+  await writeFile(tmp, `#!/bin/sh\nexec claude ${args.join(' ')} "$@"\n`);
+  await rename(tmp, file);
+  return file;
+}
+
 /** タブの mode に応じた claude の起動コマンド（既存セッションがあれば resume） */
 export async function buildClaudeCommand(sessionId: string, mode: TabMode): Promise<string> {
   const args = ['--dangerously-skip-permissions'];
-  if (isLocalLlmMode(mode)) args.push(...(await localLlmArgs()));
-  const claude = `claude ${args.join(' ')}`;
+  const claude = isLocalLlmMode(mode)
+    ? `sh ${shellQuote(await writeLocalLlmLauncher([...args, ...(await localLlmArgs())]))}`
+    : `claude ${args.join(' ')}`;
   return `${claude} --resume ${sessionId} 2>/dev/null || ${claude} --session-id ${sessionId}`;
 }
