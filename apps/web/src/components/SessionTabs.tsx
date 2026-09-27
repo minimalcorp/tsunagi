@@ -18,6 +18,7 @@ import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
 import { VoiceInputButton } from '@/components/VoiceInputButton';
 import { ClaudeIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
+import { localLlmTabLabel } from '@/lib/local-llm';
 
 interface SessionTabsProps {
   tabs: Tab[];
@@ -213,7 +214,7 @@ export function SessionTabs({
                 ) : (
                   <>
                     {(tab.mode === 'local' || tab.mode === 'ollama' || tab.mode === 'lmstudio') && (
-                      <span title="Claude Code (ローカルLLM)">
+                      <span title={localLlmTabLabel(localLlmOption?.provider ?? null)}>
                         <LocalLlmTabIcon
                           provider={localLlmOption?.provider ?? null}
                           className="w-3 h-3"
@@ -247,7 +248,7 @@ export function SessionTabs({
               <Terminal className="w-4 h-4" />
             </Button>
           )}
-          <Button size="icon" onClick={onTabCreateClaude} title="Claude Code (Anthropic)">
+          <Button size="icon" onClick={onTabCreateClaude} title="Claude Code">
             <ClaudeIcon className="w-4 h-4" />
           </Button>
           {localLlmOption && (
@@ -255,7 +256,7 @@ export function SessionTabs({
             <span
               title={
                 localLlmOption.model
-                  ? `Claude Code (ローカルLLM: ${localLlmOption.model})`
+                  ? `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
                   : 'ローカルLLMのモデルが未設定です（Settings で設定）'
               }
             >

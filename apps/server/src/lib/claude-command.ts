@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { mkdir, rename, writeFile } from 'fs/promises';
 import * as path from 'path';
-import type { TabMode } from '@minimalcorp/tsunagi-shared';
+import type { LocalLlmProvider, TabMode } from '@minimalcorp/tsunagi-shared';
 import { getStateDir } from './data-path.js';
 import { LOCAL_MODEL_ALIAS } from './local-llm-env.js';
 import { getLocalLlmSettings } from './local-llm.js';
@@ -27,6 +27,14 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+/** 起動スクリプトの type 引数。original: Anthropic、ollama / lm-studio: ローカルLLM */
+export type LaunchType = 'original' | 'ollama' | 'lm-studio';
+
+const LAUNCH_TYPE_PROVIDER: Record<Exclude<LaunchType, 'original'>, LocalLlmProvider> = {
+  ollama: 'ollama',
+  'lm-studio': 'lmstudio',
+};
+
 /**
  * ローカルLLMタブの claude に付ける引数。
  * - モデルは Settings でだけ切り替える: /model の一覧を中継口の名前1件にし、PreModelSwitch フックで
@@ -36,10 +44,9 @@ function shellQuote(value: string): string {
  *   毎回プロンプトに載る（prefill が遅くなり tool 選択の精度も落ちる）。そのため MCP を tsunagi の
  *   タスク管理と web_search だけに絞る
  */
-async function localLlmArgs(): Promise<string[]> {
-  const { active, webSearch } = await getLocalLlmSettings();
+function localLlmArgs(provider: LocalLlmProvider, webSearch: 'local' | 'ollama'): string[] {
   // ollama.com による WebSearch の代行は、使用中のモデルが Ollama のときだけ使える
-  const localWebSearch = webSearch === 'local' || active?.provider !== 'ollama';
+  const localWebSearch = webSearch === 'local' || provider !== 'ollama';
 
   const settings = {
     modelPicker: {
@@ -97,28 +104,55 @@ async function localLlmArgs(): Promise<string[]> {
 }
 
 /**
- * ローカルLLMタブの claude を起動するスクリプトを書き出し、そのパスを返す。
+ * claude の起動スクリプトを書き出し、そのパスを返す。`sh <script> <type> <session-id>` で起動し、
+ * 既存セッションがあれば resume、なければ新規作成する。
  * 起動コマンドは PTY に1行で書き込むため、macOS の端末入力の1行上限（MAX_CANON = 1024 バイト）を
  * 超えると後ろが切り捨てられる。引数の JSON をコマンドに直接載せると上限を超え、
  * `|| claude ... --session-id` 側が途中で切れてタブと別のセッションIDで起動してしまう
- * （hooks がタブに紐づかず、--settings / --mcp-config も効かない）。そのため引数はスクリプトに閉じ込める
+ * （hooks がタブに紐づかず、--settings / --mcp-config も効かない）。そのため引数はスクリプトに閉じ込める。
+ * ローカルLLMの引数は Settings に依存するため起動のたびに書き直す
  */
-async function writeLocalLlmLauncher(args: string[]): Promise<string> {
-  const dir = path.join(getStateDir(), 'local-llm');
-  await mkdir(dir, { recursive: true });
-  const file = path.join(dir, 'claude.sh');
+async function writeLauncher(): Promise<string> {
+  const { webSearch } = await getLocalLlmSettings();
+  const branches = (Object.keys(LAUNCH_TYPE_PROVIDER) as (keyof typeof LAUNCH_TYPE_PROVIDER)[])
+    .map(
+      (type) =>
+        `  ${type}) set -- ${localLlmArgs(LAUNCH_TYPE_PROVIDER[type], webSearch).join(' ')} ;;`
+    )
+    .join('\n');
+  const script = `#!/bin/sh
+# usage: launch-claude.sh <original|ollama|lm-studio> <session-id>
+type=$1
+session_id=$2
+case "$type" in
+  original) set -- ;;
+${branches}
+  *) echo "launch-claude.sh: unknown type: $type" >&2; exit 2 ;;
+esac
+claude --dangerously-skip-permissions "$@" --resume "$session_id" 2>/dev/null ||
+  exec claude --dangerously-skip-permissions "$@" --session-id "$session_id"
+`;
+  const file = path.join(getStateDir(), 'launch-claude.sh');
+  await mkdir(path.dirname(file), { recursive: true });
   // 複数タブの同時起動で書きかけのファイルを読まないよう、書き終えてから置き換える
   const tmp = `${file}.${randomUUID()}.tmp`;
-  await writeFile(tmp, `#!/bin/sh\nexec claude ${args.join(' ')} "$@"\n`);
+  await writeFile(tmp, script);
   await rename(tmp, file);
   return file;
 }
 
+/** タブの mode から起動スクリプトの type を決める。ローカルLLMは Settings で選んだ使用中のモデルに従う */
+async function resolveLaunchType(mode: TabMode): Promise<LaunchType> {
+  if (!isLocalLlmMode(mode)) return 'original';
+  const { active } = await getLocalLlmSettings();
+  if (!active) {
+    throw new Error('ローカルLLMのモデルが未設定です。Settings で使用するモデルを選んでください');
+  }
+  return active.provider === 'ollama' ? 'ollama' : 'lm-studio';
+}
+
 /** タブの mode に応じた claude の起動コマンド（既存セッションがあれば resume） */
 export async function buildClaudeCommand(sessionId: string, mode: TabMode): Promise<string> {
-  const args = ['--dangerously-skip-permissions'];
-  const claude = isLocalLlmMode(mode)
-    ? `sh ${shellQuote(await writeLocalLlmLauncher([...args, ...(await localLlmArgs())]))}`
-    : `claude ${args.join(' ')}`;
-  return `${claude} --resume ${sessionId} 2>/dev/null || ${claude} --session-id ${sessionId}`;
+  const type = await resolveLaunchType(mode);
+  return `sh ${shellQuote(await writeLauncher())} ${type} ${sessionId}`;
 }

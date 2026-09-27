@@ -385,7 +385,13 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         // 最初の発言を待たせないよう読み込みを始めておく（未設定等のエラーは中継口がタブに返す）
         ensureActiveLoaded().catch(() => undefined);
       }
-      session.pty.write(`${await buildClaudeCommand(sessionId, mode)}\n`);
+      let command: string;
+      try {
+        command = await buildClaudeCommand(sessionId, mode);
+      } catch (err) {
+        return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) });
+      }
+      session.pty.write(`${command}\n`);
       return reply.status(204).send();
     }
   );
