@@ -13,6 +13,7 @@ import {
 import { Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ClaudeIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
+import { localLlmTabLabel } from '@/lib/local-llm';
 import {
   useLmStudioSettings,
   useLocalLlmSettings,
@@ -296,7 +297,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   <span
                     title={
                       localLlmOption.model
-                        ? `Claude Code (ローカルLLM: ${localLlmOption.model})`
+                        ? `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
                         : 'ローカルLLMのモデルが未設定です（Settings で設定）'
                     }
                   >
@@ -306,7 +307,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                       disabled={!localLlmOption.model}
                     >
                       <LocalLlmTabIcon provider={localLlmOption.provider} className="w-4 h-4" />
-                      Claude Code (ローカルLLM)
+                      {localLlmTabLabel(localLlmOption.provider)}
                     </Button>
                   </span>
                 )}

@@ -28,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { LocalLlmIcon } from '@/components/icons/BrandIcons';
 import { useLocalLlmSettings } from '@/hooks/useLocalLlmSettings';
 import { formatContextLength, parseContextLength } from '@/lib/context-length';
+import { LOCAL_LLM_PROVIDER_LABEL } from '@/lib/local-llm';
 import { toaster } from '@/lib/toaster';
 import { ContextLengthInput, isValidContextLength } from './ContextLengthInput';
 import {
@@ -46,11 +47,6 @@ import {
 // 読み込み中・自動解放・他の画面での操作に追従する
 const STATUS_POLL_MS = 3000;
 const ESTIMATE_DEBOUNCE_MS = 600;
-
-const PROVIDER_LABEL: Record<LocalLlmProvider, string> = {
-  ollama: 'Ollama',
-  lmstudio: 'LM Studio',
-};
 
 interface ModelsResponse {
   models: LocalLlmModel[];
@@ -104,7 +100,7 @@ function modelLabel(m: LocalLlmModel): string {
 /** 状態の行の表示 */
 function StateLabel({ status }: { status: LocalLlmStatus }) {
   const model = status.active
-    ? `${status.active.model}（${PROVIDER_LABEL[status.active.provider]}・${formatContextLength(status.active.contextTokens)}）`
+    ? `${status.active.model}（${LOCAL_LLM_PROVIDER_LABEL[status.active.provider]}・${formatContextLength(status.active.contextTokens)}）`
     : '';
   switch (status.state) {
     case 'unconfigured':
@@ -279,7 +275,7 @@ export function LocalModelSection() {
   const options = (models?.models ?? []).map((m) => ({
     value: selectionOf(m.provider, m.model),
     label: modelLabel(m),
-    group: PROVIDER_LABEL[m.provider],
+    group: LOCAL_LLM_PROVIDER_LABEL[m.provider],
   }));
   // 保存済みのモデルが一覧にない（プロバイダーに接続できない等）場合も、選択中として表示する
   const active = settings?.active;
@@ -287,7 +283,7 @@ export function LocalModelSection() {
     options.unshift({
       value: selectionOf(active.provider, active.model),
       label: `${active.model}（一覧にありません）`,
-      group: PROVIDER_LABEL[active.provider],
+      group: LOCAL_LLM_PROVIDER_LABEL[active.provider],
     });
   }
   const noProvider = models !== null && models.models.length === 0 && models.errors.length === 0;
@@ -377,7 +373,7 @@ export function LocalModelSection() {
                     models?.errors.length ? (
                       <span className="text-destructive">
                         {models.errors
-                          .map((e) => `${PROVIDER_LABEL[e.provider]}: ${e.message}`)
+                          .map((e) => `${LOCAL_LLM_PROVIDER_LABEL[e.provider]}: ${e.message}`)
                           .join(' / ')}
                       </span>
                     ) : (
