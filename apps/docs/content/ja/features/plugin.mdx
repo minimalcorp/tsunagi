@@ -52,7 +52,7 @@ MCP server は Tsunagi のタスク管理を [Model Context Protocol](https://do
 
 ### Hook handlers
 
-プラグインは Claude Code の [hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) を subscribe しています——特に `TodoWrite`、セッション開始/終了、ツール呼び出しのあたり——そしてそれらのイベントを Tsunagi バックエンドに POST します。これが Tsunagi UI のリアルタイムプログレスバー、ステータスインジケーター、ライブターミナル出力を駆動しています。
+プラグインは Claude Code の [hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) を subscribe しています——特に `TaskCreate` / `TaskUpdate`、セッション開始/終了、ツール呼び出しのあたり——そしてそれらのイベントを Tsunagi バックエンドに POST します。これが Tsunagi UI のリアルタイムプログレスバー、ステータスインジケーター、ライブターミナル出力を駆動しています。
 
 ## Lifecycle
 

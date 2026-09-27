@@ -19,24 +19,26 @@ description: プロジェクトのタスク管理ツール。タスクの検索�
 
 ## 実装開始時の TODO 作成（必須）
 
-`coding` に遷移したら、**即座に** Claude Code 組み込みの `TodoWrite` ツールで実装ステップを TODO として登録する。これにより tsunagi UI にプログレスバーが表示される。
+`coding` に遷移したら、**即座に** Claude Code 組み込みの `TaskCreate` ツールで実装ステップを TODO として登録する。これにより tsunagi UI にプログレスバーが表示される。
 
 ### 手順
 
-1. `tsunagi_update_task(status: "coding")` の直後に `TodoWrite` を呼ぶ
+1. `tsunagi_update_task(status: "coding")` の直後に、ステップごとに `TaskCreate` を呼ぶ（`subject` と、実行中表示用の `activeForm` を指定）
 2. 各 TODO は完了判断が明確な作業単位にする
    - 例: 「○○ファイルを修正」「マイグレーション作成・適用」「lint/type-check を通す」「動作確認」
-3. ステップ完了ごとに `TodoWrite` で該当項目の status を `in_progress` → `completed` に更新する
-4. 作業中に追加ステップが判明した場合、既存 TODO に追記して `TodoWrite` で再登録する
+3. 着手時・完了時に `TaskUpdate` で status を `in_progress` → `completed` に更新する
+4. 作業中に追加ステップが判明した場合は `TaskCreate` で追加する。不要になったステップは `TaskUpdate(status: "deleted")`
+
+`TaskCreate` が使えない環境（`TodoWrite` のみ有効）では `TodoWrite` で同様に管理する。
 
 ### 語彙の使い分け（混同注意）
 
-| 対象            | 使うツール             | status 語彙                            |
-| --------------- | ---------------------- | -------------------------------------- |
-| tsunagi タスク  | `tsunagi_update_task`  | backlog/planning/coding/reviewing/done |
-| tab TODO (進捗) | `TodoWrite` (組み込み) | pending/in_progress/completed          |
+| 対象            | 使うツール                             | status 語彙                            |
+| --------------- | -------------------------------------- | -------------------------------------- |
+| tsunagi タスク  | `tsunagi_update_task`                  | backlog/planning/coding/reviewing/done |
+| tab TODO (進捗) | `TaskCreate` / `TaskUpdate` (組み込み) | pending/in_progress/completed/deleted  |
 
-tsunagi タスクの status に `in_progress` を渡してはいけない（「よくある間違い」表参照）。逆に TODO の進捗管理は組み込み `TodoWrite` で行う。
+tsunagi タスクの status に `in_progress` を渡してはいけない（「よくある間違い」表参照）。逆に TODO の進捗管理は組み込み `TaskCreate` / `TaskUpdate` で行う。
 
 ## 現在のタスクを特定する
 

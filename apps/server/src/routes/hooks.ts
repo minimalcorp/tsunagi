@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import { prisma } from '../lib/db.js';
+import { applyToolToTodos, parseTodos, TODO_TOOL_NAMES } from '../lib/tab-todos.js';
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
@@ -37,26 +38,6 @@ export interface HookEvent {
 
 export const hookEvents: HookEvent[] = [];
 
-/** セッションごとのタスクリスト（TaskCreate/TaskUpdateから組み立て） */
-interface TaskEntry {
-  id: string;
-  subject: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'deleted';
-}
-
-const sessionTasks = new Map<string, Map<string, TaskEntry>>();
-
-/**
- * TaskEntryリストをTodo形式に変換。
- * 'deleted' を含めて全 status を pass-through し、表示時のフィルタは frontend 側に任せる。
- */
-function tasksToTodos(tasks: Map<string, TaskEntry>) {
-  return Array.from(tasks.values()).map((t) => ({
-    content: t.subject,
-    status: t.status,
-  }));
-}
-
 /**
  * status から未読フラグを導出する。
  * 完了(success/error)で未読を立て、再実行・セッション終了で落とす。
@@ -73,6 +54,37 @@ function unreadForStatus(status: string): boolean | undefined {
     default:
       // waiting 等は未読状態を変えない
       return undefined;
+  }
+}
+
+/**
+ * セッションごとに todos の読み書きを直列化する。
+ * TaskUpdate 等は並列実行されうるため、read-modify-write が重なると更新が失われる
+ */
+const todosQueues = new Map<string, Promise<unknown>>();
+
+function withTodosLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = todosQueues.get(sessionId) ?? Promise.resolve();
+  const next = prev.then(fn, fn);
+  const settled = next.catch(() => undefined);
+  todosQueues.set(sessionId, settled);
+  void settled.then(() => {
+    if (todosQueues.get(sessionId) === settled) todosQueues.delete(sessionId);
+  });
+  return next;
+}
+
+/** DB上のタブの todos を読む（タブが無ければ空） */
+async function loadTabTodos(sessionId: string) {
+  try {
+    const tab = await prisma.tab.findFirst({
+      where: { tabId: sessionId },
+      select: { todos: true },
+    });
+    return parseTodos(tab?.todos);
+  } catch (err) {
+    console.warn(`[hooks] Failed to load tab todos from DB:`, err);
+    return [];
   }
 }
 
@@ -143,71 +155,33 @@ export async function hooksRoutes(fastify: FastifyInstance) {
 
         case 'PostToolUse': {
           // ツール実行完了（PermissionRequest後のAllow含む）→ runningに戻す
-          let todosUpdated = false;
-
-          if (body.tool_name === 'TodoWrite' && body.tool_input) {
-            const todos = body.tool_input.todos as Array<{
-              content: string;
-              status: 'pending' | 'in_progress' | 'completed';
-            }>;
-            if (Array.isArray(todos)) {
-              fastify.log.info(
-                { sessionId, todosCount: todos.length },
-                '[hooks] TodoWrite received'
+          // TodoWrite / Task 系ツールなら todos も更新する
+          const toolName = body.tool_name;
+          const todosUpdated =
+            toolName !== undefined &&
+            TODO_TOOL_NAMES.has(toolName) &&
+            (await withTodosLock(sessionId, async () => {
+              const todos = applyToolToTodos(
+                await loadTabTodos(sessionId),
+                toolName,
+                body.tool_input,
+                body.tool_response
               );
+              if (!todos) {
+                fastify.log.debug(
+                  { sessionId, tool: toolName, input: body.tool_input },
+                  '[hooks] todo tool ignored (unknown task or unexpected payload)'
+                );
+                return false;
+              }
               const { count } = await updateTabStatus(sessionId, 'running', todos);
               fastify.log.info(
-                { sessionId, updatedTabCount: count },
-                '[hooks] TodoWrite tab updated'
+                { sessionId, tool: toolName, todosCount: todos.length, updatedTabCount: count },
+                '[hooks] todos updated'
               );
               io.to(room).emit('todos-updated', { sessionId, todos });
-              todosUpdated = true;
-            }
-          }
-
-          // TaskCreate: タスクリストに追加
-          if (body.tool_name === 'TaskCreate' && body.tool_response) {
-            const task = body.tool_response.task as { id: string; subject: string } | undefined;
-            if (task?.id) {
-              if (!sessionTasks.has(sessionId)) {
-                sessionTasks.set(sessionId, new Map());
-              }
-              sessionTasks.get(sessionId)!.set(task.id, {
-                id: task.id,
-                subject: task.subject,
-                status: 'pending',
-              });
-              const todos = tasksToTodos(sessionTasks.get(sessionId)!);
-              await updateTabStatus(sessionId, 'running', todos);
-              io.to(room).emit('todos-updated', { sessionId, todos });
-              todosUpdated = true;
-            }
-          }
-
-          // TaskUpdate: タスクのステータスを更新（'deleted' 含む。Mapからは除去せず保持し、表示層で除外）
-          if (body.tool_name === 'TaskUpdate' && body.tool_response && body.tool_input) {
-            const taskId = body.tool_input.taskId as string | undefined;
-            // tool_input.status を優先（直接入力なので確実）、フォールバックで tool_response.statusChange.to
-            const newStatus =
-              (body.tool_input.status as string | undefined) ??
-              (body.tool_response.statusChange as { to: string } | undefined)?.to;
-            const tasks = sessionTasks.get(sessionId);
-            if (tasks && taskId && newStatus) {
-              const entry = tasks.get(taskId);
-              if (entry) {
-                entry.status = newStatus as TaskEntry['status'];
-                const todos = tasksToTodos(tasks);
-                fastify.log.info(
-                  { sessionId, taskId, newStatus, mapSize: tasks.size },
-                  '[hooks] TaskUpdate processed'
-                );
-                await updateTabStatus(sessionId, 'running', todos);
-                io.to(room).emit('todos-updated', { sessionId, todos });
-                todosUpdated = true;
-              }
-            }
-          }
-
+              return true;
+            }));
           if (!todosUpdated) {
             await updateTabStatus(sessionId, 'running');
           }
@@ -226,19 +200,18 @@ export async function hooksRoutes(fastify: FastifyInstance) {
           break;
 
         case 'StopFailure':
-          // APIエラーでターン終了 → failure状態に更新、todosをクリア
-          await updateTabStatus(sessionId, 'error', []);
+          // APIエラーでターン終了 → failure状態に更新
+          // todos は残す（Claude 側の Task はセッションに永続化され、--resume 後も続きから使われる）
+          await updateTabStatus(sessionId, 'error');
           io.to(room).emit('status-changed', { sessionId, status: 'failure' });
-          io.to(room).emit('todos-updated', { sessionId, todos: [] });
           break;
 
         case 'SessionEnd':
-          // セッション終了（Escキー中断・Ctrl+C・/exit等）→ idle状態に更新、todosをクリア
+          // セッション終了（Escキー中断・Ctrl+C・/exit等）→ idle状態に更新（todos は StopFailure と同じ理由で残す）
           // reason: "prompt_input_exit" = ユーザー中断、"other" = プロセスkill等
           fastify.log.info({ sessionId, reason: body.reason }, 'SessionEnd received');
-          await updateTabStatus(sessionId, 'idle', []);
+          await updateTabStatus(sessionId, 'idle');
           io.to(room).emit('status-changed', { sessionId, status: 'idle' });
-          io.to(room).emit('todos-updated', { sessionId, todos: [] });
           break;
 
         default:

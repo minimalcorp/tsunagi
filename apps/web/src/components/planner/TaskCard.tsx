@@ -19,6 +19,7 @@ import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import type { TabTodosMap } from '@/hooks/useTerminalTodos';
+import { sumTodoProgress } from '@/lib/todo-progress';
 
 interface TaskCardProps {
   task: Task;
@@ -88,16 +89,10 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
   const isClaudeRunning = tabs.some((t) => t.status === 'running');
   const marker = unreadKind(task);
 
-  // リアルタイムのtabTodosMapがあればそちらを優先、なければDB todosにフォールバック。'deleted' は表示層で除外
-  // running → success 遷移後もMapにデータが残るため、全タブを確認する
-  const realtimeTodos = tabTodosMap
-    ? tabs.map((tab) => tabTodosMap.get(tab.tab_id)).find((todos) => todos !== undefined)
-    : undefined;
-  const allTodos = (realtimeTodos ?? tabs.flatMap((tab) => tab.todos ?? [])).filter(
-    (t) => t.status !== 'deleted'
+  // 全タブの合計。タブごとにリアルタイムの tabTodosMap を優先し、なければ DB の todos を使う
+  const progress = sumTodoProgress(
+    tabs.map((tab) => tabTodosMap?.get(tab.tab_id) ?? tab.todos ?? [])
   );
-  const completedTodos = allTodos.filter((t) => t.status === 'completed').length;
-  const totalTodos = allTodos.length;
   const shortId = task.id.slice(0, 5) + '\u2026';
 
   const handleCopyId = useCallback(
@@ -169,17 +164,24 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
           <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
         )}
 
-        {/* Progress Bar（todosがある場合） */}
-        {totalTodos > 0 && (
-          <div className="flex items-center gap-1.5">
-            <Progress
-              value={completedTodos}
-              max={totalTodos}
-              className="flex-1 gap-0 [&_[data-slot=progress-track]]:h-[3px]"
-            />
-            <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-              {completedTodos}/{totalTodos}
-            </span>
+        {/* Progress Bar（todosがある場合）+ 実行中ステップ */}
+        {progress.total > 0 && (
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5">
+              <Progress
+                value={progress.completed}
+                max={progress.total}
+                className="flex-1 gap-0 [&_[data-slot=progress-track]]:h-[3px]"
+              />
+              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                {progress.completed}/{progress.total}
+              </span>
+            </div>
+            {progress.current && (
+              <p className="truncate text-[10px] text-muted-foreground" title={progress.current}>
+                {progress.current}
+              </p>
+            )}
           </div>
         )}
 

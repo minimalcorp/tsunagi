@@ -23,8 +23,8 @@ your task card with several pieces of live information.
 
 ## Why this works
 
-When Claude calls `TodoWrite` (one of its built-in tools), the Claude Code
-hook fires. The hook posts the new todos to Tsunagi's Fastify backend,
+When Claude calls its built-in task tools (`TaskCreate` / `TaskUpdate`), the
+Claude Code hook fires. The hook posts the updated tasks to Tsunagi's Fastify backend,
 which broadcasts them via Socket.IO to the connected web UI. Your browser
 re-renders the progress bar without a page reload.
 

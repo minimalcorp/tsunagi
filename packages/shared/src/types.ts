@@ -27,8 +27,14 @@ export interface Task {
 // Todo型（Claude TodoWrite / TaskCreate / TaskUpdate hook由来）
 // 'deleted' はデータ層で保持し、表示層（progress bar等）で除外する
 export interface Todo {
+  /** TaskCreate が採番したID（TodoWrite 由来の場合はなし） */
+  id?: string;
   content: string;
+  /** in_progress 中に表示する進行形の文言（例: "Running tests"） */
+  activeForm?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'deleted';
+  /** 完了を待っている Task の ID */
+  blockedBy?: string[];
 }
 
 /** ローカルLLMで Claude Code を動かすプロバイダー（実験的機能） */

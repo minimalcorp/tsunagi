@@ -178,18 +178,26 @@ this kills the PTY process and removes the tab record from the task.
 Each task card in the task list shows a **progress bar** that reflects
 what Claude is doing in real time.
 
-How it works: when Claude calls `TodoWrite` (one of its built-in tools)
-to record or update a todo list, the Claude Code hook fires. The bundled
-Tsunagi plugin posts the new todos to the Tsunagi backend, which
-broadcasts them via Socket.IO to every connected browser. The progress
-bar is rendered from the completed vs. pending count.
+How it works: when Claude calls its built-in task tools (`TaskCreate` /
+`TaskUpdate`, or `TodoWrite` on older setups) to record or update its
+steps, the Claude Code hook fires. The bundled Tsunagi plugin posts the
+tool call to the Tsunagi backend, which stores the updated list and
+broadcasts it via Socket.IO to every connected browser. The progress
+bar is rendered from the completed vs. total count, and the card shows
+the step Claude is working on. In the task detail view, click the
+progress in the tab header to see every step and whether it is pending,
+in progress, completed, or blocked.
+
+The progress stays after the session ends, because Claude keeps its
+task list per session and picks it up again on resume.
 
 This is why the [tutorial](/en/tutorial/start-session/) asks you to
 prompt Claude with "create a todo list, then..." — it's not just good
 prompting hygiene, it's what makes the progress bar work.
 
-You don't need to do anything to set this up. As long as Claude uses
-`TodoWrite`, the progress bar appears automatically.
+You don't need to do anything to set this up. Tsunagi launches Claude
+with the task tools enabled, and the progress bar appears as soon as
+Claude creates its first task.
 
 ## Monaco editor integration
 
