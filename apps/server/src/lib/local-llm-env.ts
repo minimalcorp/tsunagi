@@ -83,6 +83,11 @@ export function buildLocalLlmEnv(params: {
     // 書き換えるため不要で、割り当てると `/model sonnet` が同じモデルへの切り替えとみなされ、
     // PreModelSwitch フックを通らずに ~/.claude/settings.json へ保存されてしまう
     CLAUDE_CODE_SUBAGENT_MODEL: LOCAL_MODEL_ALIAS,
+    // subagent が main や他の subagent と並列にリクエストすると、ローカル側の KV キャッシュが
+    // 溢れて毎ターン prefill し直しになり直列より遅くなる。フォアグラウンド(main は待機)で
+    // 同時に1つだけ実行させ、ローカルLLMへのリクエストを常に1本にする
+    CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
+    CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS: '1',
     // 未知のモデルは 200k 扱いになり auto-compact が効かないため、ローカル側の値に揃える
     CLAUDE_CODE_MAX_CONTEXT_TOKENS: String(contextTokens),
     // リクエスト毎に変わる attribution がローカル側の KV キャッシュを無効化するため外す
