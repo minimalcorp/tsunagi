@@ -19,7 +19,7 @@ description: タスク一覧画面で Claude の作業をリアルタイムに�
 
 ## なぜこれが動くのか
 
-Claude が `TodoWrite` (Claude 標準ツールの1つ) を呼び出すと、Claude Code の hook が発火します。hook は新しい todo を Tsunagi の Fastify バックエンドに POST し、バックエンドが Socket.IO 経由で接続中の Web UI にブロードキャストします。ブラウザがページリロードなしでプログレスバーを再描画します。
+Claude が組み込みのタスクツール (`TaskCreate` / `TaskUpdate`) を呼び出すと、Claude Code の hook が発火します。hook は更新されたタスクを Tsunagi の Fastify バックエンドに POST し、バックエンドが Socket.IO 経由で接続中の Web UI にブロードキャストします。ブラウザがページリロードなしでプログレスバーを再描画します。
 
 同じ仕組みで以下も処理されます:
 

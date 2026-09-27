@@ -17,9 +17,12 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Loader2, Copy, Play, Check, SquarePen } from 'lucide-react';
 import { MonacoEditorModal } from '@/components/MonacoEditorModal';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { TodoProgressPopover } from '@/components/TodoProgressPopover';
 import { apiUrl, getServerUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
+import type { Todo } from '@minimalcorp/tsunagi-shared';
+
+export type { Todo };
 
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
 export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
@@ -29,11 +32,6 @@ export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure
 // 観測に基づくしきい値。元 cols が既にこの値の場合のみ -1 にして必ず cols を変化させ、
 // SIGWINCH を発火させる。
 const COLS_RESET_SIZE = 64;
-
-export interface Todo {
-  content: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'deleted';
-}
 
 interface TerminalViewProps {
   /** タブID（PTYのsessionIdと一致させる）。必須。 */
@@ -750,11 +748,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const isPausedOrExited = status === 'paused' || status === 'exited' || status === 'error';
   const isConnected = status === 'connected';
 
-  // 表示層で 'deleted' を除外して分母・完了数を計算
-  const visibleTodos = todos.filter((t) => t.status !== 'deleted');
-  const completedTodos = visibleTodos.filter((t) => t.status === 'completed').length;
-  const totalTodos = visibleTodos.length;
-
   // 短縮表示用UUID（先頭8文字 + …）
   const shortTabId = tabId.length > 8 ? `${tabId.slice(0, 8)}…` : tabId;
 
@@ -795,21 +788,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
             <SquarePen className="w-3 h-3" />
             Open Editor
           </Button>
-          {totalTodos > 0 && (
-            <div
-              className="ml-auto flex items-center gap-1.5 shrink-0"
-              title={todos.find((t) => t.status === 'in_progress')?.content ?? ''}
-            >
-              <Progress
-                value={completedTodos}
-                max={totalTodos}
-                className="w-16 gap-0 [&_[data-slot=progress-track]]:h-[3px]"
-              />
-              <span className="text-[10px] text-muted-foreground tabular-nums">
-                {completedTodos}/{totalTodos}
-              </span>
-            </div>
-          )}
+          <TodoProgressPopover todos={todos} className="ml-auto" />
         </div>
 
         {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}

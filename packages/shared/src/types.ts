@@ -27,8 +27,14 @@ export interface Task {
 // Todo型（Claude TodoWrite / TaskCreate / TaskUpdate hook由来）
 // 'deleted' はデータ層で保持し、表示層（progress bar等）で除外する
 export interface Todo {
+  /** TaskCreate が採番したID（TodoWrite 由来の場合はなし） */
+  id?: string;
   content: string;
+  /** in_progress 中に表示する進行形の文言（例: "Running tests"） */
+  activeForm?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'deleted';
+  /** 完了を待っている Task の ID */
+  blockedBy?: string[];
 }
 
 /** ローカルLLMで Claude Code を動かすプロバイダー（実験的機能） */
@@ -190,12 +196,24 @@ export interface LmStudioEstimate {
 }
 
 // ローカル検索（SearXNG）。Ollama / LM Studio タブの web_search MCP から使う
+/**
+ * SearXNG の起動方法。
+ * auto: searxng-run があればそれを、なければ Docker を使う
+ */
+export type SearxngMethod = 'auto' | 'process' | 'docker';
+
+/** 実際に使う（使った）起動方法 */
+export type SearxngRunner = 'process' | 'docker';
+
 export interface SearxngSettings {
   port: number;
+  method: SearxngMethod;
   /** searxng-run のパス。空なら PATH から探す */
   binPath: string;
-  /** SearXNG の設定ファイル。空なら tsunagi が生成したものを使う */
+  /** SearXNG の設定ファイル。空なら tsunagi が生成したものを使う（searxng-run のみ） */
   settingsPath: string;
+  /** Docker で起動するときのコンテナ名。無ければ tsunagi が作成する */
+  dockerContainer: string;
 }
 
 export type SearxngState =
@@ -214,6 +232,21 @@ export interface SearxngStatus {
   /** Ollama / LM Studio のどちらかが有効（= 自動起動の対象） */
   required: boolean;
   binPath: string | null;
+  /**
+   * 起動・停止に使う方法。running なら tsunagi が起動に使ったもの、
+   * 停止中なら次に起動するときに使うもの。使える方法が無ければ null
+   */
+  runner: SearxngRunner | null;
+  /** Docker の状況（runner が docker のときの表示用） */
+  docker: {
+    /** docker コマンドのパス。見つからなければ null */
+    binPath: string | null;
+    container: string;
+    /** コンテナが作成済みか（Docker が応答しない場合は null） */
+    containerExists: boolean | null;
+  };
+  /** 起動中の進捗（イメージ取得中など） */
+  message?: string;
   error?: string;
 }
 

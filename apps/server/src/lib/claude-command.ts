@@ -104,6 +104,12 @@ function localLlmArgs(provider: LocalLlmProvider, webSearch: 'local' | 'ollama')
 }
 
 /**
+ * タスク進捗（プログレスバー）の元になる Task 系ツール。
+ * Claude Code は旧モデル以外ではこれらを既定で無効にしており、--allowedTools で明示すると有効になる
+ */
+const TASK_TOOLS = 'TaskCreate,TaskGet,TaskUpdate,TaskList';
+
+/**
  * claude の起動スクリプトを書き出し、そのパスを返す。`sh <script> <type> <session-id>` で起動し、
  * 既存セッションがあれば resume、なければ新規作成する。
  * 起動コマンドは PTY に1行で書き込むため、macOS の端末入力の1行上限（MAX_CANON = 1024 バイト）を
@@ -129,8 +135,8 @@ case "$type" in
 ${branches}
   *) echo "launch-claude.sh: unknown type: $type" >&2; exit 2 ;;
 esac
-claude --dangerously-skip-permissions "$@" --resume "$session_id" 2>/dev/null ||
-  exec claude --dangerously-skip-permissions "$@" --session-id "$session_id"
+claude --dangerously-skip-permissions --allowedTools ${TASK_TOOLS} "$@" --resume "$session_id" 2>/dev/null ||
+  exec claude --dangerously-skip-permissions --allowedTools ${TASK_TOOLS} "$@" --session-id "$session_id"
 `;
   const file = path.join(getStateDir(), 'launch-claude.sh');
   await mkdir(path.dirname(file), { recursive: true });

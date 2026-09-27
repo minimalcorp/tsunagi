@@ -72,7 +72,7 @@ for the full agent definition.
 
 The plugin subscribes to Claude Code's
 [hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) —
-especially around `TodoWrite`, session start/stop, and tool
+especially around `TaskCreate` / `TaskUpdate`, session start/stop, and tool
 invocations — and posts those events to the Tsunagi backend. This is
 what drives the real-time progress bars, status indicators, and live
 terminal output you see in the Tsunagi UI.

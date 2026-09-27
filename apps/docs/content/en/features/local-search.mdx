@@ -15,8 +15,45 @@ Ollama requires signing in to ollama.com). Tabs that use local search disable We
 
 ## Setup
 
-You install SearXNG yourself. If `searxng-run` is on your PATH, nothing
-else is needed.
+Tsunagi starts SearXNG in one of two ways. The **ローカル検索 (SearXNG)**
+section in the settings shows which one Tsunagi uses (or used).
+
+| Method        | When                                      | What Tsunagi does                                                          |
+| ------------- | ----------------------------------------- | -------------------------------------------------------------------------- |
+| `searxng-run` | On your PATH (or at the configured path)  | Starts it as a child process                                               |
+| Docker        | No `searxng-run`, but Docker is available | Starts the container (default name `searxng`), creating it first if needed |
+
+By default (auto), `searxng-run` takes priority. You can pin the method
+under **起動方法** in the advanced settings.
+
+### Run with Docker
+
+Keep [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+running and nothing else is needed. If the container does not exist,
+Tsunagi pulls the
+[official image](https://docs.searxng.org/admin/installation-docker.html)
+and creates it (the first pull takes a few minutes):
+
+- Port: `127.0.0.1:7964` (the port in the advanced settings) → container
+  port `8080`
+- Settings file: `~/.tsunagi/searxng/docker/<container>/config/settings.yml`
+  (JSON results enabled)
+
+To use a container you created yourself, set its name under
+**Docker のコンテナ名** in the advanced settings. It must be published on
+Tsunagi's port, and its `settings.yml` must include `json` in
+`search.formats`:
+
+```yaml
+search:
+  formats:
+    - html
+    - json
+```
+
+### Run with searxng-run
+
+If `searxng-run` is on your PATH, nothing else is needed.
 
 ```bash
 # nix
@@ -27,30 +64,6 @@ For other methods, see the
 [SearXNG installation guide](https://docs.searxng.org/admin/installation.html).
 If it is not on your PATH, set the `searxng-run` path in the advanced
 settings.
-
-### Run with Docker
-
-To use the [official Docker image](https://docs.searxng.org/admin/installation-docker.html),
-publish it on Tsunagi's port (default `7964`). Tsunagi uses an already
-running SearXNG as-is (it does not start or stop it).
-
-```bash
-mkdir -p ~/searxng/config ~/searxng/data && cd ~/searxng
-docker run --name searxng -d --restart unless-stopped \
-  -p 127.0.0.1:7964:8080 \
-  -v "./config/:/etc/searxng/" -v "./data/:/var/cache/searxng/" \
-  docker.io/searxng/searxng:latest
-```
-
-The first run generates `config/settings.yml`. JSON output is disabled by
-default, so add the following and run `docker restart searxng`.
-
-```yaml
-search:
-  formats:
-    - html
-    - json
-```
 
 When Tsunagi runs in Docker (`make up`), the container already includes
 SearXNG, so no installation is needed.
@@ -63,11 +76,12 @@ SearXNG, so no installation is needed.
 | Both Ollama and LM Studio are disabled           | Stops the SearXNG that Tsunagi started |
 | Tsunagi exits                                    | Stops the SearXNG that Tsunagi started |
 
+- Tsunagi only stops what it started (`docker stop` for Docker).
 - If SearXNG already responds on the port, Tsunagi uses it (and never
   stops it).
-- Tsunagi starts normally even without SearXNG installed. The status is
+- Tsunagi starts normally even if SearXNG cannot be started. The status is
   shown under **ローカル検索 (SearXNG)** in the settings.
-- Tsunagi starts SearXNG with a generated settings file
+- With `searxng-run`, Tsunagi uses a generated settings file
   (`~/.tsunagi/searxng/settings.yml`, with JSON results enabled). If you
   use your own settings file, include `json` in `search.formats`.
 

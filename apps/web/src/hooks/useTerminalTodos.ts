@@ -2,12 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { io, type Socket } from 'socket.io-client';
+import type { Todo } from '@minimalcorp/tsunagi-shared';
 import { getServerUrl } from '@/lib/api-url';
 
-export interface Todo {
-  content: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'deleted';
-}
+export type { Todo };
 
 /** タブIDをキーにしたTodosのMap */
 export type TabTodosMap = Map<string, Todo[]>;
@@ -35,20 +33,6 @@ export function useTerminalTodos(runningTabIds: string[]): TabTodosMap {
           return next;
         });
       });
-
-      socket.on(
-        'status-changed',
-        ({ sessionId, status }: { sessionId: string; status: string }) => {
-          // idle/errorになったらtodosをクリア
-          if (status === 'idle' || status === 'error') {
-            setTodosMap((prev) => {
-              const next = new Map(prev);
-              next.delete(sessionId);
-              return next;
-            });
-          }
-        }
-      );
 
       // 再接続時はサーバ側 socket が新規（room 未参加）になるため、購読中の room を張り直す。
       // これを怠るとスリープ復帰後に Todos のリアルタイム更新が静かに止まる。
