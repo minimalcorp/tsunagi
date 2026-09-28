@@ -260,8 +260,13 @@ export async function reposRoutes(fastify: FastifyInstance) {
         }
       };
 
-      const sshUrl = `git@github.com:${owner}/${repo}.git`;
       const isHttpsUrl = normalizedUrl.startsWith('http');
+      const protocol = isHttpsUrl ? 'HTTPS' : 'SSH';
+      const altProtocol = isHttpsUrl ? 'SSH' : 'HTTPS';
+      // 認証エラー時にもう一方の方式で試し直すためのURL
+      const altUrl = isHttpsUrl
+        ? `git@github.com:${owner}/${repo}.git`
+        : `https://github.com/${owner}/${repo}.git`;
       let clonedUrl = normalizedUrl;
 
       try {
@@ -269,27 +274,27 @@ export async function reposRoutes(fastify: FastifyInstance) {
       } catch (error) {
         await cleanupBareRepo();
 
-        // private repository を HTTPS で clone するには認証が必要。
-        // tsunagi は SSH agent 前提で動くため、認証エラーなら SSH で自動的に試し直す。
-        if (!isHttpsUrl || !isGitAuthError(error)) throw error;
+        // 認証手段は環境により異なる（SSH鍵のみ / HTTPS + credential helper のみ 等）。
+        // 認証エラーならもう一方の方式で自動的に試し直す。
+        if (!isGitAuthError(error)) throw error;
 
         fastify.log.info(
           { owner, repo },
-          'HTTPS clone failed with an auth error, retrying over SSH'
+          `${protocol} clone failed with an auth error, retrying over ${altProtocol}`
         );
 
         try {
-          await worktreeManager.initBareRepository(owner, repo, sshUrl);
-          clonedUrl = sshUrl;
-        } catch (sshError) {
+          await worktreeManager.initBareRepository(owner, repo, altUrl);
+          clonedUrl = altUrl;
+        } catch (altError) {
           await cleanupBareRepo();
-          const httpsMessage = error instanceof Error ? error.message : String(error);
-          const sshMessage = sshError instanceof Error ? sshError.message : String(sshError);
+          const message = error instanceof Error ? error.message : String(error);
+          const altMessage = altError instanceof Error ? altError.message : String(altError);
           throw new Error(
             `Failed to clone ${owner}/${repo}. ` +
-              `HTTPS では認証情報が無いため失敗し、SSH でも失敗しました。` +
-              `SSH鍵(ssh-agent)を設定するか、リポジトリへのアクセス権を確認してください。\n` +
-              `HTTPS: ${httpsMessage.trim()}\nSSH: ${sshMessage.trim()}`
+              `HTTPS・SSH のどちらでも認証に失敗しました。` +
+              `SSH鍵(ssh-agent)または git の credential helper を設定するか、リポジトリへのアクセス権を確認してください。\n` +
+              `${protocol}: ${message.trim()}\n${altProtocol}: ${altMessage.trim()}`
           );
         }
       }
@@ -299,8 +304,8 @@ export async function reposRoutes(fastify: FastifyInstance) {
       return reply.status(200).send({
         data: {
           repository: { ...newRepo, bareRepoPath },
-          // HTTPSで認証できずSSHで clone し直した場合、UI側で利用者に知らせる
-          fallbackToSsh: clonedUrl !== normalizedUrl,
+          // 認証できず別方式で clone し直した場合、UI側で利用者に知らせる
+          fallbackProtocol: clonedUrl !== normalizedUrl ? altProtocol.toLowerCase() : null,
         },
       });
     } catch (error) {

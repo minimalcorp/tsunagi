@@ -359,7 +359,7 @@ export default function Home() {
 
       return {
         cloneUrl: data.data.repository.cloneUrl,
-        fallbackToSsh: Boolean(data.data.fallbackToSsh),
+        fallbackProtocol: data.data.fallbackProtocol ?? null,
       };
     } catch (error) {
       console.error('Failed to clone repository:', error);
