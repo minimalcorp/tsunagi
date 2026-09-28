@@ -39,7 +39,12 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
 
 # GitHub MCP Server
 RUN ARCH=$(dpkg --print-architecture) && \
-    VERSION=v0.25.0 && \
+    case "$ARCH" in \
+      amd64) ARCH=x86_64 ;; \
+      arm64) ARCH=arm64 ;; \
+      *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; \
+    esac && \
+    VERSION=v1.12.2 && \
     TARBALL="github-mcp-server_Linux_${ARCH}.tar.gz" && \
     wget -q "https://github.com/github/github-mcp-server/releases/download/${VERSION}/${TARBALL}" && \
     tar -xzf "${TARBALL}" -C /usr/local/bin && \

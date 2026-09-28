@@ -17,6 +17,7 @@ description: ローカルComfyUI（Windowsネイティブ、http://localhost:818
    python3 .claude/skills/comfyui-generate/scripts/comfy_client.py model3d --image <path> --out <path>
    python3 .claude/skills/comfyui-generate/scripts/comfy_client.py model3d --prompt "<prompt>" --out <path>
    ```
+
    - `image`のエンジンは指定がなければ既定の`zimage`（Z-Image Turbo）を使う。ユーザーが別エンジンを明示指定した場合、または前回の結果（ロゴ写り込み・形状の歪み等）に基づき別エンジンで再試行したい場合のみ`--engine flux2klein`等を使う。対応エンジンの詳細は`comfyui-generate`スキルの「対応している画像生成エンジン」表を参照
    - `model3d`は数分かかることがある（3段階の拡散＋リメッシュ＋UV展開＋テクスチャベイク）。タイムアウトを気にせず待つ
 3. 標準出力の最後の行のJSON（`{"ok": ..., "output": ..., ...}`）を確認する
