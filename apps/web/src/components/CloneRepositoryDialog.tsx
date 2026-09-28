@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 export interface CloneResult {
-  /** 実際に clone に使われたURL。HTTPSが認証エラーになった場合はSSH URLになる */
+  /** 実際に clone に使われたURL。認証エラーで別方式に切り替えた場合はそのURLになる */
   cloneUrl: string;
-  fallbackToSsh: boolean;
+  /** 認証エラーで切り替えた先の方式。切り替えていなければ null */
+  fallbackProtocol: 'ssh' | 'https' | null;
 }
 
 interface CloneRepositoryDialogProps {
@@ -42,13 +43,15 @@ export function CloneRepositoryDialog({
     try {
       const result = await onClone({ gitUrl: url });
 
-      // HTTPSで認証できずSSHで clone し直した場合は、その旨を明示する
+      // 認証できず別方式で clone し直した場合は、その旨を明示する
       toast.success(
         notificationId,
         'Successfully cloned repository',
-        result.fallbackToSsh
+        result.fallbackProtocol === 'ssh'
           ? `HTTPSでは認証できなかったため、SSHでcloneしました: ${result.cloneUrl}`
-          : url
+          : result.fallbackProtocol === 'https'
+            ? `SSHでは認証できなかったため、HTTPSでcloneしました: ${result.cloneUrl}`
+            : url
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
