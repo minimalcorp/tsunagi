@@ -161,6 +161,55 @@ def build_zimage_workflow(prompt: str, negative: str = "", width: int = 1024, he
     }
 
 
+def build_flux2klein_workflow(prompt: str, width: int = 1024, height: int = 1024,
+                               seed: int | None = None, filename_prefix: str = "gen") -> dict:
+    """FLUX.2 Klein 4B (distilled) txt2img。比較用の別エンジン。
+    4 step / cfg 1 で足りる（蒸留モデル）。SamplerCustomAdvanced系のパイプライン
+    （公式テンプレート image_flux2_klein_text_to_image.json の distilled subgraphを移植）。
+    UNETLoaderのweight_dtypeをfp8_e4m3fnにしてVRAMを抑えている（12GB環境向け）。
+    """
+    seed = seed if seed is not None else int(time.time()) % 2**32
+    return {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": "flux-2-klein-4b.safetensors", "weight_dtype": "fp8_e4m3fn"}},
+        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen_3_4b_fp4_flux2.safetensors", "type": "flux2", "device": "default"}},
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": "flux2-vae.safetensors"}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": prompt}},
+        "5": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["4", 0]}},
+        "6": {"class_type": "EmptyFlux2LatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
+        "7": {"class_type": "Flux2Scheduler", "inputs": {"steps": 4, "width": width, "height": height}},
+        "8": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+        "9": {"class_type": "CFGGuider", "inputs": {"model": ["1", 0], "positive": ["4", 0], "negative": ["5", 0], "cfg": 1}},
+        "10": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
+        "11": {"class_type": "SamplerCustomAdvanced", "inputs": {
+            "noise": ["10", 0], "guider": ["9", 0], "sampler": ["8", 0], "sigmas": ["7", 0], "latent_image": ["6", 0],
+        }},
+        "12": {"class_type": "VAEDecode", "inputs": {"samples": ["11", 0], "vae": ["3", 0]}},
+        "13": {"class_type": "SaveImage", "inputs": {"images": ["12", 0], "filename_prefix": filename_prefix}},
+    }
+
+
+def build_sd35large_workflow(prompt: str, negative: str = "", width: int = 1024, height: int = 1024,
+                              seed: int | None = None, filename_prefix: str = "gen") -> dict:
+    """SD3.5 Large (fp8 scaled, 単一チェックポイント14.9GB)。比較用の別エンジン。
+    チェックポイント自体がVRAM(12GB)を超えるが、ComfyUIの自動RAMオフロードで動作する
+    （実測30秒程度、クラッシュしない）。画質は3エンジン中最も高いが生成が遅く・重い。
+    steps 20 / cfg 4.01 / euler / sgm_uniform が公式サンプル値。
+    """
+    seed = seed if seed is not None else int(time.time()) % 2**32
+    return {
+        "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "sd3.5_large_fp8_scaled.safetensors"}},
+        "16": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["4", 1], "text": prompt}},
+        "40": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["4", 1], "text": negative}},
+        "53": {"class_type": "EmptySD3LatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
+        "3": {"class_type": "KSampler", "inputs": {
+            "model": ["4", 0], "positive": ["16", 0], "negative": ["40", 0], "latent_image": ["53", 0],
+            "seed": seed, "steps": 20, "cfg": 4.01, "sampler_name": "euler", "scheduler": "sgm_uniform", "denoise": 1,
+        }},
+        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
+        "9": {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": filename_prefix}},
+    }
+
+
 def build_stable_audio_workflow(prompt: str, seconds: float = 1.0, seed: int | None = None,
                                  filename_prefix: str = "audio/gen") -> dict:
     """Stable Audio Open 1.0 text2audio。steps 50 / cfg 4.98 / dpmpp_3m_sde_gpu が既定推奨値。
@@ -209,16 +258,25 @@ def _collect_outputs(outputs: dict, key: str) -> list[dict]:
 
 
 def cmd_image(args):
-    graph = build_zimage_workflow(args.prompt, negative=args.negative or "",
-                                   width=args.width, height=args.height,
-                                   seed=args.seed, filename_prefix="skill-image")
-    outputs = run(graph, timeout=180)
+    if args.engine == "flux2klein":
+        graph = build_flux2klein_workflow(args.prompt, width=args.width, height=args.height,
+                                           seed=args.seed, filename_prefix="skill-image-flux2klein")
+    elif args.engine == "sd35large":
+        graph = build_sd35large_workflow(args.prompt, negative=args.negative or "",
+                                          width=args.width, height=args.height,
+                                          seed=args.seed, filename_prefix="skill-image-sd35large")
+    else:
+        graph = build_zimage_workflow(args.prompt, negative=args.negative or "",
+                                       width=args.width, height=args.height,
+                                       seed=args.seed, filename_prefix="skill-image")
+    timeout = 300 if args.engine == "sd35large" else 180
+    outputs = run(graph, timeout=timeout)
     images = _collect_outputs(outputs, "images")
     if not images:
         raise RuntimeError(f"no image output: {outputs}")
     img = images[0]
     dest = download(img["filename"], img.get("subfolder", ""), img.get("type", "output"), args.out)
-    print(json.dumps({"ok": True, "output": str(dest), "kind": "image"}, ensure_ascii=False))
+    print(json.dumps({"ok": True, "output": str(dest), "kind": "image", "engine": args.engine}, ensure_ascii=False))
 
 
 def cmd_sfx(args):
@@ -273,9 +331,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("image", help="Z-Image Turboで画像生成")
+    p = sub.add_parser("image", help="画像生成（Z-Image Turbo / FLUX.2 Klein / SD3.5 Large）")
     p.add_argument("prompt")
     p.add_argument("--negative", default="")
+    p.add_argument("--engine", choices=["zimage", "flux2klein", "sd35large"], default="zimage",
+                    help="zimage=Z-Image Turbo（既定）, flux2klein=FLUX.2 Klein 4B distilled, "
+                         "sd35large=SD3.5 Large fp8（画質最高だがVRAM超過・生成が遅い、RAMオフロードで動作）")
     p.add_argument("--width", type=int, default=1024)
     p.add_argument("--height", type=int, default=1024)
     p.add_argument("--seed", type=int, default=None)
