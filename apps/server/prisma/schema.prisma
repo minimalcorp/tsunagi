@@ -34,7 +34,6 @@ model Task {
   branch             String
   baseBranch         String  @map("base_branch") // rebase/merge判定用のベースブランチ
   repoId             String  @map("repo_id")
-  worktreeStatus     String  @map("worktree_status") // 'pending' | 'created' | 'error'
 
   // Pull Request情報
   pullRequestUrl String?   @map("pull_request_url")

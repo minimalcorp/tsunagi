@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Code, Eye } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
+import { validateBranchName } from '@/lib/branch-utils';
 
 interface FieldError {
   field: string;
@@ -241,6 +242,11 @@ export function TaskDialog({
     }));
   }, [repositories]);
 
+  // worktree作成に失敗するブランチ名は入力時点で弾く
+  const branchNameError =
+    fieldErrors.branch ||
+    (mode === 'create' && formData.branch ? validateBranchName(formData.branch) : null);
+
   const branchOptions = useMemo(() => {
     return branches.map((branch) => ({
       value: branch,
@@ -373,7 +379,8 @@ export function TaskDialog({
           });
 
           if (!response.ok) {
-            throw new Error('Failed to create task');
+            const data = await response.json().catch(() => null);
+            throw new Error(data?.errors?.[0]?.message ?? data?.error ?? 'Failed to create task');
           }
 
           toast.dismiss(notificationId);
@@ -510,10 +517,6 @@ export function TaskDialog({
               <span className="font-medium text-foreground">Base Branch</span>
               <p className="text-muted-foreground">{task.baseBranch || 'N/A'}</p>
             </div>
-            <div>
-              <span className="font-medium text-foreground">Worktree</span>
-              <p className="text-muted-foreground capitalize">{task.worktreeStatus}</p>
-            </div>
           </div>
         )}
 
@@ -640,16 +643,17 @@ export function TaskDialog({
               required
               maxLength={255}
               value={formData.branch}
-              onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-              className={`w-full ${fieldErrors.branch ? 'border-destructive' : ''}`}
+              onChange={(e) => {
+                setFormData({ ...formData, branch: e.target.value });
+                setFieldErrors((prev) => ({ ...prev, branch: '' }));
+              }}
+              className={`w-full ${branchNameError ? 'border-destructive' : ''}`}
               placeholder="feature/new-feature"
               disabled={isLoading}
-              aria-invalid={!!fieldErrors.branch}
+              aria-invalid={!!branchNameError}
             />
-            {fieldErrors.branch && (
-              <p className="text-xs text-destructive mt-1">{fieldErrors.branch}</p>
-            )}
-            {!fieldErrors.branch && (
+            {branchNameError && <p className="text-xs text-destructive mt-1">{branchNameError}</p>}
+            {!branchNameError && (
               <p className="text-xs text-muted-foreground mt-1">
                 Will be created from {formData.baseBranch || 'base branch'}
               </p>
@@ -672,7 +676,7 @@ export function TaskDialog({
             type="submit"
             size="lg"
             className="active:scale-95"
-            disabled={isLoading || (isCreateMode && isFetchingBranches)}
+            disabled={isLoading || (isCreateMode && (isFetchingBranches || !!branchNameError))}
           >
             {submitButtonText}
           </Button>

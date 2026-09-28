@@ -9,7 +9,6 @@ export interface Task {
   branch: string;
   baseBranch: string; // rebase/merge判定用のベースブランチ
   repoId: string; // Repository IDへの参照
-  worktreeStatus: 'pending' | 'created' | 'error';
 
   // Pull Request情報
   pullRequestUrl?: string;

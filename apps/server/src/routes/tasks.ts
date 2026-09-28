@@ -11,6 +11,7 @@ import {
   getTask,
   updateTask,
   deleteTask,
+  validateNewTaskBranch,
   TaskServiceError,
 } from '../lib/services/task-service.js';
 
@@ -58,6 +59,13 @@ interface TabUpdateBody {
   [key: string]: unknown;
 }
 
+const CREATE_ERROR_STATUS: Partial<Record<TaskServiceError['code'], number>> = {
+  REPO_NOT_FOUND: 404,
+  BRANCH_DUPLICATE: 409,
+  INVALID_BRANCH: 400,
+  WORKTREE_CREATION_FAILED: 422,
+};
+
 export async function tasksRoutes(fastify: FastifyInstance) {
   const io = (fastify as FastifyWithIO).io;
 
@@ -75,25 +83,16 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const existingTasks = await taskRepo.getTasks({ includeDeleted: false });
-      const duplicateTask = existingTasks.find(
-        (task) => task.owner === owner && task.repo === repo && task.branch === branch
-      );
-
-      if (duplicateTask) {
-        return reply.status(409).send({
-          valid: false,
-          errors: [
-            {
-              field: 'branch',
-              message: `Branch "${branch}" already exists. Task "${duplicateTask.title}" (ID: ${duplicateTask.id}) is already using this branch.`,
-            },
-          ],
-        });
-      }
+      await validateNewTaskBranch(owner, repo, branch);
 
       return reply.status(200).send({ valid: true });
     } catch (error) {
+      if (error instanceof TaskServiceError) {
+        return reply.status(error.code === 'BRANCH_DUPLICATE' ? 409 : 400).send({
+          valid: false,
+          errors: [{ field: 'branch', message: error.message }],
+        });
+      }
       fastify.log.error(error, 'POST /tasks/validate error');
       return reply.status(500).send({
         valid: false,
@@ -211,11 +210,10 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         { io }
       );
 
-      return reply.status(201).send({ data: { task: result.task } });
+      return reply.status(201).send({ data: { task: result.task, warnings: result.warnings } });
     } catch (error) {
       if (error instanceof TaskServiceError) {
-        const statusCode =
-          error.code === 'REPO_NOT_FOUND' ? 404 : error.code === 'BRANCH_DUPLICATE' ? 409 : 500;
+        const statusCode = CREATE_ERROR_STATUS[error.code] ?? 500;
         return reply.status(statusCode).send({
           errors: [{ field: 'global', message: error.message }],
         });
@@ -230,7 +228,12 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     try {
       const { id } = request.params;
       const task = await getTask({ id });
-      return reply.status(200).send({ data: { task } });
+      const worktreeExists = await worktreeManager.worktreeExists(
+        task.owner,
+        task.repo,
+        task.branch
+      );
+      return reply.status(200).send({ data: { task, worktreeExists } });
     } catch (error) {
       if (error instanceof TaskServiceError && error.code === 'TASK_NOT_FOUND') {
         return reply.status(404).send({ error: 'Task not found' });
@@ -342,15 +345,13 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Task not found' });
       }
 
-      let needsRebase = false;
-      if (task.worktreeStatus === 'created') {
-        needsRebase = await worktreeManager.checkRebaseNeeded(
-          task.owner,
-          task.repo,
-          task.branch,
-          task.baseBranch
-        );
-      }
+      // worktreeが存在しない場合は checkRebaseNeeded が false を返す
+      const needsRebase = await worktreeManager.checkRebaseNeeded(
+        task.owner,
+        task.repo,
+        task.branch,
+        task.baseBranch
+      );
 
       return reply.status(200).send({ data: { needsRebase } });
     } catch (error) {
@@ -372,8 +373,8 @@ export async function tasksRoutes(fastify: FastifyInstance) {
           return reply.status(404).send({ error: 'Task not found' });
         }
 
-        if (task.worktreeStatus !== 'created') {
-          return reply.status(400).send({ error: 'Worktree has not been created yet' });
+        if (!(await worktreeManager.worktreeExists(task.owner, task.repo, task.branch))) {
+          return reply.status(400).send({ error: 'Worktree not found' });
         }
 
         const isClaudeRunning = task.tabs.some((tab) => tab.status === 'running');

@@ -199,6 +199,32 @@ export async function getDefaultBranch(owner: string, repo: string): Promise<str
   }
 }
 
+// git 自身のルールでブランチ名として有効か判定（最終判定用）
+// --branch はカレントのリポジトリ探索を伴い cwd 次第で失敗するため、refs/heads/ 形式で判定する
+// （"-" 始まり・"@"・"HEAD" は validateBranchName 側で弾く）
+export async function isValidBranchRef(branch: string): Promise<boolean> {
+  try {
+    await simpleGit().raw(['check-ref-format', `refs/heads/${branch}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// worktreeディレクトリが存在するか確認
+export async function worktreeExists(
+  owner: string,
+  repo: string,
+  branch: string
+): Promise<boolean> {
+  try {
+    await fs.access(getWorktreePath(owner, repo, branch));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // worktreeを作成
 export async function createWorktree(
   owner: string,

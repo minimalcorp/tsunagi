@@ -65,7 +65,6 @@ export async function createTask(
       branch: task.branch,
       baseBranch: task.baseBranch,
       repoId: task.repoId,
-      worktreeStatus: task.worktreeStatus,
       pullRequestUrl: task.pullRequestUrl,
       effort: task.effort,
       order: task.order,
@@ -94,7 +93,6 @@ export async function updateTask(
       ...(updates.description !== undefined && { description: updates.description }),
       ...(updates.branch !== undefined && { branch: updates.branch }),
       ...(updates.baseBranch !== undefined && { baseBranch: updates.baseBranch }),
-      ...(updates.worktreeStatus !== undefined && { worktreeStatus: updates.worktreeStatus }),
       ...(updates.pullRequestUrl !== undefined && { pullRequestUrl: updates.pullRequestUrl }),
       ...(updates.effort !== undefined && { effort: updates.effort }),
       ...(updates.order !== undefined && { order: updates.order }),
@@ -285,7 +283,6 @@ type PrismaTask = {
   branch: string;
   baseBranch: string;
   repoId: string;
-  worktreeStatus: string;
   pullRequestUrl: string | null;
   effort: number | null;
   order: number;
@@ -318,7 +315,6 @@ function mapTask(task: PrismaTask): Task {
     branch: task.branch,
     baseBranch: task.baseBranch,
     repoId: task.repoId,
-    worktreeStatus: task.worktreeStatus as Task['worktreeStatus'],
     // 派生値。REST / Socket.IO の全経路で必ず含める（欠けるとタブの cwd が既定ディレクトリに化ける）
     worktreePath: getWorktreePath(task.owner, task.repo, task.branch),
     pullRequestUrl: task.pullRequestUrl ?? undefined,

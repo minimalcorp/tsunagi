@@ -6,7 +6,8 @@ import type { Task } from '@minimalcorp/tsunagi-shared';
 import { getServerUrl } from '@/lib/api-url';
 
 interface TaskEventCallbacks {
-  onTaskCreated: (task: Task) => void;
+  /** warnings: 作成は成功したが注意が必要な事項（例: fetch失敗） */
+  onTaskCreated: (task: Task, warnings: string[]) => void;
   onTaskUpdated: (task: Task) => void;
   onTaskDeleted: (taskId: string) => void;
 }
@@ -24,8 +25,8 @@ export function useTaskEvents(callbacks: TaskEventCallbacks) {
     const socket = io(getServerUrl(), { transports: ['polling', 'websocket'] });
     socketRef.current = socket;
 
-    socket.on('task:created', ({ task }: { task: Task }) => {
-      callbacksRef.current.onTaskCreated(task);
+    socket.on('task:created', ({ task, warnings }: { task: Task; warnings?: string[] }) => {
+      callbacksRef.current.onTaskCreated(task, warnings ?? []);
     });
 
     socket.on('task:updated', ({ task }: { task: Task }) => {

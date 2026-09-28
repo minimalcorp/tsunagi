@@ -202,18 +202,29 @@ export default function Home() {
 
   // Socket.IOイベントでUI更新のみ行う（通知は操作元のUI側で表示するため、ここでは出さない）
   useTaskEvents({
-    onTaskCreated: (newTask) => {
+    onTaskCreated: (newTask, warnings) => {
       setTasks((prev) => {
         if (prev.some((t) => t.id === newTask.id)) return prev;
         return [...prev, newTask];
       });
 
-      toaster.create({
-        type: 'success',
-        title: 'Task created',
-        description: newTask.title,
-        duration: 5000,
-      });
+      toaster.create(
+        warnings.length > 0
+          ? {
+              type: 'warning',
+              title: 'Task created with warnings',
+              description: (
+                <>
+                  <p>{newTask.title}</p>
+                  {warnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </>
+              ),
+              duration: Infinity,
+            }
+          : { type: 'success', title: 'Task created', description: newTask.title, duration: 5000 }
+      );
     },
     onTaskUpdated: (updatedTask) => {
       setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));

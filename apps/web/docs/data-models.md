@@ -27,10 +27,6 @@ interface Task {
   repo: string; // GitHub repository名
   branch: string; // ブランチ名（1タスク = 1ブランチ）
 
-  // Worktree作成状態
-  worktreeStatus: 'creating' | 'created' | 'failed'; // Worktree作成状態
-  worktreeError?: string; // Worktree作成失敗時のエラーメッセージ
-
   // Claude実行状態
   claudeState: 'idle' | 'running'; // Claude実行状態（MVPではidle/runningのみ）
   plan?: string; // 実行計画（markdown + チェックリスト形式、オプション）
@@ -120,30 +116,12 @@ interface Task {
   - `repo: "tsunagi"`
   - `branch: "feat/auth"`
 
-#### worktreeStatus
+#### Worktree
 
-- **型**: `'creating' | 'created' | 'failed'`
-- **初期値**: `'creating'`（タスク作成時にworktree作成開始）
-- **意味**:
-  - `creating`: Worktree作成中（bare repositoryクローン + worktree作成）
-  - `created`: Worktree作成完了、Claude実行可能
-  - `failed`: Worktree作成失敗
-- **ワークフロー**:
-  1. タスク作成 → `worktreeStatus: 'creating'` でバックグラウンド処理開始
-  2. bare repository がなければクローン
-  3. worktree を作成
-  4. 成功 → `'created'`、失敗 → `'failed'` + エラーメッセージ
-- **UI表示**:
-  - `creating`: スピナー表示、Claude実行ボタン無効化、"Creating workspace..." 表示
-  - `created`: Claude実行可能
-  - `failed`: エラーメッセージ表示 + リトライボタン
-
-#### worktreeError
-
-- **型**: `string | undefined`
-- **意味**: `worktreeStatus === 'failed'` 時のエラーメッセージ
-- **例**: `"Failed to clone repository: authentication required"`, `"Branch 'feat/auth' does not exist"`
-- **UI表示**: エラー内容をユーザーに表示し、リトライまたは設定修正を促す
+- タスクは worktree 作成に成功した場合のみ登録される（worktree 作成失敗時はタスク作成自体を失敗させる）
+- `branch` は `git check-ref-format --branch` を満たす必要がある
+- fetch 失敗時はローカルの参照から worktree を作成し、作成通知で警告する
+- 既存データで worktree が存在しないタスクは、タスク詳細でターミナルを起動せず削除を促す
 
 #### claudeState
 
@@ -645,13 +623,13 @@ interface Worktree {
 **注**:
 
 - worktree のパスは `~/.tsunagi/workspaces/{owner}/{repo}/{branch}` として `owner`, `repo`, `branch` から算出されます。データモデルには含めません。
-- worktree の作成状態は `Task.worktreeStatus` で管理されます。このインターフェースは作成済みworktreeの情報表示用です。
+- Task は worktree 作成済みであることが前提です。このインターフェースは作成済みworktreeの情報表示用です。
 
 #### createdAt
 
 - **型**: `string`
 - **形式**: ISO 8601
-- **説明**: worktree作成日時（`Task.worktreeStatus` が `'created'` になった日時）
+- **説明**: worktree作成日時
 
 ---
 
