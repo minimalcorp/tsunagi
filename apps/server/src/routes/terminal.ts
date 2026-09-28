@@ -4,6 +4,7 @@ import type { TabMode } from '@minimalcorp/tsunagi-shared';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { ptyManager } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
 import { getWorktreePath } from '../lib/worktree-manager.js';
@@ -20,8 +21,14 @@ import {
 import { ensureActiveLoaded, getLocalLlmSettings } from '../lib/local-llm.js';
 import { LOCAL_LLM_PROXY_URL, buildClaudeCommand, isLocalLlmMode } from '../lib/claude-command.js';
 
-// サーバーはプロジェクトルートから起動されるため process.cwd() でルートを取得
-const TSUNAGI_EDITOR_PATH = path.resolve(process.cwd(), 'scripts/monaco-editor.sh');
+// このファイル基準で解決する(cwd 非依存):
+//   dev:        apps/server/src/routes      → apps/server/scripts
+//   build:      apps/server/dist/routes     → apps/server/scripts
+//   npm bundle: <pkg>/dist/server/routes    → <pkg>/dist/scripts
+const TSUNAGI_EDITOR_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../scripts/monaco-editor.sh'
+);
 
 // Fastify(API) の公開ポート。index.ts と同じ既定値・同じ環境変数(TSUNAGI_SERVER_PORT)を見る。
 // monaco-editor.sh など PTY 内のプロセスが API を叩く際の同一ホスト向けベース URL に使う。

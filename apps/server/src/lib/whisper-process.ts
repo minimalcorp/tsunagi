@@ -35,15 +35,16 @@ const STARTUP_TIMEOUT_MS = 60_000;
 // クラッシュ時にエラーメッセージへ含めるstderrの上限文字数。
 const STDERR_TAIL_MAX_CHARS = 4000;
 
-// このファイルは apps/server/src/lib (dev) または apps/cli/dist/server/lib
-// (npm配布物) のいずれかにいる。どちらの場合も3階層上に whisper-server が
-// 兄弟ディレクトリとして存在するようレイアウトを揃えている
-// (apps/server/dist/lib → apps/server → apps → apps/whisper-server,
-//  apps/cli/dist/server/lib → apps/cli/dist → apps/cli → apps/cli/whisper-server)。
+// このファイルの位置から whisper-server を探す:
+//   npm配布物: apps/cli/dist/server/lib → 2階層上 → apps/cli/dist/whisper-server
+//   dev/build: apps/server/{src,dist}/lib → 3階層上 → apps/whisper-server
 export function findWhisperServerDir(): string | null {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const candidate = path.join(here, '..', '..', '..', 'whisper-server');
-  return fs.existsSync(path.join(candidate, 'run.sh')) ? candidate : null;
+  const candidates = [
+    path.join(here, '..', '..', 'whisper-server'),
+    path.join(here, '..', '..', '..', 'whisper-server'),
+  ];
+  return candidates.find((c) => fs.existsSync(path.join(c, 'run.sh'))) ?? null;
 }
 
 function venvPython(): string {

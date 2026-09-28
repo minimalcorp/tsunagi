@@ -37,16 +37,9 @@
   "files": [
     "npm-shrinkwrap.json",
     "dist/**/*",
-    "docs/**/*",
-    "prisma/schema.prisma",
-    "prisma/migrations/**/*",
-    "prisma.config.ts",
     ".next/standalone/**/*",
     "scripts/fix-node-pty-permissions.cjs",
-    "scripts/monaco-editor.sh",
     "tsunagi-marketplace/**/*",
-    "whisper-server/**/*",
-    "llm-server/**/*",
     "LICENSE",
     "README.md"
   ],

@@ -43,15 +43,16 @@ const STARTUP_TIMEOUT_MS = 90_000;
 // クラッシュ時にエラーメッセージへ含めるstderrの上限文字数。
 const STDERR_TAIL_MAX_CHARS = 4000;
 
-// このファイルは apps/server/src/lib (dev) または apps/cli/dist/server/lib
-// (npm配布物) のいずれかにいる。どちらの場合も3階層上に llm-server が
-// 兄弟ディレクトリとして存在するようレイアウトを揃えている
-// (apps/server/dist/lib → apps/server → apps → apps/llm-server,
-//  apps/cli/dist/server/lib → apps/cli/dist → apps/cli → apps/cli/llm-server)。
+// このファイルの位置から llm-server を探す:
+//   npm配布物: apps/cli/dist/server/lib → 2階層上 → apps/cli/dist/llm-server
+//   dev/build: apps/server/{src,dist}/lib → 3階層上 → apps/llm-server
 export function findLlmServerDir(): string | null {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const candidate = path.join(here, '..', '..', '..', 'llm-server');
-  return fs.existsSync(path.join(candidate, 'run.sh')) ? candidate : null;
+  const candidates = [
+    path.join(here, '..', '..', 'llm-server'),
+    path.join(here, '..', '..', '..', 'llm-server'),
+  ];
+  return candidates.find((c) => fs.existsSync(path.join(c, 'run.sh'))) ?? null;
 }
 
 function venvPython(): string {
