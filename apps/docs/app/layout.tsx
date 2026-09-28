@@ -1,6 +1,7 @@
 import { Head } from 'nextra/components';
 import 'nextra-theme-docs/style.css';
 import type { ReactNode } from 'react';
+import { GoogleAnalytics } from './GoogleAnalytics';
 
 export const metadata = {
   metadataBase: new URL('https://minimalcorp.github.io/tsunagi/'),
@@ -18,7 +19,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <Head />
-      <body>{children}</body>
+      <body>
+        {children}
+        <GoogleAnalytics />
+      </body>
     </html>
   );
 }
