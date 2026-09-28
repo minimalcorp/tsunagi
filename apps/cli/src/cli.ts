@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import openBrowser from 'open';
 import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle.js';
 import { acquireSingleInstanceLock } from './single-instance-lock.js';
 
@@ -294,8 +295,9 @@ Promise.all([pollHealth(Number(PORT)), pollHealth(Number(NEXT_PORT))]).then(() =
   const url = `http://localhost:${PORT}`;
 
   if (!isDocker) {
-    const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
-    spawn(cmd, [url], { stdio: 'ignore', detached: true }).unref();
+    // macOS / Linux / WSL（Windows 側ブラウザ）の差異は open パッケージが吸収する。
+    // ブラウザを開けなくてもサーバーは継続する（URL は下で案内する）
+    openBrowser(url).catch(() => {});
   }
 
   console.log(`Open ${url}`);
