@@ -3,8 +3,10 @@
  * prepack / bundle script for @minimalcorp/tsunagi (apps/cli).
  *
  * Copies build artifacts from sibling workspaces (apps/server, apps/web)
- * into apps/cli/ so that `npm pack` produces a self-contained tarball that
- * can be installed via `npm install -g @minimalcorp/tsunagi`.
+ * into apps/cli/dist/ so that `npm pack` produces a self-contained tarball that
+ * can be installed via `npm install -g @minimalcorp/tsunagi`. Everything is
+ * placed under dist/ (git-ignored) except README.md / LICENSE, which npm only
+ * recognizes at the package root (ignored via apps/cli/.gitignore).
  *
  * Required prior steps:
  *   1. npm run build -w @minimalcorp/tsunagi-shared
@@ -78,15 +80,15 @@ async function copyFile(src, dest) {
 async function cleanCliBundleDirs() {
   const dirs = [
     path.join(CLI_DIR, 'dist/server'),
+    path.join(CLI_DIR, 'dist/prisma'),
+    path.join(CLI_DIR, 'dist/scripts'),
     path.join(CLI_DIR, '.next'),
-    path.join(CLI_DIR, 'prisma'),
-    path.join(CLI_DIR, 'docs'),
-    path.join(CLI_DIR, 'whisper-server'),
-    path.join(CLI_DIR, 'llm-server'),
+    path.join(CLI_DIR, 'dist/docs'),
+    path.join(CLI_DIR, 'dist/whisper-server'),
+    path.join(CLI_DIR, 'dist/llm-server'),
   ];
   const files = [
-    path.join(CLI_DIR, 'prisma.config.ts'),
-    path.join(CLI_DIR, 'scripts/monaco-editor.sh'),
+    path.join(CLI_DIR, 'dist/prisma.config.ts'),
     path.join(CLI_DIR, 'README.md'),
     path.join(CLI_DIR, 'LICENSE'),
   ];
@@ -104,18 +106,21 @@ async function main() {
   log('copying apps/server/dist → apps/cli/dist/server');
   await copyDir(path.join(SERVER_DIR, 'dist'), path.join(CLI_DIR, 'dist/server'));
 
-  log('copying apps/server/prisma → apps/cli/prisma');
-  await copyDir(path.join(SERVER_DIR, 'prisma'), path.join(CLI_DIR, 'prisma'));
+  log('copying apps/server/prisma → apps/cli/dist/prisma');
+  await copyDir(path.join(SERVER_DIR, 'prisma'), path.join(CLI_DIR, 'dist/prisma'));
 
-  log('copying apps/server/prisma.config.ts → apps/cli/prisma.config.ts');
-  await copyFile(path.join(SERVER_DIR, 'prisma.config.ts'), path.join(CLI_DIR, 'prisma.config.ts'));
+  log('copying apps/server/prisma.config.ts → apps/cli/dist/prisma.config.ts');
+  await copyFile(
+    path.join(SERVER_DIR, 'prisma.config.ts'),
+    path.join(CLI_DIR, 'dist/prisma.config.ts')
+  );
 
-  log('copying apps/server/scripts/monaco-editor.sh → apps/cli/scripts/monaco-editor.sh');
+  log('copying apps/server/scripts/monaco-editor.sh → apps/cli/dist/scripts/monaco-editor.sh');
   await copyFile(
     path.join(SERVER_DIR, 'scripts/monaco-editor.sh'),
-    path.join(CLI_DIR, 'scripts/monaco-editor.sh')
+    path.join(CLI_DIR, 'dist/scripts/monaco-editor.sh')
   );
-  await fs.chmod(path.join(CLI_DIR, 'scripts/monaco-editor.sh'), 0o755);
+  await fs.chmod(path.join(CLI_DIR, 'dist/scripts/monaco-editor.sh'), 0o755);
 
   log('copying apps/web/.next/standalone → apps/cli/.next/standalone');
   await copyDir(path.join(WEB_DIR, '.next/standalone'), path.join(CLI_DIR, '.next/standalone'));
@@ -126,24 +131,24 @@ async function main() {
     path.join(CLI_DIR, '.next/standalone/apps/web/.next/static')
   );
 
-  log('copying apps/whisper-server → apps/cli/whisper-server');
-  await fs.mkdir(path.join(CLI_DIR, 'whisper-server'), { recursive: true });
-  await fs.cp(WHISPER_SERVER_DIR, path.join(CLI_DIR, 'whisper-server'), {
+  log('copying apps/whisper-server → apps/cli/dist/whisper-server');
+  await fs.mkdir(path.join(CLI_DIR, 'dist/whisper-server'), { recursive: true });
+  await fs.cp(WHISPER_SERVER_DIR, path.join(CLI_DIR, 'dist/whisper-server'), {
     recursive: true,
     filter: (src) => !/\/(\.venv|__pycache__)(\/|$)/.test(src),
   });
 
-  log('copying apps/llm-server → apps/cli/llm-server');
-  await fs.mkdir(path.join(CLI_DIR, 'llm-server'), { recursive: true });
-  await fs.cp(LLM_SERVER_DIR, path.join(CLI_DIR, 'llm-server'), {
+  log('copying apps/llm-server → apps/cli/dist/llm-server');
+  await fs.mkdir(path.join(CLI_DIR, 'dist/llm-server'), { recursive: true });
+  await fs.cp(LLM_SERVER_DIR, path.join(CLI_DIR, 'dist/llm-server'), {
     recursive: true,
     filter: (src) => !/\/(\.venv|__pycache__)(\/|$)/.test(src),
   });
 
   const docsOutDir = path.join(REPO_ROOT, 'apps/docs/out');
   if (existsSync(docsOutDir)) {
-    log('copying apps/docs/out → apps/cli/docs');
-    await copyDir(docsOutDir, path.join(CLI_DIR, 'docs'));
+    log('copying apps/docs/out → apps/cli/dist/docs');
+    await copyDir(docsOutDir, path.join(CLI_DIR, 'dist/docs'));
   } else {
     log('skipping docs (apps/docs/out not found)');
   }
