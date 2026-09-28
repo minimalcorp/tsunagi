@@ -54,6 +54,8 @@ async function ensurePrereqs() {
     [path.join(WEB_DIR, '.next/static'), 'apps/web .next/static must exist'],
     [path.join(SERVER_DIR, 'prisma/schema.prisma'), 'apps/server/prisma/schema.prisma must exist'],
     [path.join(SERVER_DIR, 'prisma.config.ts'), 'apps/server/prisma.config.ts must exist'],
+    [path.join(REPO_ROOT, 'README.md'), 'README.md must exist at repo root'],
+    [path.join(REPO_ROOT, 'LICENSE'), 'LICENSE must exist at repo root'],
   ];
   for (const [p, msg] of requirements) {
     if (!existsSync(p)) {
@@ -85,6 +87,8 @@ async function cleanCliBundleDirs() {
   const files = [
     path.join(CLI_DIR, 'prisma.config.ts'),
     path.join(CLI_DIR, 'scripts/monaco-editor.sh'),
+    path.join(CLI_DIR, 'README.md'),
+    path.join(CLI_DIR, 'LICENSE'),
   ];
   for (const d of dirs) await fs.rm(d, { recursive: true, force: true });
   for (const f of files) await fs.rm(f, { force: true });
@@ -143,6 +147,10 @@ async function main() {
   } else {
     log('skipping docs (apps/docs/out not found)');
   }
+
+  log('copying README.md, LICENSE → apps/cli/');
+  await copyFile(path.join(REPO_ROOT, 'README.md'), path.join(CLI_DIR, 'README.md'));
+  await copyFile(path.join(REPO_ROOT, 'LICENSE'), path.join(CLI_DIR, 'LICENSE'));
 
   log('done');
 }
