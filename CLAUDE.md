@@ -170,6 +170,34 @@ docker exec docker-tsunagi-1 npm run type-check
 
 エラーがある場合はホスト側のファイルを修正し（リポジトリは container に mount 済み）、再度実行する。
 
+## ローカル生成AI（画像・3D・効果音）との連携
+
+tsunagiからComfyUI経由でローカルの画像/3D/効果音生成AIを呼び出す機能（`feat-local-llm-skill`）に関する方針。
+
+### WSL2 / Windows ネイティブの役割分担
+
+- **tsunagi本体・Claude Code CLIなど「直接使うツール」→ WSL2**（現状tsunagiはWSL2上でしか動作しない）
+- **重いローカル推論（ComfyUI, Ollama, LM Studio等）→ Windowsネイティブ**
+  - 理由1: WSL2は`.wslconfig`の`memory=`設定でRAMが絞られていることが多い（物理RAMの一部のみ）。モデルロードで大量RAMを使う処理はWSL内だと詰みやすい
+  - 理由2: GPUドライバ自体はWindows本体のものをWSL2も共有するため、GPU処理はどちらでも動く。制約になるのは主にシステムRAM側
+- **接続方法**: `.wslconfig`に`networkingMode=mirrored`を設定しておけば、WSL2から`http://localhost:8188`のようにポートフォワード不要で直接Windowsネイティブのサービスに到達できる
+- **設計原則**: 「何を・どう生成するか」の判断ロジック（モデル選定、ワークフロー構築、パラメータ決定）はClaude Code（WSL2）側に置き、ComfyUI（Windowsネイティブ）は生成の実行エンジンとしてAPI越しに使う。ComfyUI本体を各プロジェクトのWSL内に個別インストールする旧パターン（`fumi-indoor-sprites`等）は非推奨・廃止
+
+### 検証済みモデル（2026-09-29時点、RTX 3080 Ti / VRAM 12GB環境）
+
+- **画像生成**: Z-Image Turbo（INT8量子化）。8 step・数秒で高品質。Apache系ライセンスで商用利用も可
+  - 直近の新モデル候補Qwen-Image-2.1はResearch License（商用不可）のため不採用
+- **3Dモデル生成（画像→3D）**: TRELLIS.2 + Pixal3D（ComfyUI 0.34+に同梱の60ノード超ワークフロー）。Hunyuan3D 2.1はテクスチャ込みでVRAM 29GB要求のため12GB環境では不採用
+- **効果音生成**: Stable Audio Open 1.0。1秒前後の短いSFX生成に使用可能
+
+### 参考実装
+
+- `~/projects/comfyui-notes/comfy_api.py`: ComfyUI HTTP APIの薄いクライアント（`submit`/`wait`/`run`、SDXL系・DiT系(FLUX.2/Z-Image Turbo)ワークフロービルダー）。tsunagiからの呼び出し実装のベースとして再利用予定
+- 複雑なワークフロー（サブグラフ・動的コンボを含むもの）をComfyUIの「Templates」からそのままAPI実行するには、UIグラフJSON→API実行形式（ノードid→{class_type, inputs}）への変換が必要。移植時の注意点:
+  - `widgets_values`は、対応する入力がリンクで上書きされていても、スロットを1つ消費する（スキップしない）
+  - INT型で`control_after_generate: true`が付く入力（例: KSamplerのseed）は、直後にUI専用のcombo値（"fixed"/"randomize"等）が1つ挿入される。これはバックエンドには渡らない
+  - `COMFY_DYNAMICCOMBO_V3`型（例: RemeshMeshのsign_mode）は、選択値に応じて追加のサブフィールドが続く。API上のキー名は`親フィールド名.サブフィールド名`のドット区切り文字列になる
+
 ## Serena (MCP) 使用時の注意
 
 - **Serenaはdockerで動いているため、プロジェクトのactivateは常に `.` を指定**
