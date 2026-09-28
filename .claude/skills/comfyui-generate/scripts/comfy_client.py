@@ -227,7 +227,9 @@ def build_stable_audio_workflow(prompt: str, seconds: float = 1.0, seed: int | N
             "seed": seed, "steps": 50, "cfg": 4.98, "sampler_name": "dpmpp_3m_sde_gpu", "scheduler": "exponential", "denoise": 1,
         }},
         "12": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
-        "20": {"class_type": "SaveAudioAdvanced", "inputs": {"audio": ["12", 0], "filename_prefix": filename_prefix, "format": "flac"}},
+        "20": {"class_type": "SaveAudioAdvanced", "inputs": {
+            "audio": ["12", 0], "filename_prefix": filename_prefix, "format": "mp3", "format.quality": "320k",
+        }},
     }
 
 
