@@ -120,7 +120,7 @@ function createMcpServer(io?: SocketIOServer): Server {
       {
         name: 'tsunagi_create_task',
         description:
-          'タスクを作成する。worktree作成・初期タブ作成・Socket.IO通知を含むフル作成フロー。branchを省略するとtitleから自動生成される。',
+          'タスクを作成する。worktree作成・初期タブ作成・Socket.IO通知を含むフル作成フロー。branchを省略するとtitleから自動生成される。worktree作成に失敗した場合（gitで不正なブランチ名等）はタスクは作成されない。',
         inputSchema: {
           type: 'object',
           required: ['owner', 'repo', 'title'],
@@ -287,7 +287,12 @@ function createMcpServer(io?: SocketIOServer): Server {
             },
             { io }
           );
-          return { content: [{ type: 'text', text: JSON.stringify(result.task, null, 2) }] };
+          return {
+            content: [
+              { type: 'text', text: JSON.stringify(result.task, null, 2) },
+              ...result.warnings.map((warning) => ({ type: 'text', text: `Warning: ${warning}` })),
+            ],
+          };
         }
 
         case 'tsunagi_update_task': {

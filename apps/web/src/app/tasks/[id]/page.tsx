@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Code2, Ellipsis, Pencil, Terminal, Trash2 } from 'lucide-react';
+import { ArrowLeft, Code2, Ellipsis, FolderX, Pencil, Terminal, Trash2 } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
 import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
 import { TaskDialog } from '@/components/TaskDialog';
@@ -33,6 +33,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const router = useRouter();
   const toast = useToast();
   const [task, setTask] = useState<Task | null>(null);
+  const [worktreeExists, setWorktreeExists] = useState(true);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
@@ -104,6 +105,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       // 全 await 完了後にまとめて state 更新（中間レンダリングを防ぐ）
       setTask(loadedTask);
+      setWorktreeExists(taskData.data.worktreeExists);
       setTabs(loadedTabs);
 
       // アクティブタブ設定
@@ -316,15 +318,19 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
                 <Pencil className="w-4 h-4" />
                 Detail / Edit
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleOpenTerminal}>
-                <Terminal className="w-4 h-4" />
-                Open Terminal
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleOpenVSCode}>
-                <Code2 className="w-4 h-4" />
-                Open VS Code
-              </DropdownMenuItem>
+              {worktreeExists && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleOpenTerminal}>
+                    <Terminal className="w-4 h-4" />
+                    Open Terminal
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleOpenVSCode}>
+                    <Code2 className="w-4 h-4" />
+                    Open VS Code
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
@@ -342,16 +348,30 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       <div className="flex-1 flex flex-col min-h-0">
         {/* TerminalPanel */}
         <div className="bg-card flex flex-col flex-1 min-h-0">
-          <TerminalPanel
-            ref={terminalPanelRef}
-            task={task}
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onTabChange={setActiveTabId}
-            onTabCreate={handleTabCreate}
-            onTabDelete={handleTabDelete}
-            onClaudeStatusChange={handleClaudeStatusChange}
-          />
+          {worktreeExists ? (
+            <TerminalPanel
+              ref={terminalPanelRef}
+              task={task}
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onTabChange={setActiveTabId}
+              onTabCreate={handleTabCreate}
+              onTabDelete={handleTabDelete}
+              onClaudeStatusChange={handleClaudeStatusChange}
+            />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
+              <FolderX className="size-10 text-muted-foreground" />
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">Worktree not found</p>
+                <p className="text-sm text-muted-foreground break-all">{task.worktreePath}</p>
+              </div>
+              <Button variant="destructive" onClick={() => setIsDeleteConfirmOpen(true)}>
+                <Trash2 className="w-4 h-4" />
+                Delete Task
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -296,10 +296,15 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       ? getWorktreePath(tab.task.owner, tab.task.repo, tab.task.branch)
       : (cwd ?? defaultDir);
 
-    // cwd が存在するか確認、なければデフォルトにフォールバック
+    // cwd が存在するか確認。Task のタブは worktree 必須（無ければ起動しない）、
+    // それ以外はデフォルトにフォールバック
     try {
       await fs.access(workingDir);
     } catch {
+      if (tab) {
+        fastify.log.warn({ sessionId, workingDir }, 'worktree does not exist');
+        return reply.status(409).send({ error: `Worktree not found at ${workingDir}` });
+      }
       fastify.log.warn({ sessionId, workingDir }, 'cwd does not exist, falling back to default');
       workingDir = defaultDir;
     }

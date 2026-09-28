@@ -139,7 +139,6 @@ async function main() {
           branch: task.branch,
           baseBranch: 'main', // デフォルト値
           repoId,
-          worktreeStatus: task.worktreeStatus,
           effort: task.effort,
           order: task.order,
           deletedAt: task.deletedAt ? new Date(task.deletedAt) : null,

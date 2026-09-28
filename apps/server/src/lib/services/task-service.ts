@@ -5,7 +5,7 @@ import * as os from 'os';
 import * as taskRepo from '../repositories/task.js';
 import * as repoRepo from '../repositories/repository.js';
 import * as worktreeManager from '../worktree-manager.js';
-import { normalizeBranchName } from '../branch-utils.js';
+import { normalizeBranchName, validateBranchName } from '../branch-utils.js';
 import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
 import { prisma } from '../db.js';
 
@@ -41,6 +41,8 @@ export class TaskServiceError extends Error {
     public code:
       | 'REPO_NOT_FOUND'
       | 'BRANCH_DUPLICATE'
+      | 'INVALID_BRANCH'
+      | 'WORKTREE_CREATION_FAILED'
       | 'TASK_NOT_FOUND'
       | 'IDENTIFIER_REQUIRED'
       | 'INTERNAL_ERROR'
@@ -148,12 +150,49 @@ export async function getTask(identifier: TaskIdentifier): Promise<Task> {
 }
 
 /**
+ * 新規タスクのブランチ名を検証する（worktree 作成に失敗する値を事前に弾く）
+ */
+export async function validateNewTaskBranch(
+  owner: string,
+  repo: string,
+  branch: string
+): Promise<void> {
+  const invalidReason = validateBranchName(branch);
+  if (invalidReason || !(await worktreeManager.isValidBranchRef(branch))) {
+    throw new TaskServiceError(
+      `Invalid branch name "${branch}": ${invalidReason ?? 'rejected by git check-ref-format'}`,
+      'INVALID_BRANCH'
+    );
+  }
+
+  const existingTasks = await taskRepo.getTasks({ owner, repo, includeDeleted: false });
+  const duplicateTask = existingTasks.find((task) => task.branch === branch);
+  if (duplicateTask) {
+    throw new TaskServiceError(
+      `Branch "${branch}" already exists. Task "${duplicateTask.title}" (ID: ${duplicateTask.id}) is already using this branch.`,
+      'BRANCH_DUPLICATE'
+    );
+  }
+
+  // "/" は "-" に正規化されるため、別名のブランチでも worktree ディレクトリが衝突しうる
+  if (await worktreeManager.worktreeExists(owner, repo, branch)) {
+    throw new TaskServiceError(
+      `Worktree directory "${normalizeBranchName(branch)}" already exists. Use a different branch name.`,
+      'BRANCH_DUPLICATE'
+    );
+  }
+}
+
+/**
  * タスクを作成
+ *
+ * worktree 作成に成功した場合のみタスクを登録する（worktree の無いタスクを作らない）。
+ * fetch 失敗時はローカルの参照で worktree を作成し、warnings で通知する。
  */
 export async function createTask(
   params: CreateTaskParams,
   options?: ServiceOptions
-): Promise<{ task: Task }> {
+): Promise<{ task: Task; warnings: string[] }> {
   const {
     title,
     description = '',
@@ -164,6 +203,7 @@ export async function createTask(
     order,
     status = 'backlog',
   } = params;
+  const warnings: string[] = [];
 
   // リポジトリ存在チェック
   const repository = await repoRepo.getRepo(owner, repo);
@@ -174,78 +214,80 @@ export async function createTask(
     );
   }
 
-  // baseBranch解決
-  const baseBranch = baseBranchInput || (await worktreeManager.getDefaultBranch(owner, repo));
-
   // branch名の解決（未指定の場合はtitleから自動生成）
   const branch = params.branch || generateBranchName(title);
+  await validateNewTaskBranch(owner, repo, branch);
 
-  // ブランチ名重複チェック
-  const existingTasks = await taskRepo.getTasks({ includeDeleted: false });
-  const duplicateTask = existingTasks.find(
-    (task) => task.owner === owner && task.repo === repo && task.branch === branch
-  );
-  if (duplicateTask) {
-    throw new TaskServiceError(
-      `Branch "${branch}" already exists. Task "${duplicateTask.title}" (ID: ${duplicateTask.id}) is already using this branch.`,
-      'BRANCH_DUPLICATE'
+  // 1. fetch（失敗してもローカルの参照で続行する）
+  try {
+    await worktreeManager.fetchRemote(owner, repo);
+  } catch (error) {
+    console.warn('Failed to fetch remote:', error);
+    warnings.push(
+      'Failed to fetch from remote. The worktree was created from local refs; update it once the network is available.'
     );
   }
 
-  // 1. order解決 + bumpOrder + DB登録をアトミックに実行
-  const newTask = await prisma.$transaction(async (tx) => {
-    let resolvedOrder: number;
-    if (order !== undefined) {
-      resolvedOrder = order;
-      await taskRepo.bumpOrder(resolvedOrder, undefined, tx);
-    } else {
-      const result = await tx.task.aggregate({
-        where: { owner, repo, deletedAt: null },
-        _max: { order: true },
-      });
-      resolvedOrder = (result._max.order ?? -1) + 1;
-    }
+  // baseBranch解決
+  const baseBranch = baseBranchInput || (await worktreeManager.getDefaultBranch(owner, repo));
 
-    return await taskRepo.createTask(
-      {
-        title,
-        description,
-        status,
-        owner,
-        repo,
-        branch,
-        baseBranch,
-        repoId: repository.id,
-        worktreeStatus: 'pending',
-        effort,
-        order: resolvedOrder,
-      },
-      tx
-    );
-  });
-
-  // 3. worktree作成
+  // 2. worktree作成（失敗したらタスクは作らない）
   try {
-    await worktreeManager.fetchRemote(owner, repo);
     await worktreeManager.createWorktree(owner, repo, branch, baseBranch);
-    await taskRepo.updateTask(newTask.id, { worktreeStatus: 'created' });
   } catch (error) {
     console.error('Failed to create worktree:', error);
-    await taskRepo.updateTask(newTask.id, { worktreeStatus: 'error' });
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new TaskServiceError(`Failed to create worktree: ${reason}`, 'WORKTREE_CREATION_FAILED');
+  }
+
+  // 3. order解決 + bumpOrder + DB登録をアトミックに実行（失敗したら worktree を削除）
+  let newTask: Task;
+  try {
+    newTask = await prisma.$transaction(async (tx) => {
+      let resolvedOrder: number;
+      if (order !== undefined) {
+        resolvedOrder = order;
+        await taskRepo.bumpOrder(resolvedOrder, undefined, tx);
+      } else {
+        const result = await tx.task.aggregate({
+          where: { owner, repo, deletedAt: null },
+          _max: { order: true },
+        });
+        resolvedOrder = (result._max.order ?? -1) + 1;
+      }
+
+      return await taskRepo.createTask(
+        {
+          title,
+          description,
+          status,
+          owner,
+          repo,
+          branch,
+          baseBranch,
+          repoId: repository.id,
+          effort,
+          order: resolvedOrder,
+        },
+        tx
+      );
+    });
+  } catch (error) {
+    // force=false: 既存のローカルブランチを流用した場合に削除しないよう、ブランチは残す
+    try {
+      await worktreeManager.removeWorktree(owner, repo, branch);
+    } catch (cleanupError) {
+      console.error('Failed to remove worktree after task creation failure:', cleanupError);
+    }
+    throw error;
   }
 
   // 初期Tabは作らない。タブはユーザーがタスク詳細で起動先（Claude / Ollama 等）を選んで作る
 
-  // 4. 更新後のタスクを取得
-  const updatedTask = await taskRepo.getTask(newTask.id);
-  if (!updatedTask) {
-    throw new TaskServiceError('Failed to retrieve created task', 'INTERNAL_ERROR');
-  }
+  // 4. Socket.IO通知
+  options?.io?.emit('task:created', { task: newTask, warnings });
 
-  // 5. Socket.IO通知
-  options?.io?.emit('task:created', { task: updatedTask });
-
-  return { task: updatedTask };
+  return { task: newTask, warnings };
 }
 
 /**
