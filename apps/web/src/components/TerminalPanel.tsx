@@ -204,7 +204,10 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const handleVoiceInputTranscribed = useCallback(
       (text: string) => {
         if (!activeTabId) return;
-        terminalRefs.current.get(activeTabId)?.sendInput(text);
+        const handle = terminalRefs.current.get(activeTabId);
+        handle?.sendInput(text);
+        // 音声入力ボタンの操作でフォーカスが外れているため、続けてEnterで送信できるよう xterm に戻す
+        handle?.focus();
       },
       [activeTabId]
     );
