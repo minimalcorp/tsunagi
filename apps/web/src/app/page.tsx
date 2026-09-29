@@ -93,7 +93,6 @@ export default function Home() {
   // 判定はサーバー(/api/onboarding/status)に一本化する
   const [hasAuth, setHasAuth] = useState(false);
   const [isMetaLoading, setIsMetaLoading] = useState(true);
-  const isLoading = isTasksLoading || isMetaLoading;
   // Dialog states
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [addTaskRepo, setAddTaskRepo] = useState<{ owner: string; repo: string } | null>(null);
@@ -386,7 +385,9 @@ export default function Home() {
     }
   };
 
-  if (isLoading && tasks.length === 0) {
+  // タスクとリポジトリの両方が揃うまでボードを描画しない。
+  // 片方だけで描画すると Clone 列にスナップした後に列が前に挿入され、横スクロールが右端に飛ぶ
+  if ((isTasksLoading && tasks.length === 0) || (isMetaLoading && repositories.length === 0)) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
