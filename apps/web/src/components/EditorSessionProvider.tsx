@@ -28,7 +28,7 @@ export function EditorSessionProvider() {
 
   // session の変化を監視してカスタムイベントを発火する。
   // open: xterm の blur と customKeyEventHandler の無効化を TerminalView に通知
-  // done: Ctrl+L 送信と focus 復帰を TerminalView に通知
+  // done: resize 抑制の解除と focus 復帰を TerminalView に通知
   const prevSessionRef = useRef<EditorSession | null>(null);
   useEffect(() => {
     const prev = prevSessionRef.current;

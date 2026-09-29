@@ -344,36 +344,12 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       termRef.current?.blur();
     }
     function handleEditorSessionDone() {
-      // Ink の <Static>（Claude の welcome splash や会話履歴など）は emit-once 設計で、
-      // $EDITOR から復帰した後の通常 rerender では再 emit されず画面から消えてしまう。
-      // ユーザー操作で window を 1 文字分 resize したケースでは Static を含むフレーム
-      // 全体が再 emit され、それなりに適切な見た目に復帰することが分かっている。
-      // 同等の SIGWINCH を発火させるため、xterm + PTY を一時的に縮める cols bump を行う。
-      //
-      // フロントエンドで bump する理由: user の window resize と同じく xterm / PTY が
-      // 同時に新サイズになる方が Ink の挙動が安定する。サーバー側で PTY だけ resize
-      // すると xterm との dimension mismatch が発生する。
-      //
-      // bump サイズの選び方は COLS_RESET_SIZE のコメントを参照。
-      //
-      // - 300ms 遅延: sh の polling(最大100ms) + exit + claude foreground 復帰 を待つ
-      // - 100ms 間隔: Ink の re-layout 完了後に元の cols に戻す（fit() で container
-      //   実サイズに re-fit）
-      setTimeout(() => {
-        const term = termRef.current;
-        if (term) {
-          const bumpCols = term.cols === COLS_RESET_SIZE ? COLS_RESET_SIZE - 1 : COLS_RESET_SIZE;
-          term.resize(bumpCols, term.rows);
-          sendResize();
-          setTimeout(() => {
-            isExternalEditorOpenRef.current = false;
-            fitAddonRef.current?.fit();
-            sendResize();
-          }, 100);
-        } else {
-          isExternalEditorOpenRef.current = false;
-        }
-      }, 300);
+      // $EDITOR 復帰後の画面復元は Claude Code 側（2.1.129 以降）に委ねる。
+      // modal 表示中に抑制していた container サイズ変化のみ xterm / PTY に同期する
+      // （サイズが変わっていなければ PTY 側で no-op）。
+      isExternalEditorOpenRef.current = false;
+      fitAddonRef.current?.fit();
+      sendResize();
       // アクティブタブのみフォーカスを復帰する
       if (!isActiveRef.current) return;
       // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない）
@@ -619,7 +595,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
           // Claude (Ink) の内部状態を fresh な xterm 状態と再同期させる。
           // 同一サイズの resize は PTY 側で no-op となり SIGWINCH が飛ばないため、
           // ページ遷移後にカーソル位置がずれる問題を解消する。
-          // editor-session-done と同じ「xterm と PTY を同時に同じ値に resize する」
+          // 「xterm と PTY を同時に同じ値に resize する」
           // 対称パターンを使い、dimension mismatch を避ける。
           const t = termRef.current;
           if (t) {

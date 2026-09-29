@@ -76,11 +76,6 @@ export async function editorRoutes(fastify: FastifyInstance) {
       await writeFile(session.filePath, request.body.content, 'utf8');
       session.status = 'done';
 
-      // Ink の <Static> 再 emit を発火させる cols bump はフロントエンド (TerminalView)
-      // 側で行う。理由: ユーザー操作の window resize と同等の挙動（xterm と PTY が
-      // 同時に新サイズになる）にしたいため。サーバー側で PTY だけ resize すると xterm
-      // との dimension mismatch が発生する。
-
       return reply.send({ ok: true });
     }
   );
