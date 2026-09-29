@@ -32,7 +32,7 @@ export function VoiceInputButton({ voiceInput }: { voiceInput: VoiceInputControl
   const title = listening
     ? '音声入力を停止'
     : !serverReady
-      ? 'Whisperサーバーが起動していません（Settingsから起動してください）'
+      ? '音声認識サーバーが起動していません（Settingsから起動してください）'
       : '音声入力を開始（話した部分が自動で入力されます）';
 
   return (

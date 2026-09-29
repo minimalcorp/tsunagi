@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 
 // 指定ポートでLISTENしているプロセスを探して停止する。tsunagi自身が起動した
-// 場合はchild_processのハンドルで直接killできるが、`make whisper`/`make llm`
+// 場合はchild_processのハンドルで直接killできるが、`make whisper`
 // のようにtsunagi外で手動起動された場合はハンドルを持たないため、
 // ポート番号を手がかりにOS側から見つけて停止する。
 export function killProcessOnPort(port: number): Promise<boolean> {

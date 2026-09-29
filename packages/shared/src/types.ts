@@ -254,3 +254,36 @@ export interface ApiResponse<T> {
   data: T;
   error?: string;
 }
+
+// ---- 実験的機能: 音声入力（ローカル音声認識モデル, global のみ） ----
+
+/** 音声認識モデルの推論実装（apps/whisper-server 内で切り替える） */
+export type AsrEngine = 'whisper' | 'qwen3-asr';
+
+/** 選択肢に出す音声認識モデル */
+export interface AsrModel {
+  id: string;
+  label: string;
+  description: string;
+  engine: AsrEngine;
+  /** Hugging Face のリポジトリ ID */
+  repo: string;
+  /** ダウンロードサイズの目安（進捗・ETA の計算にも使う） */
+  expectedBytes: number;
+  license: string;
+}
+
+export interface AsrModelEntry extends AsrModel {
+  /** ダウンロード済みか */
+  installed: boolean;
+}
+
+export interface AsrModelList {
+  models: AsrModelEntry[];
+  /** 設定で選択中のモデル（次回起動時に読み込まれる） */
+  selectedModelId: string;
+}
+
+export interface VoiceInputSettings {
+  modelId: string;
+}

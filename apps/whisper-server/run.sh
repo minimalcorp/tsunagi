@@ -31,7 +31,7 @@ find_python() {
 }
 
 if ! PYTHON_BIN="$(find_python)"; then
-  echo "音声入力(Whisper)サーバーの起動に失敗: Python ${MIN_PYTHON_VERSION}以上が見つかりません。" >&2
+  echo "音声入力サーバーの起動に失敗: Python ${MIN_PYTHON_VERSION}以上が見つかりません。" >&2
   echo "'brew install python@3.12' 等でインストールしてください。" >&2
   exit 1
 fi
@@ -49,8 +49,13 @@ if [ ! -d "$VENV_DIR" ] || [ "$(cat "$REQUIREMENTS_HASH_FILE" 2>/dev/null)" != "
   echo "$CURRENT_HASH" > "$REQUIREMENTS_HASH_FILE"
 fi
 
+# 読み込むモデル。未指定ならWhisper。Qwen3-ASRを使う場合は例えば
+#   TSUNAGI_ASR_ENGINE=qwen3-asr TSUNAGI_ASR_MODEL=mlx-community/Qwen3-ASR-1.7B-8bit ./run.sh
+export TSUNAGI_ASR_ENGINE="${TSUNAGI_ASR_ENGINE:-whisper}"
+export TSUNAGI_ASR_MODEL="${TSUNAGI_ASR_MODEL:-mlx-community/whisper-large-v3-turbo}"
+
 # サーバー起動前にモデルを予めダウンロードしておく(初回文字起こしで待たされないように)。
-"$VENV_DIR/bin/python3" download_model.py
+"$VENV_DIR/bin/python3" download_model.py "$TSUNAGI_ASR_MODEL"
 
 # venvを ~/.tsunagi 配下へ移設する場合があるため、絶対パスが焼き込まれる
 # コンソールスクリプト(bin/uvicorn等)ではなく `python3 -m` 経由で呼び出す。

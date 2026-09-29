@@ -13,15 +13,15 @@ const LOG_FILE = path.join(LOG_DIR, 'voice-input-debug.log');
 const MAX_ENTRIES = 200;
 
 export interface VoiceDebugLogEntry {
+  /** 文字起こしに使ったモデル(Hugging Face のリポジトリ ID) */
+  model: string | undefined;
+  /** tsunagi から whisper-server への往復時間(モデル間の速度比較用) */
+  elapsedMs: number;
   whisperPrompt: string | undefined;
   whisperText: string;
-  useLlm: boolean;
-  llmSystemPrompt?: string;
-  correctedText?: string;
-  llmError?: string;
 }
 
-// Whisper生テキストとLLM整形結果を1リクエスト1行(JSON Lines)で追記する。
+// モデル・処理時間・プロンプト・文字起こし結果を1リクエスト1行(JSON Lines)で追記する。
 // プロンプト改善のデバッグ専用ログであり、書き込み失敗はリクエスト自体を
 // 失敗させるべきではないため例外を握りつぶす。
 export function appendVoiceDebugLog(entry: VoiceDebugLogEntry): void {

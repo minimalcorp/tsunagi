@@ -1,4 +1,8 @@
-"""ローカルWhisper文字起こしサーバー (mlx-whisper, Apple Silicon GPU)。
+"""ローカル音声認識サーバー (Apple Silicon GPU)。
+
+読み込むモデルは起動時の環境変数で切り替える(tsunagiのSettingsで選択したものが渡される)。
+- TSUNAGI_ASR_ENGINE: "whisper"(mlx-whisper) / "qwen3-asr"(mlx-qwen3-asr)
+- TSUNAGI_ASR_MODEL: Hugging FaceのリポジトリID
 
 ユーザーが手動でセットアップ・起動する常駐プロセス。モデルをメモリに保持し続け
 リクエスト毎のロード待ちを避ける。tsunagi本体(Fastify)からHTTPでプロキシされる。
@@ -9,6 +13,7 @@
 """
 
 import io
+import os
 import re
 import threading
 from typing import Optional
@@ -16,9 +21,20 @@ from typing import Optional
 import av
 import numpy as np
 from fastapi import FastAPI, File, Form, UploadFile
-import mlx_whisper
 
-MODEL = "mlx-community/whisper-large-v3-turbo"
+ENGINE = os.environ.get("TSUNAGI_ASR_ENGINE", "whisper")
+MODEL = os.environ.get("TSUNAGI_ASR_MODEL", "mlx-community/whisper-large-v3-turbo")
+if ENGINE not in ("whisper", "qwen3-asr"):
+    raise SystemExit(f"Unknown TSUNAGI_ASR_ENGINE: {ENGINE}")
+
+if ENGINE == "whisper":
+    import mlx_whisper
+else:
+    from mlx_qwen3_asr import Session
+
+    # Qwen3-ASRはモデルを保持するSessionを起動時に作り、リクエスト毎のロード待ちを避ける。
+    # 読み込み完了まで/healthが応答しないため、tsunagi側は読み込み完了を起動完了とみなせる。
+    _qwen_session = Session(model=MODEL)
 # 無音・雑音区間で「ご視聴ありがとうございました」等の無関係な文章を自信満々に
 # 生成してしまう(Whisper系モデルで知られたハルシネーション挙動)ことがあるため、
 # no_speech_prob(無音である確率)がこの値を超えるセグメントは出力から除外する。
@@ -45,7 +61,7 @@ HALLUCINATION_PHRASES = {
 }
 _NORMALIZE_RE = re.compile(r"[\s、。，．,.！!？?・…「」『』（）()\[\]〜~♪]+")
 
-# mlx_whisperの推論は同時実行を想定していないため直列化する。エンドポイント自体は
+# MLXの推論は同時実行を想定していないため直列化する。エンドポイント自体は
 # 同期関数にしてスレッドプールで実行させ、推論中も/healthが応答できるようにする
 # (途中経過の表示で文字起こしリクエストが連続しても、起動状態のポーリングが
 # タイムアウトしてUIが「未起動」扱いになるのを防ぐ)。
@@ -56,7 +72,7 @@ app = FastAPI()
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "model": MODEL}
+    return {"status": "ok", "engine": ENGINE, "model": MODEL}
 
 
 def decode_to_16k_mono(data: bytes) -> np.ndarray:
@@ -80,40 +96,52 @@ def is_hallucination_phrase(text: str) -> bool:
     return _NORMALIZE_RE.sub("", text) in HALLUCINATION_PHRASES
 
 
-@app.post("/transcribe")
-def transcribe(file: UploadFile = File(...), prompt: Optional[str] = Form(None)) -> dict:
-    data = file.file.read()
-    audio = decode_to_16k_mono(data)
-    if audio.size == 0:
-        return {"text": ""}
+def transcribe_whisper(audio: np.ndarray, prompt: Optional[str]) -> str:
     # initial_promptは文字起こしのスタイル(表記ゆれ・句読点・固有名詞など)を
     # 誘導するヒントで、tsunagiのSettingsからユーザーが自由に設定できる。
-    with _transcribe_lock:
-        result = mlx_whisper.transcribe(
-            audio,
-            path_or_hf_repo=MODEL,
-            language="ja",
-            initial_prompt=prompt or None,
-            # 前の窓の出力を次の窓のプロンプトに引き継ぐと、一度出たハルシネーションが
-            # 後続の窓へ連鎖しやすくなるため無効化する。
-            condition_on_previous_text=False,
-            word_timestamps=True,
-            hallucination_silence_threshold=HALLUCINATION_SILENCE_THRESHOLD,
-        )
+    result = mlx_whisper.transcribe(
+        audio,
+        path_or_hf_repo=MODEL,
+        language="ja",
+        initial_prompt=prompt or None,
+        # 前の窓の出力を次の窓のプロンプトに引き継ぐと、一度出たハルシネーションが
+        # 後続の窓へ連鎖しやすくなるため無効化する。
+        condition_on_previous_text=False,
+        word_timestamps=True,
+        hallucination_silence_threshold=HALLUCINATION_SILENCE_THRESHOLD,
+    )
 
     # result["text"]はno_speech_prob等のフィルタを経ずに全セグメントを結合した
     # ものなので使わず、セグメント単位でno_speech_probを見て自前で組み立て直す。
     segments = result.get("segments")
     if segments:
-        text = "".join(
+        return "".join(
             seg["text"]
             for seg in segments
             if seg.get("no_speech_prob", 0.0) <= NO_SPEECH_THRESHOLD
             and not is_hallucination_phrase(seg["text"])
         )
-    else:
-        text = result.get("text", "")
-        if is_hallucination_phrase(text):
-            text = ""
+    text = result.get("text", "")
+    return "" if is_hallucination_phrase(text) else text
 
-    return {"text": text.strip()}
+
+def transcribe_qwen3_asr(audio: np.ndarray, prompt: Optional[str]) -> str:
+    # contextはシステムプロンプトに差し込まれる語彙ヒント(スペース区切りの単語列を想定)。
+    # SettingsのプロンプトをWhisperのinitial_promptと共通で使う。
+    result = _qwen_session.transcribe(audio, context=prompt or "", language="Japanese")
+    # Whisperのようなno_speech_probは無いため、定型文の完全一致除外のみ行う。
+    return "" if is_hallucination_phrase(result.text) else result.text
+
+
+@app.post("/transcribe")
+def transcribe(file: UploadFile = File(...), prompt: Optional[str] = Form(None)) -> dict:
+    data = file.file.read()
+    audio = decode_to_16k_mono(data)
+    if audio.size == 0:
+        return {"text": "", "model": MODEL}
+    with _transcribe_lock:
+        if ENGINE == "whisper":
+            text = transcribe_whisper(audio, prompt)
+        else:
+            text = transcribe_qwen3_asr(audio, prompt)
+    return {"text": text.strip(), "model": MODEL}
