@@ -60,6 +60,11 @@ generated/
 # Prisma generated client (server)
 apps/server/src/generated/
 
+# comfyui-generate skill: 生成物の一時保存先（バイナリのためgit管理外）
+.claude/skills/comfyui-generate/output/
+__pycache__/
+*.pyc
+
 # python (apps/whisper-server, user-managed)
 .venv/
 __pycache__/
