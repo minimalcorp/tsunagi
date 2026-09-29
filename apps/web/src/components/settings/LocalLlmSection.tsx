@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
-import { LLM_SYSTEM_PROMPT_STORAGE_KEY } from '@/components/VoiceInputButton';
+import { LLM_SYSTEM_PROMPT_STORAGE_KEY } from '@/lib/voice-input';
 
 const STORAGE_KEY = 'tsunagi:local-llm-enabled';
 // 音声入力(VoiceInputButton)から、文字起こし結果をLLMで整形するかどうかの

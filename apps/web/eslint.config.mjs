@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     'dist/**',
     // Prisma client output. Auto-generated.
     'generated/**',
+    // Vendored runtime assets copied by scripts/copy-vad-assets.mjs.
+    'public/vad/**',
   ]),
 ]);
 

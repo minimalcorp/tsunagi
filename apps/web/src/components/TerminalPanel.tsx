@@ -3,6 +3,8 @@
 import { useState, useCallback, useRef, useImperativeHandle, forwardRef, useEffect } from 'react';
 import type { LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
+import { VoiceTranscriptOverlay } from '@/components/VoiceTranscriptOverlay';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
 import {
   TerminalView,
   type Todo,
@@ -201,16 +203,19 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           }
         : undefined;
 
-    const handleVoiceInputTranscribed = useCallback(
+    // 確定した文字起こしは、その時点でアクティブなタブへ入力する。
+    // Enterは送らず、内容を確認してからユーザーが送信する。
+    const handleVoiceInputFinal = useCallback(
       (text: string) => {
         if (!activeTabId) return;
         const handle = terminalRefs.current.get(activeTabId);
         handle?.sendInput(text);
-        // 音声入力ボタンの操作でフォーカスが外れているため、続けてEnterで送信できるよう xterm に戻す
+        // 音声入力ボタンの操作でフォーカスが外れていることがあるため、続けてEnterで送信できるよう xterm に戻す
         handle?.focus();
       },
       [activeTabId]
     );
+    const voiceInput = useVoiceInput({ onFinal: handleVoiceInputFinal });
 
     const handleTabDelete = useCallback(
       (tabId: string) => {
@@ -244,7 +249,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             onTabCreateLocalLlm={handleTabCreateLocalLlm}
             onTabDelete={handleTabDelete}
             tabStatusMap={tabStatusMap}
-            onVoiceInputTranscribed={tabs.length > 0 ? handleVoiceInputTranscribed : undefined}
+            voiceInput={tabs.length > 0 || voiceInput.status !== 'off' ? voiceInput : undefined}
           />
         </div>
 
@@ -321,6 +326,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               </div>
             </div>
           )}
+
+          <VoiceTranscriptOverlay utterances={voiceInput.utterances} />
 
           {tabs.length > 0 && !activeTabId && (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">

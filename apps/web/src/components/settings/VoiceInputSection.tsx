@@ -9,9 +9,10 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
-import { WHISPER_PROMPT_STORAGE_KEY } from '@/components/VoiceInputButton';
-
-const STORAGE_KEY = 'tsunagi:voice-input-enabled';
+import {
+  VOICE_INPUT_ENABLED_STORAGE_KEY as STORAGE_KEY,
+  WHISPER_PROMPT_STORAGE_KEY,
+} from '@/lib/voice-input';
 
 type ServerStep =
   | 'not_running'
