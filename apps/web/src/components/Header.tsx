@@ -3,6 +3,7 @@
 import { Settings, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import { ThemeToggle } from './ThemeToggle';
+import { UpdateIndicator } from './UpdateIndicator';
 import { Button } from '@/components/ui/button';
 import logoIcon from '@/app/icon.png';
 
@@ -29,6 +30,8 @@ export function Header({ onSettingsClick, onReload, nextStep = 'complete' }: Hea
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      <UpdateIndicator />
 
       {/* Theme Toggle */}
       <ThemeToggle />

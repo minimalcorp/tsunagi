@@ -287,3 +287,14 @@ export interface AsrModelList {
 export interface VoiceInputSettings {
   modelId: string;
 }
+
+/** npm に公開された最新バージョンとの比較結果（GET /api/version, socket `version:status`） */
+export interface UpdateStatus {
+  /** 実行中のバージョン。dev 起動など不明な場合は null（確認しない） */
+  current: string | null;
+  /** npm registry の latest。未取得なら null */
+  latest: string | null;
+  updateAvailable: boolean;
+  /** 最後に registry の確認に成功した時刻（ISO 8601） */
+  checkedAt: string | null;
+}
