@@ -41,6 +41,7 @@ interface SessionTabsProps {
 
 /** タブのリアルタイムステータスに基づくアイコン＋ラベル */
 function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
+  // terminal === null（未マウント）は Claude ステータスのみで表示する
   if (!entry || entry.terminal === 'idle') {
     return (
       <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -77,7 +78,7 @@ function TabStatusIndicator({ entry }: { entry: TabStatusEntry | undefined }) {
     );
   }
 
-  // terminal === 'connected'
+  // terminal === 'connected' | null
   switch (entry.claude) {
     case 'running':
       return (
@@ -189,7 +190,7 @@ export function SessionTabs({
           const entry = tabStatusMap?.get(tab.tab_id);
           const isRunning =
             (entry?.claude === 'running' || entry?.claude === 'waiting') &&
-            entry?.terminal === 'connected';
+            (entry?.terminal === 'connected' || entry?.terminal === null);
 
           return (
             <div
