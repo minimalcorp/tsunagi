@@ -1,11 +1,20 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import type { UpdateStatus } from '@minimalcorp/tsunagi-shared';
 import { apiUrl, getServerUrl } from '@/lib/api-url';
 
-const UpdateStatusContext = createContext<UpdateStatus | null>(null);
+interface UpdateStatusContextValue {
+  status: UpdateStatus | null;
+  /** npm の最新バージョンを今すぐ確認する。失敗時は Error を投げる */
+  checkNow: () => Promise<void>;
+}
+
+const UpdateStatusContext = createContext<UpdateStatusContextValue>({
+  status: null,
+  checkNow: async () => {},
+});
 
 /**
  * npm の最新バージョンとの比較結果を全画面に配る。
@@ -33,10 +42,31 @@ export function UpdateStatusProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  return <UpdateStatusContext.Provider value={status}>{children}</UpdateStatusContext.Provider>;
+  const checkNow = useCallback(async () => {
+    const res = await fetch(apiUrl('/api/version/check'), { method: 'POST' });
+    const json = (await res.json().catch(() => null)) as {
+      data?: UpdateStatus;
+      error?: string;
+    } | null;
+    if (!res.ok || !json?.data) {
+      throw new Error(json?.error ?? `HTTP ${res.status}`);
+    }
+    setStatus(json.data);
+  }, []);
+
+  return (
+    <UpdateStatusContext.Provider value={{ status, checkNow }}>
+      {children}
+    </UpdateStatusContext.Provider>
+  );
 }
 
 /** 未取得なら null */
 export function useUpdateStatus(): UpdateStatus | null {
-  return useContext(UpdateStatusContext);
+  return useContext(UpdateStatusContext).status;
+}
+
+/** 手動で更新を確認する関数 */
+export function useCheckForUpdate(): () => Promise<void> {
+  return useContext(UpdateStatusContext).checkNow;
 }

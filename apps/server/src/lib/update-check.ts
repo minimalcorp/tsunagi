@@ -16,6 +16,7 @@ const status: UpdateStatus = {
 };
 
 let timer: NodeJS.Timeout | null = null;
+let socket: SocketIOServer | null = null;
 
 function parseVersion(version: string): number[] | null {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version.trim());
@@ -37,28 +38,37 @@ export function getUpdateStatus(): UpdateStatus {
   return { ...status };
 }
 
-async function check(io: SocketIOServer): Promise<void> {
-  if (!status.current) return;
+/** registry を確認して status を更新する。確認できなければ false（前回の結果を保持） */
+async function check(): Promise<boolean> {
+  if (!status.current) return false;
   try {
     const res = await fetch(REGISTRY_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!res.ok) return;
+    if (!res.ok) return false;
     const { version } = (await res.json()) as { version?: unknown };
-    if (typeof version !== 'string') return;
+    if (typeof version !== 'string') return false;
 
-    const changed = version !== status.latest;
     status.latest = version;
     status.updateAvailable = isNewer(version, status.current);
     status.checkedAt = new Date().toISOString();
-    if (changed) io.emit('version:status', getUpdateStatus());
+    // checkedAt も表示しているため、変化の有無に関わらず通知する
+    socket?.emit('version:status', getUpdateStatus());
+    return true;
   } catch {
-    // オフライン等は無視し、前回の結果を保持する
+    // オフライン等
+    return false;
   }
+}
+
+/** 手動確認（Settings の確認ボタン）。確認できなければ false */
+export function checkForUpdateNow(): Promise<boolean> {
+  return check();
 }
 
 export function startUpdateCheck(io: SocketIOServer): void {
   if (!status.current || timer) return;
-  void check(io);
-  timer = setInterval(() => void check(io), CHECK_INTERVAL_MS);
+  socket = io;
+  void check();
+  timer = setInterval(() => void check(), CHECK_INTERVAL_MS);
   timer.unref();
 }
 

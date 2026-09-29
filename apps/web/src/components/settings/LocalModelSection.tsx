@@ -292,7 +292,7 @@ export function LocalModelSection() {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-1">
-          <CardTitle>Claude Code のローカルLLM (実験的機能)</CardTitle>
+          <CardTitle>Claude Code のローカルLLM</CardTitle>
           <Button
             variant="ghost"
             size="icon-sm"
