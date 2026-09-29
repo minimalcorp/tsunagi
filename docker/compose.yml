@@ -20,6 +20,9 @@ services:
       #   例: TSUNAGI_BASIC_AUTH_USER=tsunagi TSUNAGI_BASIC_AUTH_PASSWORD=xxxx make up
       - TSUNAGI_BASIC_AUTH_USER=${TSUNAGI_BASIC_AUTH_USER:-}
       - TSUNAGI_BASIC_AUTH_PASSWORD=${TSUNAGI_BASIC_AUTH_PASSWORD:-}
+      # 更新確認の動作確認用。dev 起動では未設定のため確認しない。
+      #   例: TSUNAGI_VERSION=0.1.51 make up
+      - TSUNAGI_VERSION=${TSUNAGI_VERSION:-}
       # apps/whisper-server はユーザーがホスト側で手動起動する前提のため、
       # container からは host.docker.internal 経由でアクセスする。
       - TSUNAGI_WHISPER_SERVER_URL=http://host.docker.internal:8765
