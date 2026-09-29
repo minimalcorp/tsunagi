@@ -17,6 +17,7 @@ import type { LocalLlmTabOption, TabStatusEntry } from '@/components/TerminalPan
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
 import { VoiceInputButton } from '@/components/VoiceInputButton';
+import type { VoiceInputController } from '@/hooks/useVoiceInput';
 import { ClaudeIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
 import { localLlmTabLabel } from '@/lib/local-llm';
 
@@ -34,8 +35,8 @@ interface SessionTabsProps {
   onTabDelete: (tabId: string) => void;
   /** タブごとのリアルタイムステータス */
   tabStatusMap?: Map<string, TabStatusEntry>;
-  /** 音声入力の文字起こし結果（省略時は音声入力ボタン非表示） */
-  onVoiceInputTranscribed?: (text: string) => void;
+  /** 音声入力（省略時は音声入力ボタン非表示） */
+  voiceInput?: VoiceInputController;
 }
 
 /** タブのリアルタイムステータスに基づくアイコン＋ラベル */
@@ -128,7 +129,7 @@ export function SessionTabs({
   onTabCreateLocalLlm,
   onTabDelete,
   tabStatusMap,
-  onVoiceInputTranscribed,
+  voiceInput,
 }: SessionTabsProps) {
   const tabRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
@@ -241,7 +242,7 @@ export function SessionTabs({
 
         {/* 音声入力 + divider + アクションボタン群 */}
         <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-          {onVoiceInputTranscribed && <VoiceInputButton onTranscribed={onVoiceInputTranscribed} />}
+          {voiceInput && <VoiceInputButton voiceInput={voiceInput} />}
           <div className="w-px self-stretch bg-theme" />
           {onTabCreateTerminal && (
             <Button size="icon" onClick={onTabCreateTerminal} title="Open terminal">

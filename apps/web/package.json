@@ -5,7 +5,9 @@
   "description": "Next.js UI for tsunagi",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-vad-assets.mjs",
     "dev": "next dev -p 2792",
+    "prebuild": "node scripts/copy-vad-assets.mjs",
     "build": "next build",
     "start": "next start -p 2792",
     "lint": "eslint",
@@ -16,6 +18,7 @@
     "@hello-pangea/dnd": "^18.0.1",
     "@minimalcorp/tsunagi-shared": "*",
     "@monaco-editor/react": "^4.7.0",
+    "@ricky0123/vad-web": "^0.0.31",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "@xyflow/react": "^12.10.0",

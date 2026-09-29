@@ -55,9 +55,14 @@ export async function whisperRoutes(fastify: FastifyInstance) {
     const promptField = file.fields.prompt as { value?: unknown } | undefined;
     const prompt = typeof promptField?.value === 'string' ? promptField.value : undefined;
 
+    // 発話中の途中経過表示用のリクエスト。確定前の暫定結果なので、LLM整形と
+    // デバッグログはスキップして生の文字起こし結果だけを速く返す。
+    const interimField = file.fields.interim as { value?: unknown } | undefined;
+    const interim = interimField?.value === 'true';
+
     // ローカルLLMによる整形を使うかどうかはクライアント(Settingsの有効/無効フラグ)から渡される。
     const useLlmField = file.fields.useLlm as { value?: unknown } | undefined;
-    const useLlm = useLlmField?.value === 'true';
+    const useLlm = !interim && useLlmField?.value === 'true';
 
     // LLM整形用システムプロンプトもSettings画面で編集・保存でき、指定があれば
     // 既定のプロンプトの代わりに使う(空文字列の場合は既定のプロンプトを使う)。
@@ -93,6 +98,10 @@ export async function whisperRoutes(fastify: FastifyInstance) {
             ? error.message
             : 'Transcription failed. Is apps/whisper-server running?',
       });
+    }
+
+    if (interim) {
+      return reply.status(200).send({ text: whisperText });
     }
 
     if (!useLlm || !whisperText) {

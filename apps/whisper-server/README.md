@@ -8,7 +8,7 @@ tsunagi本体はこのサーバーにHTTPでプロキシするだけで、セッ
 - macOS (Apple Silicon: M1/M2/M3/M4)
 - Python 3.9+ (Xcode Command Line Tools または Homebrew 経由で入手可能)
 
-ffmpeg等の外部バイナリは不要（音声はブラウザ側で16kHzモノラルWAVに変換して送られる）。
+ffmpeg等の外部バイナリは不要（音声はブラウザ側のVADで発話区間だけ切り出し、16kHzモノラルWAVで送られる）。
 
 ## セットアップ・起動
 
