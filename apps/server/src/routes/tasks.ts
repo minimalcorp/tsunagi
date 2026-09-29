@@ -431,6 +431,13 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // タブの増減を他の画面（ボード・詳細のサイドバー）に通知し、新しいタブの status 購読を始めさせる。
+  // task:updated だとボードで「Task updated」トーストが出るため別イベントにしている
+  const emitTabsChanged = async (taskId: string) => {
+    const task = await taskRepo.getTask(taskId);
+    if (task) io.emit('task:tabs-changed', { task });
+  };
+
   // GET /tasks/:id/tabs
   fastify.get<{ Params: { id: string } }>('/tasks/:id/tabs', async (request, reply) => {
     try {
@@ -472,6 +479,8 @@ export async function tasksRoutes(fastify: FastifyInstance) {
           return reply.status(500).send({ error: 'Failed to create tab' });
         }
 
+        await emitTabsChanged(taskId);
+
         return reply.status(201).send({ data: { tab: newTab } });
       } catch (error) {
         fastify.log.error(error, 'POST /tasks/:id/tabs error');
@@ -510,6 +519,7 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         }
         // タブの PTY(=claude プロセス) も止める。残すと GC(30分) まで動き続けるため
         ptyManager.deleteSession(tab_id);
+        await emitTabsChanged(taskId);
         return reply.status(200).send({ data: { success: true } });
       } catch (error) {
         fastify.log.error(error, 'DELETE /tasks/:id/tabs/:tab_id error');
