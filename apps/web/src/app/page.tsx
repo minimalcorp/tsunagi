@@ -12,10 +12,9 @@ import { RepositoryBoard, repoKeyOf } from '@/components/planner/RepositoryBoard
 import { type FilterState } from '@/components/planner/FilterBar';
 import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { useTerminalTodos } from '@/hooks/useTerminalTodos';
-import { useTaskEvents } from '@/hooks/useTaskEvents';
-import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
+import { useLiveTasks } from '@/hooks/useLiveTasks';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { hasUnreadResult, unreadForStatus } from '@/lib/claude-status';
+import { hasUnreadResult } from '@/lib/claude-status';
 import { toaster } from '@/lib/toaster';
 import { apiUrl } from '@/lib/api-url';
 
@@ -44,12 +43,57 @@ function buildFilterSummary(filters: ColumnFilters): string | undefined {
 
 export default function Home() {
   const router = useRouter();
-  const [tasks, setTasks] = useState<Task[]>([]);
+  // Socket.IOイベントでUI更新のみ行う（通知は操作元のUI側で表示するため、ここでは出さない）
+  const {
+    tasks,
+    setTasks,
+    isLoading: isTasksLoading,
+    reload: reloadTasks,
+  } = useLiveTasks({
+    onTaskCreated: (newTask, warnings) => {
+      toaster.create(
+        warnings.length > 0
+          ? {
+              type: 'warning',
+              title: 'Task created with warnings',
+              description: (
+                <>
+                  <p>{newTask.title}</p>
+                  {warnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </>
+              ),
+              duration: Infinity,
+            }
+          : { type: 'success', title: 'Task created', description: newTask.title, duration: 5000 }
+      );
+    },
+    onTaskUpdated: (updatedTask) => {
+      toaster.create({
+        type: 'info',
+        title: 'Task updated',
+        description: updatedTask.title,
+        duration: 5000,
+      });
+    },
+    onTaskDeleted: (_taskId, deletedTask) => {
+      if (deletedTask) {
+        toaster.create({
+          type: 'info',
+          title: 'Task deleted',
+          description: deletedTask.title,
+          duration: 5000,
+        });
+      }
+    },
+  });
   const [repositories, setRepositories] = useState<Repository[]>([]);
   // 認証設定済みか（Global の Anthropic トークン、または実験的機能のローカルLLM（Ollama / LM Studio）の設定）。
   // 判定はサーバー(/api/onboarding/status)に一本化する
   const [hasAuth, setHasAuth] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isMetaLoading, setIsMetaLoading] = useState(true);
+  const isLoading = isTasksLoading || isMetaLoading;
   // Dialog states
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [addTaskRepo, setAddTaskRepo] = useState<{ owner: string; repo: string } | null>(null);
@@ -137,17 +181,15 @@ export default function Home() {
     return grouped;
   }, [tasks, columnFilters]);
 
-  // 初回データロード
-  const loadData = async () => {
-    setIsLoading(true);
+  // リポジトリ・オンボーディング状態のロード（タスクは useLiveTasks が初回ロードする）
+  const loadMeta = async () => {
+    setIsMetaLoading(true);
     try {
-      const [tasksData, ownersData, onboardingData] = await Promise.all([
-        fetch(apiUrl('/api/tasks')).then((r) => r.json()),
+      const [ownersData, onboardingData] = await Promise.all([
         fetch(apiUrl('/api/owners')).then((r) => r.json()),
         fetch(apiUrl('/api/onboarding/status')).then((r) => r.json()),
       ]);
 
-      setTasks(tasksData.data.tasks);
       const allRepos = ownersData.data.owners.flatMap(
         (o: { repositories: Repository[] }) => o.repositories
       );
@@ -156,25 +198,23 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
-      setIsLoading(false);
+      setIsMetaLoading(false);
     }
+  };
+
+  const loadData = async () => {
+    await Promise.all([reloadTasks(), loadMeta()]);
   };
 
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     if (isInitialLoad) {
-      loadData();
+      loadMeta();
       setIsInitialLoad(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Tab status tracking
-  const allTabIds = useMemo(
-    () => tasks.flatMap((t) => (t.tabs ?? []).map((tab) => tab.tab_id)),
-    [tasks]
-  );
 
   const runningTabIds = useMemo(
     () =>
@@ -185,73 +225,6 @@ export default function Home() {
   );
 
   const tabTodosMap = useTerminalTodos(runningTabIds);
-
-  useTabStatusEvents(allTabIds, (tabId, status) => {
-    // 未読フラグはDBにもあるがリアルタイムでは status しか流れてこないため、
-    // サーバー(hooks.ts)と同じルールでここでも導出する
-    const unread = unreadForStatus(status);
-    setTasks((prev) =>
-      prev.map((task) => ({
-        ...task,
-        tabs: (task.tabs ?? []).map((tab) =>
-          tab.tab_id === tabId ? { ...tab, status, ...(unread !== undefined && { unread }) } : tab
-        ),
-      }))
-    );
-  });
-
-  // Socket.IOイベントでUI更新のみ行う（通知は操作元のUI側で表示するため、ここでは出さない）
-  useTaskEvents({
-    onTaskCreated: (newTask, warnings) => {
-      setTasks((prev) => {
-        if (prev.some((t) => t.id === newTask.id)) return prev;
-        return [...prev, newTask];
-      });
-
-      toaster.create(
-        warnings.length > 0
-          ? {
-              type: 'warning',
-              title: 'Task created with warnings',
-              description: (
-                <>
-                  <p>{newTask.title}</p>
-                  {warnings.map((warning) => (
-                    <p key={warning}>{warning}</p>
-                  ))}
-                </>
-              ),
-              duration: Infinity,
-            }
-          : { type: 'success', title: 'Task created', description: newTask.title, duration: 5000 }
-      );
-    },
-    onTaskUpdated: (updatedTask) => {
-      setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
-
-      toaster.create({
-        type: 'info',
-        title: 'Task updated',
-        description: updatedTask.title,
-        duration: 5000,
-      });
-    },
-    onTaskDeleted: (taskId) => {
-      // updater外でタスク名を取得（Strict Modeでupdaterが2回呼ばれても影響なし）
-      const taskTitle = tasks.find((t) => t.id === taskId)?.title;
-
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-
-      if (taskTitle) {
-        toaster.create({
-          type: 'info',
-          title: 'Task deleted',
-          description: taskTitle,
-          duration: 5000,
-        });
-      }
-    },
-  });
 
   // Batch delete
   const { isDeleting, deletedCount, errorCount, totalCount, isCompleted, startBatchDelete, reset } =
@@ -297,28 +270,31 @@ export default function Home() {
   }, [isDeleting, isCompleted, deletedCount, errorCount, totalCount, reset]);
 
   // Handlers
-  const handleReorder = useCallback(async (reorderedTasks: Task[]) => {
-    // Optimistic UI update
-    setTasks((prev) => {
-      const reorderedById = new Map(reorderedTasks.map((t) => [t.id, t]));
-      return prev.map((t) => reorderedById.get(t.id) ?? t);
-    });
+  const handleReorder = useCallback(
+    async (reorderedTasks: Task[]) => {
+      // Optimistic UI update
+      setTasks((prev) => {
+        const reorderedById = new Map(reorderedTasks.map((t) => [t.id, t]));
+        return prev.map((t) => reorderedById.get(t.id) ?? t);
+      });
 
-    // Persist order to server
-    try {
-      await Promise.all(
-        reorderedTasks.map((task, index) =>
-          fetch(apiUrl(`/api/tasks/${task.id}`), {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order: index }),
-          })
-        )
-      );
-    } catch (error) {
-      console.error('Failed to update task order:', error);
-    }
-  }, []);
+      // Persist order to server
+      try {
+        await Promise.all(
+          reorderedTasks.map((task, index) =>
+            fetch(apiUrl(`/api/tasks/${task.id}`), {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ order: index }),
+            })
+          )
+        );
+      } catch (error) {
+        console.error('Failed to update task order:', error);
+      }
+    },
+    [setTasks]
+  );
 
   /** 指定した列を先頭に移動する。細かい並び替えは settings ページで行う */
   const handleMoveRepositoryToFront = useCallback(

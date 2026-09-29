@@ -10,6 +10,8 @@ interface TaskEventCallbacks {
   onTaskCreated: (task: Task, warnings: string[]) => void;
   onTaskUpdated: (task: Task) => void;
   onTaskDeleted: (taskId: string) => void;
+  /** タブの作成・削除（status 購読対象の増減に使う） */
+  onTaskTabsChanged?: (task: Task) => void;
 }
 
 export function useTaskEvents(callbacks: TaskEventCallbacks) {
@@ -35,6 +37,10 @@ export function useTaskEvents(callbacks: TaskEventCallbacks) {
 
     socket.on('task:deleted', ({ taskId }: { taskId: string }) => {
       callbacksRef.current.onTaskDeleted(taskId);
+    });
+
+    socket.on('task:tabs-changed', ({ task }: { task: Task }) => {
+      callbacksRef.current.onTaskTabsChanged?.(task);
     });
 
     return () => {

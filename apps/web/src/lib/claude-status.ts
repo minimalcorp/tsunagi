@@ -61,3 +61,12 @@ export function unreadKind(task: Pick<Task, 'tabs'>): UnreadKind | null {
 export function hasUnreadResult(task: Pick<Task, 'tabs'>): boolean {
   return unreadKind(task) !== null;
 }
+
+/** 詳細ページのサイドバーに出すタスクの状態（実行中 + 未確認マーカーの種類） */
+export type ActivityKind = UnreadKind | 'running';
+
+/** 実行中・未確認のタスクか判定する（null = 対象外）。優先順位は unreadKind と同じ */
+export function activityKind(task: Pick<Task, 'tabs'>): ActivityKind | null {
+  if ((task.tabs ?? []).some((tab) => tab.status === 'running')) return 'running';
+  return unreadKind(task);
+}
