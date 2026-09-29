@@ -1,10 +1,19 @@
 'use client';
 
-import { useState, useCallback, useRef, useImperativeHandle, forwardRef, useEffect } from 'react';
+import {
+  useState,
+  useCallback,
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+  useEffect,
+  useMemo,
+} from 'react';
 import type { LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
 import { VoiceTranscriptOverlay } from '@/components/VoiceTranscriptOverlay';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
 import {
   TerminalView,
   type Todo,
@@ -23,7 +32,8 @@ import {
 } from '@/hooks/useLocalLlmSettings';
 
 export interface TabStatusEntry {
-  terminal: TerminalStatus;
+  /** TerminalView 未マウント（一度も表示していないタブ）の場合は null */
+  terminal: TerminalStatus | null;
   claude: ClaudeStatus;
 }
 
@@ -100,10 +110,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(
       () =>
         new Map(
-          tabs.map((tab) => [
-            tab.tab_id,
-            { terminal: 'connecting', claude: tab.status as ClaudeStatus },
-          ])
+          tabs.map((tab) => [tab.tab_id, { terminal: null, claude: tab.status as ClaudeStatus }])
         )
     );
 
@@ -116,13 +123,32 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         const next = new Map(prev);
         for (const tab of tabs) {
           if (!next.has(tab.tab_id)) {
-            next.set(tab.tab_id, { terminal: 'connecting', claude: tab.status as ClaudeStatus });
+            next.set(tab.tab_id, { terminal: null, claude: tab.status as ClaudeStatus });
             changed = true;
           }
         }
         return changed ? next : prev;
       });
     }, [tabs]);
+
+    // 未マウントのタブは TerminalView からの通知が来ないため、status-changed を購読して反映する
+    // （mode='subscribe' のため PTY の起動・接続は行わない）。マウント済みのタブは TerminalView が通知する。
+    const mountedTabIdsRef = useRef(mountedTabIds);
+    useEffect(() => {
+      mountedTabIdsRef.current = mountedTabIds;
+    }, [mountedTabIds]);
+    const tabIds = useMemo(() => tabs.map((tab) => tab.tab_id), [tabs]);
+    useTabStatusEvents(tabIds, (tabId, status) => {
+      if (mountedTabIdsRef.current.has(tabId)) return;
+      setTabStatusMap((prev) => {
+        const entry = prev.get(tabId);
+        if (!entry || entry.terminal !== null || entry.claude === status) return prev;
+        const next = new Map(prev);
+        next.set(tabId, { terminal: null, claude: status });
+        return next;
+      });
+      onClaudeStatusChange?.(tabId, status);
+    });
 
     // 各TerminalViewへのrefマップ
     const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
