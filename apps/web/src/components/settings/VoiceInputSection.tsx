@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog } from '@/components/ui/Dialog';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
+import { AsrModelSelector } from '@/components/settings/AsrModelSelector';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
 import {
@@ -32,6 +33,7 @@ interface DownloadProgress {
 interface ServerInfo {
   step: ServerStep;
   serverDir: string | null;
+  modelId: string | null;
   downloadProgress?: DownloadProgress;
   error?: string;
 }
@@ -189,11 +191,11 @@ export function VoiceInputSection() {
           </Button>
         </div>
         <CardDescription>
-          ローカルで動作するWhisperを使って音声入力を行います。下記のローカルLLMも有効にすると、
-          文字起こし結果がLLMで自動整形されます(無効時は文字起こし結果をそのまま使用)。
+          ローカルで動作する音声認識モデル(Whisper / Qwen3-ASR)を使って音声入力を行います。
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        <AsrModelSelector serverInfo={serverInfo} onServerChanged={() => void fetchStatus()} />
         {!enabled ? (
           <Button size="default" onClick={openModal}>
             <Mic />
@@ -245,7 +247,7 @@ export function VoiceInputSection() {
               />
               <p className="mt-1 text-[0.65rem] text-muted-foreground">
                 よく使う単語(固有名詞・専門用語・同音異義語で誤変換されやすい単語など)を列挙すると、
-                Whisperがその表記を優先しやすくなり誤変換が減ります。文章でなく単語の羅列でも構いません。空でも可。
+                その表記が優先されやすくなり誤変換が減ります。Qwen3-ASRではスペース区切りの単語の羅列を推奨。空でも可。
               </p>
             </div>
           </>
@@ -262,7 +264,7 @@ export function VoiceInputSection() {
           <div>
             <p className="font-medium text-foreground">実験的機能です</p>
             <p className="text-muted-foreground">
-              音声入力はローカルで動作するWhisper (mlx-whisper)
+              音声入力はローカルで動作する音声認識モデル (mlx-whisper / mlx-qwen3-asr)
               を利用します。精度・速度は環境に依存し、今後変更される可能性があります。
             </p>
           </div>
@@ -288,7 +290,7 @@ export function VoiceInputSection() {
             </p>
             {serverInfo && !serverDir && (
               <p className="mt-1 text-destructive">
-                whisper-serverが見つかりませんでした。インストールが壊れている可能性があります。
+                音声認識サーバー(whisper-server)が見つかりませんでした。インストールが壊れている可能性があります。
               </p>
             )}
           </div>
@@ -296,7 +298,7 @@ export function VoiceInputSection() {
           <div>
             <p className="mb-1 font-medium text-foreground">アンインストール</p>
             <p className="text-muted-foreground">
-              音声入力のためにダウンロードされるもの（Pythonの依存関係・Whisperモデル、合計約2.6GB）は全て
+              音声入力のためにダウンロードされるもの（Pythonの依存関係・選択したモデル、モデルは1つあたり約1.6〜4.1GB）は全て
               <code className="rounded bg-muted px-1">~/.tsunagi/whisper</code>
               に保存されます。不要になった場合はこのディレクトリを削除するだけで、関連リソースを完全に削除できます。
             </p>
@@ -307,7 +309,7 @@ export function VoiceInputSection() {
               <div className="flex flex-col gap-2">
                 <Button size="default" onClick={() => void handleStart()} disabled={!serverInfo}>
                   {serverInfo ? <Mic /> : <Loader2 className="animate-spin" />}
-                  Whisperサーバーを起動
+                  音声認識サーバーを起動
                 </Button>
                 {serverInfo?.step === 'error' && serverInfo.error && (
                   <p className="text-xs/relaxed text-destructive">{serverInfo.error}</p>

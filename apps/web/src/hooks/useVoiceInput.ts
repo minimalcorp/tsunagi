@@ -4,12 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MicVAD } from '@ricky0123/vad-web';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
-import {
-  LLM_SYSTEM_PROMPT_STORAGE_KEY,
-  VOICE_INPUT_ENABLED_STORAGE_KEY,
-  WHISPER_PROMPT_STORAGE_KEY,
-} from '@/lib/voice-input';
-import { LOCAL_LLM_ENABLED_STORAGE_KEY } from '@/components/settings/LocalLlmSection';
+import { VOICE_INPUT_ENABLED_STORAGE_KEY, WHISPER_PROMPT_STORAGE_KEY } from '@/lib/voice-input';
 
 // whisper-serverの起動状態を軽くポーリングし、未起動時はボタンを無効化する。
 const SERVER_STATUS_POLL_MS = 5000;
@@ -35,6 +30,11 @@ const TRAILING_SILENCE_KEEP_MS = 300;
 // 発話中の途中経過は、前回の文字起こしからこれ以上音声が伸びたら再度文字起こしする。
 const INTERIM_INTERVAL_MS = 800;
 
+// 確定した文字起こしを、入力した内容と同じものとして途中経過の表示に残しておく時間。
+// 途中経過(発話途中の音声の文字起こし)と確定結果(発話全体の文字起こし)は内容が
+// 異なることがあるため、最終的に入力された内容をユーザーが確認できるようにする。
+const FINAL_DISPLAY_MS = 2000;
+
 // レベルメーターはRMS(実効値)をdBFSに変換し、この範囲で0〜1へ正規化する。
 const LEVEL_MIN_DB = -60;
 const LEVEL_MAX_DB = -10;
@@ -52,11 +52,14 @@ const SERVER_UP_STEPS: ServerStep[] = ['running', 'running_external'];
 
 export type VoiceInputStatus = 'off' | 'starting' | 'listening';
 
-/** 1回の発話。speaking=発話中(途中経過を表示)、finalizing=発話終了後の確定文字起こし待ち */
+/**
+ * 1回の発話。speaking=発話中(途中経過を表示)、finalizing=発話終了後の確定文字起こし待ち、
+ * final=確定済み(入力した内容そのものを一定時間表示)
+ */
 export interface VoiceUtterance {
   id: number;
   text: string;
-  phase: 'speaking' | 'finalizing';
+  phase: 'speaking' | 'finalizing' | 'final';
 }
 
 /**
@@ -181,8 +184,17 @@ export function useVoiceInput({ onFinal }: UseVoiceInputOptions): VoiceInputCont
     setUtterances((prev) => prev.filter((u) => u.id !== id));
   }, []);
 
+  // 途中経過の表示を確定結果で置き換え、一定時間後に消す。
+  const showFinalUtterance = useCallback(
+    (id: number, text: string) => {
+      setUtterances((prev) => prev.map((u) => (u.id === id ? { id, text, phase: 'final' } : u)));
+      setTimeout(() => removeUtterance(id), FINAL_DISPLAY_MS);
+    },
+    [removeUtterance]
+  );
+
   const requestTranscription = useCallback(
-    async (audio: Float32Array, interim: boolean): Promise<{ text: string; warning?: string }> => {
+    async (audio: Float32Array, interim: boolean): Promise<{ text: string }> => {
       const { utils } = await import('@ricky0123/vad-web');
       // 16bit PCMのWAV。whisper-server(PyAV)がそのままデコードできる。
       const wav = utils.encodeWAV(audio, 1, SAMPLE_RATE, 1, 16);
@@ -194,12 +206,6 @@ export function useVoiceInput({ onFinal }: UseVoiceInputOptions): VoiceInputCont
       const prompt = localStorage.getItem(WHISPER_PROMPT_STORAGE_KEY);
       if (prompt) formData.append('prompt', prompt);
       formData.append('interim', String(interim));
-      if (!interim) {
-        const useLlm = localStorage.getItem(LOCAL_LLM_ENABLED_STORAGE_KEY) === 'true';
-        formData.append('useLlm', String(useLlm));
-        const systemPrompt = localStorage.getItem(LLM_SYSTEM_PROMPT_STORAGE_KEY);
-        if (systemPrompt) formData.append('systemPrompt', systemPrompt);
-      }
       formData.append('file', new Blob([wav], { type: 'audio/wav' }), 'speech.wav');
 
       const response = await fetch(apiUrl('/api/whisper/transcribe'), {
@@ -210,7 +216,7 @@ export function useVoiceInput({ onFinal }: UseVoiceInputOptions): VoiceInputCont
         const body = await response.json().catch(() => null);
         throw new Error(body?.error || `HTTPエラー: ${response.status}`);
       }
-      return (await response.json()) as { text: string; warning?: string };
+      return (await response.json()) as { text: string };
     },
     []
   );
@@ -246,27 +252,24 @@ export function useVoiceInput({ onFinal }: UseVoiceInputOptions): VoiceInputCont
 
       finalChainRef.current = finalChainRef.current.then(async () => {
         try {
-          const { text, warning } = await request;
-          if (warning) {
-            toaster.create({
-              type: 'error',
-              title: 'LLM整形をスキップしました',
-              description: warning,
-            });
+          const { text } = await request;
+          if (text) {
+            onFinalRef.current(text);
+            showFinalUtterance(id, text);
+          } else {
+            removeUtterance(id);
           }
-          if (text) onFinalRef.current(text);
         } catch (error) {
+          removeUtterance(id);
           toaster.create({
             type: 'error',
             title: '文字起こしに失敗しました',
             description: error instanceof Error ? error.message : String(error),
           });
-        } finally {
-          removeUtterance(id);
         }
       });
     },
-    [requestTranscription, removeUtterance]
+    [requestTranscription, removeUtterance, showFinalUtterance]
   );
 
   const stop = useCallback(async () => {
@@ -276,8 +279,8 @@ export function useVoiceInput({ onFinal }: UseVoiceInputOptions): VoiceInputCont
     speechFramesRef.current = [];
     recentFramesRef.current = [];
     levelStore.set(0);
-    // 確定待ちの発話は処理を続け、発話途中のもの(未確定の途中経過)だけ破棄する。
-    setUtterances((prev) => prev.filter((u) => u.phase === 'finalizing'));
+    // 確定待ち・確定済みの発話は処理・表示を続け、発話途中のもの(未確定の途中経過)だけ破棄する。
+    setUtterances((prev) => prev.filter((u) => u.phase !== 'speaking'));
     setStatus('off');
     await vad?.destroy().catch(() => {});
   }, [levelStore]);

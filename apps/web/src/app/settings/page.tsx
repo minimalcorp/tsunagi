@@ -10,7 +10,6 @@ import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
 import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
 import { VoiceInputSection } from '@/components/settings/VoiceInputSection';
-import { LocalLlmSection } from '@/components/settings/LocalLlmSection';
 import { LocalModelSection } from '@/components/settings/LocalModelSection';
 import { OllamaSection } from '@/components/settings/OllamaSection';
 import { LmStudioSection } from '@/components/settings/LmStudioSection';
@@ -143,9 +142,6 @@ export default function SettingsPage() {
 
               {/* Voice Input (Global scope only, device-wide feature) */}
               {selectedNode.scope === 'global' && <VoiceInputSection />}
-
-              {/* Local LLM (Global scope only, device-wide feature) */}
-              {selectedNode.scope === 'global' && <LocalLlmSection />}
 
               {/* ローカルLLMで Claude Code を動かす (Global scope only, 実験的機能) */}
               {selectedNode.scope === 'global' && <LocalModelSection />}

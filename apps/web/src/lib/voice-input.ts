@@ -4,5 +4,3 @@
 export const VOICE_INPUT_ENABLED_STORAGE_KEY = 'tsunagi:voice-input-enabled';
 /** Settings画面で編集できる、whisperのinitial_prompt(表記ゆれ・句読点等のヒント) */
 export const WHISPER_PROMPT_STORAGE_KEY = 'tsunagi:whisper-prompt';
-/** Settings画面で編集できる、LLM整形時のシステムプロンプト(空ならサーバー側の既定値を使う) */
-export const LLM_SYSTEM_PROMPT_STORAGE_KEY = 'tsunagi:llm-system-prompt';

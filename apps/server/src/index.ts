@@ -24,9 +24,7 @@ import { terminalRoutes } from './routes/terminal.js';
 import { editorRoutes } from './routes/editor.js';
 import { whisperRoutes } from './routes/whisper.js';
 import { stopWhisperServerOnExit } from './lib/whisper-process.js';
-import { llmRoutes } from './routes/llm.js';
 import { settingsRoutes } from './routes/settings.js';
-import { stopLlmServerOnExit } from './lib/llm-process.js';
 import { stopSearxngOnExit, syncSearxng } from './lib/searxng.js';
 import { createBasicAuth } from './basic-auth.js';
 
@@ -117,7 +115,6 @@ async function start() {
   await fastify.register(terminalRoutes, { prefix: '/api' });
   await fastify.register(editorRoutes, { prefix: '/api' });
   await fastify.register(whisperRoutes, { prefix: '/api' });
-  await fastify.register(llmRoutes, { prefix: '/api' });
   await fastify.register(settingsRoutes, { prefix: '/api' });
   await fastify.register(localLlmRoutes, { prefix: '/api' });
 
@@ -179,7 +176,6 @@ async function start() {
   const shutdown = async (signal: string) => {
     console.log(`[server] Received ${signal}, shutting down...`);
     stopWhisperServerOnExit();
-    stopLlmServerOnExit();
     stopSearxngOnExit();
     // 設定で有効なら、ローカルLLMのモデルをメモリから外す（バッテリー・メモリ節約）。
     // 開発時の tsx watch はファイル変更のたびに SIGTERM で再起動するため、その場合は外さない
@@ -195,7 +191,6 @@ async function start() {
   // SIGINT/SIGTERM を経由しない異常終了時の最後の砦（'exit' は同期処理のみ可能）。
   process.on('exit', () => {
     stopWhisperServerOnExit();
-    stopLlmServerOnExit();
     stopSearxngOnExit();
   });
 }

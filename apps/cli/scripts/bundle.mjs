@@ -29,7 +29,6 @@ const REPO_ROOT = path.resolve(CLI_DIR, '..', '..');
 const SERVER_DIR = path.join(REPO_ROOT, 'apps/server');
 const WEB_DIR = path.join(REPO_ROOT, 'apps/web');
 const WHISPER_SERVER_DIR = path.join(REPO_ROOT, 'apps/whisper-server');
-const LLM_SERVER_DIR = path.join(REPO_ROOT, 'apps/llm-server');
 
 function log(msg) {
   console.log(`[bundle] ${msg}`);
@@ -86,7 +85,6 @@ async function cleanCliBundleDirs() {
     path.join(CLI_DIR, '.next'),
     path.join(CLI_DIR, 'dist/docs'),
     path.join(CLI_DIR, 'dist/whisper-server'),
-    path.join(CLI_DIR, 'dist/llm-server'),
   ];
   const files = [
     path.join(CLI_DIR, 'dist/prisma.config.ts'),
@@ -142,13 +140,6 @@ async function main() {
   log('copying apps/whisper-server → apps/cli/dist/whisper-server');
   await fs.mkdir(path.join(CLI_DIR, 'dist/whisper-server'), { recursive: true });
   await fs.cp(WHISPER_SERVER_DIR, path.join(CLI_DIR, 'dist/whisper-server'), {
-    recursive: true,
-    filter: (src) => !/\/(\.venv|__pycache__)(\/|$)/.test(src),
-  });
-
-  log('copying apps/llm-server → apps/cli/dist/llm-server');
-  await fs.mkdir(path.join(CLI_DIR, 'dist/llm-server'), { recursive: true });
-  await fs.cp(LLM_SERVER_DIR, path.join(CLI_DIR, 'dist/llm-server'), {
     recursive: true,
     filter: (src) => !/\/(\.venv|__pycache__)(\/|$)/.test(src),
   });
