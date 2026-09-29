@@ -225,6 +225,17 @@ const NEXT_PORT = '2792';
 // （apps/server/src/pty-manager.ts）で復元できるようにする。
 const outerNodeEnv = process.env.NODE_ENV;
 
+// サーバー側の更新確認（apps/server/src/lib/update-check.ts）に実行中のバージョンを伝える。
+function readPackageVersion(): string | undefined {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8'));
+    return typeof pkg.version === 'string' ? pkg.version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const packageVersion = readPackageVersion();
+
 const fastifyChild: ChildProcess = spawn(process.execPath, [FASTIFY_ENTRY_JS], {
   stdio: ['inherit', 'pipe', 'pipe'],
   cwd: PACKAGE_ROOT,
@@ -234,6 +245,7 @@ const fastifyChild: ChildProcess = spawn(process.execPath, [FASTIFY_ENTRY_JS], {
     ...(outerNodeEnv !== undefined ? { TSUNAGI_OUTER_NODE_ENV: outerNodeEnv } : {}),
     TSUNAGI_SERVER_PORT: PORT,
     TSUNAGI_NEXT_PORT: NEXT_PORT,
+    ...(packageVersion ? { TSUNAGI_VERSION: packageVersion } : {}),
   },
 });
 

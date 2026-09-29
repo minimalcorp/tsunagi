@@ -14,6 +14,8 @@ import { LocalModelSection } from '@/components/settings/LocalModelSection';
 import { OllamaSection } from '@/components/settings/OllamaSection';
 import { LmStudioSection } from '@/components/settings/LmStudioSection';
 import { SearxngSection } from '@/components/settings/SearxngSection';
+import { VersionInfo } from '@/components/settings/VersionInfo';
+import { UpdateIndicator } from '@/components/UpdateIndicator';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
@@ -104,18 +106,23 @@ export default function SettingsPage() {
           <h1 className="text-xl font-bold text-foreground absolute left-1/2 -translate-x-1/2">
             Settings
           </h1>
+
+          <UpdateIndicator />
         </div>
       </div>
 
       {/* Split Layout */}
       <div className="flex-1 flex min-h-0">
         {/* Left Panel: Tree Navigation */}
-        <div className="w-64 border-r border-border bg-card">
-          <EnvTreeNavigation
-            selectedNode={selectedNode}
-            onNodeSelect={handleNodeSelect}
-            refreshKey={treeRefreshKey}
-          />
+        <div className="w-64 border-r border-border bg-card flex flex-col">
+          <div className="flex-1 min-h-0">
+            <EnvTreeNavigation
+              selectedNode={selectedNode}
+              onNodeSelect={handleNodeSelect}
+              refreshKey={treeRefreshKey}
+            />
+          </div>
+          <VersionInfo />
         </div>
 
         {/* Right Panel: Editor */}

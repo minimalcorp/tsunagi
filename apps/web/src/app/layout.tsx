@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { ToastProvider } from '@/components/ToastProvider';
 import { EditorSessionProvider } from '@/components/EditorSessionProvider';
+import { UpdateStatusProvider } from '@/components/UpdateStatusProvider';
 import { cn } from '@/lib/utils';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
@@ -33,10 +34,12 @@ export default function RootLayout({
     <html lang="en" className={cn('font-sans', inter.variable)}>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
-          {children}
-          <ConnectionStatus />
-          <ToastProvider />
-          <EditorSessionProvider />
+          <UpdateStatusProvider>
+            {children}
+            <ConnectionStatus />
+            <ToastProvider />
+            <EditorSessionProvider />
+          </UpdateStatusProvider>
         </ThemeProvider>
       </body>
     </html>

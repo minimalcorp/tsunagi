@@ -14,6 +14,7 @@ import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPa
 import type { ClaudeStatus } from '@/components/TerminalView';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
+import { UpdateIndicator } from '@/components/UpdateIndicator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -300,47 +301,50 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             {task.title}
           </h1>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  className="text-primary hover:bg-primary/10 hover:text-foreground"
-                  title="Task menu"
-                />
-              }
-            >
-              <Ellipsis className="w-5 h-5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
-                <Pencil className="w-4 h-4" />
-                Detail / Edit
-              </DropdownMenuItem>
-              {worktreeExists && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleOpenTerminal}>
-                    <Terminal className="w-4 h-4" />
-                    Open Terminal
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleOpenVSCode}>
-                    <Code2 className="w-4 h-4" />
-                    Open VS Code
-                  </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setIsDeleteConfirmOpen(true)}
+          <div className="flex items-center gap-1">
+            <UpdateIndicator />
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    className="text-primary hover:bg-primary/10 hover:text-foreground"
+                    title="Task menu"
+                  />
+                }
               >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <Ellipsis className="w-5 h-5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
+                  <Pencil className="w-4 h-4" />
+                  Detail / Edit
+                </DropdownMenuItem>
+                {worktreeExists && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleOpenTerminal}>
+                      <Terminal className="w-4 h-4" />
+                      Open Terminal
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleOpenVSCode}>
+                      <Code2 className="w-4 h-4" />
+                      Open VS Code
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
