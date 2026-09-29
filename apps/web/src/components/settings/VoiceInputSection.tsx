@@ -185,7 +185,7 @@ export function VoiceInputSection() {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-1">
-          <CardTitle>音声入力 (実験的機能)</CardTitle>
+          <CardTitle>音声入力</CardTitle>
           <Button variant="ghost" size="icon-sm" onClick={openModal} title="音声入力について">
             <CircleHelp />
           </Button>

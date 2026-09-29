@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FlaskConical } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
 import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNavigation';
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
@@ -147,15 +147,23 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {/* Voice Input (Global scope only, device-wide feature) */}
-              {selectedNode.scope === 'global' && <VoiceInputSection />}
-
-              {/* ローカルLLMで Claude Code を動かす (Global scope only, 実験的機能) */}
-              {selectedNode.scope === 'global' && <LocalModelSection />}
-              {selectedNode.scope === 'global' && <OllamaSection />}
-              {selectedNode.scope === 'global' && <LmStudioSection />}
-              {/* ローカル検索 (Ollama / LM Studio のどちらかが有効なときだけ表示) */}
-              {selectedNode.scope === 'global' && <SearxngSection />}
+              {/* 実験的機能 (Global scope only)。divider 以下はすべて実験的機能 */}
+              {selectedNode.scope === 'global' && (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 pt-2 text-muted-foreground">
+                    <FlaskConical className="size-4" />
+                    <span className="text-sm font-semibold">Experimental</span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                  <VoiceInputSection />
+                  {/* ローカルLLMで Claude Code を動かす */}
+                  <LocalModelSection />
+                  <OllamaSection />
+                  <LmStudioSection />
+                  {/* ローカル検索 (Ollama / LM Studio のどちらかが有効なときだけ表示) */}
+                  <SearxngSection />
+                </div>
+              )}
 
               {/* Remove Repository (Repo scope only) */}
               {selectedNode.scope === 'repo' && selectedNode.owner && selectedNode.repo && (
