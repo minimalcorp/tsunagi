@@ -84,7 +84,7 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
               <li key={task.id}>
                 <button
                   type="button"
-                  onClick={() => router.push(`/tasks/${task.id}`)}
+                  onClick={() => router.replace(`/tasks/${task.id}`)}
                   aria-current={isCurrent ? 'page' : undefined}
                   className={cn(
                     'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent',
