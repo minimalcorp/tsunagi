@@ -48,6 +48,9 @@ Tsunagi performs the following on startup:
    port `2791`.
 6. On shutdown, cleans up the PID lock.
 
+New versions are installed automatically and applied on restart (see
+[Auto Update](/en/features/auto-update/)).
+
 ## Where Tsunagi stores data
 
 ```
@@ -55,6 +58,7 @@ Tsunagi performs the following on startup:
 ├── state/
 │   ├── tsunagi.db            # SQLite database
 │   └── tsunagi.lock          # single-instance PID lock
+├── versions/                 # versions installed by auto-update
 ├── backups/                  # database backups
 └── workspaces/               # git worktrees
 ```

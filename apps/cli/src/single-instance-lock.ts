@@ -8,7 +8,8 @@ import * as path from 'node:path';
  * - Writes current PID to `~/.tsunagi/state/tsunagi.lock` on acquire
  * - On startup, if lock file exists and its PID is alive, exits with error
  * - Stale locks (PID not alive) are removed automatically
- * - Lock is released on SIGINT / SIGTERM / exit
+ * - Lock is released on process exit. Signal handling is left to the caller
+ *   (the entry waits for the app to stop before exiting)
  */
 
 function getTsunagiDataDir(): string {
@@ -84,21 +85,5 @@ export function acquireSingleInstanceLock(): void {
   }
 
   fs.writeFileSync(lockFilePath, String(process.pid), 'utf-8');
-
-  process.on('SIGINT', () => {
-    releaseLock();
-    process.exit(0);
-  });
-  process.on('SIGTERM', () => {
-    releaseLock();
-    process.exit(0);
-  });
-  process.on('exit', () => {
-    releaseLock();
-  });
-  process.on('uncaughtException', (err) => {
-    console.error('[tsunagi] Uncaught exception:', err);
-    releaseLock();
-    process.exit(1);
-  });
+  process.on('exit', releaseLock);
 }

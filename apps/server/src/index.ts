@@ -27,6 +27,9 @@ import { stopWhisperServerOnExit } from './lib/whisper-process.js';
 import { settingsRoutes } from './routes/settings.js';
 import { versionRoutes } from './routes/version.js';
 import { startUpdateCheck, stopUpdateCheck } from './lib/update-check.js';
+import { stopAutoUpdate } from './lib/auto-update.js';
+import { RESTART_EXIT_CODE, onRestartRequested } from './lib/restart.js';
+import { ptyManager } from './pty-manager.js';
 import { stopSearxngOnExit, syncSearxng } from './lib/searxng.js';
 import { createBasicAuth } from './basic-auth.js';
 
@@ -178,22 +181,33 @@ async function start() {
   // npm に新しいバージョンが公開されたかを定期確認し、Web に通知する
   startUpdateCheck(io);
 
-  const shutdown = async (signal: string) => {
+  let shuttingDown = false;
+  const shutdown = async (signal: string, exitCode = 0) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`[server] Received ${signal}, shutting down...`);
+    stopUpdateCheck();
+    stopAutoUpdate();
+    // PTY（claude を含む）は SIGHUP 任せにせず、ここで止める
+    ptyManager.deleteAllSessions();
     stopWhisperServerOnExit();
     stopSearxngOnExit();
-    stopUpdateCheck();
     // 設定で有効なら、ローカルLLMのモデルをメモリから外す（バッテリー・メモリ節約）。
     // 開発時の tsx watch はファイル変更のたびに SIGTERM で再起動するため、その場合は外さない
     if (signal === 'SIGINT' || process.env.NODE_ENV === 'production') {
       await unloadOnShutdown();
     }
     await fastify.close();
-    process.exit(0);
+    process.exit(exitCode);
   };
 
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  // 更新の適用（POST /api/version/restart）。apps/cli がこの終了コードを見て新しいバージョンで起動し直す
+  onRestartRequested(() => {
+    io.emit('version:restarting');
+    void shutdown('restart', RESTART_EXIT_CODE);
+  });
   // SIGINT/SIGTERM を経由しない異常終了時の最後の砦（'exit' は同期処理のみ可能）。
   process.on('exit', () => {
     stopWhisperServerOnExit();

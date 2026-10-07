@@ -1,0 +1,419 @@
+import { ChildProcess, spawn, spawnSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as http from 'node:http';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import openBrowser from 'open';
+import {
+  assertClaudeSupportsPluginDirs,
+  getPluginDir,
+  removeLegacyPluginInstall,
+} from './plugin-lifecycle.js';
+import {
+  isAutoUpdateEnabled,
+  isEntryOutdated,
+  removeVersionsOlderThan,
+  snapshotDbBeforeFirstStart,
+  waitForPortsFree,
+} from './update-lifecycle.js';
+import { RESTART_EXIT_CODE } from './versions.js';
+
+/**
+ * tsunagi app: spawned by the entry (dist/cli.js), runs the servers.
+ *
+ * - Exits only after every child process has exited, so the entry can
+ *   start the next version right after this process exits.
+ * - Fastify exits with RESTART_EXIT_CODE when the user requests a restart to
+ *   apply an update; this process then stops the rest and exits with the same code.
+ * - Sends `{ type: 'ready' }` to the entry over IPC once the servers respond.
+ * - Handles the version-specific parts of the update (update-lifecycle.ts).
+ *
+ * Layout when installed via npm:
+ *
+ *   <pkg>/dist/cli.js                            ← entry (bin)
+ *   <pkg>/dist/app.js                            ← this file
+ *   <pkg>/dist/update-lifecycle.js
+ *   <pkg>/dist/versions.js
+ *   <pkg>/dist/auto-migrate.js
+ *   <pkg>/dist/plugin-lifecycle.js
+ *   <pkg>/dist/single-instance-lock.js
+ *   <pkg>/dist/server/index.js                   ← Fastify entry (bundled from apps/server/dist)
+ *   <pkg>/dist/server/lib/**
+ *   <pkg>/dist/server/generated/prisma/**
+ *   <pkg>/.next/standalone/apps/web/server.js    ← Next.js standalone entry (bundled from apps/web/.next/standalone)
+ *   <pkg>/.next/standalone/apps/web/.next/static/
+ *   <pkg>/.next/standalone/node_modules/
+ *   <pkg>/dist/prisma/schema.prisma              ← bundled from apps/server/prisma
+ *   <pkg>/dist/prisma/migrations/**
+ *   <pkg>/dist/prisma.config.ts                  ← passed via --config by dist/auto-migrate.js
+ *   <pkg>/dist/scripts/monaco-editor.sh          ← $EDITOR for Ctrl+G (resolved by dist/server/routes/terminal.js)
+ *   <pkg>/dist/docs/                             ← bundled from apps/docs/out (served on DOCS_PORT)
+ *   <pkg>/dist/whisper-server/                   ← bundled from apps/whisper-server
+ *   <pkg>/tsunagi-marketplace/plugins/tsunagi-plugin/.claude-plugin/plugin.json
+ */
+
+// ---------------------------------------------------------------------------
+// Braille-dots spinner
+// ---------------------------------------------------------------------------
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+function createSpinner(message: string): { stop: () => void } {
+  let i = 0;
+  // Write first frame immediately so it shows even during spawnSync/execSync blocking
+  process.stdout.write(`\r${SPINNER_FRAMES[0]} ${message}`);
+  i++;
+  const timer = setInterval(() => {
+    process.stdout.write(`\r${SPINNER_FRAMES[i % SPINNER_FRAMES.length]} ${message}`);
+    i++;
+  }, 80);
+
+  return {
+    stop() {
+      clearInterval(timer);
+      // Clear the spinner line
+      process.stdout.write('\r' + ' '.repeat(message.length + 4) + '\r');
+    },
+  };
+}
+
+let spinner = createSpinner('Initializing...');
+
+const DIST_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PACKAGE_ROOT = path.resolve(DIST_DIR, '..');
+const AUTO_MIGRATE_JS = path.join(DIST_DIR, 'auto-migrate.js');
+const FASTIFY_ENTRY_JS = path.join(DIST_DIR, 'server', 'index.js');
+const NEXT_STANDALONE_ENTRY = path.join(
+  PACKAGE_ROOT,
+  '.next',
+  'standalone',
+  'apps',
+  'web',
+  'server.js'
+);
+const DOCS_DIR = path.join(DIST_DIR, 'docs');
+const DOCS_PORT = 2793;
+
+const isDebug = !!process.env.TSUNAGI_DEBUG;
+const isDocker = fs.existsSync('/.dockerenv');
+// 更新適用のための再起動ではブラウザを開き直さない（既存のタブが再接続する）
+const isRestart = process.env.TSUNAGI_RESTARTED === '1';
+// server（apps/server/src/lib/auto-update.ts）に自動更新の可否と entry の古さを伝える
+if (!isAutoUpdateEnabled()) delete process.env.TSUNAGI_AUTO_UPDATE;
+if (isEntryOutdated()) process.env.TSUNAGI_ENTRY_OUTDATED = '1';
+
+// サーバー側の更新確認（apps/server/src/lib/update-check.ts）に実行中のバージョンを伝える。
+function readPackageVersion(): string | undefined {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8'));
+    return typeof pkg.version === 'string' ? pkg.version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const packageVersion = readPackageVersion();
+
+// ---------------------------------------------------------------------------
+// ASCII art
+// ---------------------------------------------------------------------------
+const TSUNAGI_AA = `
+  __                          _
+ / /____ __ _____  ___ ____ _(_)
+/ __(_-</ // / _ \\/ _ \`/ _ \`/ /
+\\__/___/\\_,_/_//_/\\_,_/\\_, /_/
+                      /___/
+`;
+
+// ---------------------------------------------------------------------------
+// Phase 1: Auto-migrate (synchronous child process)
+// ---------------------------------------------------------------------------
+function runAutoMigrate(): void {
+  if (!fs.existsSync(AUTO_MIGRATE_JS)) {
+    console.error(`[tsunagi] Missing build artifact: ${AUTO_MIGRATE_JS}`);
+    process.exit(1);
+  }
+  const result = spawnSync(process.execPath, [AUTO_MIGRATE_JS], {
+    stdio: isDebug ? 'inherit' : ['inherit', 'pipe', 'pipe'],
+    cwd: PACKAGE_ROOT,
+  });
+  if (result.status !== 0) {
+    const stderr = result.stderr?.toString().trim();
+    if (stderr) console.error(stderr);
+    console.error('[tsunagi] Database migration failed.');
+    process.exit(result.status ?? 1);
+  }
+  // Display migration result (e.g. "1 migration applied.")
+  const stdout = result.stdout?.toString().trim();
+  if (stdout) console.log(stdout);
+}
+
+// 初めて起動する版なら、起動に失敗したときに戻せるようマイグレーション前に DB を退避する
+if (packageVersion) snapshotDbBeforeFirstStart(packageVersion);
+runAutoMigrate();
+
+// ---------------------------------------------------------------------------
+// Phase 2: Plugin lifecycle
+// ---------------------------------------------------------------------------
+assertClaudeSupportsPluginDirs();
+removeLegacyPluginInstall();
+
+// ---------------------------------------------------------------------------
+// Docs static file server
+// ---------------------------------------------------------------------------
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css',
+  '.js': 'application/javascript',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.wasm': 'application/wasm',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.txt': 'text/plain',
+  '.xml': 'application/xml',
+};
+
+function startDocsServer(): http.Server | null {
+  if (!fs.existsSync(DOCS_DIR)) return null;
+
+  const serveFile = (filePath: string, res: http.ServerResponse) => {
+    const ext = path.extname(filePath);
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404).end();
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(data);
+    });
+  };
+
+  const server = http.createServer((req, res) => {
+    let urlPath: string;
+    try {
+      urlPath = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
+    } catch {
+      res.writeHead(400).end();
+      return;
+    }
+
+    const filePath = path.resolve(DOCS_DIR, '.' + urlPath);
+    if (!filePath.startsWith(DOCS_DIR)) {
+      res.writeHead(403).end();
+      return;
+    }
+
+    fs.stat(filePath, (err, stat) => {
+      if (err) {
+        res.writeHead(404).end();
+        return;
+      }
+      if (stat.isDirectory()) {
+        if (!urlPath.endsWith('/')) {
+          res.writeHead(301, { Location: urlPath + '/' }).end();
+          return;
+        }
+        serveFile(path.join(filePath, 'index.html'), res);
+      } else {
+        serveFile(filePath, res);
+      }
+    });
+  });
+
+  server.listen(DOCS_PORT, '0.0.0.0');
+  return server;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: Verify build artifacts & spawn servers
+// ---------------------------------------------------------------------------
+function verifyArtifact(p: string, label: string): void {
+  if (!fs.existsSync(p)) {
+    console.error(`[tsunagi] Missing ${label}: ${p}`);
+    console.error('[tsunagi] The package appears to be incomplete. Please reinstall.');
+    process.exit(1);
+  }
+}
+
+verifyArtifact(FASTIFY_ENTRY_JS, 'Fastify server artifact');
+verifyArtifact(NEXT_STANDALONE_ENTRY, 'Next.js standalone artifact');
+
+// Fastify が単一の公開ポート。Next.js は内部ポートで動かし Fastify からプロキシする。
+const PORT = process.env.PORT ?? '2791';
+const NEXT_PORT = '2792';
+
+// 更新を適用するための再起動では、前の版が使っていたポートが空くのを待つ
+if (isRestart) await waitForPortsFree([Number(PORT), Number(NEXT_PORT), DOCS_PORT]);
+
+// Fastify サーバー自身の待受ポートは TSUNAGI_SERVER_PORT で伝える（generic な PORT は上書きしない）。
+// PORT を直接上書きすると、ユーザーが Terminal で明示的に PORT=xxxx と指定していた場合でも
+// tsunagi 内部ターミナル側でその値と tsunagi 自身の値を区別できなくなるため。
+//
+// NODE_ENV は Fastify/Next 等が直接参照するため PORT と同じ専用キー方式が使えず、サーバー
+// プロセス自身には強制的に 'production' を渡す必要がある。上書きする前に外側 Terminal 由来の
+// 元の値（未設定なら undefined）を TSUNAGI_OUTER_NODE_ENV に退避し、tsunagi 内部ターミナル側
+// （apps/server/src/pty-manager.ts）で復元できるようにする。
+const outerNodeEnv = process.env.NODE_ENV;
+
+const fastifyChild: ChildProcess = spawn(process.execPath, [FASTIFY_ENTRY_JS], {
+  stdio: ['inherit', 'pipe', 'pipe'],
+  cwd: PACKAGE_ROOT,
+  env: {
+    ...process.env,
+    NODE_ENV: 'production',
+    ...(outerNodeEnv !== undefined ? { TSUNAGI_OUTER_NODE_ENV: outerNodeEnv } : {}),
+    TSUNAGI_SERVER_PORT: PORT,
+    TSUNAGI_NEXT_PORT: NEXT_PORT,
+    // PTY の CLAUDE_CODE_PLUGIN_DIRS に渡す（apps/server/src/pty-manager.ts）
+    TSUNAGI_PLUGIN_DIR: getPluginDir(),
+    ...(packageVersion ? { TSUNAGI_VERSION: packageVersion } : {}),
+  },
+});
+
+const nextChild: ChildProcess = spawn(process.execPath, [NEXT_STANDALONE_ENTRY], {
+  stdio: ['inherit', 'pipe', 'pipe'],
+  cwd: path.dirname(NEXT_STANDALONE_ENTRY),
+  env: { ...process.env, PORT: NEXT_PORT, NODE_ENV: 'production', HOSTNAME: '0.0.0.0' },
+});
+
+const docsServer = startDocsServer();
+
+// ---------------------------------------------------------------------------
+// Child process output forwarding
+// ---------------------------------------------------------------------------
+fastifyChild.stdout?.on('data', (data: Buffer) => {
+  if (isDebug) process.stdout.write(data);
+});
+fastifyChild.stderr?.on('data', (data: Buffer) => {
+  process.stderr.write(data);
+});
+nextChild.stdout?.on('data', (data: Buffer) => {
+  if (isDebug) process.stdout.write(data);
+});
+nextChild.stderr?.on('data', (data: Buffer) => {
+  process.stderr.write(data);
+});
+
+// ---------------------------------------------------------------------------
+// Ready detection via /health polling
+// ---------------------------------------------------------------------------
+const POLL_INTERVAL_MS = 300;
+
+function pollHealth(port: number): Promise<void> {
+  return new Promise((resolve) => {
+    const poll = () => {
+      const req = http.get(`http://localhost:${port}/health`, (res) => {
+        if (res.statusCode === 200) {
+          res.resume();
+          resolve();
+        } else {
+          res.resume();
+          setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      });
+      req.on('error', () => {
+        setTimeout(poll, POLL_INTERVAL_MS);
+      });
+    };
+    poll();
+  });
+}
+
+// Fastify(PORT) と Next(NEXT_PORT) は各々 /health を持つ。各プロセスを直接叩く。
+Promise.all([pollHealth(Number(PORT)), pollHealth(Number(NEXT_PORT))]).then(() => {
+  spinner.stop();
+  console.log(TSUNAGI_AA);
+
+  const url = `http://localhost:${PORT}`;
+
+  // entry に起動完了を伝える（起動失敗時のロールバック判定に使う）
+  process.send?.({ type: 'ready' });
+  if (packageVersion && isAutoUpdateEnabled()) removeVersionsOlderThan(packageVersion);
+
+  if (!isDocker && !isRestart) {
+    // macOS / Linux / WSL（Windows 側ブラウザ）の差異は open パッケージが吸収する。
+    // ブラウザを開けなくてもサーバーは継続する（URL は下で案内する）
+    openBrowser(url).catch(() => {});
+  }
+
+  console.log(`Open ${url}`);
+  if (docsServer) {
+    console.log(`Docs http://localhost:${DOCS_PORT}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Shutdown
+// ---------------------------------------------------------------------------
+// Fastify は PTY・SearXNG(docker stop)・ローカルLLM の解放を待ってから終了するため長めに待つ
+const CHILD_EXIT_TIMEOUT_MS = 30_000;
+
+let shuttingDown = false;
+
+/** 子プロセスの終了を待つ。timeoutMs 以内に終わらなければ SIGKILL する */
+function stopChild(child: ChildProcess, timeoutMs: number): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // ignore
+      }
+    }, timeoutMs);
+    child.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    try {
+      child.kill('SIGTERM');
+    } catch {
+      // ignore
+    }
+  });
+}
+
+async function shutdown(code: number): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  spinner.stop();
+
+  const cleanupSpinner = createSpinner(
+    code === RESTART_EXIT_CODE ? 'Restarting to apply the update...' : 'Cleaning up...'
+  );
+  await Promise.all([
+    stopChild(fastifyChild, CHILD_EXIT_TIMEOUT_MS),
+    stopChild(nextChild, CHILD_EXIT_TIMEOUT_MS),
+    new Promise<void>((resolve) => (docsServer ? docsServer.close(() => resolve()) : resolve())),
+  ]);
+
+  cleanupSpinner.stop();
+  process.exit(code);
+}
+
+process.on('SIGINT', () => void shutdown(0));
+process.on('SIGTERM', () => void shutdown(0));
+process.on('SIGHUP', () => void shutdown(0));
+// entry が異常終了した場合も取り残されないよう終了する
+process.on('disconnect', () => void shutdown(0));
+
+fastifyChild.on('exit', (code) => {
+  if (shuttingDown) return;
+  if (code === RESTART_EXIT_CODE) {
+    void shutdown(RESTART_EXIT_CODE);
+    return;
+  }
+  console.error(`[tsunagi] Fastify server exited unexpectedly (code ${code})`);
+  void shutdown(code ?? 1);
+});
+nextChild.on('exit', (code) => {
+  if (!shuttingDown) {
+    console.error(`[tsunagi] Next.js server exited unexpectedly (code ${code})`);
+    void shutdown(code ?? 1);
+  }
+});

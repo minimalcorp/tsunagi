@@ -43,6 +43,8 @@ Tsunagi は起動時に以下を実行します:
 5. ポート `2792` で Fastify バックエンドを、ポート `2791` で Next.js Web UI を起動
 6. 終了時に PID lock を後始末
 
+新しいバージョンは自動でインストールされ、再起動で適用できます ([自動更新](/ja/features/auto-update/) 参照)。
+
 ## データ保存場所
 
 ```
@@ -50,6 +52,7 @@ Tsunagi は起動時に以下を実行します:
 ├── state/
 │   ├── tsunagi.db            # SQLite データベース
 │   └── tsunagi.lock          # 単一インスタンス PID lock
+├── versions/                 # 自動更新でインストールしたバージョン
 ├── backups/                  # データベースバックアップ
 └── workspaces/               # git worktrees
 ```

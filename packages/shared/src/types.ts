@@ -297,4 +297,29 @@ export interface UpdateStatus {
   updateAvailable: boolean;
   /** 最後に registry の確認に成功した時刻（ISO 8601） */
   checkedAt: string | null;
+  autoUpdate: AutoUpdateStatus;
+  /** `tsunagi` コマンド（entry）が古く、再インストールしてほしい。自動更新は続く */
+  entryOutdated: boolean;
+}
+
+/**
+ * 新しいバージョンの自動インストールの状態。
+ * - disabled: 自動更新できない（npm 以外での実行・dev 起動）。手動更新を案内する
+ * - installing: ~/.tsunagi/versions にインストール中
+ * - ready: インストール済み。再起動で適用できる
+ * - error: インストール失敗、または起動に失敗してロールバックした
+ */
+export type AutoUpdateState = 'disabled' | 'idle' | 'installing' | 'ready' | 'error';
+
+export interface AutoUpdateStatus {
+  state: AutoUpdateState;
+  /** installing / ready / error の対象バージョン */
+  version: string | null;
+  error: string | null;
+}
+
+/** 再起動を妨げている実行中（running / waiting）のタスク（POST /api/version/restart の 409） */
+export interface RestartBlocker {
+  taskId: string;
+  title: string;
 }
