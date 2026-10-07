@@ -1,0 +1,34 @@
+---
+title: 自動更新
+description: 新しいバージョンを自動でインストールし、好きなタイミングの再起動で適用する。
+---
+
+import { Callout } from 'nextra/components';
+
+# 自動更新
+
+npm に新しいバージョンが公開されると、Tsunagi は裏で自動的にインストールします。インストールが終わると、右上と Settings 左下に **Restart to update** が表示されます。再起動するタイミングはユーザーが選びます。
+
+## 流れ
+
+1. 1時間ごと (または Settings の確認ボタン) に npm の最新バージョンを確認
+2. 新しいバージョンを `~/.tsunagi/versions/<version>/` に `npm install --prefix` でインストール。実行中の Tsunagi には影響しません
+3. **Restart to update** を押すと、Tsunagi が終了処理を済ませてから新しいバージョンで起動し直します。`tsunagi` コマンドを実行したターミナルはそのまま使えます
+4. 画面は新しいバージョンに切り替わると自動で再読み込みされます
+
+<Callout type="warning">
+  実行中 (running) または権限確認待ち (waiting)
+  のタスクがある間は再起動できません。再起動すると開いているターミナルセッションは閉じます。
+</Callout>
+
+## 起動に失敗した場合
+
+新しいバージョンの起動前に DB を `~/.tsunagi/backups/pre-update-*` に退避します。新しいバージョンが起動完了前に終了した場合 (マイグレーション失敗等)、DB を戻して前のバージョンで起動し直します。失敗したバージョンは以後選ばれません。
+
+## 対象と無効化
+
+- npm (`npm install -g` / `npx`) でインストールした Tsunagi が対象です。リポジトリから build して実行している場合は、従来どおり手動更新の案内を表示します
+- 起動時は、自動更新で用意したバージョンと `tsunagi` パッケージ自身のうち新しい方が使われます
+- `tsunagi` コマンド自体 (起動と再起動だけを担う小さな部分) は自動更新されません。新しいバージョンがそれより新しい `tsunagi` コマンドを必要とする場合は、**Reinstall recommended** と再インストールのコマンドを表示します。自動更新はそのまま続きます
+- 自動更新を止めるには `TSUNAGI_DISABLE_AUTO_UPDATE=1` を設定して起動します
+- npm のミラーを使う場合は `TSUNAGI_NPM_REGISTRY` に registry の URL を指定します

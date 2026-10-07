@@ -1,21 +1,20 @@
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
  * Claude Code plugin lifecycle management.
  *
- * Strategy: clean install on startup, unconditional uninstall on shutdown.
+ * Strategy: load the plugin per session via `CLAUDE_CODE_PLUGIN_DIRS`.
  *
- * - Uses only the `claude` CLI commands; no direct manipulation of
- *   `~/.claude/settings.json` or other internal files.
- * - On startup, any pre-existing tsunagi marketplace / plugin is considered
- *   an orphan from a previous abnormal termination and is cleaned up before
- *   installing a fresh copy. This is safe because tsunagi enforces single
- *   instance via the PID lock.
- * - On shutdown, uninstall is attempted unconditionally and failures are
- *   ignored so that cleanup never blocks process exit.
+ * - The server sets `CLAUDE_CODE_PLUGIN_DIRS` on every PTY it spawns
+ *   (apps/server/src/pty-manager.ts), so only Claude sessions started inside
+ *   tsunagi load the plugin. Nothing is written to the user's Claude Code
+ *   settings, so there is nothing to clean up on shutdown.
+ * - Older tsunagi versions installed the plugin into user scope via a local
+ *   marketplace. That registration is removed once on startup.
  */
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -25,15 +24,15 @@ const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 //   → ../tsunagi-marketplace = <pkg>/tsunagi-marketplace ✓
 
 const MARKETPLACE_NAME = 'tsunagi-marketplace';
-const PLUGIN_REF = `tsunagi-plugin@${MARKETPLACE_NAME}`;
+const PLUGIN_NAME = 'tsunagi-plugin';
+const PLUGIN_REF = `${PLUGIN_NAME}@${MARKETPLACE_NAME}`;
 
-function getMarketplaceDir(): string {
-  const candidate = path.resolve(THIS_DIR, '..', 'tsunagi-marketplace');
-  if (fs.existsSync(path.join(candidate, '.claude-plugin'))) {
-    return candidate;
-  }
-  // Fallback for unexpected layouts
-  return candidate;
+// CLAUDE_CODE_PLUGIN_DIRS に対応した最初のバージョン
+const MIN_CLAUDE_VERSION = [2, 1, 280] as const;
+
+function getLegacyCleanupMarkerPath(): string {
+  const dataDir = process.env.TSUNAGI_DATA_DIR || path.join(os.homedir(), '.tsunagi');
+  return path.join(dataDir, 'state', 'legacy-plugin-removed');
 }
 
 function debugLog(msg: string): void {
@@ -42,24 +41,49 @@ function debugLog(msg: string): void {
   }
 }
 
-/** プラグインがインストール済みか確認する */
-function isPluginInstalled(): boolean {
+/** PTY の CLAUDE_CODE_PLUGIN_DIRS に渡すプラグインのディレクトリ（絶対パス） */
+export function getPluginDir(): string {
+  return path.resolve(THIS_DIR, '..', MARKETPLACE_NAME, 'plugins', PLUGIN_NAME);
+}
+
+/** `claude --version` の出力（例: "2.1.292 (Claude Code)"）から x.y.z を取り出す */
+function getClaudeVersion(): number[] | null {
   try {
-    const output = execSync('claude plugin list', { stdio: 'pipe' }).toString();
-    return output.includes(PLUGIN_REF);
+    const output = execSync('claude --version', { stdio: 'pipe' }).toString();
+    const match = /(\d+)\.(\d+)\.(\d+)/.exec(output);
+    return match ? match.slice(1).map(Number) : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-/** marketplaceが登録済みか確認する */
-function isMarketplaceAdded(): boolean {
-  try {
-    const output = execSync('claude plugin marketplace list', { stdio: 'pipe' }).toString();
-    return output.includes(MARKETPLACE_NAME);
-  } catch {
-    return false;
+function isAtLeast(version: number[], min: readonly number[]): boolean {
+  for (let i = 0; i < min.length; i++) {
+    if (version[i] !== min[i]) return version[i] > min[i];
   }
+  return true;
+}
+
+/**
+ * Exits the process with code 1 if the `claude` CLI is missing or too old to
+ * load plugins from `CLAUDE_CODE_PLUGIN_DIRS`.
+ */
+export function assertClaudeSupportsPluginDirs(): void {
+  const minLabel = MIN_CLAUDE_VERSION.join('.');
+  const version = getClaudeVersion();
+  if (!version) {
+    console.error('[tsunagi:plugin] Failed to run `claude --version`.');
+    console.error('[tsunagi:plugin] Ensure the `claude` CLI is installed and available on PATH.');
+    process.exit(1);
+  }
+  if (!isAtLeast(version, MIN_CLAUDE_VERSION)) {
+    console.error(
+      `[tsunagi:plugin] Claude Code ${version.join('.')} is too old. tsunagi requires ${minLabel} or later.`
+    );
+    console.error('[tsunagi:plugin] Run `claude update` and start tsunagi again.');
+    process.exit(1);
+  }
+  debugLog(`Claude Code ${version.join('.')}`);
 }
 
 /**
@@ -78,50 +102,38 @@ function runClaude(args: string): boolean {
   }
 }
 
-/**
- * Ensure a clean plugin state by removing any pre-existing tsunagi plugin /
- * marketplace registrations and then installing fresh copies.
- *
- * Exits the process with code 1 on install failure.
- *
- * @returns `'clean'` if orphaned state was cleaned up before install,
- *          `'fresh'` if no prior state existed.
- */
-export function ensureCleanPluginState(): 'clean' | 'fresh' {
-  // Phase 1: best-effort cleanup of any orphaned state from a previous run.
-  // Check existence first to avoid error output when plugin is not installed (normal first-boot case).
-  const hadOrphan = isPluginInstalled() || isMarketplaceAdded();
-  if (isPluginInstalled()) {
-    runClaude(`plugin uninstall ${PLUGIN_REF}`);
+function claudeOutput(args: string): string {
+  try {
+    return execSync(`claude ${args}`, { stdio: 'pipe' }).toString();
+  } catch {
+    return '';
   }
-  if (isMarketplaceAdded()) {
-    runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`);
-  }
-
-  // Phase 2: clean install. Failures here are fatal.
-  const marketplaceDir = getMarketplaceDir();
-  if (!runClaude(`plugin marketplace add ${marketplaceDir}`)) {
-    console.error('[tsunagi:plugin] Failed to add Claude Code marketplace.');
-    console.error('[tsunagi:plugin] Ensure the `claude` CLI is installed and available on PATH.');
-    console.error(`[tsunagi:plugin] Marketplace path: ${marketplaceDir}`);
-    process.exit(1);
-  }
-  debugLog('Marketplace added');
-
-  if (!runClaude(`plugin install ${PLUGIN_REF} --scope user`)) {
-    console.error('[tsunagi:plugin] Failed to install Claude Code plugin.');
-    runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`);
-    process.exit(1);
-  }
-  debugLog('Plugin installed');
-
-  return hadOrphan ? 'clean' : 'fresh';
 }
 
 /**
- * Best-effort cleanup. Called on process shutdown. Never throws.
+ * Remove the user-scope plugin / marketplace registered by older tsunagi
+ * versions. Runs once; a marker file in the state dir records completion.
+ * Never throws and never blocks startup on failure.
  */
-export function cleanupPluginState(): void {
-  runClaude(`plugin uninstall ${PLUGIN_REF}`);
-  runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`);
+export function removeLegacyPluginInstall(): void {
+  const markerPath = getLegacyCleanupMarkerPath();
+  if (fs.existsSync(markerPath)) return;
+
+  // 存在確認してから消す（未登録時のエラー出力を避ける）
+  let removed = true;
+  if (claudeOutput('plugin list').includes(PLUGIN_REF)) {
+    removed = runClaude(`plugin uninstall ${PLUGIN_REF}`) && removed;
+  }
+  if (claudeOutput('plugin marketplace list').includes(MARKETPLACE_NAME)) {
+    removed = runClaude(`plugin marketplace remove ${MARKETPLACE_NAME}`) && removed;
+  }
+  if (!removed) return; // 次回起動時に再試行する
+
+  try {
+    fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+    fs.writeFileSync(markerPath, new Date().toISOString(), 'utf-8');
+    debugLog('Legacy plugin registration removed');
+  } catch {
+    // マーカーを書けなくても次回再確認するだけ
+  }
 }

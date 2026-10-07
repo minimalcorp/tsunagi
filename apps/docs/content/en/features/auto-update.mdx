@@ -1,0 +1,50 @@
+---
+title: Auto Update
+description: Installs new versions automatically and applies them on a restart you choose.
+---
+
+import { Callout } from 'nextra/components';
+
+# Auto Update
+
+When a new version is published to npm, Tsunagi installs it in the
+background. Once it's installed, **Restart to update** appears at the top
+right and at the bottom left of Settings. You choose when to restart.
+
+## How it works
+
+1. Tsunagi checks npm for the latest version every hour (or when you press
+   the check button in Settings).
+2. It installs the new version into `~/.tsunagi/versions/<version>/` with
+   `npm install --prefix`. The running Tsunagi is not affected.
+3. When you press **Restart to update**, Tsunagi finishes its shutdown and
+   starts again on the new version. The terminal where you ran `tsunagi`
+   stays attached.
+4. The page reloads automatically once the new version is up.
+
+<Callout type="warning">
+  You can't restart while a task is running or waiting for a permission prompt. Restarting closes
+  open terminal sessions.
+</Callout>
+
+## If the new version fails to start
+
+Before starting a new version, Tsunagi copies the DB to
+`~/.tsunagi/backups/pre-update-*`. If the new version exits before it
+finishes starting (for example, a failed migration), Tsunagi restores the DB
+and starts the previous version again. The failed version is not selected
+again.
+
+## Scope and opting out
+
+- Applies to Tsunagi installed from npm (`npm install -g` / `npx`). When you
+  build and run from the repository, Tsunagi shows the manual update steps
+  as before.
+- At startup, Tsunagi runs the newer of the auto-updated version and the
+  `tsunagi` package itself.
+- The `tsunagi` command itself (a small part that only starts and restarts
+  Tsunagi) is not auto-updated. When a new version needs a newer `tsunagi`
+  command, Tsunagi shows **Reinstall recommended** with the reinstall
+  command. Auto-update keeps working.
+- Set `TSUNAGI_DISABLE_AUTO_UPDATE=1` to turn auto-update off.
+- To use an npm mirror, set `TSUNAGI_NPM_REGISTRY` to its registry URL.

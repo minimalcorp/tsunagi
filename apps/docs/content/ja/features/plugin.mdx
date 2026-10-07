@@ -7,7 +7,7 @@ import { Callout } from 'nextra/components';
 
 # Tsunagi プラグイン
 
-Tsunagi は独自の Claude Code プラグイン——**MCP server**、**skill**、**curator agent**、**hook handler** をまとめたバンドル——を同梱しており、Tsunagi 起動時に自動で install します。このプラグインが Tsunagi と Claude の緊密な統合を実現している中核です: Claude が Tsunagi のタスク状態を読み書きできるようにし、いつステータスを変更すべきかを Claude に教え、Claude の活動を Tsunagi UI にリアルタイムに流し込みます。
+Tsunagi は独自の Claude Code プラグイン——**MCP server**、**skill**、**curator agent**、**hook handler** をまとめたバンドル——を同梱しており、Tsunagi の内部ターミナルで起動した Claude Code に自動で読み込ませます。このプラグインが Tsunagi と Claude の緊密な統合を実現している中核です: Claude が Tsunagi のタスク状態を読み書きできるようにし、いつステータスを変更すべきかを Claude に教え、Claude の活動を Tsunagi UI にリアルタイムに流し込みます。
 
 <Screenshot src="/screenshots/mcp-task-create.webp" alt="Claude が Tsunagi MCP を呼び出す" />
 
@@ -56,33 +56,18 @@ MCP server は Tsunagi のタスク管理を [Model Context Protocol](https://do
 
 ## Lifecycle
 
-Tsunagi は起動・終了のシーケンスの一部としてプラグインを自動で install / uninstall します。`claude plugin install` を自分で実行する必要はありません。
+Tsunagi は内部ターミナルを起動するときに、環境変数 [`CLAUDE_CODE_PLUGIN_DIRS`](https://code.claude.com/docs/en/env-vars) へ同梱のプラグインディレクトリを追加します。そのターミナルで起動した Claude Code は、このプラグインをセッション単位で読み込みます (`--plugin-dir` と同じ扱い)。`claude plugin install` を自分で実行する必要はありません。
 
-### 起動時
-
-1. 前回実行の残骸 (例: プロセスが crash した場合) があれば検出して削除
-2. `claude plugin marketplace add <bundled marketplace dir>` を実行
-3. `claude plugin install tsunagi-plugin@tsunagi-marketplace --scope user` を実行
-4. Fastify と Next.js サーバーの起動へ進む
-
-毎回の起動でクリーンインストールするので、プラグインのバージョンが実行中の Tsunagi プロセスと常に一致していることが保証されます。バージョンドリフトを心配する必要はありません。
-
-### 終了時
-
-1. `claude plugin uninstall tsunagi-plugin@tsunagi-marketplace`
-2. `claude plugin marketplace remove tsunagi-marketplace`
-3. Tsunagi が終了
-
-### Crash 後
-
-Tsunagi が終了シーケンスを実行できずに crash した場合、プラグインと marketplace のエントリが Claude Code 側に残ることがあります。次回 Tsunagi を起動したとき、上記のクリーンインストールシーケンスがそれらを検出してゼロから再 install するので、手動リカバリは不要です。
+- Claude Code の設定には何も install しないので、終了時の後始末はありません。crash してもプラグインの登録は残りません
+- Tsunagi の外で起動した Claude Code には読み込まれません
+- Claude Code **v2.1.280 以降** が必要です。古い場合 Tsunagi は起動時にエラーで終了します (`claude update` で更新してください)
 
 <Callout type="info">
-  Tsunagi は公式の `claude` CLI (`claude plugin marketplace add/remove` と `claude plugin
-  install/uninstall`) **のみ** を使って install / uninstall を行います。 `~/.claude/settings.json`
-  や他の Claude Code の内部ファイルを直接編集することは一切ありません。
+  旧バージョンの Tsunagi は `claude plugin install --scope user` でプラグインを install
+  していました。新しいバージョンの初回起動時に、残っている `tsunagi-plugin@tsunagi-marketplace` と
+  `tsunagi-marketplace` を `claude` CLI で1度だけ削除します。
 </Callout>
 
 ## なぜプラグインはバンドルされているのか
 
-「なぜプラグインを公開 marketplace に publish してユーザーに手動 install させないのか?」と思うかもしれません。答えはバージョン安全性です。Tsunagi のバックエンドとプラグインの MCP ツールスキーマは正確に一致している必要があります。プラグインを Tsunagi の npm パッケージに同梱し、起動時に install することで、古いプラグインによるスキーマの不整合が発生する心配がなくなります。
+「なぜプラグインを公開 marketplace に publish してユーザーに手動 install させないのか?」と思うかもしれません。答えはバージョン安全性です。Tsunagi のバックエンドとプラグインの MCP ツールスキーマは正確に一致している必要があります。プラグインを Tsunagi の npm パッケージに同梱し、実行中の Tsunagi のディレクトリから読み込ませることで、古いプラグインによるスキーマの不整合が発生する心配がなくなります。

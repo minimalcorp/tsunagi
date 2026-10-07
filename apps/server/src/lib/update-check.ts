@@ -1,14 +1,25 @@
 import type { Server as SocketIOServer } from 'socket.io';
 import type { UpdateStatus } from '@minimalcorp/tsunagi-shared';
+import {
+  getAutoUpdateStatus,
+  isEntryOutdated,
+  onAutoUpdateChange,
+  prepareUpdate,
+} from './auto-update.js';
 
-// 公開パッケージの latest dist-tag のみを返す軽量エンドポイント（数KB）
-const REGISTRY_URL = 'https://registry.npmjs.org/@minimalcorp%2ftsunagi/latest';
+// 公開パッケージの latest dist-tag のみを返す軽量エンドポイント（数KB）。
+// TSUNAGI_NPM_REGISTRY でミラー・検証用 registry に差し替えられる（自動更新の install も同じ registry を使う）
+const REGISTRY_BASE = (process.env.TSUNAGI_NPM_REGISTRY || 'https://registry.npmjs.org').replace(
+  /\/+$/,
+  ''
+);
+const REGISTRY_URL = `${REGISTRY_BASE}/@minimalcorp%2ftsunagi/latest`;
 const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
 
 // 実行中のバージョンは apps/cli が自身の package.json から注入する。
 // dev 起動（npm run dev）では未設定のため確認しない
-const status: UpdateStatus = {
+const status: Omit<UpdateStatus, 'autoUpdate' | 'entryOutdated'> = {
   current: process.env.TSUNAGI_VERSION || null,
   latest: null,
   updateAvailable: false,
@@ -35,7 +46,11 @@ export function isNewer(latest: string, current: string): boolean {
 }
 
 export function getUpdateStatus(): UpdateStatus {
-  return { ...status };
+  return { ...status, autoUpdate: getAutoUpdateStatus(), entryOutdated: isEntryOutdated() };
+}
+
+function emitStatus(): void {
+  socket?.emit('version:status', getUpdateStatus());
 }
 
 /** registry を確認して status を更新する。確認できなければ false（前回の結果を保持） */
@@ -51,7 +66,9 @@ async function check(): Promise<boolean> {
     status.updateAvailable = isNewer(version, status.current);
     status.checkedAt = new Date().toISOString();
     // checkedAt も表示しているため、変化の有無に関わらず通知する
-    socket?.emit('version:status', getUpdateStatus());
+    emitStatus();
+    // 新しいバージョンは自動でインストールしておき、再起動のタイミングだけユーザーに任せる
+    if (status.updateAvailable) prepareUpdate(version);
     return true;
   } catch {
     // オフライン等
@@ -67,6 +84,7 @@ export function checkForUpdateNow(): Promise<boolean> {
 export function startUpdateCheck(io: SocketIOServer): void {
   if (!status.current || timer) return;
   socket = io;
+  onAutoUpdateChange(emitStatus);
   void check();
   timer = setInterval(() => void check(), CHECK_INTERVAL_MS);
   timer.unref();

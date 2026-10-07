@@ -1,6 +1,7 @@
 export default {
   'repository-management': 'リポジトリ管理',
   'task-management': 'タスク管理',
+  'auto-update': '自動更新',
   plugin: 'Tsunagi プラグイン',
   'environment-variables': '環境変数管理',
   'local-llm': 'ローカルLLM（実験的機能）',

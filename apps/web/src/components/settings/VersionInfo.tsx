@@ -1,7 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowUpCircle, CheckCircle2, CircleHelp, RefreshCw } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowUpCircle,
+  CheckCircle2,
+  CircleHelp,
+  RefreshCw,
+  RotateCw,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger } from '@/components/ui/popover';
 import { UpdatePopoverContent } from '@/components/UpdateIndicator';
@@ -53,7 +60,16 @@ export function VersionInfo() {
       {status?.updateAvailable ? (
         <Popover>
           <PopoverTrigger className="flex items-center gap-1 rounded-sm text-info hover:underline cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            <ArrowUpCircle className="size-3.5" />v{status.latest} available
+            {status.autoUpdate.state === 'ready' ? (
+              <>
+                <RotateCw className="size-3.5" />
+                Restart to update to v{status.autoUpdate.version}
+              </>
+            ) : (
+              <>
+                <ArrowUpCircle className="size-3.5" />v{status.latest} available
+              </>
+            )}
           </PopoverTrigger>
           <UpdatePopoverContent status={status} />
         </Popover>
@@ -67,6 +83,15 @@ export function VersionInfo() {
           <CircleHelp className="size-3.5" />
           Not checked
         </div>
+      )}
+      {status?.entryOutdated && !status.updateAvailable && (
+        <Popover>
+          <PopoverTrigger className="flex items-center gap-1 rounded-sm text-warning hover:underline cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+            <AlertCircle className="size-3.5" />
+            Reinstall recommended
+          </PopoverTrigger>
+          <UpdatePopoverContent status={status} />
+        </Popover>
       )}
       {status?.checkedAt && (
         <div className="text-muted-foreground">
