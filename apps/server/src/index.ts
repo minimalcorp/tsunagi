@@ -52,8 +52,12 @@ const corsOrigins = [`http://localhost:${NEXT_PORT}`, ...extraOrigins];
 // TSUNAGI_BASIC_AUTH_USER / TSUNAGI_BASIC_AUTH_PASSWORD が両方ある時だけ有効。
 const basicAuth = createBasicAuth();
 
+const SHUTDOWN_TIMEOUT_MS = 20_000;
+
 async function start() {
   const fastify = Fastify({
+    // 終了時に処理中のリクエスト（プロキシ中・ロングポーリング等）も閉じ、close() が待ち続けないようにする
+    forceCloseConnections: true,
     logger: {
       level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'error' : 'info'),
     },
@@ -105,6 +109,12 @@ async function start() {
     pingTimeout: 15000,
   });
   fastify.decorate('io', io);
+  // fastify.close() は upgrade 済みの WebSocket を閉じず、engine.io は http server の close を待って
+  // 閉じるため、互いに待ち合って close() が返らない（ブラウザが開いていると再起動が止まる）。先に閉じる
+  fastify.addHook('preClose', (done) => {
+    io.close();
+    done();
+  });
 
   fastify.get('/health', async () => ({ status: 'ok' }));
 
@@ -188,6 +198,12 @@ async function start() {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`[server] Received ${signal}, shutting down...`);
+    // 終了処理がどこかで止まっても終了する。restart は apps/cli の app 側に強制終了がないため必須。
+    // unloadOnShutdown の上限（10秒）より長く、app の CHILD_EXIT_TIMEOUT_MS（30秒）より短くする
+    setTimeout(() => {
+      console.error(`[server] Shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms, exiting`);
+      process.exit(exitCode);
+    }, SHUTDOWN_TIMEOUT_MS).unref();
     stopUpdateCheck();
     stopAutoUpdate();
     // PTY（claude を含む）は SIGHUP 任せにせず、ここで止める
