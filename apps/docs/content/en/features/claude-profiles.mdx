@@ -1,0 +1,48 @@
+---
+title: Claude Profiles
+description: Use multiple Claude accounts and switch them per owner or repository.
+---
+
+# Claude Profiles
+
+Tsunagi uses Claude Code's
+[`CLAUDE_CONFIG_DIR`](https://code.claude.com/docs/en/authentication#log-in-with-multiple-accounts)
+to keep Claude accounts (login, settings and session history) apart as
+profiles. You don't need to issue or register any token.
+
+## System default
+
+With nothing configured, Tsunagi uses the same configuration as running
+`claude` in your terminal (`~/.claude`). If you are already logged in
+with `claude`, Tsunagi works as is.
+
+## Add a profile
+
+1. Open **Global** in Settings
+2. Under **Claude Profile**, click **Add Profile** and enter a name
+   (letters, numbers, spaces, `-` and `_`)
+3. A terminal runs `claude auth login`; authenticate in the browser (if
+   the browser doesn't open, open the printed URL and paste the code)
+
+The profile lives in `~/.tsunagi/claude-profiles/<name>/` (spaces become
+`-`, upper case becomes lower case). Profiles don't share settings
+(settings.json, skills, etc.) or session history.
+
+## Choose a profile
+
+Pick the profile for each scope in the **Claude Profile** selector.
+
+- **Global** — the default profile
+- **Owner / repository** — inherits from the parent when unset (Inherit)
+
+Task tabs (both Claude and terminal) start with the `CLAUDE_CONFIG_DIR`
+of the profile resolved for the task's repository. Tabs using a profile
+have `ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` removed from their
+environment, since those would take precedence over the login.
+
+## Applying to open tabs
+
+Changing the assignment also applies to open tabs automatically (the
+same as changes in [Environment Variables](/en/features/environment-variables/)).
+A tab that switches profiles starts a new conversation, because the new
+profile doesn't have the previous one.

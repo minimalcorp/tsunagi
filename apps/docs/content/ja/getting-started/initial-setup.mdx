@@ -7,18 +7,11 @@ description: 最初のリポジトリを登録し、Tsunagi を作業に接続�
 
 [Tsunagi をインストール](/ja/getting-started/installation/) して [http://localhost:2791](http://localhost:2791) を開いた後、UI が初回セットアップを案内します。このページでは各ステップが内部で何を行っているか、何を選ぶべきかを説明します。
 
-## 1. Claude の認証情報を提供する
+## 1. Claude にログインする
 
-Tsunagi は Claude Code 自身が使う認証情報を再利用します。Tsunagi を起動するシェルで以下のいずれかの環境変数を設定してください:
+Tsunagi は普段ターミナルで `claude` を使うときと同じ設定（`~/.claude`）を使います。既に `claude` でログイン済みなら、このステップは自動で完了します。
 
-```bash
-# どちらか:
-export ANTHROPIC_API_KEY="sk-ant-..."
-# または:
-export CLAUDE_CODE_OAUTH_TOKEN="..."
-```
-
-これは [Claude Code 公式ドキュメント](https://docs.claude.com/en/docs/claude-code/overview) に記載されているのと同じ認証情報です。Tsunagi はこれらを保存・改変しません。
+未ログインの場合は、Settings の **Global** → **Claude Profile** で **System default** の **Login** を押し、表示されたターミナルで認証します。アカウントを使い分ける場合は [Claude プロファイル](/ja/features/claude-profiles/) を参照してください。
 
 ## 2. リポジトリを登録する
 

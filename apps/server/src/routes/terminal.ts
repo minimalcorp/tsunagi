@@ -1,38 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { TabMode } from '@minimalcorp/tsunagi-shared';
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { ptyManager } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
-import { getWorktreePath } from '../lib/worktree-manager.js';
-import { getEnv } from '../lib/repositories/environment.js';
+import { ensureActiveLoaded } from '../lib/local-llm.js';
+import { buildClaudeCommand, isLocalLlmMode } from '../lib/claude-command.js';
 import {
-  ensureClaudeOnboardingCompleted,
-  removeLocalModelFromUserSettings,
-} from '../lib/claude-config-guard.js';
-import {
-  LOCAL_LLM_UNSET_ENV_KEYS,
-  LOCAL_MODEL_ALIAS,
-  buildLocalLlmEnv,
-} from '../lib/local-llm-env.js';
-import { ensureActiveLoaded, getLocalLlmSettings } from '../lib/local-llm.js';
-import { LOCAL_LLM_PROXY_URL, buildClaudeCommand, isLocalLlmMode } from '../lib/claude-command.js';
-
-// このファイル基準で解決する(cwd 非依存):
-//   dev:        apps/server/src/routes      → apps/server/scripts
-//   build:      apps/server/dist/routes     → apps/server/scripts
-//   npm bundle: <pkg>/dist/server/routes    → <pkg>/dist/scripts
-const TSUNAGI_EDITOR_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../../scripts/monaco-editor.sh'
-);
-
-// Fastify(API) の公開ポート。index.ts と同じ既定値・同じ環境変数(TSUNAGI_SERVER_PORT)を見る。
-// monaco-editor.sh など PTY 内のプロセスが API を叩く際の同一ホスト向けベース URL に使う。
-const SERVER_PORT = Number(process.env.TSUNAGI_SERVER_PORT) || 2791;
+  PtyLaunchError,
+  prepareClaudeConfigForSession,
+  resolvePtyLaunch,
+  startPtySession,
+} from '../lib/pty-launch.js';
+import { getEnvPending, initPtyEnvSync, respawnSessionNow } from '../lib/pty-env-sync.js';
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
@@ -80,25 +59,9 @@ interface CreateSessionBody {
   claude?: boolean;
 }
 
-/**
- * ローカルLLMタブで注入する環境変数を返す。Claude Code は tsunagi の中継口に接続し、
- * 中継口が使用中のモデルへ転送する。最初の発言を待たせないよう、読み込みはここで始めておく（完了は待たない）
- */
-async function prepareLocalLlm(): Promise<Record<string, string>> {
-  const { active, extraEnv } = await getLocalLlmSettings();
-  if (!active) {
-    throw new Error('ローカルLLMのモデルが未設定です。Settings で使用するモデルを選んでください');
-  }
-  ensureActiveLoaded().catch(() => undefined);
-  return buildLocalLlmEnv({
-    proxyUrl: LOCAL_LLM_PROXY_URL,
-    contextTokens: active.contextTokens,
-    extraEnv,
-  });
-}
-
 export async function terminalRoutes(fastify: FastifyInstance) {
   const io = (fastify as FastifyWithIO).io;
+  initPtyEnvSync(io);
 
   // socket.io イベントハンドラ
   io.on('connection', (socket) => {
@@ -144,6 +107,8 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       socket.removeAllListeners('input');
 
       socket.join(room);
+      // 環境変数の変更が未反映ならクライアントに伝える（反映待ちバッジ）
+      socket.emit('env-pending', { sessionId, pending: getEnvPending(sessionId) });
 
       // 接続確立 → GCタイマーをキャンセル
       ptyManager.cancelGc(sessionId);
@@ -189,6 +154,9 @@ export async function terminalRoutes(fastify: FastifyInstance) {
 
       // PTYプロセス終了 → room全体に通知（全接続クライアントに終了を伝える）+ セッション削除
       const exitHandler = ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
+        // 環境変数の反映のための作り直し（pty-env-sync）。新しい PTY が同じ sessionId で
+        // 既に動いているため、終了扱い・セッション削除はしない
+        if (session.respawning) return;
         io.to(room).emit('exit', { exitCode });
         // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット
         // todos は残す（Claude 側の Task はセッションに永続化され、--resume 後も続きから使われる）
@@ -230,6 +198,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       socket.on('input', ({ sessionId: sid, data }: { sessionId: string; data: string }) => {
         if (sid !== sessionId) return;
         if (ptyManager.getActiveSocket(sessionId) !== socket.id) return;
+        session.lastInputAt = Date.now();
         ptyProcess.write(data);
       });
     });
@@ -268,8 +237,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
 
   // POST /terminal/sessions - セッション作成（または既存セッション再利用）
   fastify.post<{ Body: CreateSessionBody }>('/terminal/sessions', async (request, reply) => {
-    const { cwd, env, sessionId: requestedSessionId, claude } = request.body ?? {};
-    let { command } = request.body ?? {};
+    const { cwd, env, sessionId: requestedSessionId, claude, command } = request.body ?? {};
 
     const sessionId = requestedSessionId ?? crypto.randomUUID();
 
@@ -280,103 +248,21 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(200).send({ sessionId, reused: true });
     }
 
-    // sessionId(=tab_id) から Task を解決する。cwd / env の決定に使う。
-    // Taskに紐づかないタブは Tab レコードが存在しないため null になる。
-    const tab = await prisma.tab
-      .findUnique({ where: { tabId: sessionId }, include: { task: true } })
-      .catch((err: unknown) => {
-        fastify.log.warn({ err, sessionId }, 'Failed to load tab');
-        return null;
+    const launchRequest = { cwd, env };
+    try {
+      const launch = await resolvePtyLaunch(sessionId, launchRequest);
+      await startPtySession(sessionId, launch, {
+        request: launchRequest,
+        launchClaude: Boolean(claude),
+        command,
       });
-
-    // cwd は Task があればサーバー側で worktree パスを導出する（クライアントの state に依存しない）。
-    // クライアント指定の cwd は Task に紐づかないタブのフォールバックとしてのみ使う。
-    const defaultDir = path.join(os.homedir(), '.tsunagi', 'workspaces');
-    let workingDir = tab
-      ? getWorktreePath(tab.task.owner, tab.task.repo, tab.task.branch)
-      : (cwd ?? defaultDir);
-
-    // cwd が存在するか確認。Task のタブは worktree 必須（無ければ起動しない）、
-    // それ以外はデフォルトにフォールバック
-    try {
-      await fs.access(workingDir);
-    } catch {
-      if (tab) {
-        fastify.log.warn({ sessionId, workingDir }, 'worktree does not exist');
-        return reply.status(409).send({ error: `Worktree not found at ${workingDir}` });
-      }
-      fastify.log.warn({ sessionId, workingDir }, 'cwd does not exist, falling back to default');
-      workingDir = defaultDir;
-    }
-    // デフォルトディレクトリが存在しない場合も作成する
-    await fs.mkdir(workingDir, { recursive: true });
-
-    try {
-      // repo スコープまで階層マージした環境変数を取得する（global → owner → repo、後勝ちで上書き）。
-      // Taskに紐づかないタブは global のみになる。
-      let dbEnv: Record<string, string> = {};
-      const tabMode = tab?.mode;
-      try {
-        dbEnv = tab ? await getEnv('repo', tab.task.owner, tab.task.repo) : await getEnv('global');
-        fastify.log.info(
-          { count: Object.keys(dbEnv).length, owner: tab?.task.owner, repo: tab?.task.repo },
-          'Loaded env vars'
-        );
-      } catch (err) {
-        fastify.log.warn({ err }, 'Failed to load env vars');
-      }
-
-      // ローカルLLMタブ: Anthropic の代わりに tsunagi の中継口（→ Ollama / LM Studio）で claude を動かす。
-      // DB の環境変数より後に適用し、Anthropic の認証トークンは環境変数ごと取り除く。
-      let providerEnv: Record<string, string> = {};
-      let unsetKeys: string[] = [];
-      if (isLocalLlmMode(tabMode as TabMode | undefined)) {
-        try {
-          providerEnv = await prepareLocalLlm();
-        } catch (err) {
-          return reply
-            .status(400)
-            .send({ error: err instanceof Error ? err.message : String(err) });
-        }
-        unsetKeys = LOCAL_LLM_UNSET_ENV_KEYS;
-      }
-
-      if (claude) {
-        command = await buildClaudeCommand(sessionId, (tabMode ?? 'claude') as TabMode);
-      }
-
-      // 優先順位: リクエストで渡されたenv > ローカルLLMのprovider env > DB env(global/owner/repo) > tsunagi独自のEDITOR設定
-      // tsunagi-editor.sh をデフォルトにすることで Ctrl+G が Monaco Modal を開く。
-      // DB / リクエストで EDITOR が明示設定されている場合はそちらが優先される。
-      const tsunagiDefaultEnv: Record<string, string> = {
-        EDITOR: TSUNAGI_EDITOR_PATH,
-        TSUNAGI_SESSION_ID: sessionId,
-        // monaco-editor.sh が API(Fastify) を叩くためのベース URL。サーバーと同一
-        // ホストなので localhost。単一ポート化で API は SERVER_PORT(既定 2791)。
-        TSUNAGI_API_BASE: `http://localhost:${SERVER_PORT}`,
-      };
-      const mergedEnv = { ...tsunagiDefaultEnv, ...dbEnv, ...providerEnv, ...env };
-
-      const session = ptyManager.createSession(sessionId, workingDir, mergedEnv, unsetKeys);
-
-      // コマンドが指定されていればPTY起動後にシェルへ書き込む
-      if (command) {
-        const cmd = command.endsWith('\n') ? command : command + '\n';
-        // claude logout で ~/.claude.json の hasCompletedOnboarding がリセットされて
-        // いると、次回 claude 起動時にオンボーディングウィザードが表示され --resume/
-        // --session-id を前提にした自動起動フローが止まるため、起動前に補正する。
-        await ensureClaudeOnboardingCompleted();
-        // 監視の取りこぼしに備え、起動前にも中継口の名前が既定モデルに残っていないか補正する
-        await removeLocalModelFromUserSettings(LOCAL_MODEL_ALIAS);
-        // シェルの初期化（プロンプト表示）を待つため少し遅延させて書き込む
-        setTimeout(() => {
-          session.pty.write(cmd);
-        }, 300);
-      }
-
       return reply.status(201).send({ sessionId, reused: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof PtyLaunchError) {
+        fastify.log.warn({ sessionId, err: message }, 'Failed to launch PTY');
+        return reply.status(err.statusCode).send({ error: message });
+      }
       return reply.status(500).send({ error: message });
     }
   });
@@ -403,7 +289,20 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       } catch (err) {
         return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) });
       }
+      // 環境変数の反映で PTY を作り直したときも claude を起動し直す
+      session.options.launchClaude = true;
+      await prepareClaudeConfigForSession(session);
       session.pty.write(`${command}\n`);
+      return reply.status(204).send();
+    }
+  );
+
+  // POST /terminal/sessions/:sessionId/respawn - 環境変数の変更を今すぐ反映する（PTY を作り直す）
+  fastify.post<{ Params: { sessionId: string } }>(
+    '/terminal/sessions/:sessionId/respawn',
+    async (request, reply) => {
+      const ok = await respawnSessionNow(request.params.sessionId);
+      if (!ok) return reply.status(404).send({ error: 'Session not found' });
       return reply.status(204).send();
     }
   );

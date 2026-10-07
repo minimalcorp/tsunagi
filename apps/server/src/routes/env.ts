@@ -1,5 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import * as envRepo from '../lib/repositories/environment.js';
+import { RESERVED_ENV_KEYS } from '../lib/claude-profiles.js';
+import { notifyEnvChanged } from '../lib/pty-env-sync.js';
+
+const RESERVED_KEY_ERROR = 'Claude の認証は Settings の Claude Profile で設定してください';
+
+/** 変更後、起動中のターミナルに反映する（失敗しても API 自体は成功扱い） */
+function syncPtyEnv(fastify: FastifyInstance): void {
+  notifyEnvChanged().catch((err: unknown) => fastify.log.warn(err, 'Failed to sync PTY env'));
+}
 
 interface EnvBody {
   key: string;
@@ -55,6 +64,10 @@ export async function envRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Missing required fields: key, value, scope' });
       }
 
+      if (RESERVED_ENV_KEYS.includes(key)) {
+        return reply.status(400).send({ error: RESERVED_KEY_ERROR });
+      }
+
       if (scope === 'owner' && !owner) {
         return reply.status(400).send({ error: 'Missing required field: owner for scope=owner' });
       }
@@ -66,6 +79,7 @@ export async function envRoutes(fastify: FastifyInstance) {
       }
 
       await envRepo.setEnv(key, value, scope, owner, repo);
+      syncPtyEnv(fastify);
       return reply.status(201).send({ data: { success: true } });
     } catch (error) {
       fastify.log.error(error, 'POST /env error');
@@ -82,6 +96,10 @@ export async function envRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Missing required fields: key, value, scope' });
       }
 
+      if (RESERVED_ENV_KEYS.includes(key)) {
+        return reply.status(400).send({ error: RESERVED_KEY_ERROR });
+      }
+
       if (scope === 'owner' && !owner) {
         return reply.status(400).send({ error: 'Missing required field: owner for scope=owner' });
       }
@@ -93,6 +111,7 @@ export async function envRoutes(fastify: FastifyInstance) {
       }
 
       await envRepo.setEnv(key, value, scope, owner, repo);
+      syncPtyEnv(fastify);
       return reply.status(200).send({ data: { success: true } });
     } catch (error) {
       fastify.log.error(error, 'PUT /env error');
@@ -115,6 +134,10 @@ export async function envRoutes(fastify: FastifyInstance) {
         });
       }
 
+      if (RESERVED_ENV_KEYS.includes(key)) {
+        return reply.status(400).send({ error: RESERVED_KEY_ERROR });
+      }
+
       if (scope === 'owner' && !owner) {
         return reply.status(400).send({
           error: 'Missing required query parameter: owner for scope=owner',
@@ -132,6 +155,7 @@ export async function envRoutes(fastify: FastifyInstance) {
       if (!success) {
         return reply.status(404).send({ error: 'Environment variable not found' });
       }
+      syncPtyEnv(fastify);
 
       return reply.status(200).send({ data: { success: true } });
     } catch (error) {
@@ -160,7 +184,10 @@ export async function envRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const envVars = await envRepo.getAllEnv(scope, owner || undefined, repo || undefined);
+      // 予約キー（Claude プロファイルの割り当て）は専用 UI で扱うため一覧に含めない
+      const envVars = (
+        await envRepo.getAllEnv(scope, owner || undefined, repo || undefined)
+      ).filter((env) => !RESERVED_ENV_KEYS.includes(env.key));
       return reply.status(200).send({ data: { envVars } });
     } catch (error) {
       fastify.log.error(error, 'GET /env/list error');
@@ -177,7 +204,12 @@ export async function envRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'key, scope, and enabled are required' });
       }
 
+      if (RESERVED_ENV_KEYS.includes(key)) {
+        return reply.status(400).send({ error: RESERVED_KEY_ERROR });
+      }
+
       await envRepo.toggleEnv(key, scope, enabled, owner, repo);
+      syncPtyEnv(fastify);
       return reply.status(200).send({ data: { success: true } });
     } catch (error) {
       fastify.log.error(error, 'Failed to toggle environment variable');

@@ -42,58 +42,29 @@ export async function getEnv(
   repo?: string
 ): Promise<Record<string, string>> {
   const result: Record<string, string> = {};
-
-  // Claude認証トークンのキー定義
-  const CLAUDE_TOKEN_KEYS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
-
-  // Helper: Claude認証トークンをクリア
-  const clearClaudeTokens = () => {
-    CLAUDE_TOKEN_KEYS.forEach((key) => delete result[key]);
-  };
-
-  // Helper: 環境変数リストにClaude認証トークンが含まれるか
-  const hasClaudeToken = (envs: Array<{ key: string }>) => {
-    return envs.some((env) => CLAUDE_TOKEN_KEYS.includes(env.key));
+  const apply = (envs: Array<{ key: string; value: string }>) => {
+    envs.forEach((env) => {
+      result[env.key] = env.value;
+    });
   };
 
   // グローバル変数を先に適用（有効なもののみ）
-  const globalEnvs = await prisma.environmentVariable.findMany({
-    where: { scope: 'global', enabled: true },
-  });
-  globalEnvs.forEach((env: { key: string; value: string }) => {
-    result[env.key] = env.value;
-  });
+  apply(await prisma.environmentVariable.findMany({ where: { scope: 'global', enabled: true } }));
 
   // owner変数を適用（上書き、有効なもののみ）
   if (scope === 'owner' || scope === 'repo') {
-    const ownerEnvs = await prisma.environmentVariable.findMany({
-      where: { scope: 'owner', owner, enabled: true },
-    });
-
-    // Ownerスコープで新しいClaude認証トークンがあれば、Globalのものをクリア
-    if (hasClaudeToken(ownerEnvs)) {
-      clearClaudeTokens();
-    }
-
-    ownerEnvs.forEach((env: { key: string; value: string }) => {
-      result[env.key] = env.value;
-    });
+    apply(
+      await prisma.environmentVariable.findMany({ where: { scope: 'owner', owner, enabled: true } })
+    );
   }
 
   // repo変数を適用（上書き、有効なもののみ）
   if (scope === 'repo') {
-    const repoEnvs = await prisma.environmentVariable.findMany({
-      where: { scope: 'repo', owner, repo, enabled: true },
-    });
-
-    // Repoスコープで新しいClaude認証トークンがあれば、以前のものをクリア
-    if (hasClaudeToken(repoEnvs)) {
-      clearClaudeTokens();
-    }
-
-    repoEnvs.forEach((env: { key: string; value: string }) => {
-      result[env.key] = env.value;
-    });
+    apply(
+      await prisma.environmentVariable.findMany({
+        where: { scope: 'repo', owner, repo, enabled: true },
+      })
+    );
   }
 
   return result;

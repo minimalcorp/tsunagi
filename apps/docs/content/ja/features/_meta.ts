@@ -4,6 +4,7 @@ export default {
   'auto-update': '自動更新',
   plugin: 'Tsunagi プラグイン',
   'environment-variables': '環境変数管理',
+  'claude-profiles': 'Claude プロファイル',
   'local-llm': 'ローカルLLM（実験的機能）',
   ollama: 'Ollama',
   'lm-studio': 'LM Studio',

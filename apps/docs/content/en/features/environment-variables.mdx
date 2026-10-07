@@ -55,9 +55,13 @@ task's `(owner, repo)` and sets them in the PTY's environment before
 launching Claude Code. From Claude's perspective, it's exactly as if you
 had exported those variables in your shell rc file.
 
-If you edit a variable while a tab is already open, the change applies
-to **new tabs only**. Running tabs keep the environment they started
-with — kill and reopen the tab to pick up changes.
+If you edit a variable while a tab is already open, the change is applied
+to it automatically. Because a running process's environment can't be
+changed, Tsunagi recreates the tab's terminal (Claude tabs resume the same
+conversation). To avoid breaking your work, it waits while Claude is
+responding or waiting for permission, while a command is running in the
+terminal, or shortly after you typed; meanwhile the tab shows
+**Apply env** (click it to apply right away).
 
 ## Special variables Tsunagi cares about
 
@@ -66,17 +70,16 @@ Tsunagi or to Claude Code itself. You usually don't define these in
 Tsunagi's settings page — you set them in your login shell before
 starting Tsunagi — but knowing they exist helps.
 
-| Variable                  | Purpose                                                                                                                                                                                                                              |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ANTHROPIC_API_KEY`       | Your Anthropic API credential. Read by Claude Code itself                                                                                                                                                                            |
-| `CLAUDE_CODE_OAUTH_TOKEN` | OAuth token alternative to `ANTHROPIC_API_KEY`. Read by Claude Code                                                                                                                                                                  |
-| `EDITOR`                  | Tsunagi pre-sets this to its bundled Monaco helper inside every Claude tab, so `git commit` and similar commands open the Monaco modal instead of `vi`. Defining `EDITOR` in Tsunagi settings at the global scope will override this |
-| `TSUNAGI_SESSION_ID`      | Injected automatically into each Claude tab's shell. Scripts and the plugin use this to identify the current task from inside the session                                                                                            |
+| Variable             | Purpose                                                                                                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CLAUDE_CONFIG_DIR`  | Directory of the profile chosen in [Claude Profiles](/en/features/claude-profiles/). Injected by Tsunagi                                                                                                                             |
+| `EDITOR`             | Tsunagi pre-sets this to its bundled Monaco helper inside every Claude tab, so `git commit` and similar commands open the Monaco modal instead of `vi`. Defining `EDITOR` in Tsunagi settings at the global scope will override this |
+| `TSUNAGI_SESSION_ID` | Injected automatically into each Claude tab's shell. Scripts and the plugin use this to identify the current task from inside the session                                                                                            |
 
-You should not define `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`
-in Tsunagi's settings page — export them in the shell where you launch
-Tsunagi so Claude Code picks them up directly, the same as if you ran
-`claude` by hand.
+Claude authentication is configured in
+[Claude Profiles](/en/features/claude-profiles/). `ANTHROPIC_API_KEY`,
+`CLAUDE_CODE_OAUTH_TOKEN` and `CLAUDE_CONFIG_DIR` can't be defined in the
+settings page.
 
 ## Where the data is stored
 

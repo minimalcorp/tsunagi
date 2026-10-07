@@ -10,21 +10,16 @@ After [installing Tsunagi](/en/getting-started/installation/) and opening
 initial setup. This page explains what each step is doing under the hood
 and what to choose.
 
-## 1. Provide a Claude credential
+## 1. Log in to Claude
 
-Tsunagi reuses whatever credential Claude Code itself uses. Set one of the
-following environment variables in the shell where you launch Tsunagi:
+Tsunagi uses the same configuration as running `claude` in your terminal
+(`~/.claude`). If you are already logged in with `claude`, this step
+completes automatically.
 
-```bash
-# Either:
-export ANTHROPIC_API_KEY="sk-ant-..."
-# Or:
-export CLAUDE_CODE_OAUTH_TOKEN="..."
-```
-
-These are the same credentials documented in
-[Claude Code's official docs](https://docs.claude.com/en/docs/claude-code/overview).
-Tsunagi does not store or modify them.
+Otherwise, open Settings → **Global** → **Claude Profile**, click
+**Login** on **System default** and authenticate in the terminal that
+appears. To use several accounts, see
+[Claude Profiles](/en/features/claude-profiles/).
 
 ## 2. Register a repository
 

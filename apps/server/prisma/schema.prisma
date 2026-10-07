@@ -93,6 +93,15 @@ model EnvironmentVariable {
   @@map("environment_variables")
 }
 
+// ClaudeProfile - Claude Code のプロファイル（CLAUDE_CONFIG_DIR = ~/.tsunagi/claude-profiles/<slug>）
+model ClaudeProfile {
+  slug      String   @id
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("claude_profiles")
+}
+
 // AppSetting - アプリ全体の設定（key単位でJSONを保存）
 model AppSetting {
   key       String   @id

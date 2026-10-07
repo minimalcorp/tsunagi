@@ -124,7 +124,7 @@ Claude のタブを作成すると、Tsunagi は以下を実行します:
 
 1. `node-pty` を使って、タスクの worktree 内で PTY バックエンドのシェルを起動
 2. Tsunagi 設定画面で定義された環境変数を注入 ([環境変数管理](/ja/features/environment-variables/) 参照)
-3. Claude Code 自身が使うのと同じ認証情報 (`ANTHROPIC_API_KEY` または `CLAUDE_CODE_OAUTH_TOKEN`) でそのシェルで Claude Code を起動
+3. そのリポジトリの [Claude プロファイル](/ja/features/claude-profiles/) でそのシェルで Claude Code を起動
 4. Claude の hooks を Tsunagi バックエンドに接続し、UI からセッションの動作をリアルタイムに読めるようにする
 
 ### リロードを跨いだ永続化
