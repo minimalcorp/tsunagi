@@ -46,10 +46,30 @@ function addTsunagiPluginDir(env: Record<string, string | undefined>): void {
   env.CLAUDE_CODE_PLUGIN_DIRS = dirs.join(':');
 }
 
+/** PTY 作成時の付随情報（環境変数の変更を反映するために作り直すときに使う） */
+export interface PtySessionOptions {
+  /** クライアントが指定した cwd / env */
+  request?: { cwd?: string; env?: Record<string, string> };
+  /** 作成時に claude を起動したか（作り直し後も claude を --resume で起動する） */
+  launchClaude?: boolean;
+  /** tsunagi の環境変数の変更を自動で反映する対象か（Claude のログイン用 PTY 等は対象外） */
+  syncEnv?: boolean;
+}
+
 export interface PtySession {
   pty: pty.IPty;
   sessionId: string;
   cwd: string;
+  /** 作成時に渡した環境変数と取り除いたキー（変更検知の比較元） */
+  appliedEnv: Record<string, string>;
+  appliedUnsetKeys: string[];
+  options: PtySessionOptions;
+  /** tsunagi の環境変数が変わり、作り直し待ちの状態 */
+  envPending: boolean;
+  /** 環境変数の反映のために kill 中。onExit で「セッション終了」として扱わない */
+  respawning: boolean;
+  /** 最後にユーザー入力があった時刻（入力中の作り直しを避けるため） */
+  lastInputAt: number;
   /** PTY出力のリングバッファ（再接続時にまとめて送信） */
   scrollback: string[];
   scrollbackSize: number;
@@ -87,8 +107,9 @@ class PtyManager {
   createSession(
     sessionId: string,
     cwd: string,
-    env?: Record<string, string>,
-    unsetKeys: string[] = []
+    env: Record<string, string> = {},
+    unsetKeys: string[] = [],
+    options: PtySessionOptions = {}
   ): PtySession {
     if (this.sessions.has(sessionId)) {
       throw new Error(`Session already exists: ${sessionId}`);
@@ -133,6 +154,12 @@ class PtyManager {
       pty: ptyProcess,
       sessionId,
       cwd,
+      appliedEnv: env,
+      appliedUnsetKeys: unsetKeys,
+      options,
+      envPending: false,
+      respawning: false,
+      lastInputAt: 0,
       scrollback: [],
       scrollbackSize: 0,
       lastOutputAt: now,

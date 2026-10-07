@@ -16,14 +16,6 @@
         "--enable-web-dashboard=false"
       ]
     },
-    "github": {
-      "type": "stdio",
-      "command": "github-mcp-server",
-      "args": ["stdio"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}"
-      }
-    },
     "penpot": {
       "type": "http",
       "url": "http://host.docker.internal:4401/mcp"

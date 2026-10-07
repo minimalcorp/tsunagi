@@ -6,7 +6,7 @@ import { ArrowLeft, FlaskConical } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
 import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNavigation';
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
-import { ClaudeTokenSection } from '@/components/env/ClaudeTokenSection';
+import { ClaudeProfileSection } from '@/components/settings/ClaudeProfileSection';
 import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
 import { VoiceInputSection } from '@/components/settings/VoiceInputSection';
@@ -44,20 +44,14 @@ export default function SettingsPage() {
 
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
-  const [onboardingStatus, setOnboardingStatus] = useState({
-    completed: true,
-    hasGlobalToken: true,
-  });
 
   // Initialize on mount (one-time initialization from localStorage)
   useEffect(() => {
     fetch(apiUrl('/api/onboarding/status'))
       .then((r) => r.json())
       .then((data) => {
-        const status = data.data;
-        setOnboardingStatus(status);
-
-        if (!status.completed && !status.hasGlobalToken) {
+        // オンボーディング未完了なら、Claude のログインを行う Global を開く
+        if (!data.data?.completed) {
           setSelectedNode({ scope: 'global', label: 'Global' });
         } else {
           setSelectedNode(getInitialNode());
@@ -78,10 +72,6 @@ export default function SettingsPage() {
 
   const handleNodeSelect = (node: SelectedNode) => {
     setSelectedNode(node);
-  };
-
-  const handleSwitchToGlobal = () => {
-    setSelectedNode({ scope: 'global', label: 'Global' });
   };
 
   const handleRepoDeleted = () => {
@@ -129,12 +119,8 @@ export default function SettingsPage() {
         <div className="flex-1 bg-card p-4 overflow-y-auto">
           {selectedNode ? (
             <div className="space-y-6">
-              {/* Claude Token Section (All scopes) */}
-              <ClaudeTokenSection
-                selectedNode={selectedNode}
-                onboardingStatus={onboardingStatus}
-                onSwitchToGlobal={handleSwitchToGlobal}
-              />
+              {/* Claude Profile (All scopes。Global ではプロファイルの追加・ログインも行う) */}
+              <ClaudeProfileSection selectedNode={selectedNode} />
 
               {/* Environment Variables Section */}
               <EnvVariableEditor selectedNode={selectedNode} />

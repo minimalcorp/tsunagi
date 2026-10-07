@@ -81,6 +81,42 @@ export interface EnvironmentVariable {
   enabled: boolean; // 有効/無効フラグ（デフォルトtrue）
 }
 
+// ---- Claude プロファイル（CLAUDE_CONFIG_DIR） ----
+
+export interface ClaudeProfile {
+  slug: string;
+  name: string;
+  /** CLAUDE_CONFIG_DIR（~/.tsunagi/claude-profiles/<slug>） */
+  configDir: string;
+}
+
+/** `claude auth status --json` の要約 */
+export interface ClaudeAuthStatus {
+  loggedIn: boolean;
+  authMethod?: string;
+  email?: string;
+  orgName?: string;
+  subscriptionType?: string;
+  /** claude の実行自体に失敗した場合 */
+  error?: string;
+}
+
+export interface ClaudeProfileWithStatus {
+  /** システム既定（~/.claude）は slug = 'default'、configDir = null */
+  slug: string;
+  name: string;
+  configDir: string | null;
+  status: ClaudeAuthStatus;
+}
+
+/** スコープごとのプロファイル割り当て */
+export interface ClaudeProfileAssignment {
+  /** このスコープに直接設定された slug。未設定（親を継承）は null */
+  assigned: string | null;
+  /** 継承を解決した結果の slug */
+  effective: string;
+}
+
 // ---- 実験的機能: ローカルLLM（Ollama / LM Studio）で Claude Code を起動する（global のみ） ----
 
 /** 使用中のモデル（メモリに載せるのは常にこの1つ） */

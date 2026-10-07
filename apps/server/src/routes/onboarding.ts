@@ -1,20 +1,31 @@
 import type { FastifyInstance } from 'fastify';
-import { getEnv } from '../lib/repositories/environment.js';
 import { isLocalLlmReady } from '../lib/local-llm.js';
+import {
+  DEFAULT_CLAUDE_PROFILE,
+  getClaudeAuthStatus,
+  listClaudeProfiles,
+} from '../lib/claude-profiles.js';
+
+/** システム既定かいずれかの Claude プロファイルがログイン済みか */
+async function isClaudeLoggedIn(): Promise<boolean> {
+  if ((await getClaudeAuthStatus(DEFAULT_CLAUDE_PROFILE)).loggedIn) return true;
+  const profiles = await listClaudeProfiles();
+  const statuses = await Promise.all(profiles.map((p) => getClaudeAuthStatus(p.slug)));
+  return statuses.some((status) => status.loggedIn);
+}
 
 export async function onboardingRoutes(fastify: FastifyInstance) {
   // GET /onboarding/status
   fastify.get('/onboarding/status', async (_request, reply) => {
     try {
-      const globalEnv = await getEnv('global');
-      const hasGlobalToken = Boolean(
-        globalEnv.ANTHROPIC_API_KEY || globalEnv.CLAUDE_CODE_OAUTH_TOKEN
-      );
-      // 実験的機能のローカルLLM（Ollama / LM Studio）を設定済みなら、Anthropic のトークンがなくても claude を起動できる
-      const localLlmReady = await isLocalLlmReady();
+      const [claudeLoggedIn, localLlmReady] = await Promise.all([
+        isClaudeLoggedIn(),
+        // 実験的機能のローカルLLM（Ollama / LM Studio）を設定済みなら、Claude にログインしていなくても claude を起動できる
+        isLocalLlmReady(),
+      ]);
 
       return reply.status(200).send({
-        data: { completed: hasGlobalToken || localLlmReady, hasGlobalToken, localLlmReady },
+        data: { completed: claudeLoggedIn || localLlmReady, claudeLoggedIn, localLlmReady },
       });
     } catch (error) {
       fastify.log.error(error, 'GET /onboarding/status error');

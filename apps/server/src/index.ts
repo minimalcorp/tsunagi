@@ -12,6 +12,7 @@ import { envRoutes } from './routes/env.js';
 import { worktreesRoutes } from './routes/worktrees.js';
 import { commandsRoutes } from './routes/commands.js';
 import { onboardingRoutes } from './routes/onboarding.js';
+import { claudeProfilesRoutes } from './routes/claude-profiles.js';
 import { internalRoutes } from './routes/internal.js';
 import { hooksRoutes } from './routes/hooks.js';
 import { mcpRoutes } from './routes/mcp.js';
@@ -113,6 +114,7 @@ async function start() {
   await fastify.register(worktreesRoutes, { prefix: '/api' });
   await fastify.register(commandsRoutes, { prefix: '/api' });
   await fastify.register(onboardingRoutes, { prefix: '/api' });
+  await fastify.register(claudeProfilesRoutes, { prefix: '/api' });
   await fastify.register(internalRoutes, { prefix: '/api' });
   await fastify.register(hooksRoutes, { prefix: '/api' });
   await fastify.register(mcpRoutes, { prefix: '/api' });

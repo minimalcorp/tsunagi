@@ -158,8 +158,8 @@ When you create a Claude tab, Tsunagi:
 1. Spawns a PTY-backed shell inside the task's worktree using `node-pty`
 2. Injects the environment variables defined in the Tsunagi settings
    page (see [Environment Variables](/en/features/environment-variables/))
-3. Launches Claude Code in that shell with the same credentials Claude
-   Code itself uses (`ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`)
+3. Launches Claude Code in that shell with the repository's
+   [Claude profile](/en/features/claude-profiles/)
 4. Wires Claude's hooks to the Tsunagi backend so the UI can read what
    the session is doing in real time
 

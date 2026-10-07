@@ -1,0 +1,33 @@
+---
+title: Claude プロファイル
+description: 複数の Claude アカウントを使い分け、オーナー・リポジトリ単位で切り替える。
+---
+
+# Claude プロファイル
+
+Tsunagi は Claude Code の [`CLAUDE_CONFIG_DIR`](https://code.claude.com/docs/en/authentication#log-in-with-multiple-accounts) を使って、Claude のアカウント（ログイン・設定・会話履歴）をプロファイルとして使い分けます。トークンの発行・登録は不要です。
+
+## システム既定
+
+何も設定しなければ、普段ターミナルで `claude` を使うときと同じ設定（`~/.claude`）を使います。既に `claude` でログイン済みなら、そのまま Tsunagi を使えます。
+
+## プロファイルを追加する
+
+1. Settings の **Global** を開く
+2. **Claude Profile** の **Add Profile** で名前を入力する（英数字・空白・`-`・`_`）
+3. 開いたターミナルで `claude auth login` が実行されるので、ブラウザで認証する（ブラウザが開かない場合は表示された URL を開き、コードを貼り付ける）
+
+プロファイルは `~/.tsunagi/claude-profiles/<名前>/` に作られます（空白は `-` に、大文字は小文字に変換）。プロファイル同士で設定（settings.json・skills 等）や会話履歴は共有しません。
+
+## 使うプロファイルを選ぶ
+
+**Claude Profile** の選択欄で、スコープごとに使うプロファイルを選びます。
+
+- **Global** — 既定のプロファイル
+- **オーナー / リポジトリ** — 未指定（Inherit）なら親の設定を継承
+
+タスクのタブ（Claude・ターミナルとも）は、そのタスクのリポジトリに対して解決したプロファイルの `CLAUDE_CONFIG_DIR` で起動します。プロファイルを選んだタブでは、`ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` を環境から取り除きます（ログインより優先されてしまうため）。
+
+## 開いているタブへの反映
+
+割り当てを変えると、開いているタブにも自動で反映します（[環境変数管理](/ja/features/environment-variables/) の変更と同じ）。プロファイルを切り替えたタブは、切り替え先のプロファイルに前の会話がないため、新しい会話として始まります。

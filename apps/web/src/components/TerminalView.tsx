@@ -14,7 +14,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { io, type Socket } from 'socket.io-client';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Loader2, Copy, Play, Check, SquarePen } from 'lucide-react';
+import { Loader2, Copy, Play, Check, SquarePen, RefreshCw } from 'lucide-react';
 import { MonacoEditorModal } from '@/components/MonacoEditorModal';
 import { Button } from '@/components/ui/button';
 import { TodoProgressPopover } from '@/components/TodoProgressPopover';
@@ -46,6 +46,8 @@ interface TerminalViewProps {
    */
   launchClaude?: boolean;
   className?: string;
+  /** タブID・Run Claude 等のツールバーを出さない（Claude のログイン用ターミナル等） */
+  hideToolbar?: boolean;
   /** DBから読み込んだ初期Todoリスト */
   initialTodos?: Todo[];
   /** DBから読み込んだ初期Claudeステータス（ページ再訪時にsuccess等を維持するため） */
@@ -77,6 +79,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     env,
     launchClaude = false,
     className = '',
+    hideToolbar = false,
     initialTodos,
     initialClaudeStatus,
     isActive,
@@ -117,6 +120,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const claudeStatusRef = useRef<ClaudeStatus>(initialClaudeStatus ?? 'idle');
   const [todos, setTodos] = useState<Todo[]>(initialTodos ?? []);
   const [copied, setCopied] = useState(false);
+  // tsunagi の環境変数が変わり、PTY の作り直し（反映）待ちの状態。サーバーが env-pending で通知する
+  const [envPending, setEnvPending] = useState(false);
   const { effectiveTheme } = useTheme();
   // onStatusChange をrefで保持（useEffectの依存配列に入れず常に最新を参照）
   const onStatusChangeRef = useRef(onStatusChange);
@@ -644,6 +649,19 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       }
     });
 
+    // 環境変数の変更が未反映か（サーバーが安全なタイミングで PTY を作り直す）
+    socket.on('env-pending', ({ pending }: { sessionId: string; pending: boolean }) => {
+      setEnvPending(pending);
+    });
+
+    // 環境変数の反映のため PTY が作り直された → 新しい PTY に接続し直す
+    socket.on('pty-respawned', () => {
+      setEnvPending(false);
+      // 初回接続として扱い、旧 PTY の画面を消してから新しい PTY の出力を表示する
+      hasConnectedOnceRef.current = false;
+      void reconnectSession();
+    });
+
     // claude hooksからのステータス変更
     socket.on(
       'status-changed',
@@ -701,6 +719,22 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     });
   }, [tabId]);
 
+  // 環境変数の変更を今すぐ反映する（PTY を作り直し、claude は --resume で再開する）
+  async function handleApplyEnv() {
+    try {
+      const res = await fetch(apiUrl(`/api/terminal/sessions/${tabId}/respawn`), {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error(`HTTPエラー: ${res.status}`);
+    } catch (error) {
+      toaster.create({
+        type: 'error',
+        title: '環境変数を反映できません',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   // コマンドはタブの mode に応じてサーバーが組み立てて PTY に書き込む
   async function handleRunClaude() {
     const sid = sessionIdRef.current;
@@ -731,41 +765,56 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     <>
       <div className={`flex flex-col h-full min-h-0 ${className}`}>
         {/* UUID表示バー */}
-        <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0 bg-card">
-          <span className="font-mono text-xs text-muted-foreground" title={tabId}>
-            {shortTabId}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={handleCopyTabId}
-            className="text-muted-foreground hover:text-foreground"
-            title="Copy tab ID"
-          >
-            {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
-          </Button>
-          <Button
-            size="xs"
-            onClick={() => void handleRunClaude()}
-            disabled={!isConnected}
-            title="Run Claude"
-          >
-            <Play className="w-3 h-3" />
-            Run Claude
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setShowEditorModal(true)}
-            disabled={!isConnected}
-            className="text-muted-foreground hover:text-foreground"
-            title="Open editor input"
-          >
-            <SquarePen className="w-3 h-3" />
-            Open Editor
-          </Button>
-          <TodoProgressPopover todos={todos} className="ml-auto" />
-        </div>
+        {!hideToolbar && (
+          <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0 bg-card">
+            <span className="font-mono text-xs text-muted-foreground" title={tabId}>
+              {shortTabId}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={handleCopyTabId}
+              className="text-muted-foreground hover:text-foreground"
+              title="Copy tab ID"
+            >
+              {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+            </Button>
+            <Button
+              size="xs"
+              onClick={() => void handleRunClaude()}
+              disabled={!isConnected}
+              title="Run Claude"
+            >
+              <Play className="w-3 h-3" />
+              Run Claude
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setShowEditorModal(true)}
+              disabled={!isConnected}
+              className="text-muted-foreground hover:text-foreground"
+              title="Open editor input"
+            >
+              <SquarePen className="w-3 h-3" />
+              Open Editor
+            </Button>
+            {envPending && (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => void handleApplyEnv()}
+                disabled={!isConnected}
+                className="text-warning"
+                title="環境変数が変更されました。Claude の応答待ちでない時に自動で反映されます。クリックで今すぐ反映します（ターミナルを再起動し、Claude は会話を再開します）"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Apply env
+              </Button>
+            )}
+            <TodoProgressPopover todos={todos} className="ml-auto" />
+          </div>
+        )}
 
         {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
         <div className="relative flex-1 min-h-0 overflow-hidden">

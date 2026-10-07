@@ -105,11 +105,6 @@ migrationやデータ破壊が発生した場合、最新バックアップか�
 
 `db:restore` は最新のバックアップを自動選択し、現在のDBを `tsunagi.db.broken-<timestamp>` に退避した上で復元する。
 
-## GitHub 操作のルール
-
-- **`gh` コマンドより先に GitHub MCP ツール (`mcp__github__*`) を使用する**
-- worktree 環境では `gh auth` が未設定の場合があるため、MCP 経由の方が確実に動作する
-
 ## Git操作のルール
 
 - **作業完了後に勝手にcommitしない**

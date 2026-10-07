@@ -9,8 +9,13 @@ import { LoadingSpinner } from '../LoadingSpinner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-// Claude Tokens (excluded from variables section)
-const CLAUDE_TOKENS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
+// Claude の認証は Claude Profile で扱うため、汎用の環境変数としては登録させない（サーバーでも拒否する）
+const RESERVED_KEYS = [
+  'ANTHROPIC_API_KEY',
+  'CLAUDE_CODE_OAUTH_TOKEN',
+  'CLAUDE_CONFIG_DIR',
+  'TSUNAGI_CLAUDE_PROFILE',
+];
 
 interface EnvVariableEditorProps {
   selectedNode: SelectedNode;
@@ -39,14 +44,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
         if (!response.ok) throw new Error('Failed to fetch environment variables');
 
         const data = await response.json();
-        const allVars = data.data.envVars || [];
-
-        // Exclude Claude Tokens
-        const filteredVars = allVars.filter(
-          (v: EnvironmentVariable) => !CLAUDE_TOKENS.includes(v.key)
-        );
-
-        setEnvVars(filteredVars);
+        setEnvVars(data.data.envVars || []);
       } catch (err) {
         console.error('Failed to load environment variables:', err);
         setError('Failed to load environment variables');
@@ -59,27 +57,6 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
   }, [selectedNode]);
 
   const handleToggle = async (key: string, enabled: boolean) => {
-    // 必須変数のバリデーション（Global スコープのみ、無効化の場合のみ）
-    if (selectedNode.scope === 'global' && !enabled) {
-      const isClaudeToken = key === 'ANTHROPIC_API_KEY' || key === 'CLAUDE_CODE_OAUTH_TOKEN';
-      if (isClaudeToken) {
-        // 他の有効な Claude Token があるか確認
-        const otherClaudeToken = envVars.find(
-          (v) =>
-            v.key !== key &&
-            (v.key === 'ANTHROPIC_API_KEY' || v.key === 'CLAUDE_CODE_OAUTH_TOKEN') &&
-            v.enabled
-        );
-
-        if (!otherClaudeToken) {
-          alert(
-            'Cannot disable the last enabled Claude Token. Please add or enable another Claude Token first.'
-          );
-          return;
-        }
-      }
-    }
-
     try {
       const response = await fetch(apiUrl('/api/env/toggle'), {
         method: 'PATCH',
@@ -162,9 +139,9 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
       return false;
     }
 
-    // Claude Token除外
-    if (CLAUDE_TOKENS.includes(key)) {
-      setAddError('Claude tokens should be added in the Tokens section');
+    // Claude の認証は Claude Profile で設定する
+    if (RESERVED_KEYS.includes(key)) {
+      setAddError('Claude の認証は Claude Profile で設定してください');
       return false;
     }
 
@@ -217,11 +194,7 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
       const listResponse = await fetch(apiUrl(`/api/env/list?${params}`));
       if (listResponse.ok) {
         const data = await listResponse.json();
-        const allVars = data.data.envVars || [];
-        const filteredVars = allVars.filter(
-          (v: EnvironmentVariable) => !CLAUDE_TOKENS.includes(v.key)
-        );
-        setEnvVars(filteredVars);
+        setEnvVars(data.data.envVars || []);
       }
 
       setIsAdding(false);
