@@ -48,17 +48,6 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     chmod 755 /usr/local/bin/uvx
 USER node
 
-# GitHub MCP Server のインストール
-USER root
-RUN ARCH=$(dpkg --print-architecture) && \
-    VERSION=v0.25.0 && \
-    TARBALL="github-mcp-server_Linux_${ARCH}.tar.gz" && \
-    wget -q "https://github.com/github/github-mcp-server/releases/download/${VERSION}/${TARBALL}" && \
-    tar -xzf "${TARBALL}" -C /usr/local/bin && \
-    rm "${TARBALL}" && \
-    chmod 755 /usr/local/bin/github-mcp-server
-USER node
-
 # Claude Code のインストール（nodeユーザーとして実行）
 RUN curl -fsSL https://claude.ai/install.sh | bash
 

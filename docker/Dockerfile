@@ -37,20 +37,6 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     mv /root/.local/bin/uvx /usr/local/bin/uvx && \
     chmod 755 /usr/local/bin/uvx
 
-# GitHub MCP Server
-RUN ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in \
-      amd64) ARCH=x86_64 ;; \
-      arm64) ARCH=arm64 ;; \
-      *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; \
-    esac && \
-    VERSION=v1.12.2 && \
-    TARBALL="github-mcp-server_Linux_${ARCH}.tar.gz" && \
-    wget -q "https://github.com/github/github-mcp-server/releases/download/${VERSION}/${TARBALL}" && \
-    tar -xzf "${TARBALL}" -C /usr/local/bin && \
-    rm "${TARBALL}" && \
-    chmod 755 /usr/local/bin/github-mcp-server
-
 # SearXNG（ローカルLLMタブのローカル検索）。tsunagi が PATH 上の searxng-run を自動で起動・停止する。
 # PyPI では配布されていないため、固定したコミットのソースから入れる（setup.py が searx を import
 # するので依存を先に入れ、ビルド分離なしでインストールする）

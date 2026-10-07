@@ -17,8 +17,6 @@ services:
     environment:
       # MCP設定
       - MCP_FIGMA_HOSTNAME=host.docker.internal
-      # GitHub MCP用環境変数（ホストから引き継ぎ）
-      - GITHUB_PAT=${GITHUB_PAT}
     ports:
       - '2791:2791'
       - '2792:2792'
