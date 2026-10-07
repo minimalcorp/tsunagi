@@ -5,7 +5,11 @@ import * as http from 'node:http';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import openBrowser from 'open';
-import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle.js';
+import {
+  assertClaudeSupportsPluginDirs,
+  getPluginDir,
+  removeLegacyPluginInstall,
+} from './plugin-lifecycle.js';
 import { acquireSingleInstanceLock } from './single-instance-lock.js';
 
 /**
@@ -123,7 +127,8 @@ runAutoMigrate();
 // ---------------------------------------------------------------------------
 // Phase 2: Plugin lifecycle
 // ---------------------------------------------------------------------------
-ensureCleanPluginState();
+assertClaudeSupportsPluginDirs();
+removeLegacyPluginInstall();
 
 // ---------------------------------------------------------------------------
 // Docs static file server
@@ -245,6 +250,8 @@ const fastifyChild: ChildProcess = spawn(process.execPath, [FASTIFY_ENTRY_JS], {
     ...(outerNodeEnv !== undefined ? { TSUNAGI_OUTER_NODE_ENV: outerNodeEnv } : {}),
     TSUNAGI_SERVER_PORT: PORT,
     TSUNAGI_NEXT_PORT: NEXT_PORT,
+    // PTY の CLAUDE_CODE_PLUGIN_DIRS に渡す（apps/server/src/pty-manager.ts）
+    TSUNAGI_PLUGIN_DIR: getPluginDir(),
     ...(packageVersion ? { TSUNAGI_VERSION: packageVersion } : {}),
   },
 });
@@ -340,16 +347,12 @@ function shutdown(code: number): void {
   }
   docsServer?.close();
 
-  cleanupPluginState();
   cleanupSpinner.stop();
   process.exit(code);
 }
 
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
-process.on('exit', () => {
-  if (!shuttingDown) cleanupPluginState();
-});
 
 fastifyChild.on('exit', (code) => {
   if (!shuttingDown) {

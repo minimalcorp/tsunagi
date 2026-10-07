@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { cleanupPluginState, ensureCleanPluginState } from './plugin-lifecycle.js';
+import {
+  assertClaudeSupportsPluginDirs,
+  getPluginDir,
+  removeLegacyPluginInstall,
+} from './plugin-lifecycle.js';
 
 /**
  * Development wrapper:
- *   1. Install Claude Code plugin (clean install)
+ *   1. Pass the Claude Code plugin dir to the server via TSUNAGI_PLUGIN_DIR
  *   2. Spawn `npm run dev -w @minimalcorp/tsunagi-web` and
  *      `npm run dev -w @minimalcorp/tsunagi-server` concurrently
  *
@@ -18,7 +22,10 @@ if (mode !== 'dev' && mode !== 'start') {
   process.exit(1);
 }
 
-ensureCleanPluginState();
+assertClaudeSupportsPluginDirs();
+removeLegacyPluginInstall();
+// 子プロセス（concurrently → server）に継承させる
+process.env.TSUNAGI_PLUGIN_DIR = getPluginDir();
 
 const webCmd =
   mode === 'dev'
@@ -61,15 +68,11 @@ function shutdown(code: number): void {
     }
   }
 
-  cleanupPluginState();
   process.exit(code);
 }
 
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
-process.on('exit', () => {
-  if (!shuttingDown) cleanupPluginState();
-});
 process.on('uncaughtException', (err) => {
   console.error('[tsunagi] Uncaught exception:', err);
   shutdown(1);

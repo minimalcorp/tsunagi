@@ -43,7 +43,7 @@ Tsunagi は Claude Code の [hooks](https://docs.claude.com/en/docs/claude-code/
 
 ## MCP サーバー
 
-Tsunagi はタスク管理を [MCP (Model Context Protocol) サーバー](https://docs.claude.com/en/docs/claude-code/mcp) として公開しています。これにより **Claude 自身が Tsunagi を呼び出して** タスクの作成・更新・並び替え・削除ができます。Tsunagi の MCP サーバーは Claude Code plugin としてバンドルされています (起動時に install される marketplace と plugin がそれです)。
+Tsunagi はタスク管理を [MCP (Model Context Protocol) サーバー](https://docs.claude.com/en/docs/claude-code/mcp) として公開しています。これにより **Claude 自身が Tsunagi を呼び出して** タスクの作成・更新・並び替え・削除ができます。Tsunagi の MCP サーバーは Claude Code plugin としてバンドルされています (Tsunagi の内部ターミナルで起動した Claude Code が読み込む plugin がそれです)。
 
 提供される MCP ツールには以下があります:
 
@@ -58,17 +58,17 @@ Tsunagi はタスク管理を [MCP (Model Context Protocol) サーバー](https:
 
 ## Claude Code plugin
 
-Tsunagi が起動すると、バンドルされた marketplace から `tsunagi-plugin` という Claude Code plugin を install します。この plugin が登録するもの:
+Tsunagi の内部ターミナルで起動した Claude Code は、同梱の `tsunagi-plugin` という Claude Code plugin を `CLAUDE_CODE_PLUGIN_DIRS` でセッション単位に読み込みます。この plugin が登録するもの:
 
 - 上記の MCP サーバー
 - skills (Claude が Tsunagi の中で正しく振る舞うためのヘルパー)
 - agent 定義 (`tsunagi-task-curator`) — タスク棚卸しワークフロー用
 
-Tsunagi の install / uninstall は公式の `claude` CLI のみを使います——`~/.claude/settings.json` を直接編集することはありません。
+Claude Code の設定には install しないので、Tsunagi の外で起動した Claude Code には影響しません。
 
 ## 単一インスタンス
 
-Tsunagi は同時に1プロセスしか起動できません。これは `~/.tsunagi/state/tsunagi.lock` の PID lock ファイルで保証されています。plugin のライフサイクル (起動時 install / 終了時 uninstall) と worktree の状態が race condition を起こすのを防ぐためです。
+Tsunagi は同時に1プロセスしか起動できません。これは `~/.tsunagi/state/tsunagi.lock` の PID lock ファイルで保証されています。worktree やデータベースの状態が race condition を起こすのを防ぐためです。
 
 ## 次は
 

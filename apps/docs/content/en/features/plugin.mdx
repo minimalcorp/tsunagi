@@ -9,7 +9,7 @@ import { Callout } from 'nextra/components';
 
 Tsunagi ships its own Claude Code plugin — a bundle that includes an
 **MCP server**, a **skill**, a **curator agent**, and **hook handlers** —
-and installs it automatically when Tsunagi starts. This plugin is what
+and loads it automatically into Claude Code started in Tsunagi's terminals. This plugin is what
 makes Tsunagi's tight integration with Claude possible: it lets Claude
 read and write Tsunagi's task state, teaches Claude when to change task
 status, and streams Claude's activity back into the Tsunagi UI in real
@@ -79,39 +79,23 @@ terminal output you see in the Tsunagi UI.
 
 ## Lifecycle
 
-Tsunagi installs and uninstalls the plugin automatically as part of its
-startup and shutdown sequences. You never run `claude plugin install`
-yourself.
+When Tsunagi spawns an internal terminal, it appends the bundled plugin
+directory to the
+[`CLAUDE_CODE_PLUGIN_DIRS`](https://code.claude.com/docs/en/env-vars)
+environment variable. Claude Code started in that terminal loads the
+plugin for the session only, the same way `--plugin-dir` does. You never
+run `claude plugin install` yourself.
 
-### On startup
-
-1. Tsunagi detects any leftover Tsunagi plugin from a previous run
-   (e.g., if the previous process crashed) and removes it
-2. Runs `claude plugin marketplace add <bundled marketplace dir>`
-3. Runs `claude plugin install tsunagi-plugin@tsunagi-marketplace --scope user`
-4. Proceeds to start the Fastify and Next.js servers
-
-The clean-install on every startup guarantees the plugin's version
-always matches the running Tsunagi process. There's no version drift to
-worry about.
-
-### On shutdown
-
-1. `claude plugin uninstall tsunagi-plugin@tsunagi-marketplace`
-2. `claude plugin marketplace remove tsunagi-marketplace`
-3. Tsunagi exits
-
-### After a crash
-
-If Tsunagi crashes before it can run its shutdown sequence, the plugin
-and marketplace entries may remain in Claude Code. The next time you
-start Tsunagi, the clean-install sequence above will detect them and
-reinstall from scratch — no manual recovery needed.
+- Nothing is installed into your Claude Code settings, so there is no
+  shutdown cleanup, and a crash leaves no plugin registration behind.
+- Claude Code started outside Tsunagi does not load the plugin.
+- Requires Claude Code **v2.1.280 or later**. With an older version,
+  Tsunagi exits at startup with an error (run `claude update`).
 
 <Callout type="info">
-  Tsunagi performs install / uninstall **only** through the official `claude` CLI (`claude plugin
-  marketplace add/remove` and `claude plugin install/uninstall`). It never edits
-  `~/.claude/settings.json` or any other Claude Code internal file directly.
+  Older Tsunagi versions installed the plugin with `claude plugin install --scope user`. On the
+  first launch of a newer version, Tsunagi removes any remaining
+  `tsunagi-plugin@tsunagi-marketplace` and `tsunagi-marketplace` once, through the `claude` CLI.
 </Callout>
 
 ## Why the plugin is bundled
@@ -119,6 +103,6 @@ reinstall from scratch — no manual recovery needed.
 You might wonder why the plugin isn't published to a public marketplace
 for users to install manually. The answer is version safety: Tsunagi's
 backend and the plugin's MCP tool schemas must match exactly. Bundling
-the plugin with the Tsunagi npm package and installing it at startup
-ensures you never run into schema mismatches from a stale plugin
-installation.
+the plugin with the Tsunagi npm package and loading it from the running
+Tsunagi's own directory ensures you never run into schema mismatches from
+a stale plugin installation.

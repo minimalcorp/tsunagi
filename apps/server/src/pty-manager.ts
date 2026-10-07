@@ -6,7 +6,7 @@ const SESSION_GC_INTERVAL_MS = 30 * 60 * 1000; // 30分
 
 /**
  * apps/cli が Fastify サーバー起動時に自分で注入する環境変数
- * （TSUNAGI_SERVER_PORT, NODE_ENV, TSUNAGI_NEXT_PORT, TSUNAGI_OUTER_NODE_ENV）。
+ * （TSUNAGI_SERVER_PORT, NODE_ENV, TSUNAGI_NEXT_PORT, TSUNAGI_OUTER_NODE_ENV, TSUNAGI_PLUGIN_DIR）。
  * サーバープロセス自身の制御用に後から足された値のため、内部ターミナルには継承しない。
  * 外側 Terminal 由来の環境変数はこのリストと無関係に、これまで通り全て継承する
  * （PORT はここでは扱わない。apps/cli は generic な PORT を上書きせず、専用キー
@@ -23,7 +23,21 @@ const TSUNAGI_INJECTED_ENV_KEYS = [
   'NODE_ENV',
   'TSUNAGI_NEXT_PORT',
   'TSUNAGI_OUTER_NODE_ENV',
+  'TSUNAGI_PLUGIN_DIR',
 ];
+
+/**
+ * tsunagi の Claude Code プラグイン（hooks・MCP・skill）を、内部ターミナルで起動する claude に
+ * セッション単位で読み込ませる。ユーザー設定にはインストールしないため、tsunagi 外の claude には
+ * 影響しない。外側 Terminal や DB で CLAUDE_CODE_PLUGIN_DIRS が設定済みなら、その後ろに追加する。
+ */
+function addTsunagiPluginDir(env: Record<string, string | undefined>): void {
+  const pluginDir = process.env.TSUNAGI_PLUGIN_DIR;
+  if (!pluginDir) return;
+  const dirs = (env.CLAUDE_CODE_PLUGIN_DIRS ?? '').split(':').filter(Boolean);
+  if (!dirs.includes(pluginDir)) dirs.push(pluginDir);
+  env.CLAUDE_CODE_PLUGIN_DIRS = dirs.join(':');
+}
 
 export interface PtySession {
   pty: pty.IPty;
@@ -97,6 +111,7 @@ class PtyManager {
     for (const key of unsetKeys) {
       delete spawnEnv[key];
     }
+    addTsunagiPluginDir(spawnEnv);
 
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',

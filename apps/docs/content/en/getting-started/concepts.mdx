@@ -62,7 +62,7 @@ Tsunagi exposes its task management as an
 [MCP (Model Context Protocol) server](https://docs.claude.com/en/docs/claude-code/mcp).
 That means **Claude itself can call into Tsunagi** to create, update,
 reorder, and delete tasks. The Tsunagi MCP server is bundled as a Claude
-Code plugin (the marketplace and plugin install you see during startup).
+Code plugin, loaded by Claude Code started in Tsunagi's terminals.
 
 The MCP tools include:
 
@@ -78,23 +78,23 @@ Together they let you (or Claude) treat Tsunagi as the source of truth for
 
 ## The Claude Code plugin
 
-When Tsunagi starts, it installs a Claude Code plugin called
-`tsunagi-plugin` from a bundled marketplace. This plugin registers:
+Claude Code started in Tsunagi's internal terminals loads the bundled
+`tsunagi-plugin` for the session through `CLAUDE_CODE_PLUGIN_DIRS`. This
+plugin registers:
 
 - The MCP server above
 - A set of skills (helpers Claude can read to behave correctly inside
   Tsunagi)
 - An agent definition (`tsunagi-task-curator`) for task triage workflows
 
-Tsunagi performs install / uninstall via the official `claude` CLI only —
-it never edits `~/.claude/settings.json` directly.
+Nothing is installed into your Claude Code settings, so Claude Code
+started outside Tsunagi is unaffected.
 
 ## Single instance
 
 Only one Tsunagi process can run at a time, enforced by a PID lock file at
-`~/.tsunagi/state/tsunagi.lock`. This is required because the plugin
-lifecycle (install on start, uninstall on stop) and the worktree state
-would race otherwise.
+`~/.tsunagi/state/tsunagi.lock`. This is required because the worktree and
+database state would race otherwise.
 
 ## What's next
 
