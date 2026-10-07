@@ -27,12 +27,6 @@ export type { Todo };
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
 export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
 
-// Ink の <Static> を再 emit させるため、xterm + PTY を一時的にこの幅に揃える。
-// 一定の幅を下回ると Ink が full-frame redraw を行い Static が再描画されるという
-// 観測に基づくしきい値。元 cols が既にこの値の場合のみ -1 にして必ず cols を変化させ、
-// SIGWINCH を発火させる。
-const COLS_RESET_SIZE = 64;
-
 interface TerminalViewProps {
   /** タブID（PTYのsessionIdと一致させる）。必須。 */
   tabId: string;
@@ -102,7 +96,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const statusRef = useRef<TerminalStatus>('idle');
   // 初回接続かどうかを追跡（再接続時のフォーカス復帰判定用）
   const hasConnectedOnceRef = useRef(false);
-  // reused接続時、リングバッファ受信後にsendResize()するまでuseEffectからのsendResizeを抑制
+  // 接続後、replay（リングバッファ）を書き終えて sendResize() するまで useEffect / ResizeObserver からの sendResize を抑制
   const suppressResizeRef = useRef(false);
   // term.onData の購読。connectSocket のたびに張り直すため dispose を保持して解放漏れを防ぐ。
   const onDataDisposeRef = useRef<{ dispose: () => void } | null>(null);
@@ -112,6 +106,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const healthCheckAckHandlerRef = useRef<(() => void) | null>(null);
   // サーバ側セッションが GC 済みで join に失敗した際の自動再生成回数（無限ループ防止）
   const sessionRecreateRef = useRef(0);
+  // マウント中の接続処理（connectSession）を unmount 時に中断するための AbortController。
+  // 再接続（reconnectSession）もこれを使い、unmount 後に socket が作られて残るのを防ぐ。
+  const mountAbortRef = useRef<AbortController | null>(null);
   const [status, setStatus] = useState<TerminalStatus>('idle');
   // セッション作成APIが返したエラー（例: Ollama のモデル未設定）。error オーバーレイに表示する
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -185,7 +182,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   useEffect(() => {
     if (status === 'connected' && fitAddonRef.current) {
       fitAddonRef.current.fit();
-      // reused時はリングバッファ受信後（firstMessageHandled）にsendResizeするため、ここでは抑制
+      // replay 受信後に sendResize するため、それまでは抑制
       if (!suppressResizeRef.current) {
         sendResize();
       }
@@ -300,7 +297,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       // main buffer のログエリアが消える問題を回避する。
       if (isExternalEditorOpenRef.current) return;
       fitAddon.fit();
-      // reused接続中はリングバッファ受信前にsendResizeしない（suppressResizeRefで制御）
+      // replay 受信前は sendResize しない（suppressResizeRef で制御）
       if (!suppressResizeRef.current) {
         sendResize();
       }
@@ -310,11 +307,13 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // AbortController をエフェクトのローカルスコープで作成
     // cleanup で abort() を呼ぶことで in-flight な fetch を実際にキャンセルする
     const abortController = new AbortController();
+    mountAbortRef.current = abortController;
 
     connectSession(tabId, term, abortController.signal);
 
     return () => {
       abortController.abort();
+      mountAbortRef.current = null;
       observer.disconnect();
       container.removeEventListener('compositionend', onCompositionEndCapture, true);
       container.removeEventListener('touchstart', onTouchStart);
@@ -515,33 +514,29 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         } catch {
           // JSON でなければ表示用メッセージは出さない
         }
-        if (serverError) setSessionError(serverError);
+        if (serverError && !signal.aborted) setSessionError(serverError);
         throw new Error(`Failed to create session: ${res.status} ${errorText}`);
       }
 
-      const body = (await res.json()) as { sessionId: string; reused: boolean };
+      const body = (await res.json()) as { sessionId: string };
 
       // await 後にキャンセル済みかチェック（StrictMode の cleanup 等による中断）
       if (signal.aborted) return;
 
       sessionIdRef.current = body.sessionId;
 
-      // 新規セッションのみ画面をクリア（reused の場合はリングバッファで復元するため触らない）
-      if (!body.reused) {
-        clearTerminalDisplay(term);
-      }
-
-      connectSocket(body.sessionId, body.reused, term, signal);
+      connectSocket(body.sessionId, term, signal);
     } catch (err) {
-      // AbortError はクリーンアップによる正常なキャンセル → エラーとして扱わない
-      if (err instanceof Error && err.name === 'AbortError') return;
+      // クリーンアップによる正常なキャンセル → エラーとして扱わない
+      // （abort 後に応答本文の読み取り等で AbortError 以外が投げられる場合も含む）
+      if (signal.aborted) return;
       const message = err instanceof Error ? err.message : String(err);
       console.error('[TerminalView] connectSession error:', message);
       setStatus('error');
     }
   }
 
-  function connectSocket(sessionId: string, reused: boolean, term: Terminal, signal: AbortSignal) {
+  function connectSocket(sessionId: string, term: Terminal, signal: AbortSignal) {
     // 再接続（reconnectSession 等）で connectSocket が再呼び出しされた場合、
     // 旧 socket と旧 onData 購読を必ず破棄してからやり直す。
     // これを怠ると旧 socket が Socket.IO の自動再接続で生き返り、
@@ -558,24 +553,15 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // ため、認証付き公開時は polling(XHR) でないと接続できない。デスクトップは WS に昇格。
     const socket = io(getServerUrl(), { transports: ['polling', 'websocket'] });
     socketRef.current = socket;
-    // reused時: 最初のoutputイベント（リングバッファ）受信後にリサイズを再送する
-    let firstMessageHandled = false;
 
     socket.on('connect', () => {
       const isReconnect = hasConnectedOnceRef.current;
       hasConnectedOnceRef.current = true;
 
-      if (isReconnect) {
-        // 再接続時: reusedフラグに関係なくroom再参加のみ行う
-        term.writeln('\x1b[90mReconnected.\x1b[0m');
-      } else if (reused) {
-        // 初回接続 + reused: リングバッファ受信後にリサイズする
-        suppressResizeRef.current = true;
-        clearTerminalDisplay(term);
-      } else {
-        // 初回接続 + 新規
-        term.writeln('\x1b[90mConnected.\x1b[0m');
-      }
+      // join のたびにサーバーから replay が届く（初回接続・再接続を問わない）。
+      // replay を書き終えるまで resize を送らない。
+      // 「Connected.」等の行は書き込まない（Claude(Ink) の想定するカーソル位置がずれるため）。
+      suppressResizeRef.current = true;
       setStatus('connected');
       // 接続成功 → セッション自動再生成カウンタをリセット
       sessionRecreateRef.current = 0;
@@ -589,34 +575,24 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       }
     });
 
+    // 画面復元: 既存の表示に重ねず、クリアしてから replay する。
+    // xterm を PTY と同じサイズにしてから書き込むことで、Claude(Ink) が描いた幅と
+    // 表示の幅を一致させる。書き終えたら実サイズへ resize し、サイズが変われば
+    // SIGWINCH で Claude が現在の画面を描き直す（サーバーは切断時に PTY の cols を
+    // 縮めておくため、再表示時は通常サイズが変わる）。
+    socket.on('replay', ({ data, cols, rows }: { data: string; cols: number; rows: number }) => {
+      clearTerminalDisplay(term);
+      term.resize(cols, rows);
+      term.write(data, () => {
+        suppressResizeRef.current = false;
+        fitAddonRef.current?.fit();
+        sendResize();
+        term.scrollToBottom();
+      });
+    });
+
     socket.on('output', ({ data }: { data: string }) => {
-      if (reused && !firstMessageHandled) {
-        firstMessageHandled = true;
-        // リングバッファを書き込み、完了コールバックでsendResizeする。
-        term.write(data, () => {
-          suppressResizeRef.current = false;
-          fitAddonRef.current?.fit();
-          // 一時的に xterm + PTY を COLS_RESET_SIZE に揃える bump で SIGWINCH を発火させ、
-          // Claude (Ink) の内部状態を fresh な xterm 状態と再同期させる。
-          // 同一サイズの resize は PTY 側で no-op となり SIGWINCH が飛ばないため、
-          // ページ遷移後にカーソル位置がずれる問題を解消する。
-          // 「xterm と PTY を同時に同じ値に resize する」
-          // 対称パターンを使い、dimension mismatch を避ける。
-          const t = termRef.current;
-          if (t) {
-            const bumpCols = t.cols === COLS_RESET_SIZE ? COLS_RESET_SIZE - 1 : COLS_RESET_SIZE;
-            t.resize(bumpCols, t.rows);
-            sendResize();
-            setTimeout(() => {
-              fitAddonRef.current?.fit();
-              sendResize();
-            }, 50);
-          }
-          term.scrollToBottom();
-        });
-      } else {
-        term.write(data);
-      }
+      term.write(data);
     });
 
     socket.on('exit', ({ exitCode }: { exitCode: number }) => {
@@ -657,7 +633,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // 環境変数の反映のため PTY が作り直された → 新しい PTY に接続し直す
     socket.on('pty-respawned', () => {
       setEnvPending(false);
-      // 初回接続として扱い、旧 PTY の画面を消してから新しい PTY の出力を表示する
+      // 初回接続として扱う（旧 PTY の画面は replay 受信時にクリアされる）
       hasConnectedOnceRef.current = false;
       void reconnectSession();
     });
@@ -706,9 +682,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
   async function reconnectSession() {
     const term = termRef.current;
-    if (!term) return;
-    // 手動再接続は unmount を待たないため、独立した AbortController を使用
-    const abortController = new AbortController();
+    const abortController = mountAbortRef.current;
+    if (!term || !abortController) return;
+    // マウント中の AbortController を使い、unmount されたら接続処理を中断する
     await connectSession(tabId, term, abortController.signal);
   }
 
@@ -818,7 +794,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
         {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
         <div className="relative flex-1 min-h-0 overflow-hidden">
-          <div ref={containerRef} className="w-full h-full" style={{ padding: '4px' }} />
+          {/* FitAddon は親要素の padding を差し引かないため、padding は fit 対象の外側に付ける */}
+          <div className="w-full h-full p-1">
+            <div ref={containerRef} className="w-full h-full" />
+          </div>
 
           {/* 接続中オーバーレイ: connected になると消える */}
           {isConnecting && (

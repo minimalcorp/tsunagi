@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { TabMode } from '@minimalcorp/tsunagi-shared';
-import { ptyManager } from '../pty-manager.js';
+import { ptyManager, type PtySession } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
 import { ensureActiveLoaded } from '../lib/local-llm.js';
 import { buildClaudeCommand, isLocalLlmMode } from '../lib/claude-command.js';
@@ -41,6 +41,28 @@ function stripTerminalQueries(s: string): string {
     .replace(/\x1b\[[?>=]?[0-9;]*c/g, ''); // DA: ESC[c / ESC[0c / ESC[>c / ESC[=c
 }
 
+/**
+ * 表示中のクライアントがいなくなった PTY の cols をこの幅に縮める。
+ * 一定の幅を下回ると Claude(Ink) が full-frame redraw を行い <Static> を再 emit するという
+ * 観測に基づくしきい値。元 cols が既にこの値の場合のみ -1 にして必ず cols を変化させる。
+ *
+ * 再表示時は replay 後にクライアントが実サイズへ resize するため、必ず cols が変わり
+ * SIGWINCH が飛んで Claude が現在の画面を描き直す（同一サイズの resize は no-op で
+ * SIGWINCH が飛ばない）。縮める処理を切断時に済ませておくことで、縮めた時の再描画が
+ * 再表示より前に scrollback に入り、replay と描き直しの順序がタイミングに依存しない。
+ */
+const REDRAW_BUMP_COLS = 64;
+
+function bumpColsForRedraw(session: PtySession): void {
+  const { pty: ptyProcess } = session;
+  const cols = ptyProcess.cols === REDRAW_BUMP_COLS ? REDRAW_BUMP_COLS - 1 : REDRAW_BUMP_COLS;
+  try {
+    ptyProcess.resize(cols, ptyProcess.rows);
+  } catch {
+    // 終了済みの PTY は無視する
+  }
+}
+
 interface CreateSessionBody {
   cwd?: string;
   env?: Record<string, string>;
@@ -61,6 +83,11 @@ interface CreateSessionBody {
 
 export async function terminalRoutes(fastify: FastifyInstance) {
   const io = (fastify as FastifyWithIO).io;
+  // 作成中のセッション（sessionId → 作成処理）。存在確認から PTY 作成までの間に await を挟むため、
+  // 同じ sessionId の作成要求が並行すると両方が存在確認を通過し、後発が "Session already exists" で
+  // 失敗する（開発時の StrictMode による effect の二重実行で必ず起きる）。後発は作成中の処理を待って
+  // 再利用として返す。
+  const pendingCreations = new Map<string, Promise<void>>();
   initPtyEnvSync(io);
 
   // socket.io イベントハンドラ
@@ -127,16 +154,19 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       const { pty: ptyProcess } = session;
       const isReused = session.scrollback.length > 0;
 
-      // リングバッファの内容を一括送信（再接続時の画面復元）
-      if (isReused) {
-        // 端末クエリ列（ESC[?6n / ESC[c 等）を除去してから replay する。
-        // これを怠ると xterm.js が応答を生成し PTY へ注入され、入力欄に "1;2c64;3R..." が
-        // 勝手に入力される（stripTerminalQueries のコメント参照）。
-        const buffered = stripTerminalQueries(session.scrollback.join(''));
+      // リングバッファの内容を一括送信（画面復元）。初回接続・再接続を問わず join のたびに送る。
+      // クライアントは replay を受けたら画面をクリアし、xterm を PTY と同じサイズにしてから
+      // 書き込み、完了後に実サイズへ resize する（新規セッションは data が空）。
+      // 端末クエリ列（ESC[?6n / ESC[c 等）を除去してから replay する。
+      // これを怠ると xterm.js が応答を生成し PTY へ注入され、入力欄に "1;2c64;3R..." が
+      // 勝手に入力される（stripTerminalQueries のコメント参照）。
+      const buffered = isReused ? stripTerminalQueries(session.scrollback.join('')) : '';
+      socket.emit('replay', {
         // 末尾の \r\n / \n / \r をトリムする。
-        const trimmed = buffered.replace(/[\r\n]+$/, '');
-        socket.emit('output', { data: trimmed });
-      }
+        data: buffered.replace(/[\r\n]+$/, ''),
+        cols: ptyProcess.cols,
+        rows: ptyProcess.rows,
+      });
 
       // reused の場合、最初の resize まで onData 出力をバッファリング
       let initialResizeHandled = !isReused;
@@ -225,6 +255,10 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         ptyManager.clearActiveSocket(boundSessionId, socket.id);
         if (wasOwner) {
           ptyManager.scheduleGc(boundSessionId);
+          // 次に表示されたとき Claude に描き直させるため、表示中のクライアントがいない間に
+          // cols を縮めておく（REDRAW_BUMP_COLS 参照）
+          const session = ptyManager.getSession(boundSessionId);
+          if (session) bumpColsForRedraw(session);
         }
       }
     });
@@ -248,14 +282,29 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(200).send({ sessionId, reused: true });
     }
 
-    const launchRequest = { cwd, env };
+    const pending = pendingCreations.get(sessionId);
+    const creation =
+      pending ??
+      (async () => {
+        const launchRequest = { cwd, env };
+        const launch = await resolvePtyLaunch(sessionId, launchRequest);
+        await startPtySession(sessionId, launch, {
+          request: launchRequest,
+          launchClaude: Boolean(claude),
+          command,
+        });
+      })();
+    if (!pending) {
+      pendingCreations.set(sessionId, creation);
+      void creation.catch(() => undefined).finally(() => pendingCreations.delete(sessionId));
+    }
+
     try {
-      const launch = await resolvePtyLaunch(sessionId, launchRequest);
-      await startPtySession(sessionId, launch, {
-        request: launchRequest,
-        launchClaude: Boolean(claude),
-        command,
-      });
+      await creation;
+      if (pending) {
+        fastify.log.info({ sessionId }, 'Reusing PTY session created by a concurrent request');
+        return reply.status(200).send({ sessionId, reused: true });
+      }
       return reply.status(201).send({ sessionId, reused: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
