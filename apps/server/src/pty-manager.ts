@@ -81,6 +81,11 @@ export interface PtySession {
   gcTimer: ReturnType<typeof setInterval> | null;
 }
 
+export interface TerminalSize {
+  cols: number;
+  rows: number;
+}
+
 class PtyManager {
   private sessions = new Map<string, PtySession>();
   /** sessionId → 最後に input を送信した socket.id */
@@ -98,6 +103,36 @@ class PtyManager {
     if (this.activeSocketIds.get(sessionId) === socketId) {
       this.activeSocketIds.delete(sessionId);
     }
+  }
+
+  /** sessionId → (socket.id → その socket の xterm サイズ)。挿入順 = 最後に resize/claim した順 */
+  private terminalSizes = new Map<string, Map<string, TerminalSize>>();
+
+  setTerminalSize(sessionId: string, socketId: string, size: TerminalSize): void {
+    let sizes = this.terminalSizes.get(sessionId);
+    if (!sizes) {
+      sizes = new Map();
+      this.terminalSizes.set(sessionId, sizes);
+    }
+    // 末尾に移して「最後に使われた socket」を末尾で表す
+    sizes.delete(socketId);
+    sizes.set(socketId, size);
+  }
+
+  /** socket の登録を外し、残っている socket のうち最後に使われたものを返す */
+  removeTerminalSocket(
+    sessionId: string,
+    socketId: string
+  ): { socketId: string; size: TerminalSize } | undefined {
+    const sizes = this.terminalSizes.get(sessionId);
+    if (!sizes) return undefined;
+    sizes.delete(socketId);
+    const last = Array.from(sizes.entries()).at(-1);
+    if (!last) {
+      this.terminalSizes.delete(sessionId);
+      return undefined;
+    }
+    return { socketId: last[0], size: last[1] };
   }
 
   /**

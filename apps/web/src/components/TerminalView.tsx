@@ -447,6 +447,22 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     };
   }, []);
 
+  // 同一タスクを複数ウィンドウで開いた場合、PTY のサイズと入力の所有権はフォアグラウンドの
+  // ウィンドウを優先する。フォアグラウンドに戻ったら claim し、PTY をこの xterm のサイズに合わせる
+  // （他のウィンドウのサイズで描かれた Claude の表示が、SIGWINCH で描き直される）。
+  useEffect(() => {
+    function handleForeground() {
+      if (document.visibilityState !== 'visible') return;
+      sendClaim();
+    }
+    window.addEventListener('focus', handleForeground);
+    document.addEventListener('visibilitychange', handleForeground);
+    return () => {
+      window.removeEventListener('focus', handleForeground);
+      document.removeEventListener('visibilitychange', handleForeground);
+    };
+  }, []); // sendClaim は ref を参照するため依存不要
+
   /**
    * ESC中断をサーバに通知する。Claude CLIはESC中断時にStop/SessionEndを発火しないため、
    * クライアント側でESC押下を検知してtab.statusをidleに戻す。
@@ -465,6 +481,16 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     const sid = sessionIdRef.current;
     if (!socket || !socket.connected || !term || !sid) return;
     socket.emit('resize', { sessionId: sid, cols: term.cols, rows: term.rows });
+  }
+
+  function sendClaim() {
+    const socket = socketRef.current;
+    const term = termRef.current;
+    const sid = sessionIdRef.current;
+    if (!socket || !socket.connected || !term || !sid) return;
+    // replay 適用前（join 時点で所有者になる）とエディタセッション中は resize と同様に送らない
+    if (suppressResizeRef.current || isExternalEditorOpenRef.current) return;
+    socket.emit('claim', { sessionId: sid, cols: term.cols, rows: term.rows });
   }
 
   // 外部からPTYに書き込むためのハンドル

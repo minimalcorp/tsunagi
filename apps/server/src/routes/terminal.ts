@@ -115,6 +115,10 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         return;
       }
 
+      // 別セッションへ join し直した場合は、前のセッションのサイズ登録を外す
+      if (boundSessionId && boundSessionId !== sessionId) {
+        ptyManager.removeTerminalSocket(boundSessionId, socket.id);
+      }
       boundSessionId = sessionId;
 
       const session = ptyManager.getSession(sessionId);
@@ -131,6 +135,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       dataHandlerDispose = null;
       exitHandlerDispose = null;
       socket.removeAllListeners('resize');
+      socket.removeAllListeners('claim');
       socket.removeAllListeners('input');
 
       socket.join(room);
@@ -203,12 +208,17 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       });
       exitHandlerDispose = () => exitHandler.dispose();
 
-      // resize イベント: PTYリサイズ
+      // resize イベント: この socket のサイズを記録し、所有者 socket の場合のみ PTY へ反映する。
+      // 同一タスクを複数ウィンドウで開いた場合に、フォアグラウンドでない側のサイズで
+      // PTY が変わり Claude の表示幅がずれるのを防ぐ（所有者の切り替えは claim で行う）。
       socket.on(
         'resize',
         ({ sessionId: sid, cols, rows }: { sessionId: string; cols: number; rows: number }) => {
           if (sid !== sessionId) return;
-          ptyProcess.resize(cols, rows);
+          ptyManager.setTerminalSize(sessionId, socket.id, { cols, rows });
+          if (ptyManager.getActiveSocket(sessionId) === socket.id) {
+            ptyProcess.resize(cols, rows);
+          }
 
           // reused時: 初回 resize 後にバッファリングしていた出力をフラッシュ
           if (!initialResizeHandled) {
@@ -218,6 +228,20 @@ export async function terminalRoutes(fastify: FastifyInstance) {
               pendingOutput.length = 0;
               socket.emit('output', { data: flushed });
             }
+          }
+        }
+      );
+
+      // claim イベント: フォアグラウンドになった socket が所有者になり、PTY を自分のサイズに合わせる。
+      // サイズが変われば SIGWINCH で Claude が描き直す。
+      socket.on(
+        'claim',
+        ({ sessionId: sid, cols, rows }: { sessionId: string; cols: number; rows: number }) => {
+          if (sid !== sessionId) return;
+          ptyManager.setTerminalSize(sessionId, socket.id, { cols, rows });
+          ptyManager.setActiveSocket(sessionId, socket.id);
+          if (ptyProcess.cols !== cols || ptyProcess.rows !== rows) {
+            ptyProcess.resize(cols, rows);
           }
         }
       );
@@ -253,7 +277,18 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         // 遅延切断では GC を張らない（現役セッションが誤って GC 対象になるのを防ぐ）。
         const wasOwner = ptyManager.getActiveSocket(boundSessionId) === socket.id;
         ptyManager.clearActiveSocket(boundSessionId, socket.id);
-        if (wasOwner) {
+        const next = ptyManager.removeTerminalSocket(boundSessionId, socket.id);
+        if (wasOwner && next) {
+          // 同じ PTY を表示している socket が残っている → 最後に使われた socket に所有権と
+          // サイズを引き継ぐ（表示中なので GC も cols の縮小も行わない）
+          ptyManager.setActiveSocket(boundSessionId, next.socketId);
+          const session = ptyManager.getSession(boundSessionId);
+          try {
+            session?.pty.resize(next.size.cols, next.size.rows);
+          } catch {
+            // 終了済みの PTY は無視する
+          }
+        } else if (wasOwner) {
           ptyManager.scheduleGc(boundSessionId);
           // 次に表示されたとき Claude に描き直させるため、表示中のクライアントがいない間に
           // cols を縮めておく（REDRAW_BUMP_COLS 参照）
