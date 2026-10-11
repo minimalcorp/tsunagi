@@ -68,6 +68,11 @@ Tsunagi は内部ターミナルを起動するときに、環境変数 [`CLAUDE
   `tsunagi-marketplace` を `claude` CLI で1度だけ削除します。
 </Callout>
 
+<Callout type="info">
+  Codex のタブにはプラグインの代わりに、同じ MCP server・skill・curator agent・hook
+  を起動時の引数で渡します （[Codex](/ja/features/codex/) 参照）。
+</Callout>
+
 ## なぜプラグインはバンドルされているのか
 
 「なぜプラグインを公開 marketplace に publish してユーザーに手動 install させないのか?」と思うかもしれません。答えはバージョン安全性です。Tsunagi のバックエンドとプラグインの MCP ツールスキーマは正確に一致している必要があります。プラグインを Tsunagi の npm パッケージに同梱し、実行中の Tsunagi のディレクトリから読み込ませることで、古いプラグインによるスキーマの不整合が発生する心配がなくなります。

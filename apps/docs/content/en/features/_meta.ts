@@ -5,6 +5,7 @@ export default {
   plugin: 'Tsunagi Plugin',
   'environment-variables': 'Environment Variables',
   'claude-profiles': 'Claude Profiles',
+  codex: 'Codex',
   'local-llm': 'Local LLM (Experimental)',
   ollama: 'Ollama',
   'lm-studio': 'LM Studio',

@@ -1,0 +1,47 @@
+---
+title: Codex
+description: Claude Code の代わりに Codex CLI をタスクのタブで使う。
+---
+
+# Codex
+
+タスクのタブで、Claude Code の代わりに [Codex CLI](https://developers.openai.com/codex/cli)（`codex`）を起動できます。ChatGPT のプランでログインした Codex を、Claude Code のタブと同じようにステータス表示・進捗表示・タスク管理と連携して使えます。
+
+## 前提
+
+- `codex` コマンドが `PATH` 上にあり、**v0.162.0 以降** であること
+- Tsunagi は `claude` と `codex` のどちらか一方があれば起動します。`codex` が入っていればタスク画面に Codex タブの作成ボタンが出ます
+
+## ログインとプロファイル
+
+何も設定しなければ、普段ターミナルで `codex` を使うときと同じ設定（`~/.codex`）を使います。既に `codex login` 済みならそのまま使えます。
+
+未ログインの場合や、アカウントを使い分ける場合は Settings の **Global** → **Codex Profile** で操作します（[Claude プロファイル](/ja/features/claude-profiles/) と同じ仕組みで、`CODEX_HOME` を切り替えます）。
+
+- プロファイルは `~/.tsunagi/codex-profiles/<名前>/` に作られます
+- **Login** を押すと開いたターミナルで `codex login` を実行します。ブラウザでの認証後に `127.0.0.1:1455` へ戻れない環境（コンテナ等）では、Ctrl+C で止めて `codex login --device-auth` を実行してください
+- プロファイルを選んだタブでは `CODEX_API_KEY` / `CODEX_ACCESS_TOKEN` を環境から取り除きます（ログインより優先されてしまうため）
+
+## Tsunagi との連携
+
+Codex には Claude Code のプラグインに当たる仕組みがないため、Tsunagi は起動時の引数（`-c`）で次を渡します。引数は起動スクリプト（`~/.tsunagi/state/launch-codex.sh`）にまとめており、`~/.codex/config.toml` には何も書き込みません。
+
+| 連携       | 内容                                                                              |
+| ---------- | --------------------------------------------------------------------------------- |
+| hooks      | 実行中・完了・中断などのステータスを Tsunagi に通知する（承認済みとして登録する） |
+| 計画ツール | `update_plan` を有効にし、その計画をタブの進捗バーに表示する                      |
+| MCP        | Tsunagi のタスク管理ツール（`tsunagi_*`）                                         |
+| skill      | `tsunagi-task` の Codex 向けの本文を `developer_instructions` として渡す          |
+| subagent   | 並び替え・棚卸し用の `tsunagi-task-curator` を agent role として渡す              |
+
+権限は Claude Code タブの `--dangerously-skip-permissions` と同じく、`--dangerously-bypass-approvals-and-sandbox`（承認なし・サンドボックスなし）で起動します。
+
+## 会話の再開
+
+Codex のセッションIDは Tsunagi のタブIDと別に振られるため、タブには最初に起動したときの Codex のセッションIDを保存しておきます。ページの再読み込み・環境変数の変更・**Run Codex** での再起動では、そのセッションを `codex resume` で再開します（会話記録が見つからなければ新しい会話として始めます）。
+
+## 制約
+
+- Codex にはターンの失敗を通知する hook がないため、API エラー等でターンが失敗しても **error** 状態にはなりません
+- ローカルLLM（実験的機能）は Claude Code のタブでだけ使えます
+- `developer_instructions` に渡した skill の本文は、常にコンテキストに載ります

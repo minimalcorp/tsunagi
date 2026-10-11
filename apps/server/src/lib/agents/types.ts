@@ -1,7 +1,6 @@
-import type { TabMode, Todo } from '@minimalcorp/tsunagi-shared';
+import type { AgentAuthStatus, AgentId, TabMode, Todo } from '@minimalcorp/tsunagi-shared';
 
-/** タブで起動するコーディングエージェント（CLI） */
-export type AgentId = 'claude';
+export type { AgentId };
 
 /** エージェントの起動に必要な設定が足りないなど、起動前に分かる失敗 */
 export class AgentLaunchError extends Error {
@@ -18,7 +17,12 @@ export class AgentLaunchError extends Error {
  * tabId は tsunagi のタブID（Claude はセッションID = タブID、それ以外は PTY の TSUNAGI_SESSION_ID）
  */
 export type NormalizedHookEvent =
-  | { tabId: string; kind: 'session-start' }
+  | {
+      tabId: string;
+      kind: 'session-start';
+      /** エージェント側のセッションID（タブIDと別の ID を振るエージェントのみ）。resume 用に保存する */
+      agentSessionId?: string;
+    }
   | {
       tabId: string;
       kind: 'prompt' | 'permission' | 'stop' | 'stop-failure' | 'interrupt' | 'session-end';
@@ -42,8 +46,35 @@ export interface AgentLaunchEnv {
   unsetKeys: string[];
 }
 
+/** プロファイル（エージェントの設定ディレクトリ）の扱い */
+export interface AgentProfileSpec {
+  /** タブで使うプロファイルの割り当てを保存する予約キー（global → owner → repo で継承） */
+  envKey: string;
+  /** 設定ディレクトリを指す環境変数（CLAUDE_CONFIG_DIR / CODEX_HOME） */
+  configDirEnvKey: string;
+  /**
+   * プロファイルのログインより優先される認証情報の環境変数。
+   * プロファイルを選んだタブでは外側 Terminal から継承した値も取り除く
+   */
+  authEnvKeys: string[];
+  /** システム既定の設定ディレクトリ（表示用） */
+  defaultConfigDir: string;
+  /** ログイン用 PTY に書き込むコマンド */
+  loginCommand: string;
+  /** configDir が undefined ならシステム既定 */
+  getAuthStatus(configDir: string | undefined): Promise<AgentAuthStatus>;
+  logout(configDir: string): Promise<void>;
+}
+
 export interface AgentAdapter {
   id: AgentId;
+  /** 表示名 */
+  label: string;
+  /** CLI のコマンド名 */
+  cli: string;
+  /** tsunagi が必要とする最低バージョン */
+  minVersion: readonly [number, number, number];
+  profile: AgentProfileSpec;
   /** タブの mode に応じた追加の環境変数（DB の環境変数より後に適用する） */
   resolveLaunchEnv(mode: TabMode): Promise<AgentLaunchEnv>;
   /** 起動前の補正（設定ファイルの修正など）。env は PTY に渡す環境変数 */

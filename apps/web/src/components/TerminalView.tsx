@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { TodoProgressPopover } from '@/components/TodoProgressPopover';
 import { apiUrl, getServerUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
-import type { Todo } from '@minimalcorp/tsunagi-shared';
+import type { TabMode, Todo } from '@minimalcorp/tsunagi-shared';
 
 export type { Todo };
 
@@ -39,6 +39,8 @@ interface TerminalViewProps {
    * （ローカルLLMタブは MCP の絞り込み等の引数が付く）。新規セッション作成時のみ有効（reused時は無視）。
    */
   launchAgent?: boolean;
+  /** タブの起動モード（Run ボタンの表示と、ESC 中断の検知に使う） */
+  mode?: TabMode;
   className?: string;
   /** タブID・Run Claude 等のツールバーを出さない（Claude のログイン用ターミナル等） */
   hideToolbar?: boolean;
@@ -72,6 +74,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     cwd,
     env,
     launchAgent = false,
+    mode,
     className = '',
     hideToolbar = false,
     initialTodos,
@@ -115,6 +118,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>(initialClaudeStatus ?? 'idle');
   // ESC中断検知（term.onData のクロージャから最新値を読むためのref）
   const claudeStatusRef = useRef<ClaudeStatus>(initialClaudeStatus ?? 'idle');
+  // onData のハンドラは接続時に一度だけ登録するため、最新の mode は ref で参照する
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const [todos, setTodos] = useState<Todo[]>(initialTodos ?? []);
   const [copied, setCopied] = useState(false);
   // tsunagi の環境変数が変わり、PTY の作り直し（反映）待ちの状態。サーバーが env-pending で通知する
@@ -666,9 +672,11 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
     onDataDisposeRef.current = term.onData((data) => {
       // ESC単体（矢印キー等のエスケープシーケンスは複数バイトのため対象外）押下時、
-      // running/waiting中ならClaude中断とみなしサーバへ通知する
+      // running/waiting中ならClaude中断とみなしサーバへ通知する。
+      // Codex は中断を Interrupt hook で通知するため対象外
       if (
         data === '\x1b' &&
+        modeRef.current !== 'codex' &&
         (claudeStatusRef.current === 'running' || claudeStatusRef.current === 'waiting') &&
         sessionIdRef.current
       ) {
@@ -724,12 +732,13 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     } catch (error) {
       toaster.create({
         type: 'error',
-        title: 'Claude を起動できません',
+        title: `${agentLabel} を起動できません`,
         description: error instanceof Error ? error.message : String(error),
       });
     }
   }
 
+  const agentLabel = mode === 'codex' ? 'Codex' : 'Claude';
   const isConnecting = status === 'connecting';
   const isPausedOrExited = status === 'paused' || status === 'exited' || status === 'error';
   const isConnected = status === 'connected';
@@ -759,10 +768,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
               size="xs"
               onClick={() => void handleRunClaude()}
               disabled={!isConnected}
-              title="Run Claude"
+              title={`Run ${agentLabel}`}
             >
               <Play className="w-3 h-3" />
-              Run Claude
+              Run {agentLabel}
             </Button>
             <Button
               variant="ghost"

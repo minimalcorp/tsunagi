@@ -107,7 +107,15 @@ async function applyHookEvent(
 
   switch (event.kind) {
     case 'session-start':
-      // エージェントが起動しただけ（まだプロンプト処理していない）→ idleのまま通知のみ
+      // エージェントが起動しただけ（まだプロンプト処理していない）→ idleのまま通知のみ。
+      // タブIDと別のセッションIDを振るエージェント（Codex）は、次回の resume 用に保存する
+      if (event.agentSessionId) {
+        await prisma.tab
+          .updateMany({ where: { tabId }, data: { agentSessionId: event.agentSessionId } })
+          .catch((err: unknown) =>
+            fastify.log.warn(err, '[hooks] Failed to save agent session id')
+          );
+      }
       io.to(room).emit('status-changed', { sessionId: tabId, status: 'idle' });
       break;
 

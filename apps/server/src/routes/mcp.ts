@@ -43,7 +43,7 @@ const STATUS_ENUM = ['backlog', 'planning', 'coding', 'reviewing', 'done'] as co
 /** status description（LLMバイアス対策の警告文言付き） */
 const STATUS_DESCRIPTION =
   'ステータス。backlog → planning → coding → reviewing → done の順で遷移。' +
-  '注意: `in_progress` / `completed` / `todo` は使用不可（Claude Code 組み込み TaskUpdate の語彙と混同しないこと）。' +
+  '注意: `in_progress` / `completed` / `todo` は使用不可（エージェント組み込みの TODO 管理ツール（Claude Code の TaskUpdate、Codex の update_plan）の語彙と混同しないこと）。' +
   '実装中 = `coding`、完了 = `done`。';
 
 /** typo 検出ヒント（schema validation が skip された場合のフォールバック） */
@@ -99,7 +99,7 @@ function createMcpServer(io?: SocketIOServer): Server {
               description:
                 'ステータスフィルタ。単一値（例: "backlog"）または配列（例: ["backlog", "planning"]）で指定。' +
                 '有効値: backlog / planning / coding / reviewing / done。' +
-                '注意: `in_progress` / `completed` / `todo` は使用不可（Claude Code 組み込み TaskUpdate の語彙）。',
+                '注意: `in_progress` / `completed` / `todo` は使用不可（エージェント組み込みの TODO 管理ツールの語彙）。',
             },
           },
           additionalProperties: false,

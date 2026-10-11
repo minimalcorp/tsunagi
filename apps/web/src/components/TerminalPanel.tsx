@@ -9,7 +9,7 @@ import {
   useEffect,
   useMemo,
 } from 'react';
-import type { LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
+import type { AgentAvailability, LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
 import { VoiceTranscriptOverlay } from '@/components/VoiceTranscriptOverlay';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
@@ -23,13 +23,14 @@ import {
 } from '@/components/TerminalView';
 import { Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ClaudeIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
+import { ClaudeIcon, CodexIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
 import { localLlmTabLabel } from '@/lib/local-llm';
 import {
   useLmStudioSettings,
   useLocalLlmSettings,
   useOllamaSettings,
 } from '@/hooks/useLocalLlmSettings';
+import { useAgentAvailability } from '@/hooks/useAgentAvailability';
 
 export interface TabStatusEntry {
   /** TerminalView 未マウント（一度も表示していないタブ）の場合は null */
@@ -59,6 +60,21 @@ export interface LocalLlmTabOption {
   provider: LocalLlmProvider | null;
   /** 使用中のモデル。未設定（空）ならボタンを無効化する */
   model: string;
+}
+
+/** エージェントのタブ作成ボタンの状態。disabledReason があれば無効化して title に出す */
+export interface AgentTabOption {
+  disabledReason?: string;
+}
+
+/** CLI が使えない理由（使えるなら undefined） */
+function agentDisabledReason(label: string, availability: AgentAvailability | undefined) {
+  if (!availability) return undefined;
+  if (!availability.installed) return `${label} の CLI が見つかりません`;
+  if (!availability.supported) {
+    return `${label} ${availability.version ?? ''} は古いため使えません（${availability.minVersion} 以上が必要）`;
+  }
+  return undefined;
 }
 
 /** TerminalPanelの外部からアクセス可能なハンドル */
@@ -215,7 +231,22 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     const handleTabCreateClaude = useCallback(() => handleTabCreate('claude'), [handleTabCreate]);
 
+    const handleTabCreateCodex = useCallback(() => handleTabCreate('codex'), [handleTabCreate]);
+
     const handleTabCreateLocalLlm = useCallback(() => handleTabCreate('local'), [handleTabCreate]);
+
+    // Claude は常にボタンを出し、CLI が使えなければ無効化する。Codex は CLI を入れているときだけ出す
+    const agents = useAgentAvailability();
+    const claudeOption: AgentTabOption = {
+      disabledReason: agentDisabledReason(
+        'Claude Code',
+        agents?.find((a) => a.agent === 'claude')
+      ),
+    };
+    const codexAvailability = agents?.find((a) => a.agent === 'codex');
+    const codexOption: AgentTabOption | undefined = codexAvailability?.installed
+      ? { disabledReason: agentDisabledReason('Codex', codexAvailability) }
+      : undefined;
 
     // 実験的機能のローカルLLMは、プロバイダーが有効なときだけタブの作成ボタンを出す
     const { settings: ollamaSettings } = useOllamaSettings();
@@ -271,6 +302,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             onTabChange={handleTabChange}
             onTabCreateTerminal={handleTabCreateTerminal}
             onTabCreateClaude={handleTabCreateClaude}
+            claudeOption={claudeOption}
+            codexOption={codexOption}
+            onTabCreateCodex={handleTabCreateCodex}
             localLlmOption={localLlmOption}
             onTabCreateLocalLlm={handleTabCreateLocalLlm}
             onTabDelete={handleTabDelete}
@@ -309,6 +343,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   isActive={isActive}
                   cwd={task.worktreePath}
                   launchAgent={tab.mode !== 'terminal'}
+                  mode={tab.mode}
                   className="h-full"
                   initialTodos={tab.todos}
                   initialClaudeStatus={tab.status as ClaudeStatus}
@@ -323,10 +358,27 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             <div className="h-full flex flex-col items-center justify-center gap-4 px-4">
               <p className="text-sm text-muted-foreground">起動するタブを選んでください</p>
               <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button onClick={handleTabCreateClaude}>
-                  <ClaudeIcon className="w-4 h-4" />
-                  Claude Code
-                </Button>
+                <span title={claudeOption.disabledReason}>
+                  <Button
+                    onClick={handleTabCreateClaude}
+                    disabled={Boolean(claudeOption.disabledReason)}
+                  >
+                    <ClaudeIcon className="w-4 h-4" />
+                    Claude Code
+                  </Button>
+                </span>
+                {codexOption && (
+                  <span title={codexOption.disabledReason}>
+                    <Button
+                      variant="outline"
+                      onClick={handleTabCreateCodex}
+                      disabled={Boolean(codexOption.disabledReason)}
+                    >
+                      <CodexIcon className="w-4 h-4" />
+                      Codex
+                    </Button>
+                  </span>
+                )}
                 {localLlmOption && (
                   <span
                     title={

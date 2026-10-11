@@ -333,9 +333,6 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       const tab = await prisma.tab.findUnique({ where: { tabId: sessionId } }).catch(() => null);
       const mode = (tab?.mode ?? 'claude') as TabMode;
       const agent = getAgentForMode(mode);
-      if (!agent) {
-        return reply.status(400).send({ error: 'This tab does not run an agent' });
-      }
       let command: string;
       try {
         command = await agent.buildCommand(sessionId, mode);

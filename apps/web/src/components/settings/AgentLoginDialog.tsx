@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { CircleCheck } from 'lucide-react';
-import type { ClaudeAuthStatus, ClaudeProfileWithStatus } from '@minimalcorp/tsunagi-shared';
+import type { AgentAuthStatus, AgentProfileWithStatus } from '@minimalcorp/tsunagi-shared';
 import { apiUrl } from '@/lib/api-url';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
@@ -13,31 +13,40 @@ import { errorMessage, requestData } from './local-llm-ui';
 /** ログイン完了を確認する間隔 */
 const STATUS_POLL_MS = 2000;
 
-interface ClaudeLoginDialogProps {
-  profile: ClaudeProfileWithStatus;
+interface AgentLoginDialogProps {
+  profile: AgentProfileWithStatus;
   onClose: () => void;
 }
 
+/** エージェントごとの案内 */
+const LOGIN_HINT: Record<AgentProfileWithStatus['agent'], string> = {
+  claude:
+    'ブラウザで認証してください。ブラウザが開かない場合は表示された URL を開き、表示されたコードをこのターミナルに貼り付けます。',
+  codex:
+    'ブラウザで認証してください。ブラウザが開かない場合は表示された URL を開きます。認証後に 127.0.0.1:1455 へ戻れない環境（コンテナ等）では Ctrl+C で止め、codex login --device-auth を実行してください。',
+};
+
 /**
- * プロファイルの CLAUDE_CONFIG_DIR で `claude auth login` を実行するターミナル。
- * ブラウザでの認証（WSL2 等ではコードの貼り付け）をこのターミナルで行い、ログインを確認したら完了表示にする。
+ * プロファイルの設定ディレクトリでログインコマンド（`claude auth login` / `codex login`）を実行するターミナル。
+ * ブラウザでの認証をこのターミナルで行い、ログインを確認したら完了表示にする。
  */
-export function ClaudeLoginDialog({ profile, onClose }: ClaudeLoginDialogProps) {
+export function AgentLoginDialog({ profile, onClose }: AgentLoginDialogProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<ClaudeAuthStatus | null>(null);
+  const [status, setStatus] = useState<AgentAuthStatus | null>(null);
 
   // ログイン用 PTY を起動し、閉じたら片付ける
   useEffect(() => {
     let id: string | null = null;
     let cancelled = false;
-    requestData<{ sessionId: string }>(`/api/claude-profiles/${profile.slug}/login`, {
-      method: 'POST',
-    })
+    requestData<{ sessionId: string }>(
+      `/api/agent-profiles/${profile.agent}/${profile.slug}/login`,
+      { method: 'POST' }
+    )
       .then((data) => {
         id = data.sessionId;
         if (cancelled) {
-          void fetch(apiUrl(`/api/claude-profiles/login/${id}`), { method: 'DELETE' });
+          void fetch(apiUrl(`/api/agent-profiles/login/${id}`), { method: 'DELETE' });
           return;
         }
         setSessionId(data.sessionId);
@@ -45,16 +54,18 @@ export function ClaudeLoginDialog({ profile, onClose }: ClaudeLoginDialogProps) 
       .catch((err: unknown) => setError(errorMessage(err)));
     return () => {
       cancelled = true;
-      if (id) void fetch(apiUrl(`/api/claude-profiles/login/${id}`), { method: 'DELETE' });
+      if (id) void fetch(apiUrl(`/api/agent-profiles/login/${id}`), { method: 'DELETE' });
     };
-  }, [profile.slug]);
+  }, [profile.agent, profile.slug]);
 
-  // ログイン完了を確認する（claude auth login はログイン後に終了するだけなので状態を問い合わせる）
+  // ログイン完了を確認する（ログインコマンドはログイン後に終了するだけなので状態を問い合わせる）
   const loggedIn = status?.loggedIn ?? false;
   useEffect(() => {
     if (!sessionId || loggedIn) return;
     const timer = setInterval(() => {
-      requestData<{ status: ClaudeAuthStatus }>(`/api/claude-profiles/${profile.slug}/status`)
+      requestData<{ status: AgentAuthStatus }>(
+        `/api/agent-profiles/${profile.agent}/${profile.slug}/status`
+      )
         .then((data) => {
           // 再ログイン時はログイン済みのまま始まるため、アカウントが変わったかではなく
           // ログイン状態の変化だけを見る（未ログイン → ログイン済み）
@@ -63,7 +74,7 @@ export function ClaudeLoginDialog({ profile, onClose }: ClaudeLoginDialogProps) 
         .catch(() => undefined);
     }, STATUS_POLL_MS);
     return () => clearInterval(timer);
-  }, [sessionId, loggedIn, profile.slug, profile.status.loggedIn]);
+  }, [sessionId, loggedIn, profile.agent, profile.slug, profile.status.loggedIn]);
 
   return (
     <Dialog
@@ -88,8 +99,7 @@ export function ClaudeLoginDialog({ profile, onClose }: ClaudeLoginDialogProps) 
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            ブラウザで認証してください。ブラウザが開かない場合は表示された URL
-            を開き、表示されたコードをこのターミナルに貼り付けます。
+            {LOGIN_HINT[profile.agent]}
             {profile.status.loggedIn && ' 再ログインが終わったら閉じてください。'}
           </p>
         )}

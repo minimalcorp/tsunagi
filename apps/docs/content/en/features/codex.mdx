@@ -1,0 +1,47 @@
+---
+title: Codex
+description: Use the Codex CLI instead of Claude Code in task tabs.
+---
+
+# Codex
+
+Task tabs can run the [Codex CLI](https://developers.openai.com/codex/cli) (`codex`) instead of Claude Code. Codex logged in with your ChatGPT plan works like a Claude Code tab: status, progress and task management are all connected to Tsunagi.
+
+## Requirements
+
+- The `codex` command must be on your `PATH`, **v0.162.0 or later**.
+- Tsunagi starts if either `claude` or `codex` is installed. When `codex` is installed, the task screen shows a button to create a Codex tab.
+
+## Login and profiles
+
+By default Tsunagi uses the same configuration as running `codex` in your terminal (`~/.codex`). If you have already run `codex login`, you are ready.
+
+To log in or to use several accounts, open Settings → **Global** → **Codex Profile**. It works like [Claude Profiles](/en/features/claude-profiles/) and switches `CODEX_HOME`.
+
+- Profiles are created at `~/.tsunagi/codex-profiles/<name>/`.
+- **Login** runs `codex login` in a terminal. Where the browser cannot return to `127.0.0.1:1455` after authenticating (containers etc.), stop it with Ctrl+C and run `codex login --device-auth`.
+- Tabs that use a profile drop `CODEX_API_KEY` / `CODEX_ACCESS_TOKEN` from the environment, since they take precedence over the login.
+
+## Integration with Tsunagi
+
+Codex has no equivalent of Claude Code plugins, so Tsunagi passes the following as launch arguments (`-c`). The arguments live in a launcher script (`~/.tsunagi/state/launch-codex.sh`); nothing is written to `~/.codex/config.toml`.
+
+| Integration | What it does                                                                  |
+| ----------- | ----------------------------------------------------------------------------- |
+| hooks       | Report running / done / interrupted status to Tsunagi (registered as trusted) |
+| Plan tool   | Enable `update_plan` and show the plan as the tab's progress bar              |
+| MCP         | Tsunagi's task management tools (`tsunagi_*`)                                 |
+| skill       | The Codex version of `tsunagi-task`, passed as `developer_instructions`       |
+| subagent    | `tsunagi-task-curator` for reordering and triage, passed as an agent role     |
+
+Like `--dangerously-skip-permissions` in Claude Code tabs, Codex runs with `--dangerously-bypass-approvals-and-sandbox` (no approvals, no sandbox).
+
+## Resuming conversations
+
+Codex assigns its own session ID, separate from the Tsunagi tab ID, so the tab stores the Codex session ID from its first launch. Reloading the page, changing environment variables or restarting with **Run Codex** resumes that session with `codex resume` (a new conversation starts if the session is not found).
+
+## Limitations
+
+- Codex has no hook for failed turns, so a turn that fails (API errors etc.) does not show the **error** status.
+- Local LLM (experimental) is available in Claude Code tabs only.
+- The skill passed through `developer_instructions` is always in context.

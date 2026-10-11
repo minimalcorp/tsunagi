@@ -1,4 +1,4 @@
-import type { TabMode } from '@minimalcorp/tsunagi-shared';
+import type { AgentAuthStatus, TabMode } from '@minimalcorp/tsunagi-shared';
 import { LOCAL_LLM_PROXY_URL, buildClaudeCommand, isLocalLlmMode } from '../claude-command.js';
 import {
   ensureClaudeOnboardingCompleted,
@@ -8,7 +8,13 @@ import {
 import { LOCAL_LLM_UNSET_ENV_KEYS, LOCAL_MODEL_ALIAS, buildLocalLlmEnv } from '../local-llm-env.js';
 import { ensureActiveLoaded, getLocalLlmSettings } from '../local-llm.js';
 import { TODO_TOOL_NAMES, applyToolToTodos } from '../tab-todos.js';
-import { AgentLaunchError, type AgentAdapter, type NormalizedHookEvent } from './types.js';
+import { agentCliEnv, runAgentCli } from './cli.js';
+import {
+  AgentLaunchError,
+  type AgentAdapter,
+  type AgentProfileSpec,
+  type NormalizedHookEvent,
+} from './types.js';
 
 // Claude CLIのhookイベント型
 interface ClaudeHookBody {
@@ -33,8 +39,56 @@ const SIMPLE_EVENTS: Record<string, Exclude<NormalizedHookEvent['kind'], 'tool-p
   SessionEnd: 'session-end',
 };
 
+const claudeProfile: AgentProfileSpec = {
+  envKey: 'TSUNAGI_CLAUDE_PROFILE',
+  configDirEnvKey: 'CLAUDE_CONFIG_DIR',
+  // Claude Code が /login のログインより優先する認証情報
+  authEnvKeys: ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'],
+  defaultConfigDir: '~/.claude',
+  loginCommand: 'claude auth login',
+
+  // `claude auth status --json` でログイン状態を取得する
+  async getAuthStatus(configDir) {
+    const env = agentCliEnv(claudeProfile, configDir);
+    try {
+      const { stdout } = await runAgentCli('claude', ['auth', 'status', '--json'], env);
+      const raw = JSON.parse(stdout) as Record<string, unknown>;
+      const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
+      return {
+        loggedIn: raw.loggedIn === true,
+        authMethod: str(raw.authMethod),
+        email: str(raw.email),
+        orgName: str(raw.orgName),
+        subscriptionType: str(raw.subscriptionType),
+      } satisfies AgentAuthStatus;
+    } catch (err) {
+      // claude auth status は未ログイン時に非 0 で終了するが、stdout には JSON が出る
+      const stdout = (err as { stdout?: string }).stdout;
+      if (stdout) {
+        try {
+          const raw = JSON.parse(stdout) as { loggedIn?: boolean; authMethod?: string };
+          return { loggedIn: raw.loggedIn === true, authMethod: raw.authMethod };
+        } catch {
+          // fallthrough
+        }
+      }
+      return { loggedIn: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+
+  // ログイン情報（macOS は Keychain）を残さないよう、プロファイル削除前に logout する
+  async logout(configDir) {
+    await runAgentCli('claude', ['auth', 'logout'], agentCliEnv(claudeProfile, configDir));
+  },
+};
+
 export const claudeAdapter: AgentAdapter = {
   id: 'claude',
+  label: 'Claude Code',
+  cli: 'claude',
+  // CLAUDE_CODE_PLUGIN_DIRS に対応した最初のバージョン（apps/cli の起動チェックと同じ）
+  minVersion: [2, 1, 280],
+  profile: claudeProfile,
 
   // ローカルLLMタブ: Anthropic の代わりに tsunagi の中継口（→ Ollama / LM Studio）で claude を動かす。
   // Anthropic の認証トークンは環境変数ごと取り除く

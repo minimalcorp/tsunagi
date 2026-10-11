@@ -463,8 +463,8 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         const { id: taskId } = request.params;
         const requested = request.body?.mode;
         const mode: Tab['mode'] =
-          requested === 'terminal'
-            ? 'terminal'
+          requested === 'terminal' || requested === 'codex'
+            ? requested
             : requested === 'local' || requested === 'ollama' || requested === 'lmstudio'
               ? 'local'
               : 'claude';

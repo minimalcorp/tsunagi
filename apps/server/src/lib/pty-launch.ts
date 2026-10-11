@@ -7,7 +7,7 @@ import { ptyManager, type PtySession } from '../pty-manager.js';
 import { prisma } from './db.js';
 import { getWorktreePath } from './worktree-manager.js';
 import { getEnv } from './repositories/environment.js';
-import { resolveClaudeProfileEnv } from './claude-profiles.js';
+import { resolveAgentProfileEnv } from './agent-profiles.js';
 import { AgentLaunchError as PtyLaunchError, getAgentForMode } from './agents/index.js';
 
 // このファイル基準で解決する(cwd 非依存):
@@ -43,7 +43,7 @@ export { PtyLaunchError };
 /**
  * sessionId(=tab_id) から PTY の作業ディレクトリと環境変数を解決する。
  * 環境変数の優先順位: リクエストで渡されたenv > エージェント固有のenv（ローカルLLMの provider 等） >
- * DB env(global/owner/repo、Claude プロファイルを CLAUDE_CONFIG_DIR に変換) > tsunagi独自のEDITOR設定
+ * DB env(global/owner/repo、エージェントのプロファイルを設定ディレクトリに変換) > tsunagi独自のEDITOR設定
  */
 export async function resolvePtyLaunch(
   sessionId: string,
@@ -75,14 +75,11 @@ export async function resolvePtyLaunch(
   // Taskに紐づかないタブは global のみになる。
   // 読み込みに失敗したら起動しない（空の環境変数で起動・作り直しすると設定が抜け落ちるため）
   const dbEnv = tab ? await getEnv('repo', tab.task.owner, tab.task.repo) : await getEnv('global');
-  const profile = resolveClaudeProfileEnv(dbEnv);
+  const profile = resolveAgentProfileEnv(dbEnv);
 
   // エージェント固有の環境変数は DB の環境変数より後に適用する
   const mode = tab?.mode as TabMode | undefined;
-  const agentEnv = (await getAgentForMode(mode)?.resolveLaunchEnv(mode ?? 'claude')) ?? {
-    env: {},
-    unsetKeys: [],
-  };
+  const agentEnv = await getAgentForMode(mode).resolveLaunchEnv(mode ?? 'claude');
   const providerEnv = agentEnv.env;
   const unsetKeys = [...new Set([...profile.unsetKeys, ...agentEnv.unsetKeys])];
 

@@ -59,13 +59,15 @@ model Tab {
   taskId       String    @map("task_id")
   order        Int       // タブ表示用の連番
   status       String    // 'idle' | 'running' | 'success' | 'error'
-  mode         String    @default("claude") // 'terminal' | 'claude' | 'local'（local: ローカルLLMで起動するclaude。旧 'ollama' / 'lmstudio' も local 扱い）
+  mode         String    @default("claude") // 'terminal' | 'claude' | 'codex' | 'local'（local: ローカルLLMで起動するclaude。旧 'ollama' / 'lmstudio' も local 扱い）
   createdAt    DateTime  @default(now()) @map("created_at")
   startedAt    DateTime  @map("started_at")
   completedAt  DateTime? @map("completed_at")
   todos        String?   @default("[]") // JSON: Todo[]
   // 完了(success/error)したがタスク詳細で未確認であることを示す。詳細を開くとfalseになる
   unread       Boolean   @default(false)
+  // エージェント側のセッションID（タブIDと別の ID を振るエージェントのみ。Codex の thread id）。resume に使う
+  agentSessionId String?  @map("agent_session_id")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -93,13 +95,15 @@ model EnvironmentVariable {
   @@map("environment_variables")
 }
 
-// ClaudeProfile - Claude Code のプロファイル（CLAUDE_CONFIG_DIR = ~/.tsunagi/claude-profiles/<slug>）
-model ClaudeProfile {
-  slug      String   @id
+// エージェントのプロファイル。実体は ~/.tsunagi/<agent>-profiles/<slug>/（Claude: CLAUDE_CONFIG_DIR / Codex: CODEX_HOME）
+model AgentProfile {
+  agent     String // 'claude' | 'codex'
+  slug      String
   name      String
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@map("claude_profiles")
+  @@id([agent, slug])
+  @@map("agent_profiles")
 }
 
 // AppSetting - アプリ全体の設定（key単位でJSONを保存）

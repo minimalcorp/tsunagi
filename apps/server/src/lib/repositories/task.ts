@@ -299,6 +299,7 @@ type PrismaTab = {
   mode: string;
   todos: string | null;
   unread: boolean;
+  agentSessionId: string | null;
   startedAt: Date;
   completedAt: Date | null;
   updatedAt: Date;
@@ -335,6 +336,7 @@ function mapTab(tab: PrismaTab): Tab {
     mode: tab.mode as Tab['mode'],
     unread: tab.unread,
     todos: tab.todos ? JSON.parse(tab.todos) : [],
+    agentSessionId: tab.agentSessionId ?? undefined,
     startedAt: tab.startedAt.toISOString(),
     completedAt: tab.completedAt?.toISOString(),
     updatedAt: tab.updatedAt.toISOString(),

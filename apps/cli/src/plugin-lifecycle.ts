@@ -46,10 +46,13 @@ export function getPluginDir(): string {
   return path.resolve(THIS_DIR, '..', MARKETPLACE_NAME, 'plugins', PLUGIN_NAME);
 }
 
-/** `claude --version` の出力（例: "2.1.292 (Claude Code)"）から x.y.z を取り出す */
-function getClaudeVersion(): number[] | null {
+// tsunagi が使う `-c` キー（hooks / hooks.state / tools.update_plan 等）を確認したバージョン
+const MIN_CODEX_VERSION = [0, 162, 0] as const;
+
+/** `<cli> --version` の出力（例: "2.1.292 (Claude Code)" / "codex-cli 0.162.1"）から x.y.z を取り出す */
+function getCliVersion(cli: string): number[] | null {
   try {
-    const output = execSync('claude --version', { stdio: 'pipe' }).toString();
+    const output = execSync(`${cli} --version`, { stdio: 'pipe' }).toString();
     const match = /(\d+)\.(\d+)\.(\d+)/.exec(output);
     return match ? match.slice(1).map(Number) : null;
   } catch {
@@ -64,26 +67,62 @@ function isAtLeast(version: number[], min: readonly number[]): boolean {
   return true;
 }
 
+type CliCheck =
+  | { status: 'ok'; version: string }
+  | { status: 'missing' }
+  | { status: 'outdated'; version: string };
+
+function checkCli(cli: string, min: readonly number[]): CliCheck {
+  const version = getCliVersion(cli);
+  if (!version) return { status: 'missing' };
+  return isAtLeast(version, min)
+    ? { status: 'ok', version: version.join('.') }
+    : { status: 'outdated', version: version.join('.') };
+}
+
 /**
- * Exits the process with code 1 if the `claude` CLI is missing or too old to
- * load plugins from `CLAUDE_CODE_PLUGIN_DIRS`.
+ * 使えるエージェント CLI（claude / codex）を確認する。どちらも使えなければ code 1 で終了する。
+ * 戻り値は claude が使えるか（旧プラグインの掃除は claude があるときだけ行う）。
  */
-export function assertClaudeSupportsPluginDirs(): void {
-  const minLabel = MIN_CLAUDE_VERSION.join('.');
-  const version = getClaudeVersion();
-  if (!version) {
-    console.error('[tsunagi:plugin] Failed to run `claude --version`.');
-    console.error('[tsunagi:plugin] Ensure the `claude` CLI is installed and available on PATH.');
-    process.exit(1);
-  }
-  if (!isAtLeast(version, MIN_CLAUDE_VERSION)) {
+export function assertAgentCliAvailable(): { claude: boolean } {
+  const claude = checkCli('claude', MIN_CLAUDE_VERSION);
+  const codex = checkCli('codex', MIN_CODEX_VERSION);
+  const claudeMin = MIN_CLAUDE_VERSION.join('.');
+  const codexMin = MIN_CODEX_VERSION.join('.');
+
+  if (claude.status === 'ok') debugLog(`Claude Code ${claude.version}`);
+  if (codex.status === 'ok') debugLog(`Codex ${codex.version}`);
+
+  if (claude.status !== 'ok' && codex.status !== 'ok') {
+    console.error('[tsunagi:plugin] No supported coding agent CLI found.');
+    if (claude.status === 'outdated') {
+      console.error(
+        `[tsunagi:plugin] Claude Code ${claude.version} is too old (requires ${claudeMin}+). Run \`claude update\`.`
+      );
+    }
+    if (codex.status === 'outdated') {
+      console.error(
+        `[tsunagi:plugin] Codex ${codex.version} is too old (requires ${codexMin}+). Update the \`codex\` CLI.`
+      );
+    }
     console.error(
-      `[tsunagi:plugin] Claude Code ${version.join('.')} is too old. tsunagi requires ${minLabel} or later.`
+      '[tsunagi:plugin] Install `claude` (Claude Code) or `codex` (Codex CLI) and make sure it is on PATH.'
     );
-    console.error('[tsunagi:plugin] Run `claude update` and start tsunagi again.');
     process.exit(1);
   }
-  debugLog(`Claude Code ${version.join('.')}`);
+
+  // 片方だけ古い場合は起動を続け、そのエージェントのタブだけ使えない旨を出す
+  if (claude.status === 'outdated') {
+    console.warn(
+      `[tsunagi:plugin] Claude Code ${claude.version} is too old (requires ${claudeMin}+). Claude tabs will not work until you run \`claude update\`.`
+    );
+  }
+  if (codex.status === 'outdated') {
+    console.warn(
+      `[tsunagi:plugin] Codex ${codex.version} is too old (requires ${codexMin}+). Codex tabs will not work until you update it.`
+    );
+  }
+  return { claude: claude.status === 'ok' };
 }
 
 /**

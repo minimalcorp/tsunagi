@@ -1,11 +1,16 @@
 import type { SVGProps } from 'react';
-import { Cpu } from 'lucide-react';
+import { Cpu, SquareCode } from 'lucide-react';
 
 // lucide-react にはブランドアイコンがないため simple-icons (CC0-1.0, v16.32.0) の path を埋め込む。
 // https://simpleicons.org/?q=claude / https://simpleicons.org/?q=ollama / https://simpleicons.org/?q=lmstudio
 // ロゴの商標はそれぞれ Anthropic / Ollama / LM Studio に帰属する。
 
 type BrandIconProps = SVGProps<SVGSVGElement>;
+
+/** Codex。simple-icons から OpenAI のロゴが外されたため lucide のアイコンで表す */
+export function CodexIcon({ className }: { className?: string }) {
+  return <SquareCode className={className} aria-hidden="true" />;
+}
 
 export function ClaudeIcon(props: BrandIconProps) {
   return (

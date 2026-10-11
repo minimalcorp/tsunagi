@@ -9,12 +9,16 @@ import { LoadingSpinner } from '../LoadingSpinner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-// Claude の認証は Claude Profile で扱うため、汎用の環境変数としては登録させない（サーバーでも拒否する）
+// エージェントの認証は Profile で扱うため、汎用の環境変数としては登録させない（サーバーでも拒否する）
 const RESERVED_KEYS = [
   'ANTHROPIC_API_KEY',
   'CLAUDE_CODE_OAUTH_TOKEN',
   'CLAUDE_CONFIG_DIR',
   'TSUNAGI_CLAUDE_PROFILE',
+  'CODEX_API_KEY',
+  'CODEX_ACCESS_TOKEN',
+  'CODEX_HOME',
+  'TSUNAGI_CODEX_PROFILE',
 ];
 
 interface EnvVariableEditorProps {
@@ -139,9 +143,9 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
       return false;
     }
 
-    // Claude の認証は Claude Profile で設定する
+    // エージェントの認証は Profile で設定する
     if (RESERVED_KEYS.includes(key)) {
-      setAddError('Claude の認証は Claude Profile で設定してください');
+      setAddError('エージェントの認証は Claude Profile / Codex Profile で設定してください');
       return false;
     }
 
