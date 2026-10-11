@@ -3,11 +3,10 @@ import type { Server as SocketIOServer } from 'socket.io';
 import type { TabMode } from '@minimalcorp/tsunagi-shared';
 import { ptyManager, type PtySession } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
-import { ensureActiveLoaded } from '../lib/local-llm.js';
-import { buildClaudeCommand, isLocalLlmMode } from '../lib/claude-command.js';
+import { getAgentForMode } from '../lib/agents/index.js';
 import {
   PtyLaunchError,
-  prepareClaudeConfigForSession,
+  prepareAgentLaunchForSession,
   resolvePtyLaunch,
   startPtySession,
 } from '../lib/pty-launch.js';
@@ -75,9 +74,11 @@ interface CreateSessionBody {
    */
   command?: string;
   /**
-   * true なら PTY 起動後に claude を起動する。コマンドはタブの mode に応じてサーバーで組み立てる
+   * true なら PTY 起動後にタブの mode のエージェントを起動する。コマンドは mode に応じてサーバーで組み立てる
    * （ローカルLLMタブは MCP の絞り込み等の引数が付く）。command より優先する。
    */
+  agent?: boolean;
+  /** agent の旧名（互換のため残す） */
   claude?: boolean;
 }
 
@@ -271,7 +272,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
 
   // POST /terminal/sessions - セッション作成（または既存セッション再利用）
   fastify.post<{ Body: CreateSessionBody }>('/terminal/sessions', async (request, reply) => {
-    const { cwd, env, sessionId: requestedSessionId, claude, command } = request.body ?? {};
+    const { cwd, env, sessionId: requestedSessionId, agent, claude, command } = request.body ?? {};
 
     const sessionId = requestedSessionId ?? crypto.randomUUID();
 
@@ -290,7 +291,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         const launch = await resolvePtyLaunch(sessionId, launchRequest);
         await startPtySession(sessionId, launch, {
           request: launchRequest,
-          launchClaude: Boolean(claude),
+          launchAgent: Boolean(agent ?? claude),
           command,
         });
       })();
@@ -316,11 +317,14 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST /terminal/sessions/:sessionId/claude - 既存 PTY で claude を（再）起動する
-  // コマンドはタブの mode に応じてサーバーで組み立てる（ローカルLLMタブは引数が付くため）
-  fastify.post<{ Params: { sessionId: string } }>(
+  // POST /terminal/sessions/:sessionId/agent - 既存 PTY でエージェントを（再）起動する
+  // コマンドはタブの mode に応じてサーバーで組み立てる（ローカルLLMタブは引数が付くため）。
+  // /claude は旧パス（互換のため残す）
+  for (const route of [
+    '/terminal/sessions/:sessionId/agent',
     '/terminal/sessions/:sessionId/claude',
-    async (request, reply) => {
+  ]) {
+    fastify.post<{ Params: { sessionId: string } }>(route, async (request, reply) => {
       const { sessionId } = request.params;
       const session = ptyManager.getSession(sessionId);
       if (!session) {
@@ -328,23 +332,23 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       }
       const tab = await prisma.tab.findUnique({ where: { tabId: sessionId } }).catch(() => null);
       const mode = (tab?.mode ?? 'claude') as TabMode;
-      if (isLocalLlmMode(mode)) {
-        // 最初の発言を待たせないよう読み込みを始めておく（未設定等のエラーは中継口がタブに返す）
-        ensureActiveLoaded().catch(() => undefined);
+      const agent = getAgentForMode(mode);
+      if (!agent) {
+        return reply.status(400).send({ error: 'This tab does not run an agent' });
       }
       let command: string;
       try {
-        command = await buildClaudeCommand(sessionId, mode);
+        command = await agent.buildCommand(sessionId, mode);
       } catch (err) {
         return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) });
       }
-      // 環境変数の反映で PTY を作り直したときも claude を起動し直す
-      session.options.launchClaude = true;
-      await prepareClaudeConfigForSession(session);
+      // 環境変数の反映で PTY を作り直したときもエージェントを起動し直す
+      session.options.launchAgent = true;
+      await prepareAgentLaunchForSession(session, mode);
       session.pty.write(`${command}\n`);
       return reply.status(204).send();
-    }
-  );
+    });
+  }
 
   // POST /terminal/sessions/:sessionId/respawn - 環境変数の変更を今すぐ反映する（PTY を作り直す）
   fastify.post<{ Params: { sessionId: string } }>(

@@ -308,7 +308,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   tabId={tab.tab_id}
                   isActive={isActive}
                   cwd={task.worktreePath}
-                  launchClaude={tab.mode !== 'terminal'}
+                  launchAgent={tab.mode !== 'terminal'}
                   className="h-full"
                   initialTodos={tab.todos}
                   initialClaudeStatus={tab.status as ClaudeStatus}

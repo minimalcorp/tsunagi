@@ -35,10 +35,10 @@ interface TerminalViewProps {
   /** PTYに渡す環境変数 */
   env?: Record<string, string>;
   /**
-   * PTY起動後に claude を自動起動するか。コマンドはタブの mode に応じてサーバーが組み立てる
+   * PTY起動後にタブの mode のエージェントを自動起動するか。コマンドは mode に応じてサーバーが組み立てる
    * （ローカルLLMタブは MCP の絞り込み等の引数が付く）。新規セッション作成時のみ有効（reused時は無視）。
    */
-  launchClaude?: boolean;
+  launchAgent?: boolean;
   className?: string;
   /** タブID・Run Claude 等のツールバーを出さない（Claude のログイン用ターミナル等） */
   hideToolbar?: boolean;
@@ -71,7 +71,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     tabId,
     cwd,
     env,
-    launchClaude = false,
+    launchAgent = false,
     className = '',
     hideToolbar = false,
     initialTodos,
@@ -502,7 +502,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       const res = await fetch(apiUrl('/api/terminal/sessions'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cwd, env, sessionId, claude: launchClaude }),
+        body: JSON.stringify({ cwd, env, sessionId, agent: launchAgent }),
         signal,
       });
 
@@ -605,7 +605,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     socket.on('error', ({ message }: { message: string }) => {
       console.error('[TerminalView] Socket error message:', message);
       // サーバ側セッションが GC 済み等で存在しない場合、再接続では join が必ず失敗するため
-      // セッションを作り直す（POST /sessions で PTY を再起動し、launchClaude なら claude を resume）。
+      // セッションを作り直す（POST /sessions で PTY を再起動し、launchAgent ならエージェントを resume）。
       // 無限ループ防止のため自動再生成は1回までに制限し、connect 成功でリセットする。
       if (message.startsWith('Session not found') && sessionRecreateRef.current < 1) {
         sessionRecreateRef.current += 1;
@@ -716,7 +716,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     const sid = sessionIdRef.current;
     if (!sid) return;
     try {
-      const res = await fetch(apiUrl(`/api/terminal/sessions/${sid}/claude`), { method: 'POST' });
+      const res = await fetch(apiUrl(`/api/terminal/sessions/${sid}/agent`), { method: 'POST' });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(body?.error || `HTTPエラー: ${res.status}`);

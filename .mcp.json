@@ -4,6 +4,10 @@
       "command": "npx",
       "args": ["shadcn@latest", "mcp"]
     },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--isolated"]
+    },
     "serena": {
       "command": "docker",
       "args": [

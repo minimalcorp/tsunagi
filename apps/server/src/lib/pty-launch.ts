@@ -7,15 +7,8 @@ import { ptyManager, type PtySession } from '../pty-manager.js';
 import { prisma } from './db.js';
 import { getWorktreePath } from './worktree-manager.js';
 import { getEnv } from './repositories/environment.js';
-import {
-  ensureClaudeOnboardingCompleted,
-  removeLocalModelFromUserSettings,
-  watchUserSettingsForLocalModel,
-} from './claude-config-guard.js';
-import { LOCAL_LLM_UNSET_ENV_KEYS, LOCAL_MODEL_ALIAS, buildLocalLlmEnv } from './local-llm-env.js';
-import { ensureActiveLoaded, getLocalLlmSettings } from './local-llm.js';
-import { LOCAL_LLM_PROXY_URL, buildClaudeCommand, isLocalLlmMode } from './claude-command.js';
 import { resolveClaudeProfileEnv } from './claude-profiles.js';
+import { AgentLaunchError as PtyLaunchError, getAgentForMode } from './agents/index.js';
 
 // このファイル基準で解決する(cwd 非依存):
 //   dev:        apps/server/src/lib      → apps/server/scripts
@@ -45,18 +38,11 @@ export interface PtyLaunch {
   unsetKeys: string[];
 }
 
-export class PtyLaunchError extends Error {
-  constructor(
-    message: string,
-    readonly statusCode: number
-  ) {
-    super(message);
-  }
-}
+export { PtyLaunchError };
 
 /**
  * sessionId(=tab_id) から PTY の作業ディレクトリと環境変数を解決する。
- * 環境変数の優先順位: リクエストで渡されたenv > ローカルLLMのprovider env >
+ * 環境変数の優先順位: リクエストで渡されたenv > エージェント固有のenv（ローカルLLMの provider 等） >
  * DB env(global/owner/repo、Claude プロファイルを CLAUDE_CONFIG_DIR に変換) > tsunagi独自のEDITOR設定
  */
 export async function resolvePtyLaunch(
@@ -91,26 +77,14 @@ export async function resolvePtyLaunch(
   const dbEnv = tab ? await getEnv('repo', tab.task.owner, tab.task.repo) : await getEnv('global');
   const profile = resolveClaudeProfileEnv(dbEnv);
 
-  // ローカルLLMタブ: Anthropic の代わりに tsunagi の中継口（→ Ollama / LM Studio）で claude を動かす。
-  // DB の環境変数より後に適用し、Anthropic の認証トークンは環境変数ごと取り除く。
+  // エージェント固有の環境変数は DB の環境変数より後に適用する
   const mode = tab?.mode as TabMode | undefined;
-  let providerEnv: Record<string, string> = {};
-  let unsetKeys = profile.unsetKeys;
-  if (isLocalLlmMode(mode)) {
-    const { active, extraEnv } = await getLocalLlmSettings();
-    if (!active) {
-      throw new PtyLaunchError(
-        'ローカルLLMのモデルが未設定です。Settings で使用するモデルを選んでください',
-        400
-      );
-    }
-    providerEnv = buildLocalLlmEnv({
-      proxyUrl: LOCAL_LLM_PROXY_URL,
-      contextTokens: active.contextTokens,
-      extraEnv,
-    });
-    unsetKeys = [...new Set([...unsetKeys, ...LOCAL_LLM_UNSET_ENV_KEYS])];
-  }
+  const agentEnv = (await getAgentForMode(mode)?.resolveLaunchEnv(mode ?? 'claude')) ?? {
+    env: {},
+    unsetKeys: [],
+  };
+  const providerEnv = agentEnv.env;
+  const unsetKeys = [...new Set([...profile.unsetKeys, ...agentEnv.unsetKeys])];
 
   // tsunagi-editor.sh をデフォルトにすることで Ctrl+G が Monaco Modal を開く。
   // DB / リクエストで EDITOR が明示設定されている場合はそちらが優先される。
@@ -132,38 +106,20 @@ export async function resolvePtyLaunch(
 }
 
 /**
- * claude 起動前の補正。claude logout で .claude.json の hasCompletedOnboarding がリセットされて
- * いると、次回 claude 起動時にオンボーディングウィザードが表示され --resume/--session-id を前提にした
- * 自動起動フローが止まるため補正する。監視の取りこぼしに備え、中継口の名前が既定モデルに残って
- * いないかも補正する。対象はタブが使う Claude プロファイルの設定ディレクトリ。
- */
-async function prepareClaudeConfig(env: Record<string, string>): Promise<void> {
-  // PTY は外側 Terminal の環境を継承するため、プロファイル未指定なら外側の CLAUDE_CONFIG_DIR に従う
-  const configDir = env.CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR;
-  await ensureClaudeOnboardingCompleted(configDir);
-  await removeLocalModelFromUserSettings(LOCAL_MODEL_ALIAS, configDir);
-  watchUserSettingsForLocalModel(LOCAL_MODEL_ALIAS, configDir);
-}
-
-/**
- * 解決済みの launch で PTY を作り、claude を起動する。
+ * 解決済みの launch で PTY を作り、エージェントを起動する。
  * 新規作成（POST /terminal/sessions）と環境変数変更時の作り直し（pty-env-sync）で共用する。
  */
 export async function startPtySession(
   sessionId: string,
   launch: PtyLaunch,
-  options: { request: PtyLaunchRequest; launchClaude: boolean; command?: string }
+  options: { request: PtyLaunchRequest; launchAgent: boolean; command?: string }
 ): Promise<PtySession> {
   await fs.mkdir(launch.workingDir, { recursive: true });
 
-  let command = options.command;
-  if (options.launchClaude) {
-    if (isLocalLlmMode(launch.mode)) {
-      // 最初の発言を待たせないよう読み込みを始めておく（完了は待たない）
-      ensureActiveLoaded().catch(() => undefined);
-    }
-    command = await buildClaudeCommand(sessionId, launch.mode ?? 'claude');
-  }
+  const agent = options.launchAgent ? getAgentForMode(launch.mode) : undefined;
+  const command = agent
+    ? await agent.buildCommand(sessionId, launch.mode ?? 'claude')
+    : options.command;
 
   const session = ptyManager.createSession(
     sessionId,
@@ -172,7 +128,7 @@ export async function startPtySession(
     launch.unsetKeys,
     {
       request: options.request,
-      launchClaude: options.launchClaude,
+      launchAgent: options.launchAgent,
       syncEnv: true,
     }
   );
@@ -180,7 +136,7 @@ export async function startPtySession(
   // コマンドが指定されていればPTY起動後にシェルへ書き込む
   if (command) {
     const cmd = command.endsWith('\n') ? command : command + '\n';
-    await prepareClaudeConfig(launch.env);
+    await agent?.prepareLaunch(launch.env);
     // シェルの初期化（プロンプト表示）を待つため少し遅延させて書き込む
     setTimeout(() => {
       session.pty.write(cmd);
@@ -190,7 +146,10 @@ export async function startPtySession(
   return session;
 }
 
-/** 既存 PTY で claude を（再）起動する前の補正。PTY 作成時の環境変数のプロファイルを対象にする */
-export async function prepareClaudeConfigForSession(session: PtySession): Promise<void> {
-  await prepareClaudeConfig(session.appliedEnv);
+/** 既存 PTY でエージェントを（再）起動する前の補正。PTY 作成時の環境変数のプロファイルを対象にする */
+export async function prepareAgentLaunchForSession(
+  session: PtySession,
+  mode: TabMode | undefined
+): Promise<void> {
+  await getAgentForMode(mode)?.prepareLaunch(session.appliedEnv);
 }

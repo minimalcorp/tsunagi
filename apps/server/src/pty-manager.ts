@@ -50,8 +50,8 @@ function addTsunagiPluginDir(env: Record<string, string | undefined>): void {
 export interface PtySessionOptions {
   /** クライアントが指定した cwd / env */
   request?: { cwd?: string; env?: Record<string, string> };
-  /** 作成時に claude を起動したか（作り直し後も claude を --resume で起動する） */
-  launchClaude?: boolean;
+  /** 作成時にエージェントを起動したか（作り直し後もエージェントを resume で起動する） */
+  launchAgent?: boolean;
   /** tsunagi の環境変数の変更を自動で反映する対象か（Claude のログイン用 PTY 等は対象外） */
   syncEnv?: boolean;
 }
