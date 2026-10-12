@@ -19,7 +19,7 @@ By default Tsunagi uses the same configuration as running `codex` in your termin
 To log in or to use several accounts, open Settings → **Global** → **Codex Profile**. It works like [Claude Profiles](/en/features/claude-profiles/) and switches `CODEX_HOME`.
 
 - Profiles are created at `~/.tsunagi/codex-profiles/<name>/`.
-- **Login** runs `codex login` in a terminal. Where the browser cannot return to `127.0.0.1:1455` after authenticating (containers etc.), stop it with Ctrl+C and run `codex login --device-auth`.
+- **Login** runs `codex login` in a terminal. When Tsunagi runs in Docker, the browser cannot open `127.0.0.1:1455` after authenticating; paste the URL from its address bar into the dialog.
 - Tabs that use a profile drop `CODEX_API_KEY` / `CODEX_ACCESS_TOKEN` from the environment, since they take precedence over the login.
 
 ## Integration with Tsunagi

@@ -25,10 +25,6 @@ services:
       - '2891:2791'
       - '2892:2792'
       - '2893:2793'
-      # codex login のブラウザ認証の戻り先（127.0.0.1:1455、使用中なら 1457）。
-      # tsunagi がログイン中だけコンテナ内の codex へ中継する
-      - '127.0.0.1:1455:1455'
-      - '127.0.0.1:1457:1457'
     # root で volume 所有権と SSH socket 権限を修正後、node に切り替えて起動
     # npm ci (devDeps含む) → build → bundle → NODE_ENV=production で CLI 起動
     command:

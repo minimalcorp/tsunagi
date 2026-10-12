@@ -63,7 +63,7 @@ export interface AgentProfileSpec {
   loginCommand: string;
   /**
    * ブラウザでの OAuth の戻り先として CLI が 127.0.0.1 で待ち受けるポート（使用中のときの予備を含む）。
-   * コンテナ内ではホストのブラウザから届くよう中継する（login-callback-relay.ts）
+   * ブラウザから届かない環境（コンテナ内）では、ブラウザで開けなかった URL を貼り付けて CLI に渡す（login-callback.ts）
    */
   loginCallbackPorts?: number[];
   /** configDir が undefined ならシステム既定 */

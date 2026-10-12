@@ -19,7 +19,7 @@ description: Claude Code の代わりに Codex CLI をタスクのタブで使�
 未ログインの場合や、アカウントを使い分ける場合は Settings の **Global** → **Codex Profile** で操作します（[Claude プロファイル](/ja/features/claude-profiles/) と同じ仕組みで、`CODEX_HOME` を切り替えます）。
 
 - プロファイルは `~/.tsunagi/codex-profiles/<名前>/` に作られます
-- **Login** を押すと開いたターミナルで `codex login` を実行します。ブラウザでの認証後に `127.0.0.1:1455` へ戻れない環境（コンテナ等）では、Ctrl+C で止めて `codex login --device-auth` を実行してください
+- **Login** を押すと開いたターミナルで `codex login` を実行します。Docker 内で動かしている場合、認証後にブラウザが `127.0.0.1:1455` を開けないため、そのアドレスバーの URL をダイアログに貼り付けてください
 - プロファイルを選んだタブでは `CODEX_API_KEY` / `CODEX_ACCESS_TOKEN` を環境から取り除きます（ログインより優先されてしまうため）
 
 ## Tsunagi との連携

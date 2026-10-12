@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { CircleCheck } from 'lucide-react';
 import type { AgentAuthStatus, AgentProfileWithStatus } from '@minimalcorp/tsunagi-shared';
 import { apiUrl } from '@/lib/api-url';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { TerminalView } from '@/components/TerminalView';
 import { errorMessage, requestData } from './local-llm-ui';
@@ -22,16 +23,63 @@ interface AgentLoginDialogProps {
 const LOGIN_HINT: Record<AgentProfileWithStatus['agent'], string> = {
   claude:
     'ブラウザで認証してください。ブラウザが開かない場合は表示された URL を開き、表示されたコードをこのターミナルに貼り付けます。',
-  codex:
-    'ブラウザで認証してください。ブラウザが開かない場合は表示された URL を開きます。認証後に 127.0.0.1:1455 へ戻れない環境（コンテナ等）では Ctrl+C で止め、codex login --device-auth を実行してください。',
+  codex: 'ブラウザで認証してください。ブラウザが開かない場合は表示された URL を開きます。',
 };
+
+/**
+ * ブラウザから CLI の待ち受け（127.0.0.1）に届かない環境（コンテナ内）で、認証後にブラウザが開けなかった
+ * 戻り先の URL を貼り付けて CLI に渡す欄
+ */
+function CallbackPasteForm({ sessionId }: { sessionId: string }) {
+  const [url, setUrl] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    requestData(`/api/agent-profiles/login/${sessionId}/callback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    })
+      .then(() => setUrl(''))
+      .catch((err: unknown) => setError(errorMessage(err)))
+      .finally(() => setSubmitting(false));
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-1">
+      <p className="text-xs text-muted-foreground">
+        認証後にブラウザが 127.0.0.1 のページを開けなかったら、そのアドレスバーの URL
+        を貼り付けてください。
+      </p>
+      <div className="flex gap-2">
+        <Input
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+          placeholder="http://127.0.0.1:1455/auth/callback?code=..."
+          aria-label="Callback URL"
+        />
+        <Button type="submit" disabled={!url.trim() || submitting}>
+          Submit
+        </Button>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </form>
+  );
+}
 
 /**
  * プロファイルの設定ディレクトリでログインコマンド（`claude auth login` / `codex login`）を実行するターミナル。
  * ブラウザでの認証をこのターミナルで行い、ログインを確認したら完了表示にする。
  */
 export function AgentLoginDialog({ profile, onClose }: AgentLoginDialogProps) {
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [session, setSession] = useState<{ sessionId: string; callbackPaste: boolean } | null>(
+    null
+  );
+  const sessionId = session?.sessionId ?? null;
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<AgentAuthStatus | null>(null);
 
@@ -39,7 +87,7 @@ export function AgentLoginDialog({ profile, onClose }: AgentLoginDialogProps) {
   useEffect(() => {
     let id: string | null = null;
     let cancelled = false;
-    requestData<{ sessionId: string }>(
+    requestData<{ sessionId: string; callbackPaste: boolean }>(
       `/api/agent-profiles/${profile.agent}/${profile.slug}/login`,
       { method: 'POST' }
     )
@@ -49,7 +97,7 @@ export function AgentLoginDialog({ profile, onClose }: AgentLoginDialogProps) {
           void fetch(apiUrl(`/api/agent-profiles/login/${id}`), { method: 'DELETE' });
           return;
         }
-        setSessionId(data.sessionId);
+        setSession(data);
       })
       .catch((err: unknown) => setError(errorMessage(err)));
     return () => {
@@ -103,6 +151,7 @@ export function AgentLoginDialog({ profile, onClose }: AgentLoginDialogProps) {
             {profile.status.loggedIn && ' 再ログインが終わったら閉じてください。'}
           </p>
         )}
+        {!loggedIn && session?.callbackPaste && <CallbackPasteForm sessionId={session.sessionId} />}
         <div className="h-[420px] overflow-hidden rounded-md border border-border">
           {error ? (
             <div className="flex h-full items-center justify-center text-sm text-destructive">
