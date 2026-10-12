@@ -23,8 +23,6 @@ import { watchUserSettingsForLocalModel } from './lib/claude-config-guard.js';
 import { LOCAL_MODEL_ALIAS } from './lib/local-llm-env.js';
 import { terminalRoutes } from './routes/terminal.js';
 import { editorRoutes } from './routes/editor.js';
-import { whisperRoutes } from './routes/whisper.js';
-import { stopWhisperServerOnExit } from './lib/whisper-process.js';
 import { settingsRoutes } from './routes/settings.js';
 import { versionRoutes } from './routes/version.js';
 import { startUpdateCheck, stopUpdateCheck } from './lib/update-check.js';
@@ -131,7 +129,6 @@ async function start() {
   await fastify.register(mcpWebRoutes, { prefix: '/api' });
   await fastify.register(terminalRoutes, { prefix: '/api' });
   await fastify.register(editorRoutes, { prefix: '/api' });
-  await fastify.register(whisperRoutes, { prefix: '/api' });
   await fastify.register(settingsRoutes, { prefix: '/api' });
   await fastify.register(localLlmRoutes, { prefix: '/api' });
   await fastify.register(versionRoutes, { prefix: '/api' });
@@ -208,7 +205,6 @@ async function start() {
     stopAutoUpdate();
     // PTY（claude を含む）は SIGHUP 任せにせず、ここで止める
     ptyManager.deleteAllSessions();
-    stopWhisperServerOnExit();
     stopSearxngOnExit();
     // 設定で有効なら、ローカルLLMのモデルをメモリから外す（バッテリー・メモリ節約）。
     // 開発時の tsx watch はファイル変更のたびに SIGTERM で再起動するため、その場合は外さない
@@ -228,7 +224,6 @@ async function start() {
   });
   // SIGINT/SIGTERM を経由しない異常終了時の最後の砦（'exit' は同期処理のみ可能）。
   process.on('exit', () => {
-    stopWhisperServerOnExit();
     stopSearxngOnExit();
   });
 }

@@ -48,7 +48,6 @@ import { RESTART_EXIT_CODE } from './versions.js';
  *   <pkg>/dist/prisma.config.ts                  ← passed via --config by dist/auto-migrate.js
  *   <pkg>/dist/scripts/monaco-editor.sh          ← $EDITOR for Ctrl+G (resolved by dist/server/routes/terminal.js)
  *   <pkg>/dist/docs/                             ← bundled from apps/docs/out (served on DOCS_PORT)
- *   <pkg>/dist/whisper-server/                   ← bundled from apps/whisper-server
  *   <pkg>/tsunagi-marketplace/plugins/tsunagi-plugin/.claude-plugin/plugin.json
  */
 

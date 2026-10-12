@@ -1,8 +1,0 @@
-mlx-whisper==0.4.3
-mlx-qwen3-asr==0.4.4
-mlx==0.32.0
-fastapi
-uvicorn[standard]
-python-multipart
-numpy
-av

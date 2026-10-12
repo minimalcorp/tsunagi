@@ -3,7 +3,7 @@ import * as path from 'path';
 import type { AgentAuthStatus, AgentProfile } from '@minimalcorp/tsunagi-shared';
 import { prisma } from './db.js';
 import { getTsunagiDataDir } from './data-path.js';
-import { AGENTS, type AgentAdapter } from './agents/index.js';
+import { AGENTS, getAgentAvailability, type AgentAdapter } from './agents/index.js';
 
 /**
  * エージェントのプロファイル（Claude: CLAUDE_CONFIG_DIR / Codex: CODEX_HOME）。
@@ -102,7 +102,12 @@ export async function deleteProfile(agent: AgentAdapter, slug: string): Promise<
   await fs.rm(configDir, { recursive: true, force: true });
 }
 
-export function getProfileAuthStatus(agent: AgentAdapter, slug: string): Promise<AgentAuthStatus> {
+/** CLI が未導入なら CLI を呼ばずに未ログインとする */
+export async function getProfileAuthStatus(
+  agent: AgentAdapter,
+  slug: string
+): Promise<AgentAuthStatus> {
+  if (!(await getAgentAvailability(agent)).installed) return { loggedIn: false };
   return agent.profile.getAuthStatus(getProfileConfigDir(agent, slug));
 }
 

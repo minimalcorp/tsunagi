@@ -9,10 +9,8 @@ import {
   useEffect,
   useMemo,
 } from 'react';
-import type { AgentAvailability, LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
+import type { LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
-import { VoiceTranscriptOverlay } from '@/components/VoiceTranscriptOverlay';
-import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
 import {
   TerminalView,
@@ -31,6 +29,7 @@ import {
   useOllamaSettings,
 } from '@/hooks/useLocalLlmSettings';
 import { useAgentAvailability } from '@/hooks/useAgentAvailability';
+import { agentDisabledReason } from '@/lib/agent-availability';
 
 export interface TabStatusEntry {
   /** TerminalView 未マウント（一度も表示していないタブ）の場合は null */
@@ -58,23 +57,15 @@ export type TabCreateMode = Tab['mode'];
 export interface LocalLlmTabOption {
   /** 使用中のモデルのプロバイダー（アイコン用）。未設定なら null */
   provider: LocalLlmProvider | null;
-  /** 使用中のモデル。未設定（空）ならボタンを無効化する */
+  /** 使用中のモデル */
   model: string;
+  /** 使えない理由（Claude Code の CLI が使えない、モデルが未設定）。あれば無効化して title に出す */
+  disabledReason?: string;
 }
 
 /** エージェントのタブ作成ボタンの状態。disabledReason があれば無効化して title に出す */
 export interface AgentTabOption {
   disabledReason?: string;
-}
-
-/** CLI が使えない理由（使えるなら undefined） */
-function agentDisabledReason(label: string, availability: AgentAvailability | undefined) {
-  if (!availability) return undefined;
-  if (!availability.installed) return `${label} の CLI が見つかりません`;
-  if (!availability.supported) {
-    return `${label} ${availability.version ?? ''} は古いため使えません（${availability.minVersion} 以上が必要）`;
-  }
-  return undefined;
 }
 
 /** TerminalPanelの外部からアクセス可能なハンドル */
@@ -254,27 +245,18 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const { settings: ollamaSettings } = useOllamaSettings();
     const { settings: lmStudioSettings } = useLmStudioSettings();
     const { settings: localLlmSettings } = useLocalLlmSettings();
+    // ローカルLLMのタブは Claude Code を起動するため、claude の CLI が必要
+    const localLlmModel = localLlmSettings?.active?.model ?? '';
     const localLlmOption: LocalLlmTabOption | undefined =
       ollamaSettings?.enabled || lmStudioSettings?.enabled
         ? {
             provider: localLlmSettings?.active?.provider ?? null,
-            model: localLlmSettings?.active?.model ?? '',
+            model: localLlmModel,
+            disabledReason:
+              claudeOption.disabledReason ??
+              (localLlmModel ? undefined : 'ローカルLLMのモデルが未設定です（Settings で設定）'),
           }
         : undefined;
-
-    // 確定した文字起こしは、その時点でアクティブなタブへ入力する。
-    // Enterは送らず、内容を確認してからユーザーが送信する。
-    const handleVoiceInputFinal = useCallback(
-      (text: string) => {
-        if (!activeTabId) return;
-        const handle = terminalRefs.current.get(activeTabId);
-        handle?.sendInput(text);
-        // 音声入力ボタンの操作でフォーカスが外れていることがあるため、続けてEnterで送信できるよう xterm に戻す
-        handle?.focus();
-      },
-      [activeTabId]
-    );
-    const voiceInput = useVoiceInput({ onFinal: handleVoiceInputFinal });
 
     const handleTabDelete = useCallback(
       (tabId: string) => {
@@ -311,7 +293,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             onTabCreateLocalLlm={handleTabCreateLocalLlm}
             onTabDelete={handleTabDelete}
             tabStatusMap={tabStatusMap}
-            voiceInput={tabs.length > 0 || voiceInput.status !== 'off' ? voiceInput : undefined}
           />
         </div>
 
@@ -384,15 +365,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                 {localLlmOption && (
                   <span
                     title={
-                      localLlmOption.model
-                        ? `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
-                        : 'ローカルLLMのモデルが未設定です（Settings で設定）'
+                      localLlmOption.disabledReason ??
+                      `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
                     }
                   >
                     <Button
                       variant="outline"
                       onClick={() => void handleTabCreateLocalLlm()}
-                      disabled={!localLlmOption.model}
+                      disabled={Boolean(localLlmOption.disabledReason)}
                     >
                       <LocalLlmTabIcon provider={localLlmOption.provider} className="w-4 h-4" />
                       {localLlmTabLabel(localLlmOption.provider)}
@@ -406,8 +386,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               </div>
             </div>
           )}
-
-          <VoiceTranscriptOverlay utterances={voiceInput.utterances} />
 
           {tabs.length > 0 && !activeTabId && (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">

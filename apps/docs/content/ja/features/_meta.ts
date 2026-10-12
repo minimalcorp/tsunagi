@@ -6,6 +6,7 @@ export default {
   'environment-variables': '環境変数管理',
   'claude-profiles': 'Claude プロファイル',
   codex: 'Codex',
+  'voice-input': '音声入力（mukuchi）',
   'local-llm': 'ローカルLLM（実験的機能）',
   ollama: 'Ollama',
   'lm-studio': 'LM Studio',
