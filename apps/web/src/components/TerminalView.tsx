@@ -141,10 +141,28 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         selectionBackground: '#264f78',
       }
     : {
+        // --card / --foreground に合わせる
         background: '#ffffff',
-        foreground: '#1e1e1e',
-        cursor: '#1e1e1e',
-        selectionBackground: '#add6ff',
+        foreground: '#121719',
+        cursor: '#121719',
+        selectionBackground: '#c8d9f7',
+        // xterm.js 既定の ANSI 色は暗背景向けで、黄・白系が白地で消えるため GitHub Light 系に置き換える
+        black: '#24292f',
+        red: '#cf222e',
+        green: '#116329',
+        yellow: '#7d4e00',
+        blue: '#0550ae',
+        magenta: '#8250df',
+        cyan: '#1b7c83',
+        white: '#6e7781',
+        brightBlack: '#57606a',
+        brightRed: '#a40e26',
+        brightGreen: '#1a7f37',
+        brightYellow: '#633c01',
+        brightBlue: '#0969da',
+        brightMagenta: '#a475f9',
+        brightCyan: '#3192aa',
+        brightWhite: '#8c959f',
       };
 
   // status/agentStatus 変化時に親へ通知
@@ -208,6 +226,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       fontSize: 13,
       fontFamily: '"Cascadia Code", "Fira Code", "Menlo", monospace',
       theme: xtermTheme,
+      // CLI 側が暗背景向けの色で出力しても白地で読めるよう、light では文字色を AA まで自動補正する
+      minimumContrastRatio: isDark ? 1 : 4.5,
       allowProposedApi: true,
     });
 
@@ -344,6 +364,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   useEffect(() => {
     if (termRef.current) {
       termRef.current.options.theme = xtermTheme;
+      termRef.current.options.minimumContrastRatio = isDark ? 1 : 4.5;
     }
   }, [isDark]); // eslint-disable-line react-hooks/exhaustive-deps
 

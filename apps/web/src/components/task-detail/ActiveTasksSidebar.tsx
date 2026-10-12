@@ -66,9 +66,9 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
   }, [tasks, currentTaskId]);
 
   return (
-    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-card">
+    <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border bg-background dark:bg-card">
       {/* 詳細ページのヘッダー（p-4 + h-8 の行 + border）と高さを揃える */}
-      <div className="flex h-8 shrink-0 box-content items-center gap-2 border-b border-border p-4">
+      <div className="flex h-8 shrink-0 box-content items-center gap-2 border-b border-border bg-card p-4">
         <span className="text-sm font-medium text-foreground">Active</span>
         <Badge variant="secondary">{items.length}</Badge>
       </div>

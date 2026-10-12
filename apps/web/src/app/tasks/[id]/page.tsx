@@ -350,8 +350,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
       {/* Scrollable content */}
       <div className="flex-1 flex flex-col min-h-0">
-        {/* TerminalPanel */}
-        <div className="bg-card flex flex-col flex-1 min-h-0">
+        {/* TerminalPanel: light はトップページと同じく地を background、ターミナルを card にして境界を出す */}
+        <div className="bg-background dark:bg-card flex flex-col flex-1 min-h-0">
           {worktreeExists ? (
             <TerminalPanel
               ref={terminalPanelRef}

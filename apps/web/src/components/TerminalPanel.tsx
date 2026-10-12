@@ -346,7 +346,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   cwd={task.worktreePath}
                   launchAgent={tab.mode !== 'terminal'}
                   mode={tab.mode}
-                  className="h-full"
+                  className="h-full overflow-hidden rounded-lg border border-border bg-card dark:rounded-none dark:border-0"
                   initialTodos={tab.todos}
                   initialAgentStatus={tab.status as AgentStatus}
                   onTodosUpdated={onTodosUpdated}
