@@ -168,9 +168,9 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
         {progress.total > 0 && (
           <div className="space-y-0.5">
             <div className="flex items-center gap-1.5">
+              {/* Base UI の既定 aria-valuetext は max を考慮せず value を % として扱うため割合で渡す */}
               <Progress
-                value={progress.completed}
-                max={progress.total}
+                value={Math.round((progress.completed / progress.total) * 100)}
                 className="flex-1 gap-0 [&_[data-slot=progress-track]]:h-[3px]"
               />
               <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">

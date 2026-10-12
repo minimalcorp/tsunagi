@@ -36,9 +36,9 @@ export function TodoProgressPopover({ todos, className }: { todos: Todo[]; class
             {progress.current}
           </span>
         )}
+        {/* Base UI の既定 aria-valuetext は max を考慮せず value を % として扱うため割合で渡す */}
         <Progress
-          value={progress.completed}
-          max={progress.total}
+          value={Math.round((progress.completed / progress.total) * 100)}
           className="w-16 shrink-0 gap-0 [&_[data-slot=progress-track]]:h-[3px]"
         />
         <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
