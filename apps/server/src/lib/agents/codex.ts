@@ -181,7 +181,11 @@ async function writeLauncher(): Promise<string> {
   const script = `#!/bin/sh
 # usage: launch-codex.sh [<codex-session-id>]
 session_id=$1
-set -- ${args.join(' \\\n  ')}
+# 作業フォルダの信頼確認を出さない（Claude の --dangerously-skip-permissions と揃える）。
+# -c のキーはドットで区切られパスを書けないため、projects をインラインテーブルで渡す
+cwd_key=$(pwd -P | sed 's/[\\\\"]/\\\\&/g')
+set -- ${args.join(' \\\n  ')} \\
+  -c "projects={\\"$cwd_key\\"={trust_level=\\"trusted\\"}}"
 codex_home=\${CODEX_HOME:-$HOME/.codex}
 if [ -n "$session_id" ] &&
   [ -n "$(find "$codex_home/sessions" -name "rollout-*-$session_id.jsonl" 2>/dev/null | head -n 1)" ]; then
@@ -239,6 +243,8 @@ const codexProfile: AgentProfileSpec = {
   defaultConfigDir: '~/.codex',
   // ブラウザでの OAuth（127.0.0.1:1455 で待ち受け）。戻れない環境ではユーザーが --device-auth に切り替える
   loginCommand: 'codex login',
+  // codex login はブラウザでの認証の戻りを 127.0.0.1:1455（使用中なら 1457）で待つ
+  loginCallbackPorts: [1455, 1457],
 
   // `codex login status` は終了コードでログイン状態を返し、stderr に1行だけ方式を出す
   async getAuthStatus(configDir) {

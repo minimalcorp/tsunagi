@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { io, type Socket } from 'socket.io-client';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -212,6 +213,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
+    // 平文の URL をクリックで新しいタブに開けるようにする（Codex のログイン URL 等。
+    // Claude Code は OSC 8 のハイパーリンクで出力するため、これが無くてもリンクになる）
+    term.loadAddon(new WebLinksAddon());
     term.open(containerRef.current);
     fitAddon.fit();
 

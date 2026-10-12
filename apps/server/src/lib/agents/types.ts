@@ -61,6 +61,11 @@ export interface AgentProfileSpec {
   defaultConfigDir: string;
   /** ログイン用 PTY に書き込むコマンド */
   loginCommand: string;
+  /**
+   * ブラウザでの OAuth の戻り先として CLI が 127.0.0.1 で待ち受けるポート（使用中のときの予備を含む）。
+   * コンテナ内ではホストのブラウザから届くよう中継する（login-callback-relay.ts）
+   */
+  loginCallbackPorts?: number[];
   /** configDir が undefined ならシステム既定 */
   getAuthStatus(configDir: string | undefined): Promise<AgentAuthStatus>;
   logout(configDir: string): Promise<void>;

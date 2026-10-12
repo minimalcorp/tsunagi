@@ -296,13 +296,19 @@ select:hover:not(:focus):not(:disabled) {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--error) 50%, transparent);
 }
 
-/* Select chevron */
+/* Select chevron
+ * 背景画像の SVG は currentColor を継承できない（黒になる）ため、テーマごとに --muted-foreground と
+ * 同じ色（light: oklch(0.56 0.021 213.5) / dark: oklch(0.723 0.014 214.4) を sRGB にしたもの）を埋め込む */
 select {
   appearance: none;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2367787c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-size: 1.25rem;
   background-position: right 0.75rem center;
   background-repeat: no-repeat;
+}
+
+.dark select {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%239ca8ab' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 }
 
 /* Animations */

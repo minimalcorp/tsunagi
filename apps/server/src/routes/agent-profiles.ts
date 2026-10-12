@@ -16,6 +16,7 @@ import {
   profileExists,
 } from '../lib/agent-profiles.js';
 import { notifyEnvChanged } from '../lib/pty-env-sync.js';
+import { startLoginCallbackRelay } from '../lib/agents/login-callback-relay.js';
 
 type Scope = 'global' | 'owner' | 'repo';
 
@@ -35,6 +36,25 @@ interface AssignmentBody {
 
 /** ログイン用 PTY の sessionId の接頭辞（タブの PTY と区別する） */
 const LOGIN_SESSION_PREFIX = 'agent-login-';
+
+/** ログインの戻り先の中継を止めるまでの上限（閉じ忘れ・PTY が残った場合に備える） */
+const LOGIN_RELAY_TIMEOUT_MS = 15 * 60 * 1000;
+
+/**
+ * ログイン用 PTY ごとの戻り先の中継の停止関数。ポートを取り合わないよう、PTY を閉じるときに同期的に止める
+ * （PTY の終了通知を待つと、続けて開いた次のログインの中継と重なる）
+ */
+const loginRelays = new Map<string, () => void>();
+
+function stopLoginRelay(sessionId: string): void {
+  loginRelays.get(sessionId)?.();
+  loginRelays.delete(sessionId);
+}
+
+function closeLoginSession(sessionId: string): void {
+  stopLoginRelay(sessionId);
+  ptyManager.deleteSession(sessionId);
+}
 
 function validateScope(scope: Scope | undefined, owner?: string, repo?: string): string | null {
   if (scope !== 'global' && scope !== 'owner' && scope !== 'repo') return 'Invalid scope';
@@ -156,17 +176,29 @@ export async function agentProfilesRoutes(fastify: FastifyInstance) {
       if (!(await profileExists(agent, slug))) {
         return reply.status(404).send({ error: 'Profile not found' });
       }
-      // 同じプロファイルのログイン用 PTY が残っていれば閉じる
-      const prefix = `${LOGIN_SESSION_PREFIX}${agent.id}-${slug}-`;
+      // 同じエージェントのログイン用 PTY が残っていれば閉じる（戻り先のポートを1つの CLI に使わせる）
+      const agentPrefix = `${LOGIN_SESSION_PREFIX}${agent.id}-`;
       for (const id of ptyManager.listSessions()) {
-        if (id.startsWith(prefix)) ptyManager.deleteSession(id);
+        if (id.startsWith(agentPrefix)) closeLoginSession(id);
       }
+      const prefix = `${agentPrefix}${slug}-`;
       const sessionId = `${prefix}${crypto.randomUUID()}`;
       const { env, unsetKeys } = loginPtyEnv(agent, slug);
       const configDir = env[agent.profile.configDirEnvKey];
       // CODEX_HOME は存在しないと codex が起動しない
       if (configDir) await mkdir(configDir, { recursive: true });
       const session = ptyManager.createSession(sessionId, os.homedir(), env, unsetKeys);
+      // コンテナ内では、ホストのブラウザからの OAuth の戻りを CLI に中継する。ログイン用 PTY が終わるまで
+      const { loginCallbackPorts } = agent.profile;
+      if (loginCallbackPorts) {
+        const stop = startLoginCallbackRelay(loginCallbackPorts, (msg) => fastify.log.warn(msg));
+        const timer = setTimeout(() => stopLoginRelay(sessionId), LOGIN_RELAY_TIMEOUT_MS);
+        loginRelays.set(sessionId, () => {
+          clearTimeout(timer);
+          stop();
+        });
+        session.pty.onExit(() => stopLoginRelay(sessionId));
+      }
       // シェルの初期化（プロンプト表示）を待つため少し遅延させて書き込む
       setTimeout(() => session.pty.write(`${agent.profile.loginCommand}\n`), 300);
       return reply.status(201).send({ data: { sessionId } });
@@ -181,7 +213,7 @@ export async function agentProfilesRoutes(fastify: FastifyInstance) {
       if (!sessionId.startsWith(LOGIN_SESSION_PREFIX)) {
         return reply.status(400).send({ error: 'Not a login session' });
       }
-      ptyManager.deleteSession(sessionId);
+      closeLoginSession(sessionId);
       return reply.status(204).send();
     }
   );
