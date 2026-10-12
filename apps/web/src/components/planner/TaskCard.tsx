@@ -14,7 +14,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { Task } from '@minimalcorp/tsunagi-shared';
-import { unreadKind, type UnreadKind } from '@/lib/claude-status';
+import { unreadKind, type UnreadKind } from '@/lib/agent-status';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -42,7 +42,7 @@ const UNREAD_MARKER: Record<UnreadKind, { className: string; label: string }> = 
   waiting: { className: 'bg-unread-waiting', label: 'Waiting for your input' },
 };
 
-function ClaudeStatusIndicator({ tabs }: { tabs: Task['tabs'] }) {
+function AgentStatusIndicator({ tabs }: { tabs: Task['tabs'] }) {
   if (!tabs || tabs.length === 0) return null;
 
   const running = tabs.some((t) => t.status === 'running');
@@ -86,7 +86,7 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
   const [copied, setCopied] = useState(false);
   const repoColor = getRepoColor(task.owner, task.repo);
   const tabs = task.tabs ?? [];
-  const isClaudeRunning = tabs.some((t) => t.status === 'running');
+  const isAgentRunning = tabs.some((t) => t.status === 'running');
   const marker = unreadKind(task);
 
   // 全タブの合計。タブごとにリアルタイムの tabTodosMap を優先し、なければ DB の todos を使う
@@ -112,7 +112,7 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
       onClick={() => router.push(`/tasks/${task.id}`)}
       className={cn(
         'relative rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md cursor-pointer',
-        isClaudeRunning && 'opacity-50'
+        isAgentRunning && 'opacity-50'
       )}
     >
       {/* 未確認マーカー: カード上下から10px内側に入れた左端のバー */}
@@ -132,7 +132,7 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
         {/* ID + Status */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1">
-            <ClaudeStatusIndicator tabs={task.tabs} />
+            <AgentStatusIndicator tabs={task.tabs} />
             <span className="font-mono text-xs text-muted-foreground">{shortId}</span>
             <button
               onClick={handleCopyId}

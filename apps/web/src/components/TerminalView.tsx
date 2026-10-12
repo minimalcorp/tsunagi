@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { io, type Socket } from 'socket.io-client';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -20,12 +21,12 @@ import { Button } from '@/components/ui/button';
 import { TodoProgressPopover } from '@/components/TodoProgressPopover';
 import { apiUrl, getServerUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
-import type { Todo } from '@minimalcorp/tsunagi-shared';
+import type { TabMode, Todo } from '@minimalcorp/tsunagi-shared';
 
 export type { Todo };
 
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
-export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
+export type AgentStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
 
 interface TerminalViewProps {
   /** タブID（PTYのsessionIdと一致させる）。必須。 */
@@ -35,17 +36,19 @@ interface TerminalViewProps {
   /** PTYに渡す環境変数 */
   env?: Record<string, string>;
   /**
-   * PTY起動後に claude を自動起動するか。コマンドはタブの mode に応じてサーバーが組み立てる
+   * PTY起動後にタブの mode のエージェントを自動起動するか。コマンドは mode に応じてサーバーが組み立てる
    * （ローカルLLMタブは MCP の絞り込み等の引数が付く）。新規セッション作成時のみ有効（reused時は無視）。
    */
-  launchClaude?: boolean;
+  launchAgent?: boolean;
+  /** タブの起動モード（Run ボタンの表示と、ESC 中断の検知に使う） */
+  mode?: TabMode;
   className?: string;
   /** タブID・Run Claude 等のツールバーを出さない（Claude のログイン用ターミナル等） */
   hideToolbar?: boolean;
   /** DBから読み込んだ初期Todoリスト */
   initialTodos?: Todo[];
   /** DBから読み込んだ初期Claudeステータス（ページ再訪時にsuccess等を維持するため） */
-  initialClaudeStatus?: ClaudeStatus;
+  initialAgentStatus?: AgentStatus;
   /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
   /** タブがアクティブかどうか（フォーカス制御用） */
@@ -54,7 +57,7 @@ interface TerminalViewProps {
   onStatusChange?: (
     tabId: string,
     terminalStatus: TerminalStatus,
-    claudeStatus: ClaudeStatus
+    agentStatus: AgentStatus
   ) => void;
 }
 
@@ -71,11 +74,12 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     tabId,
     cwd,
     env,
-    launchClaude = false,
+    launchAgent = false,
+    mode,
     className = '',
     hideToolbar = false,
     initialTodos,
-    initialClaudeStatus,
+    initialAgentStatus,
     isActive,
     onTodosUpdated,
     onStatusChange,
@@ -112,9 +116,12 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const [status, setStatus] = useState<TerminalStatus>('idle');
   // セッション作成APIが返したエラー（例: Ollama のモデル未設定）。error オーバーレイに表示する
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>(initialClaudeStatus ?? 'idle');
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>(initialAgentStatus ?? 'idle');
   // ESC中断検知（term.onData のクロージャから最新値を読むためのref）
-  const claudeStatusRef = useRef<ClaudeStatus>(initialClaudeStatus ?? 'idle');
+  const agentStatusRef = useRef<AgentStatus>(initialAgentStatus ?? 'idle');
+  // onData のハンドラは接続時に一度だけ登録するため、最新の mode は ref で参照する
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const [todos, setTodos] = useState<Todo[]>(initialTodos ?? []);
   const [copied, setCopied] = useState(false);
   // tsunagi の環境変数が変わり、PTY の作り直し（反映）待ちの状態。サーバーが env-pending で通知する
@@ -140,10 +147,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         selectionBackground: '#add6ff',
       };
 
-  // status/claudeStatus 変化時に親へ通知
+  // status/agentStatus 変化時に親へ通知
   useEffect(() => {
-    onStatusChangeRef.current?.(tabId, status, claudeStatus);
-  }, [tabId, status, claudeStatus]);
+    onStatusChangeRef.current?.(tabId, status, agentStatus);
+  }, [tabId, status, agentStatus]);
 
   useLayoutEffect(() => {
     isActiveRef.current = isActive;
@@ -154,7 +161,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   });
 
   useLayoutEffect(() => {
-    claudeStatusRef.current = claudeStatus;
+    agentStatusRef.current = agentStatus;
   });
 
   // アクティブになったタイミングで xterm にフォーカスを当てる
@@ -206,6 +213,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
+    // 平文の URL をクリックで新しいタブに開けるようにする（Codex のログイン URL 等。
+    // Claude Code は OSC 8 のハイパーリンクで出力するため、これが無くてもリンクになる）
+    term.loadAddon(new WebLinksAddon());
     term.open(containerRef.current);
     fitAddon.fit();
 
@@ -528,7 +538,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       const res = await fetch(apiUrl('/api/terminal/sessions'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cwd, env, sessionId, claude: launchClaude }),
+        body: JSON.stringify({ cwd, env, sessionId, agent: launchAgent }),
         signal,
       });
 
@@ -631,7 +641,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     socket.on('error', ({ message }: { message: string }) => {
       console.error('[TerminalView] Socket error message:', message);
       // サーバ側セッションが GC 済み等で存在しない場合、再接続では join が必ず失敗するため
-      // セッションを作り直す（POST /sessions で PTY を再起動し、launchClaude なら claude を resume）。
+      // セッションを作り直す（POST /sessions で PTY を再起動し、launchAgent ならエージェントを resume）。
       // 無限ループ防止のため自動再生成は1回までに制限し、connect 成功でリセットする。
       if (message.startsWith('Session not found') && sessionRecreateRef.current < 1) {
         sessionRecreateRef.current += 1;
@@ -667,8 +677,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // claude hooksからのステータス変更
     socket.on(
       'status-changed',
-      ({ status: newStatus }: { sessionId: string; status: ClaudeStatus }) => {
-        setClaudeStatus(newStatus);
+      ({ status: newStatus }: { sessionId: string; status: AgentStatus }) => {
+        setAgentStatus(newStatus);
       }
     );
 
@@ -692,10 +702,12 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
 
     onDataDisposeRef.current = term.onData((data) => {
       // ESC単体（矢印キー等のエスケープシーケンスは複数バイトのため対象外）押下時、
-      // running/waiting中ならClaude中断とみなしサーバへ通知する
+      // running/waiting中ならClaude中断とみなしサーバへ通知する。
+      // Codex は中断を Interrupt hook で通知するため対象外
       if (
         data === '\x1b' &&
-        (claudeStatusRef.current === 'running' || claudeStatusRef.current === 'waiting') &&
+        modeRef.current !== 'codex' &&
+        (agentStatusRef.current === 'running' || agentStatusRef.current === 'waiting') &&
         sessionIdRef.current
       ) {
         void notifyInterrupt(sessionIdRef.current);
@@ -738,11 +750,11 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   }
 
   // コマンドはタブの mode に応じてサーバーが組み立てて PTY に書き込む
-  async function handleRunClaude() {
+  async function handleRunAgent() {
     const sid = sessionIdRef.current;
     if (!sid) return;
     try {
-      const res = await fetch(apiUrl(`/api/terminal/sessions/${sid}/claude`), { method: 'POST' });
+      const res = await fetch(apiUrl(`/api/terminal/sessions/${sid}/agent`), { method: 'POST' });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(body?.error || `HTTPエラー: ${res.status}`);
@@ -750,12 +762,13 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     } catch (error) {
       toaster.create({
         type: 'error',
-        title: 'Claude を起動できません',
+        title: `${agentLabel} を起動できません`,
         description: error instanceof Error ? error.message : String(error),
       });
     }
   }
 
+  const agentLabel = mode === 'codex' ? 'Codex' : 'Claude';
   const isConnecting = status === 'connecting';
   const isPausedOrExited = status === 'paused' || status === 'exited' || status === 'error';
   const isConnected = status === 'connected';
@@ -783,12 +796,12 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
             </Button>
             <Button
               size="xs"
-              onClick={() => void handleRunClaude()}
+              onClick={() => void handleRunAgent()}
               disabled={!isConnected}
-              title="Run Claude"
+              title={`Run ${agentLabel}`}
             >
               <Play className="w-3 h-3" />
-              Run Claude
+              Run {agentLabel}
             </Button>
             <Button
               variant="ghost"

@@ -11,9 +11,9 @@ You will need:
 
 - **Node.js ≥ 20**
 - **Git ≥ 2.42** (Tsunagi uses `git worktree add --orphan`, which requires Git 2.42 or later)
-- **[Claude Code CLI](https://docs.claude.com/en/docs/claude-code/overview)** — the `claude` command must be on your `PATH`, v2.1.280 or later. Tsunagi assumes you already use Claude Code; we do not document Claude Code itself here.
+- **[Claude Code CLI](https://docs.claude.com/en/docs/claude-code/overview) (v2.1.280 or later) or [Codex CLI](https://developers.openai.com/codex/cli) (v0.162.0 or later)** — either `claude` or `codex` must be on your `PATH`. Tsunagi assumes you already use them; we do not document the CLIs themselves here (for Codex, see [Codex](/en/features/codex/)).
 - **macOS or Linux**. Windows is not supported (WSL2 may work but is unsupported).
-- **A Claude account** — if you are logged in with `claude`, Tsunagi uses it as is (otherwise you log in during the initial setup).
+- **A Claude or ChatGPT account** — if you are logged in with `claude` / `codex`, Tsunagi uses it as is (otherwise you log in during the initial setup).
 
 ## Run with `npx` (recommended)
 
@@ -41,7 +41,7 @@ Tsunagi performs the following on startup:
 2. Applies Prisma migrations to bring the schema up to date.
 3. Writes a PID lock file at `~/.tsunagi/state/tsunagi.lock` to enforce
    the single-instance constraint.
-4. Checks the `claude` CLI version. The Tsunagi Claude Code plugin is not
+4. Checks the `claude` / `codex` CLI versions (exits if neither is usable). The Tsunagi Claude Code plugin is not
    installed; internal terminals load it per session through
    `CLAUDE_CODE_PLUGIN_DIRS` (see [Tsunagi plugin](/en/features/plugin/)).
 5. Starts the Fastify backend on port `2792` and the Next.js web UI on

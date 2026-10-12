@@ -14,7 +14,7 @@ import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { useTerminalTodos } from '@/hooks/useTerminalTodos';
 import { useLiveTasks } from '@/hooks/useLiveTasks';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { hasUnreadResult } from '@/lib/claude-status';
+import { hasUnreadResult } from '@/lib/agent-status';
 import { toaster } from '@/lib/toaster';
 import { apiUrl } from '@/lib/api-url';
 
@@ -89,7 +89,7 @@ export default function Home() {
     },
   });
   const [repositories, setRepositories] = useState<Repository[]>([]);
-  // 認証設定済みか（Global の Anthropic トークン、または実験的機能のローカルLLM（Ollama / LM Studio）の設定）。
+  // 認証設定済みか（いずれかのエージェント（Claude / Codex）でログイン済み、または実験的機能のローカルLLM（Ollama / LM Studio）の設定）。
   // 判定はサーバー(/api/onboarding/status)に一本化する
   const [hasAuth, setHasAuth] = useState(false);
   const [isMetaLoading, setIsMetaLoading] = useState(true);

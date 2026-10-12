@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
 import {
-  assertClaudeSupportsPluginDirs,
+  assertAgentCliAvailable,
   getPluginDir,
   removeLegacyPluginInstall,
 } from './plugin-lifecycle.js';
@@ -22,8 +22,7 @@ if (mode !== 'dev' && mode !== 'start') {
   process.exit(1);
 }
 
-assertClaudeSupportsPluginDirs();
-removeLegacyPluginInstall();
+if (assertAgentCliAvailable().claude) removeLegacyPluginInstall();
 // 子プロセス（concurrently → server）に継承させる
 process.env.TSUNAGI_PLUGIN_DIR = getPluginDir();
 

@@ -139,7 +139,7 @@ tsunagi/
 
 - **Node.js ≥ 20**
 - **Git ≥ 2.42**（空リポジトリを扱うため `git worktree add --orphan` を使用）
-- **Claude Code CLI**（`claude` コマンドが PATH 上に必要）
+- **Claude Code CLI**（`claude` ≥ 2.1.280）または **Codex CLI**（`codex` ≥ 0.162.0）のどちらか（PATH 上に必要）
 
 ## ライセンス
 

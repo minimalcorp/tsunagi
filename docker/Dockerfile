@@ -25,6 +25,9 @@ FROM base
 
 RUN npm install -g npm@10.8.2
 
+# Codex CLI（Codex タブ）
+RUN npm install -g @openai/codex
+
 WORKDIR /workspace
 
 RUN mkdir -p /workspace/node_modules && chown node:node /workspace/node_modules

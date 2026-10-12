@@ -149,3 +149,16 @@ export function applyToolToTodos(
       return null;
   }
 }
+
+/**
+ * Codex の update_plan（PostToolUse の tool_input: { plan: [{ step, status }] }）を todos に変換する。
+ * 毎回計画全体が渡されるため全置換する。解釈できなければ null
+ */
+export function planToTodos(input: unknown): Todo[] | null {
+  const plan = isRecord(input) ? input.plan : undefined;
+  if (!Array.isArray(plan)) return null;
+  return plan.filter(isRecord).map((item) => ({
+    content: String(item.step ?? ''),
+    status: isStatus(item.status) ? item.status : 'pending',
+  }));
+}

@@ -1,39 +1,20 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import { prisma } from '../lib/db.js';
-import { applyToolToTodos, parseTodos, TODO_TOOL_NAMES } from '../lib/tab-todos.js';
+import { parseTodos } from '../lib/tab-todos.js';
+import { getAgent, type NormalizedHookEvent } from '../lib/agents/index.js';
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
 }
 
-// Claude CLIのhookイベント型
-interface ClaudeHookBody {
-  hook_event_name: string;
-  session_id?: string;
-  transcript_path?: string;
-  cwd?: string;
-  permission_mode?: string;
-  // UserPromptSubmit
-  prompt?: string;
-  // PreToolUse / PostToolUse / PostToolUseFailure
-  tool_name?: string;
-  tool_use_id?: string;
-  tool_input?: Record<string, unknown>;
-  tool_response?: Record<string, unknown>;
-  // StopFailure
-  error?: string;
-  error_details?: string;
-  // SessionEnd
-  reason?: string;
-}
-
 // 受信したhookイベントをメモリに保持（確認用）
 export interface HookEvent {
   receivedAt: string;
-  event: string;
-  sessionId?: string;
-  raw: ClaudeHookBody;
+  agent: string;
+  event?: string;
+  tabId?: string;
+  raw: Record<string, unknown>;
 }
 
 export const hookEvents: HookEvent[] = [];
@@ -41,7 +22,7 @@ export const hookEvents: HookEvent[] = [];
 /**
  * status から未読フラグを導出する。
  * 完了(success/error)で未読を立て、再実行・セッション終了で落とす。
- * web 側 (apps/web/src/lib/claude-status.ts の unreadForStatus) と同じルール。
+ * web 側 (apps/web/src/lib/agent-status.ts の unreadForStatus) と同じルール。
  */
 function unreadForStatus(status: string): boolean | undefined {
   switch (status) {
@@ -111,116 +92,128 @@ async function updateTabStatus(
   }
 }
 
+/** 正規化した hook イベントでタブの状態を更新し、購読中のクライアントに通知する */
+async function applyHookEvent(
+  fastify: FastifyInstance,
+  io: SocketIOServer,
+  event: NormalizedHookEvent
+): Promise<void> {
+  const { tabId } = event;
+  const room = `tab:${tabId}`;
+  const setStatus = async (status: string, emitted: string = status) => {
+    await updateTabStatus(tabId, status);
+    io.to(room).emit('status-changed', { sessionId: tabId, status: emitted });
+  };
+
+  switch (event.kind) {
+    case 'session-start':
+      // エージェントが起動しただけ（まだプロンプト処理していない）→ idleのまま通知のみ。
+      // タブIDと別のセッションIDを振るエージェント（Codex）は、次回の resume 用に保存する
+      if (event.agentSessionId) {
+        await prisma.tab
+          .updateMany({ where: { tabId }, data: { agentSessionId: event.agentSessionId } })
+          .catch((err: unknown) =>
+            fastify.log.warn(err, '[hooks] Failed to save agent session id')
+          );
+      }
+      io.to(room).emit('status-changed', { sessionId: tabId, status: 'idle' });
+      break;
+
+    case 'prompt':
+      // プロンプト送信開始 → running
+      await setStatus('running');
+      break;
+
+    case 'permission':
+      // ツール実行許可待ち → waiting
+      await setStatus('waiting');
+      break;
+
+    case 'tool-post': {
+      // ツール実行完了（許可待ち後のAllow含む）→ runningに戻す。todos を更新するツールなら todos も更新する
+      const { applyTodos } = event;
+      const todosUpdated =
+        applyTodos !== undefined &&
+        (await withTodosLock(tabId, async () => {
+          const todos = applyTodos(await loadTabTodos(tabId));
+          if (!todos) {
+            fastify.log.debug(
+              { tabId, tool: event.toolName },
+              '[hooks] todo tool ignored (unknown task or unexpected payload)'
+            );
+            return false;
+          }
+          const { count } = await updateTabStatus(tabId, 'running', todos);
+          fastify.log.info(
+            { tabId, tool: event.toolName, todosCount: todos.length, updatedTabCount: count },
+            '[hooks] todos updated'
+          );
+          io.to(room).emit('todos-updated', { sessionId: tabId, todos });
+          return true;
+        }));
+      if (!todosUpdated) {
+        await updateTabStatus(tabId, 'running');
+      }
+      io.to(room).emit('status-changed', { sessionId: tabId, status: 'running' });
+      break;
+    }
+
+    case 'stop':
+      // 正常完了 → success
+      await setStatus('success');
+      break;
+
+    case 'stop-failure':
+      // APIエラーでターン終了 → error
+      // todos は残す（エージェント側の進捗はセッションに永続化され、resume 後も続きから使われる）
+      await setStatus('error', 'failure');
+      break;
+
+    case 'interrupt':
+    case 'session-end':
+      // 中断・セッション終了 → idle（todos は stop-failure と同じ理由で残す）
+      await setStatus('idle');
+      break;
+  }
+}
+
 export async function hooksRoutes(fastify: FastifyInstance) {
   const io = (fastify as FastifyWithIO).io;
 
-  // POST /hooks/claude - Claude CLIからのhook受信
-  fastify.post<{ Body: ClaudeHookBody }>('/hooks/claude', async (request, reply) => {
-    const body = request.body;
-    const eventName = body.hook_event_name;
-    const sessionId = body.session_id;
+  // POST /hooks/:agent - エージェント CLI からの hook 受信
+  fastify.post<{ Params: { agent: string }; Body: Record<string, unknown> }>(
+    '/hooks/:agent',
+    async (request, reply) => {
+      const adapter = getAgent(request.params.agent);
+      if (!adapter) return reply.status(404).send({ error: 'Unknown agent' });
 
-    fastify.log.info({ eventName, sessionId }, 'Claude hook received');
+      const body = request.body ?? {};
+      const event = adapter.normalizeHook({ body, headers: request.headers });
+      const eventName = typeof body.hook_event_name === 'string' ? body.hook_event_name : undefined;
+      fastify.log.info(
+        { agent: adapter.id, eventName, tabId: event?.tabId },
+        'Agent hook received'
+      );
 
-    // メモリに記録（確認用）
-    hookEvents.push({
-      receivedAt: new Date().toISOString(),
-      event: eventName,
-      sessionId,
-      raw: body,
-    });
-    // 最新100件のみ保持
-    if (hookEvents.length > 100) hookEvents.splice(0, hookEvents.length - 100);
+      // メモリに記録（確認用）
+      hookEvents.push({
+        receivedAt: new Date().toISOString(),
+        agent: adapter.id,
+        event: eventName,
+        tabId: event?.tabId,
+        raw: body,
+      });
+      // 最新100件のみ保持
+      if (hookEvents.length > 100) hookEvents.splice(0, hookEvents.length - 100);
 
-    if (sessionId) {
-      const room = `tab:${sessionId}`;
-
-      switch (eventName) {
-        case 'SessionStart':
-          // claudeが起動しただけ（まだプロンプト処理していない）→ idleのまま通知のみ
-          io.to(room).emit('status-changed', { sessionId, status: 'idle' });
-          break;
-
-        case 'UserPromptSubmit':
-          // プロンプト送信開始 → running状態に更新
-          await updateTabStatus(sessionId, 'running');
-          io.to(room).emit('status-changed', { sessionId, status: 'running' });
-          break;
-
-        case 'PermissionRequest':
-          // ツール実行許可待ち → waiting状態に更新
-          await updateTabStatus(sessionId, 'waiting');
-          io.to(room).emit('status-changed', { sessionId, status: 'waiting' });
-          break;
-
-        case 'PostToolUse': {
-          // ツール実行完了（PermissionRequest後のAllow含む）→ runningに戻す
-          // TodoWrite / Task 系ツールなら todos も更新する
-          const toolName = body.tool_name;
-          const todosUpdated =
-            toolName !== undefined &&
-            TODO_TOOL_NAMES.has(toolName) &&
-            (await withTodosLock(sessionId, async () => {
-              const todos = applyToolToTodos(
-                await loadTabTodos(sessionId),
-                toolName,
-                body.tool_input,
-                body.tool_response
-              );
-              if (!todos) {
-                fastify.log.debug(
-                  { sessionId, tool: toolName, input: body.tool_input },
-                  '[hooks] todo tool ignored (unknown task or unexpected payload)'
-                );
-                return false;
-              }
-              const { count } = await updateTabStatus(sessionId, 'running', todos);
-              fastify.log.info(
-                { sessionId, tool: toolName, todosCount: todos.length, updatedTabCount: count },
-                '[hooks] todos updated'
-              );
-              io.to(room).emit('todos-updated', { sessionId, todos });
-              return true;
-            }));
-          if (!todosUpdated) {
-            await updateTabStatus(sessionId, 'running');
-          }
-          io.to(room).emit('status-changed', { sessionId, status: 'running' });
-          break;
-        }
-
-        case 'PreToolUse':
-          // ログ記録のみ
-          break;
-
-        case 'Stop':
-          // 正常完了 → success状態に更新
-          await updateTabStatus(sessionId, 'success');
-          io.to(room).emit('status-changed', { sessionId, status: 'success' });
-          break;
-
-        case 'StopFailure':
-          // APIエラーでターン終了 → failure状態に更新
-          // todos は残す（Claude 側の Task はセッションに永続化され、--resume 後も続きから使われる）
-          await updateTabStatus(sessionId, 'error');
-          io.to(room).emit('status-changed', { sessionId, status: 'failure' });
-          break;
-
-        case 'SessionEnd':
-          // セッション終了（Escキー中断・Ctrl+C・/exit等）→ idle状態に更新（todos は StopFailure と同じ理由で残す）
-          // reason: "prompt_input_exit" = ユーザー中断、"other" = プロセスkill等
-          fastify.log.info({ sessionId, reason: body.reason }, 'SessionEnd received');
-          await updateTabStatus(sessionId, 'idle');
-          io.to(room).emit('status-changed', { sessionId, status: 'idle' });
-          break;
-
-        default:
-          fastify.log.debug({ eventName }, 'Unhandled hook event');
+      if (event) {
+        await applyHookEvent(fastify, io, event);
+      } else {
+        fastify.log.debug({ agent: adapter.id, eventName }, 'Unhandled hook event');
       }
+      return reply.status(200).send({ ok: true });
     }
-
-    return reply.status(200).send({ ok: true });
-  });
+  );
 
   // GET /hooks/events - 受信済みhookイベント一覧（確認用）
   fastify.get('/hooks/events', async () => {

@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { TabMode } from '@minimalcorp/tsunagi-shared';
-import { ptyManager, type PtySession } from '../pty-manager.js';
+import { isShellForeground, ptyManager, type PtySession } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
-import { ensureActiveLoaded } from '../lib/local-llm.js';
-import { buildClaudeCommand, isLocalLlmMode } from '../lib/claude-command.js';
+import { getAgentForMode } from '../lib/agents/index.js';
+import { LOGIN_SESSION_PREFIX } from '../lib/agent-profiles.js';
 import {
   PtyLaunchError,
-  prepareClaudeConfigForSession,
+  prepareAgentLaunchForSession,
   resolvePtyLaunch,
   startPtySession,
 } from '../lib/pty-launch.js';
@@ -75,9 +75,11 @@ interface CreateSessionBody {
    */
   command?: string;
   /**
-   * true なら PTY 起動後に claude を起動する。コマンドはタブの mode に応じてサーバーで組み立てる
+   * true なら PTY 起動後にタブの mode のエージェントを起動する。コマンドは mode に応じてサーバーで組み立てる
    * （ローカルLLMタブは MCP の絞り込み等の引数が付く）。command より優先する。
    */
+  agent?: boolean;
+  /** agent の旧名（互換のため残す） */
   claude?: boolean;
 }
 
@@ -193,7 +195,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         // 既に動いているため、終了扱い・セッション削除はしない
         if (session.respawning) return;
         io.to(room).emit('exit', { exitCode });
-        // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット
+        // Ctrl+C等でClaudeが強制終了した場合にagentStatusをidleにリセット
         // todos は残す（Claude 側の Task はセッションに永続化され、--resume 後も続きから使われる）
         io.to(room).emit('status-changed', { sessionId, status: 'idle' });
         prisma.tab
@@ -306,7 +308,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
 
   // POST /terminal/sessions - セッション作成（または既存セッション再利用）
   fastify.post<{ Body: CreateSessionBody }>('/terminal/sessions', async (request, reply) => {
-    const { cwd, env, sessionId: requestedSessionId, claude, command } = request.body ?? {};
+    const { cwd, env, sessionId: requestedSessionId, agent, claude, command } = request.body ?? {};
 
     const sessionId = requestedSessionId ?? crypto.randomUUID();
 
@@ -317,6 +319,11 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(200).send({ sessionId, reused: true });
     }
 
+    // ログイン用 PTY は作り直さない（無ければ終わっている。ログインコマンドの無いシェルを出さない）
+    if (sessionId.startsWith(LOGIN_SESSION_PREFIX)) {
+      return reply.status(404).send({ error: 'Login session has ended. Close and try again.' });
+    }
+
     const pending = pendingCreations.get(sessionId);
     const creation =
       pending ??
@@ -325,7 +332,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         const launch = await resolvePtyLaunch(sessionId, launchRequest);
         await startPtySession(sessionId, launch, {
           request: launchRequest,
-          launchClaude: Boolean(claude),
+          launchAgent: Boolean(agent ?? claude),
           command,
         });
       })();
@@ -351,35 +358,41 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // POST /terminal/sessions/:sessionId/claude - 既存 PTY で claude を（再）起動する
-  // コマンドはタブの mode に応じてサーバーで組み立てる（ローカルLLMタブは引数が付くため）
-  fastify.post<{ Params: { sessionId: string } }>(
+  // POST /terminal/sessions/:sessionId/agent - 既存 PTY でエージェントを（再）起動する
+  // コマンドはタブの mode に応じてサーバーで組み立てる（ローカルLLMタブは引数が付くため）。
+  // /claude は旧パス（互換のため残す）
+  for (const route of [
+    '/terminal/sessions/:sessionId/agent',
     '/terminal/sessions/:sessionId/claude',
-    async (request, reply) => {
+  ]) {
+    fastify.post<{ Params: { sessionId: string } }>(route, async (request, reply) => {
       const { sessionId } = request.params;
       const session = ptyManager.getSession(sessionId);
       if (!session) {
         return reply.status(404).send({ error: 'Session not found' });
       }
+      // エージェントなどが動いている間に書き込むと、そのコマンドの入力欄に入ってしまう
+      if (!isShellForeground(session)) {
+        return reply.status(409).send({
+          error: 'ターミナルで実行中のコマンド（エージェント等）を終了してから実行してください',
+        });
+      }
       const tab = await prisma.tab.findUnique({ where: { tabId: sessionId } }).catch(() => null);
       const mode = (tab?.mode ?? 'claude') as TabMode;
-      if (isLocalLlmMode(mode)) {
-        // 最初の発言を待たせないよう読み込みを始めておく（未設定等のエラーは中継口がタブに返す）
-        ensureActiveLoaded().catch(() => undefined);
-      }
+      const agent = getAgentForMode(mode);
       let command: string;
       try {
-        command = await buildClaudeCommand(sessionId, mode);
+        command = await agent.buildCommand(sessionId, mode);
       } catch (err) {
         return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) });
       }
-      // 環境変数の反映で PTY を作り直したときも claude を起動し直す
-      session.options.launchClaude = true;
-      await prepareClaudeConfigForSession(session);
+      // 環境変数の反映で PTY を作り直したときもエージェントを起動し直す
+      session.options.launchAgent = true;
+      await prepareAgentLaunchForSession(session, mode);
       session.pty.write(`${command}\n`);
       return reply.status(204).send();
-    }
-  );
+    });
+  }
 
   // POST /terminal/sessions/:sessionId/respawn - 環境変数の変更を今すぐ反映する（PTY を作り直す）
   fastify.post<{ Params: { sessionId: string } }>(

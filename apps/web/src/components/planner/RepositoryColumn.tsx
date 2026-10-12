@@ -5,7 +5,7 @@ import type { Task } from '@minimalcorp/tsunagi-shared';
 import { SearchAndFilterBar, type FilterState } from '@/components/planner/FilterBar';
 import { TaskList } from '@/components/planner/TaskList';
 import { Button } from '@/components/ui/button';
-import { hasUnreadResult } from '@/lib/claude-status';
+import { hasUnreadResult } from '@/lib/agent-status';
 import { getRepoColor } from '@/lib/repo-colors';
 import { cn } from '@/lib/utils';
 import type { TabTodosMap } from '@/hooks/useTerminalTodos';

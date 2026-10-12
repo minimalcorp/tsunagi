@@ -13,12 +13,12 @@ import {
   XCircle,
   MessageSquare,
 } from 'lucide-react';
-import type { LocalLlmTabOption, TabStatusEntry } from '@/components/TerminalPanel';
+import type { AgentTabOption, LocalLlmTabOption, TabStatusEntry } from '@/components/TerminalPanel';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
 import { VoiceInputButton } from '@/components/VoiceInputButton';
 import type { VoiceInputController } from '@/hooks/useVoiceInput';
-import { ClaudeIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
+import { ClaudeIcon, CodexIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
 import { localLlmTabLabel } from '@/lib/local-llm';
 
 interface SessionTabsProps {
@@ -29,6 +29,10 @@ interface SessionTabsProps {
   onTabCreateTerminal?: () => void;
   /** Terminalを追加してClaudeを起動するタブ追加 */
   onTabCreateClaude: () => void;
+  claudeOption?: AgentTabOption;
+  /** Codex を起動するタブ追加（CLI 未導入なら省略してボタン非表示） */
+  codexOption?: AgentTabOption;
+  onTabCreateCodex?: () => void;
   /** ローカルLLM（Settings で選んだ使用中のモデル）でClaudeを起動するタブ追加（省略時はボタン非表示） */
   localLlmOption?: LocalLlmTabOption;
   onTabCreateLocalLlm?: () => void;
@@ -126,6 +130,9 @@ export function SessionTabs({
   onTabChange,
   onTabCreateTerminal,
   onTabCreateClaude,
+  claudeOption,
+  codexOption,
+  onTabCreateCodex,
   localLlmOption,
   onTabCreateLocalLlm,
   onTabDelete,
@@ -215,6 +222,11 @@ export function SessionTabs({
                   <span className="text-xs">terminal {terminalNumbers.get(tab.tab_id)}</span>
                 ) : (
                   <>
+                    {tab.mode === 'codex' && (
+                      <span title="Codex">
+                        <CodexIcon className="w-3 h-3" />
+                      </span>
+                    )}
                     {(tab.mode === 'local' || tab.mode === 'ollama' || tab.mode === 'lmstudio') && (
                       <span title={localLlmTabLabel(localLlmOption?.provider ?? null)}>
                         <LocalLlmTabIcon
@@ -250,9 +262,26 @@ export function SessionTabs({
               <Terminal className="w-4 h-4" />
             </Button>
           )}
-          <Button size="icon" onClick={onTabCreateClaude} title="Claude Code">
-            <ClaudeIcon className="w-4 h-4" />
-          </Button>
+          <span title={claudeOption?.disabledReason ?? 'Claude Code'}>
+            <Button
+              size="icon"
+              onClick={onTabCreateClaude}
+              disabled={Boolean(claudeOption?.disabledReason)}
+            >
+              <ClaudeIcon className="w-4 h-4" />
+            </Button>
+          </span>
+          {codexOption && (
+            <span title={codexOption.disabledReason ?? 'Codex'}>
+              <Button
+                size="icon"
+                onClick={onTabCreateCodex}
+                disabled={Boolean(codexOption.disabledReason)}
+              >
+                <CodexIcon className="w-4 h-4" />
+              </Button>
+            </span>
+          )}
           {localLlmOption && (
             // disabled の Button は pointer-events:none で title が出ないため span に付ける
             <span

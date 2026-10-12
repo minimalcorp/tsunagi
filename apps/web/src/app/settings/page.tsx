@@ -6,7 +6,7 @@ import { ArrowLeft, FlaskConical } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
 import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNavigation';
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
-import { ClaudeProfileSection } from '@/components/settings/ClaudeProfileSection';
+import { AgentProfileSection } from '@/components/settings/AgentProfileSection';
 import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
 import { VoiceInputSection } from '@/components/settings/VoiceInputSection';
@@ -18,11 +18,14 @@ import { VersionInfo } from '@/components/settings/VersionInfo';
 import { UpdateIndicator } from '@/components/UpdateIndicator';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useAgentAvailability } from '@/hooks/useAgentAvailability';
 
 export default function SettingsPage() {
   const router = useRouter();
 
   useDocumentTitle('settings');
+  // 導入済みのエージェントだけプロファイル設定を出す
+  const agents = useAgentAvailability();
 
   // Initialize selectedNode from localStorage or default to Global
   const getInitialNode = (): SelectedNode => {
@@ -50,7 +53,7 @@ export default function SettingsPage() {
     fetch(apiUrl('/api/onboarding/status'))
       .then((r) => r.json())
       .then((data) => {
-        // オンボーディング未完了なら、Claude のログインを行う Global を開く
+        // オンボーディング未完了なら、エージェントのログインを行う Global を開く
         if (!data.data?.completed) {
           setSelectedNode({ scope: 'global', label: 'Global' });
         } else {
@@ -119,8 +122,16 @@ export default function SettingsPage() {
         <div className="flex-1 bg-card p-4 overflow-y-auto">
           {selectedNode ? (
             <div className="space-y-6">
-              {/* Claude Profile (All scopes。Global ではプロファイルの追加・ログインも行う) */}
-              <ClaudeProfileSection selectedNode={selectedNode} />
+              {/* エージェントのプロファイル (All scopes。Global ではプロファイルの追加・ログインも行う) */}
+              {agents
+                ?.filter((agent) => agent.installed)
+                .map((agent) => (
+                  <AgentProfileSection
+                    key={agent.agent}
+                    agent={agent.agent}
+                    selectedNode={selectedNode}
+                  />
+                ))}
 
               {/* Environment Variables Section */}
               <EnvVariableEditor selectedNode={selectedNode} />

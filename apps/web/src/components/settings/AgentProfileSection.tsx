@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, CircleAlert, LogIn, Plus, Trash2, UserRound, X } from 'lucide-react';
 import type {
-  ClaudeAuthStatus,
-  ClaudeProfileAssignment,
-  ClaudeProfileWithStatus,
+  AgentAuthStatus,
+  AgentId,
+  AgentProfileAssignment,
+  AgentProfileWithStatus,
 } from '@minimalcorp/tsunagi-shared';
 import { apiUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
@@ -14,10 +15,29 @@ import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import type { SelectedNode } from '@/components/env/EnvTreeNavigation';
-import { ClaudeLoginDialog } from './ClaudeLoginDialog';
+import { AgentLoginDialog } from './AgentLoginDialog';
 import { Code, Field, errorMessage, requestData } from './local-llm-ui';
 
 const DEFAULT_SLUG = 'default';
+
+/** エージェントごとの表示 */
+export const AGENT_PROFILE_META: Record<
+  AgentId,
+  { label: string; configDirEnv: string; defaultConfigDir: string; loginCommand: string }
+> = {
+  claude: {
+    label: 'Claude',
+    configDirEnv: 'CLAUDE_CONFIG_DIR',
+    defaultConfigDir: '~/.claude',
+    loginCommand: 'claude auth login',
+  },
+  codex: {
+    label: 'Codex',
+    configDirEnv: 'CODEX_HOME',
+    defaultConfigDir: '~/.codex',
+    loginCommand: 'codex login',
+  },
+};
 const PROFILE_NAME_PATTERN = /^[A-Za-z0-9 _-]+$/;
 
 /** サーバーと同じ規則（空白→`-`、小文字化） */
@@ -25,7 +45,7 @@ function toSlug(name: string): string {
   return name.trim().replace(/\s+/g, '-').toLowerCase();
 }
 
-function validateName(name: string, profiles: ClaudeProfileWithStatus[]): string | null {
+function validateName(name: string, profiles: AgentProfileWithStatus[]): string | null {
   const trimmed = name.trim();
   if (!trimmed) return null;
   if (!PROFILE_NAME_PATTERN.test(trimmed)) return 'Use only letters, numbers, spaces, "-" and "_"';
@@ -34,9 +54,11 @@ function validateName(name: string, profiles: ClaudeProfileWithStatus[]): string
   return null;
 }
 
-function statusLabel(status: ClaudeAuthStatus): string {
+function statusLabel(status: AgentAuthStatus): string {
   if (!status.loggedIn) return 'Not logged in';
-  const account = [status.email, status.orgName].filter(Boolean).join(' · ');
+  const account = [status.email, status.orgName ?? status.subscriptionType]
+    .filter(Boolean)
+    .join(' · ');
   return account || status.authMethod || 'Logged in';
 }
 
@@ -47,46 +69,49 @@ function scopeQuery(node: SelectedNode): string {
   return params.toString();
 }
 
-interface ClaudeProfileSectionProps {
+interface AgentProfileSectionProps {
+  agent: AgentId;
   selectedNode: SelectedNode;
 }
 
 /**
- * Claude のプロファイル（CLAUDE_CONFIG_DIR）。Global ではプロファイルの追加・ログイン・削除、
- * 全スコープでそのスコープのタブが使うプロファイルの選択（親から継承）を行う。
+ * エージェントのプロファイル（Claude: CLAUDE_CONFIG_DIR / Codex: CODEX_HOME）。Global ではプロファイルの
+ * 追加・ログイン・削除、全スコープでそのスコープのタブが使うプロファイルの選択（親から継承）を行う。
  */
-export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps) {
-  const [profiles, setProfiles] = useState<ClaudeProfileWithStatus[] | null>(null);
-  const [assignment, setAssignment] = useState<ClaudeProfileAssignment | null>(null);
+export function AgentProfileSection({ agent, selectedNode }: AgentProfileSectionProps) {
+  const meta = AGENT_PROFILE_META[agent];
+  const title = `${meta.label} Profile`;
+  const [profiles, setProfiles] = useState<AgentProfileWithStatus[] | null>(null);
+  const [assignment, setAssignment] = useState<AgentProfileAssignment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [loginSlug, setLoginSlug] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ClaudeProfileWithStatus | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AgentProfileWithStatus | null>(null);
 
   const isGlobal = selectedNode.scope === 'global';
 
   const loadProfiles = useCallback(async () => {
     try {
-      const data = await requestData<{ profiles: ClaudeProfileWithStatus[] }>(
-        '/api/claude-profiles'
+      const data = await requestData<{ profiles: AgentProfileWithStatus[] }>(
+        `/api/agent-profiles/${agent}`
       );
       setProfiles(data.profiles);
     } catch (err) {
       setError(errorMessage(err));
     }
-  }, []);
+  }, [agent]);
 
   const loadAssignment = useCallback(async () => {
     try {
-      const data = await requestData<{ assignment: ClaudeProfileAssignment }>(
-        `/api/claude-profiles/assignment?${scopeQuery(selectedNode)}`
+      const data = await requestData<{ assignment: AgentProfileAssignment }>(
+        `/api/agent-profiles/${agent}/assignment?${scopeQuery(selectedNode)}`
       );
       setAssignment(data.assignment);
     } catch (err) {
       setError(errorMessage(err));
     }
-  }, [selectedNode]);
+  }, [agent, selectedNode]);
 
   useEffect(() => {
     void loadProfiles();
@@ -99,8 +124,8 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
 
   const handleAssign = async (value: string) => {
     try {
-      const data = await requestData<{ assignment: ClaudeProfileAssignment }>(
-        '/api/claude-profiles/assignment',
+      const data = await requestData<{ assignment: AgentProfileAssignment }>(
+        `/api/agent-profiles/${agent}/assignment`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -124,11 +149,14 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
 
   const handleAdd = async () => {
     try {
-      const data = await requestData<{ profile: { slug: string } }>('/api/claude-profiles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim() }),
-      });
+      const data = await requestData<{ profile: { slug: string } }>(
+        `/api/agent-profiles/${agent}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName.trim() }),
+        }
+      );
       setIsAdding(false);
       setNewName('');
       await loadProfiles();
@@ -143,9 +171,9 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
     }
   };
 
-  const handleDelete = async (profile: ClaudeProfileWithStatus) => {
+  const handleDelete = async (profile: AgentProfileWithStatus) => {
     try {
-      const res = await fetch(apiUrl(`/api/claude-profiles/${profile.slug}`), {
+      const res = await fetch(apiUrl(`/api/agent-profiles/${agent}/${profile.slug}`), {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error(`HTTPエラー: ${res.status}`);
@@ -162,7 +190,7 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
   if (error) {
     return (
       <section className="space-y-3">
-        <h2 className="text-lg font-bold text-foreground">Claude Profile</h2>
+        <h2 className="text-lg font-bold text-foreground">{title}</h2>
         <p className="text-sm text-destructive">{error}</p>
       </section>
     );
@@ -171,7 +199,7 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
   if (!profiles || !assignment) {
     return (
       <section className="space-y-3">
-        <h2 className="text-lg font-bold text-foreground">Claude Profile</h2>
+        <h2 className="text-lg font-bold text-foreground">{title}</h2>
         <LoadingSpinner size="sm" message="Loading profiles..." />
       </section>
     );
@@ -183,11 +211,11 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
 
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-bold text-foreground">Claude Profile</h2>
+      <h2 className="text-lg font-bold text-foreground">{title}</h2>
 
       <Field
         label={isGlobal ? 'Default profile' : 'Profile for this scope'}
-        hint="このスコープのタスクのターミナル・Claude で使うアカウント。変更は開いているタブにも自動で反映されます"
+        hint={`このスコープのタスクのターミナル・${meta.label} で使うアカウント。変更は開いているタブにも自動で反映されます`}
       >
         <select
           value={assignment.assigned ?? ''}
@@ -226,7 +254,10 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
                     <span className="truncate">{statusLabel(profile.status)}</span>
                   </div>
                   <div className="truncate text-[0.65rem] text-muted-foreground">
-                    <Code>{profile.configDir ?? 'CLAUDE_CONFIG_DIR 未指定（~/.claude）'}</Code>
+                    <Code>
+                      {profile.configDir ??
+                        `${meta.configDirEnv} 未指定（${meta.defaultConfigDir}）`}
+                    </Code>
                   </div>
                 </div>
               </div>
@@ -235,7 +266,7 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
                   variant={profile.status.loggedIn ? 'ghost' : 'default'}
                   size="sm"
                   onClick={() => setLoginSlug(profile.slug)}
-                  title="claude auth login"
+                  title={meta.loginCommand}
                 >
                   <LogIn className="size-4" />
                   {profile.status.loggedIn ? 'Re-login' : 'Login'}
@@ -271,7 +302,9 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
               ) : (
                 newName.trim() && (
                   <p className="text-xs text-muted-foreground">
-                    <Code>~/.tsunagi/claude-profiles/{toSlug(newName)}</Code>
+                    <Code>
+                      ~/.tsunagi/{agent}-profiles/{toSlug(newName)}
+                    </Code>
                   </p>
                 )
               )}
@@ -305,7 +338,7 @@ export function ClaudeProfileSection({ selectedNode }: ClaudeProfileSectionProps
       )}
 
       {loginProfile && (
-        <ClaudeLoginDialog
+        <AgentLoginDialog
           profile={loginProfile}
           onClose={() => {
             setLoginSlug(null);

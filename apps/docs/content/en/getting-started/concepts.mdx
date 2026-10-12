@@ -15,7 +15,7 @@ A unit of work. Each task has:
 - A **title** and (optional) **description** (Markdown)
 - An **owner / repo / branch** triple identifying the git context
 - A **status**: `backlog` → `planning` → `coding` → `reviewing` → `done`
-- Zero or more **tabs** (Claude sessions) attached to it
+- Zero or more **tabs** (agent sessions, etc.) attached to it
 - An **order** for sorting within its status column
 
 A task is the atomic unit Tsunagi cares about. When you create a task,
@@ -27,7 +27,7 @@ the worktree is removed too.
 A [git worktree](https://git-scm.com/docs/git-worktree) is a checkout of
 a branch in its own directory, sharing the underlying object database with
 the original repository. Tsunagi uses one worktree per task so that
-multiple Claude sessions never collide on the file system.
+multiple agent sessions never collide on the file system.
 
 Tsunagi worktrees live under:
 
@@ -40,7 +40,9 @@ named `.default`.
 
 ## Tab
 
-A **tab** is one Claude Code session attached to a task. A task can have
+A **tab** is a terminal session attached to a task, running Claude Code,
+[Codex](/en/features/codex/), a local LLM (Claude Code with Ollama /
+LM Studio), or a plain terminal in the task's worktree. A task can have
 multiple tabs — useful when you want to run several conversations in
 parallel within the same worktree (for example: one tab implementing the
 feature, another debugging tests).
@@ -50,19 +52,27 @@ inside the task's worktree.
 
 ## Hooks
 
-Tsunagi listens to Claude Code's
-[hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) to extract
-real-time information from each session: which todos Claude is tracking,
-when it starts and stops working, what tools it invokes, etc. This is what
-makes the progress bars and status indicators in the UI possible.
+Tsunagi receives each agent's hooks to extract real-time information from
+each session: which todos the agent is tracking, when it starts and stops
+working, what tools it invokes, etc. This is what makes the progress bars
+and status indicators (running / waiting / success / idle) in the UI
+possible.
+
+- **Claude Code**: its
+  [hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide); todos
+  come from `TaskCreate` / `TaskUpdate`
+- **Codex**: hooks passed via `-c` at launch; todos come from
+  `update_plan`. Codex has no failure hook, so Codex tabs never show the
+  error state
 
 ## MCP Server
 
 Tsunagi exposes its task management as an
 [MCP (Model Context Protocol) server](https://docs.claude.com/en/docs/claude-code/mcp).
-That means **Claude itself can call into Tsunagi** to create, update,
-reorder, and delete tasks. The Tsunagi MCP server is bundled as a Claude
-Code plugin, loaded by Claude Code started in Tsunagi's terminals.
+That means **the agents themselves can call into Tsunagi** to create,
+update, reorder, and delete tasks. Claude Code gets it through the bundled
+Claude Code plugin (below); Codex gets it through
+`-c mcp_servers.tsunagi.url` at launch.
 
 The MCP tools include:
 
@@ -73,7 +83,7 @@ The MCP tools include:
 - `tsunagi_get_task`
 - ...and a few more
 
-Together they let you (or Claude) treat Tsunagi as the source of truth for
+Together they let you (or the agents) treat Tsunagi as the source of truth for
 "what work is in flight."
 
 ## The Claude Code plugin
@@ -89,6 +99,11 @@ plugin registers:
 
 Nothing is installed into your Claude Code settings, so Claude Code
 started outside Tsunagi is unaffected.
+
+Codex has no plugin mechanism, so Tsunagi passes the MCP server, the skill
+(`developer_instructions`), and `tsunagi-task-curator` (agents config) at
+launch. Nothing is written to your Codex settings either (see
+[Codex](/en/features/codex/)).
 
 ## Single instance
 

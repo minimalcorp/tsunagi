@@ -76,7 +76,7 @@ async function respawn(session: PtySession): Promise<void> {
   try {
     await startPtySession(sessionId, launch, {
       request: session.options.request ?? {},
-      launchClaude: session.options.launchClaude ?? false,
+      launchAgent: session.options.launchAgent ?? false,
     });
   } catch (err) {
     console.error(`[pty-env-sync] Failed to respawn ${sessionId}:`, err);

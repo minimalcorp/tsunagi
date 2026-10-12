@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import openBrowser from 'open';
 import {
-  assertClaudeSupportsPluginDirs,
+  assertAgentCliAvailable,
   getPluginDir,
   removeLegacyPluginInstall,
 } from './plugin-lifecycle.js';
@@ -153,8 +153,7 @@ runAutoMigrate();
 // ---------------------------------------------------------------------------
 // Phase 2: Plugin lifecycle
 // ---------------------------------------------------------------------------
-assertClaudeSupportsPluginDirs();
-removeLegacyPluginInstall();
+if (assertAgentCliAvailable().claude) removeLegacyPluginInstall();
 
 // ---------------------------------------------------------------------------
 // Docs static file server

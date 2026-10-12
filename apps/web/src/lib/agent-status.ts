@@ -3,10 +3,10 @@ import type { Tab, Task } from '@minimalcorp/tsunagi-shared';
 export type TabStatus = 'idle' | 'running' | 'waiting' | 'success' | 'error';
 
 /**
- * Get the current Claude tab status
+ * Get the current agent tab status
  * Returns the status directly from the tab object
  */
-export function getClaudeStatus(tab: Tab): TabStatus {
+export function getAgentStatus(tab: Tab): TabStatus {
   return tab.status;
 }
 
@@ -41,7 +41,7 @@ export type UnreadKind = 'success' | 'error' | 'waiting';
 
 /**
  * 未確認マーカーの種類を返す（null = マーカーなし）。
- * 優先順位は ClaudeStatusIndicator と揃える: running > waiting > error > success。
+ * 優先順位は AgentStatusIndicator と揃える: running > waiting > error > success。
  * waiting（許可待ち）は未読フラグではなく status から判定する。ユーザーの入力を
  * 待って止まっている状態なので、開いたかどうかに関わらず一覧で気付けるようにする。
  */

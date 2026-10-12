@@ -9,7 +9,7 @@ import {
   useEffect,
   useMemo,
 } from 'react';
-import type { LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
+import type { AgentAvailability, LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
 import { VoiceTranscriptOverlay } from '@/components/VoiceTranscriptOverlay';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
@@ -19,22 +19,23 @@ import {
   type Todo,
   type TerminalViewHandle,
   type TerminalStatus,
-  type ClaudeStatus,
+  type AgentStatus,
 } from '@/components/TerminalView';
 import { Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ClaudeIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
+import { ClaudeIcon, CodexIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
 import { localLlmTabLabel } from '@/lib/local-llm';
 import {
   useLmStudioSettings,
   useLocalLlmSettings,
   useOllamaSettings,
 } from '@/hooks/useLocalLlmSettings';
+import { useAgentAvailability } from '@/hooks/useAgentAvailability';
 
 export interface TabStatusEntry {
   /** TerminalView 未マウント（一度も表示していないタブ）の場合は null */
   terminal: TerminalStatus | null;
-  claude: ClaudeStatus;
+  claude: AgentStatus;
 }
 
 interface TerminalPanelProps {
@@ -47,7 +48,7 @@ interface TerminalPanelProps {
   /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
   /** Claudeステータス変化時のコールバック（詳細を開いたまま完了したときの既読化用） */
-  onClaudeStatusChange?: (tabId: string, claude: ClaudeStatus) => void;
+  onAgentStatusChange?: (tabId: string, claude: AgentStatus) => void;
 }
 
 /** タブ追加モード */
@@ -59,6 +60,21 @@ export interface LocalLlmTabOption {
   provider: LocalLlmProvider | null;
   /** 使用中のモデル。未設定（空）ならボタンを無効化する */
   model: string;
+}
+
+/** エージェントのタブ作成ボタンの状態。disabledReason があれば無効化して title に出す */
+export interface AgentTabOption {
+  disabledReason?: string;
+}
+
+/** CLI が使えない理由（使えるなら undefined） */
+function agentDisabledReason(label: string, availability: AgentAvailability | undefined) {
+  if (!availability) return undefined;
+  if (!availability.installed) return `${label} の CLI が見つかりません`;
+  if (!availability.supported) {
+    return `${label} ${availability.version ?? ''} は古いため使えません（${availability.minVersion} 以上が必要）`;
+  }
+  return undefined;
 }
 
 /** TerminalPanelの外部からアクセス可能なハンドル */
@@ -82,7 +98,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       onTabCreate,
       onTabDelete,
       onTodosUpdated,
-      onClaudeStatusChange,
+      onAgentStatusChange,
     },
     ref
   ) {
@@ -110,7 +126,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(
       () =>
         new Map(
-          tabs.map((tab) => [tab.tab_id, { terminal: null, claude: tab.status as ClaudeStatus }])
+          tabs.map((tab) => [tab.tab_id, { terminal: null, claude: tab.status as AgentStatus }])
         )
     );
 
@@ -123,7 +139,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         const next = new Map(prev);
         for (const tab of tabs) {
           if (!next.has(tab.tab_id)) {
-            next.set(tab.tab_id, { terminal: null, claude: tab.status as ClaudeStatus });
+            next.set(tab.tab_id, { terminal: null, claude: tab.status as AgentStatus });
             changed = true;
           }
         }
@@ -147,7 +163,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         next.set(tabId, { terminal: null, claude: status });
         return next;
       });
-      onClaudeStatusChange?.(tabId, status);
+      onAgentStatusChange?.(tabId, status);
     });
 
     // 各TerminalViewへのrefマップ
@@ -162,15 +178,15 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     }, [activeTabId]);
 
     const handleStatusChange = useCallback(
-      (tabId: string, terminal: TerminalStatus, claude: ClaudeStatus) => {
+      (tabId: string, terminal: TerminalStatus, claude: AgentStatus) => {
         setTabStatusMap((prev) => {
           const next = new Map(prev);
           next.set(tabId, { terminal, claude });
           return next;
         });
-        onClaudeStatusChange?.(tabId, claude);
+        onAgentStatusChange?.(tabId, claude);
       },
-      [onClaudeStatusChange]
+      [onAgentStatusChange]
     );
 
     useImperativeHandle(ref, () => ({
@@ -215,7 +231,24 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     const handleTabCreateClaude = useCallback(() => handleTabCreate('claude'), [handleTabCreate]);
 
+    const handleTabCreateCodex = useCallback(() => handleTabCreate('codex'), [handleTabCreate]);
+
     const handleTabCreateLocalLlm = useCallback(() => handleTabCreate('local'), [handleTabCreate]);
+
+    // エージェントのボタンは常に出し（使えることを知らせる）、CLI が使えなければ無効化する
+    const agents = useAgentAvailability();
+    const claudeOption: AgentTabOption = {
+      disabledReason: agentDisabledReason(
+        'Claude Code',
+        agents?.find((a) => a.agent === 'claude')
+      ),
+    };
+    const codexOption: AgentTabOption = {
+      disabledReason: agentDisabledReason(
+        'Codex',
+        agents?.find((a) => a.agent === 'codex')
+      ),
+    };
 
     // 実験的機能のローカルLLMは、プロバイダーが有効なときだけタブの作成ボタンを出す
     const { settings: ollamaSettings } = useOllamaSettings();
@@ -271,6 +304,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             onTabChange={handleTabChange}
             onTabCreateTerminal={handleTabCreateTerminal}
             onTabCreateClaude={handleTabCreateClaude}
+            claudeOption={claudeOption}
+            codexOption={codexOption}
+            onTabCreateCodex={handleTabCreateCodex}
             localLlmOption={localLlmOption}
             onTabCreateLocalLlm={handleTabCreateLocalLlm}
             onTabDelete={handleTabDelete}
@@ -308,10 +344,11 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   tabId={tab.tab_id}
                   isActive={isActive}
                   cwd={task.worktreePath}
-                  launchClaude={tab.mode !== 'terminal'}
+                  launchAgent={tab.mode !== 'terminal'}
+                  mode={tab.mode}
                   className="h-full"
                   initialTodos={tab.todos}
-                  initialClaudeStatus={tab.status as ClaudeStatus}
+                  initialAgentStatus={tab.status as AgentStatus}
                   onTodosUpdated={onTodosUpdated}
                   onStatusChange={handleStatusChange}
                 />
@@ -323,10 +360,27 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             <div className="h-full flex flex-col items-center justify-center gap-4 px-4">
               <p className="text-sm text-muted-foreground">起動するタブを選んでください</p>
               <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button onClick={handleTabCreateClaude}>
-                  <ClaudeIcon className="w-4 h-4" />
-                  Claude Code
-                </Button>
+                <span title={claudeOption.disabledReason}>
+                  <Button
+                    onClick={handleTabCreateClaude}
+                    disabled={Boolean(claudeOption.disabledReason)}
+                  >
+                    <ClaudeIcon className="w-4 h-4" />
+                    Claude Code
+                  </Button>
+                </span>
+                {codexOption && (
+                  <span title={codexOption.disabledReason}>
+                    <Button
+                      variant="outline"
+                      onClick={handleTabCreateCodex}
+                      disabled={Boolean(codexOption.disabledReason)}
+                    >
+                      <CodexIcon className="w-4 h-4" />
+                      Codex
+                    </Button>
+                  </span>
+                )}
                 {localLlmOption && (
                   <span
                     title={

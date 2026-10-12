@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import * as envRepo from '../lib/repositories/environment.js';
-import { RESERVED_ENV_KEYS } from '../lib/claude-profiles.js';
+import { RESERVED_ENV_KEYS } from '../lib/agent-profiles.js';
 import { notifyEnvChanged } from '../lib/pty-env-sync.js';
 
-const RESERVED_KEY_ERROR = 'Claude の認証は Settings の Claude Profile で設定してください';
+const RESERVED_KEY_ERROR =
+  'エージェントの認証は Settings の Claude Profile / Codex Profile で設定してください';
 
 /** 変更後、起動中のターミナルに反映する（失敗しても API 自体は成功扱い） */
 function syncPtyEnv(fastify: FastifyInstance): void {
