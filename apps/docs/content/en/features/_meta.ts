@@ -6,6 +6,7 @@ export default {
   'environment-variables': 'Environment Variables',
   'claude-profiles': 'Claude Profiles',
   codex: 'Codex',
+  'voice-input': 'Voice Input (mukuchi)',
   'local-llm': 'Local LLM (Experimental)',
   ollama: 'Ollama',
   'lm-studio': 'LM Studio',

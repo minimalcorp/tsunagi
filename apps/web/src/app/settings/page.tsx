@@ -6,10 +6,14 @@ import { ArrowLeft, FlaskConical } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
 import { EnvTreeNavigation, type SelectedNode } from '@/components/env/EnvTreeNavigation';
 import { EnvVariableEditor } from '@/components/env/EnvVariableEditor';
-import { AgentProfileSection } from '@/components/settings/AgentProfileSection';
+import {
+  AGENT_IDS,
+  AgentProfileSection,
+  CliNotice,
+} from '@/components/settings/AgentProfileSection';
 import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
-import { VoiceInputSection } from '@/components/settings/VoiceInputSection';
+import { VoiceInputGuide } from '@/components/settings/VoiceInputGuide';
 import { LocalModelSection } from '@/components/settings/LocalModelSection';
 import { OllamaSection } from '@/components/settings/OllamaSection';
 import { LmStudioSection } from '@/components/settings/LmStudioSection';
@@ -17,6 +21,7 @@ import { SearxngSection } from '@/components/settings/SearxngSection';
 import { VersionInfo } from '@/components/settings/VersionInfo';
 import { UpdateIndicator } from '@/components/UpdateIndicator';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useAgentAvailability } from '@/hooks/useAgentAvailability';
 
@@ -24,8 +29,11 @@ export default function SettingsPage() {
   const router = useRouter();
 
   useDocumentTitle('settings');
-  // 導入済みのエージェントだけプロファイル設定を出す
+  // CLI が未導入のエージェントもプロファイル設定を出し、無効化して導入を促す
   const agents = useAgentAvailability();
+  // ローカルLLMは Claude Code を起動するため、claude の CLI が必要
+  const claudeAvailability = agents?.find((a) => a.agent === 'claude');
+  const claudeNotInstalled = claudeAvailability?.installed === false;
 
   // Initialize selectedNode from localStorage or default to Global
   const getInitialNode = (): SelectedNode => {
@@ -123,15 +131,14 @@ export default function SettingsPage() {
           {selectedNode ? (
             <div className="space-y-6">
               {/* エージェントのプロファイル (All scopes。Global ではプロファイルの追加・ログインも行う) */}
-              {agents
-                ?.filter((agent) => agent.installed)
-                .map((agent) => (
-                  <AgentProfileSection
-                    key={agent.agent}
-                    agent={agent.agent}
-                    selectedNode={selectedNode}
-                  />
-                ))}
+              {AGENT_IDS.map((agent) => (
+                <AgentProfileSection
+                  key={agent}
+                  agent={agent}
+                  availability={agents?.find((a) => a.agent === agent)}
+                  selectedNode={selectedNode}
+                />
+              ))}
 
               {/* Environment Variables Section */}
               <EnvVariableEditor selectedNode={selectedNode} />
@@ -144,6 +151,9 @@ export default function SettingsPage() {
                 </div>
               )}
 
+              {/* 音声入力の案内 (Global scope only) */}
+              {selectedNode.scope === 'global' && <VoiceInputGuide />}
+
               {/* 実験的機能 (Global scope only)。divider 以下はすべて実験的機能 */}
               {selectedNode.scope === 'global' && (
                 <div className="space-y-6">
@@ -152,11 +162,16 @@ export default function SettingsPage() {
                     <span className="text-sm font-semibold">Experimental</span>
                     <div className="h-px flex-1 bg-border" />
                   </div>
-                  <VoiceInputSection />
                   {/* ローカルLLMで Claude Code を動かす */}
-                  <LocalModelSection />
-                  <OllamaSection />
-                  <LmStudioSection />
+                  <CliNotice agent="claude" availability={claudeAvailability} />
+                  <fieldset
+                    disabled={claudeNotInstalled}
+                    className={cn('min-w-0 space-y-6', claudeNotInstalled && 'opacity-50')}
+                  >
+                    <LocalModelSection />
+                    <OllamaSection />
+                    <LmStudioSection />
+                  </fieldset>
                   {/* ローカル検索 (Ollama / LM Studio のどちらかが有効なときだけ表示) */}
                   <SearxngSection />
                 </div>

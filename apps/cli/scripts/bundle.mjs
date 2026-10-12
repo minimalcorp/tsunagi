@@ -28,7 +28,6 @@ const REPO_ROOT = path.resolve(CLI_DIR, '..', '..');
 
 const SERVER_DIR = path.join(REPO_ROOT, 'apps/server');
 const WEB_DIR = path.join(REPO_ROOT, 'apps/web');
-const WHISPER_SERVER_DIR = path.join(REPO_ROOT, 'apps/whisper-server');
 
 function log(msg) {
   console.log(`[bundle] ${msg}`);
@@ -84,7 +83,6 @@ async function cleanCliBundleDirs() {
     path.join(CLI_DIR, 'dist/scripts'),
     path.join(CLI_DIR, '.next'),
     path.join(CLI_DIR, 'dist/docs'),
-    path.join(CLI_DIR, 'dist/whisper-server'),
   ];
   const files = [
     path.join(CLI_DIR, 'dist/prisma.config.ts'),
@@ -129,20 +127,6 @@ async function main() {
     path.join(WEB_DIR, '.next/static'),
     path.join(CLI_DIR, '.next/standalone/apps/web/.next/static')
   );
-
-  // standaloneビルドはpublic/を含まないため手動でコピーする(音声入力のVADアセット等)。
-  log('copying apps/web/public → apps/cli/.next/standalone/apps/web/public');
-  await copyDir(
-    path.join(WEB_DIR, 'public'),
-    path.join(CLI_DIR, '.next/standalone/apps/web/public')
-  );
-
-  log('copying apps/whisper-server → apps/cli/dist/whisper-server');
-  await fs.mkdir(path.join(CLI_DIR, 'dist/whisper-server'), { recursive: true });
-  await fs.cp(WHISPER_SERVER_DIR, path.join(CLI_DIR, 'dist/whisper-server'), {
-    recursive: true,
-    filter: (src) => !/\/(\.venv|__pycache__)(\/|$)/.test(src),
-  });
 
   const docsOutDir = path.join(REPO_ROOT, 'apps/docs/out');
   if (existsSync(docsOutDir)) {

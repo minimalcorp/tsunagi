@@ -16,8 +16,6 @@ import {
 import type { AgentTabOption, LocalLlmTabOption, TabStatusEntry } from '@/components/TerminalPanel';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
-import { VoiceInputButton } from '@/components/VoiceInputButton';
-import type { VoiceInputController } from '@/hooks/useVoiceInput';
 import { ClaudeIcon, CodexIcon, LocalLlmTabIcon } from '@/components/icons/BrandIcons';
 import { localLlmTabLabel } from '@/lib/local-llm';
 
@@ -30,7 +28,7 @@ interface SessionTabsProps {
   /** Terminalを追加してClaudeを起動するタブ追加 */
   onTabCreateClaude: () => void;
   claudeOption?: AgentTabOption;
-  /** Codex を起動するタブ追加（CLI 未導入なら省略してボタン非表示） */
+  /** Codex を起動するタブ追加（省略時はボタン非表示） */
   codexOption?: AgentTabOption;
   onTabCreateCodex?: () => void;
   /** ローカルLLM（Settings で選んだ使用中のモデル）でClaudeを起動するタブ追加（省略時はボタン非表示） */
@@ -39,8 +37,6 @@ interface SessionTabsProps {
   onTabDelete: (tabId: string) => void;
   /** タブごとのリアルタイムステータス */
   tabStatusMap?: Map<string, TabStatusEntry>;
-  /** 音声入力（省略時は音声入力ボタン非表示） */
-  voiceInput?: VoiceInputController;
 }
 
 /** タブのリアルタイムステータスに基づくアイコン＋ラベル */
@@ -137,7 +133,6 @@ export function SessionTabs({
   onTabCreateLocalLlm,
   onTabDelete,
   tabStatusMap,
-  voiceInput,
 }: SessionTabsProps) {
   const tabRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
@@ -255,9 +250,8 @@ export function SessionTabs({
           );
         })}
 
-        {/* 音声入力 + divider + アクションボタン群 */}
+        {/* divider + アクションボタン群 */}
         <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-          {voiceInput && <VoiceInputButton voiceInput={voiceInput} />}
           <div className="w-px self-stretch bg-theme" />
           {onTabCreateTerminal && (
             <Button size="icon" onClick={onTabCreateTerminal} title="Open terminal">
@@ -288,12 +282,15 @@ export function SessionTabs({
             // disabled の Button は pointer-events:none で title が出ないため span に付ける
             <span
               title={
-                localLlmOption.model
-                  ? `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
-                  : 'ローカルLLMのモデルが未設定です（Settings で設定）'
+                localLlmOption.disabledReason ??
+                `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
               }
             >
-              <Button size="icon" onClick={onTabCreateLocalLlm} disabled={!localLlmOption.model}>
+              <Button
+                size="icon"
+                onClick={onTabCreateLocalLlm}
+                disabled={Boolean(localLlmOption.disabledReason)}
+              >
                 <LocalLlmTabIcon provider={localLlmOption.provider} className="w-4 h-4" />
               </Button>
             </span>
