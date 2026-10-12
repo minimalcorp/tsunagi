@@ -36,7 +36,7 @@ export function RepositoryOnboardingOverlay({
               {hasEnvVars ? <Check className="w-3 h-3" /> : '1'}
             </span>
             <span className={hasEnvVars ? 'text-success' : 'font-medium text-muted-foreground'}>
-              Claude にログイン（or ローカルLLM）
+              Claude / Codex にログイン（or ローカルLLM）
             </span>
           </div>
 
