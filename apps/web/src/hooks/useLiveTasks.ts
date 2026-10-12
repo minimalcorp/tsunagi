@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Task } from '@minimalcorp/tsunagi-shared';
 import { apiUrl } from '@/lib/api-url';
-import { unreadForStatus } from '@/lib/claude-status';
+import { unreadForStatus } from '@/lib/agent-status';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
 

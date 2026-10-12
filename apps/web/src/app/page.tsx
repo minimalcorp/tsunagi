@@ -14,7 +14,7 @@ import { useBatchDelete } from '@/hooks/useBatchDelete';
 import { useTerminalTodos } from '@/hooks/useTerminalTodos';
 import { useLiveTasks } from '@/hooks/useLiveTasks';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { hasUnreadResult } from '@/lib/claude-status';
+import { hasUnreadResult } from '@/lib/agent-status';
 import { toaster } from '@/lib/toaster';
 import { apiUrl } from '@/lib/api-url';
 

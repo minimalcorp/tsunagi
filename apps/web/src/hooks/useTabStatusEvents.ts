@@ -5,9 +5,9 @@ import { io, type Socket } from 'socket.io-client';
 import type { Tab } from '@minimalcorp/tsunagi-shared';
 import { getServerUrl } from '@/lib/api-url';
 
-// Socket.IOのClaudeStatusをTab.statusにマッピング
-function toTabStatus(claudeStatus: string): Tab['status'] | null {
-  switch (claudeStatus) {
+// Socket.IOのAgentStatusをTab.statusにマッピング
+function toTabStatus(agentStatus: string): Tab['status'] | null {
+  switch (agentStatus) {
     case 'running':
       return 'running';
     case 'waiting':

@@ -7,8 +7,8 @@ import { Callout } from 'nextra/components';
 
 # Task Management
 
-Tasks are the atomic unit of work in Tsunagi. Every feature — Claude
-sessions, git worktrees, progress tracking, the editor integration —
+Tasks are the atomic unit of work in Tsunagi. Every feature — agent
+sessions (Claude Code / Codex), git worktrees, progress tracking, the editor integration —
 hangs off a task. If you understand what a task is and what it owns,
 you understand most of Tsunagi.
 
@@ -26,11 +26,11 @@ A task in Tsunagi is a record that binds together:
 | `status`                    | Where the task is in its lifecycle (see below)                         |
 | `order`                     | Priority within a status column (drag to reorder)                      |
 | `effort`                    | Rough size estimate (`S` / `M` / `L` / `XL`)                           |
-| `tabs`                      | Zero or more Claude sessions attached to this task                     |
+| `tabs`                      | Zero or more tabs (agent sessions, etc.) attached to this task         |
 | `worktreeStatus`            | Internal state of the git worktree Tsunagi manages for this task       |
 
 Every task **owns exactly one git worktree** on disk, and you do all the
-real work in that worktree — either through the Claude sessions Tsunagi
+real work in that worktree — either through the agent sessions Tsunagi
 launches inside it, or directly with your own tools.
 
 ## Creating a task
@@ -42,7 +42,7 @@ Click **+ Add Task** in the task list panel. Fill in:
 - **Branch** — the branch Tsunagi will create the worktree on. Choose a
   meaningful name; Tsunagi will not auto-rename it later
 - **Description** — optional; great for writing a plan or PRD that
-  Claude can read
+  the agent can read
 - **Effort** — optional sizing hint
 
 Click **Create**. Tsunagi will:
@@ -55,7 +55,7 @@ Click **Create**. Tsunagi will:
    connected browser tab
 
 That's it — no manual `git` commands, no shell. The worktree is ready
-for Claude (or you) to start working in.
+for the agent (or you) to start working in.
 
 ## Editing a task
 
@@ -106,25 +106,27 @@ Tasks move through these statuses:
 `backlog` → `planning` → `coding` → `reviewing` → `done`
 
 You can change status manually at any time, but Tsunagi also **updates
-status automatically** based on what Claude is doing. The bundled
-Tsunagi plugin includes a small skill that teaches Claude when to call
-`tsunagi_update_task` to advance the status.
+status automatically** based on what the agent is doing. The bundled
+Tsunagi plugin includes a small skill that teaches the agent when to call
+`tsunagi_update_task` to advance the status (Codex receives the same skill
+at launch).
 
-| Status      | When                                                       |
-| ----------- | ---------------------------------------------------------- |
-| `backlog`   | Task exists, no one is working on it yet                   |
-| `planning`  | A human-Claude conversation about the approach is underway |
-| `coding`    | Claude is actively implementing                            |
-| `reviewing` | Implementation is done; ready for human review             |
-| `done`      | Task is complete and the human has confirmed               |
+| Status      | When                                                      |
+| ----------- | --------------------------------------------------------- |
+| `backlog`   | Task exists, no one is working on it yet                  |
+| `planning`  | A human-agent conversation about the approach is underway |
+| `coding`    | The agent is actively implementing                        |
+| `reviewing` | Implementation is done; ready for human review            |
+| `done`      | Task is complete and the human has confirmed              |
 
 This means you can watch tasks flow across the board in real time, just
 like a physical kanban board — except no one has to physically move the
 cards.
 
-## Tabs — multiple Claude sessions per task
+## Tabs — multiple sessions per task
 
-A **tab** is a single Claude Code session attached to a task. A task can
+A **tab** is a single terminal session (Claude Code, Codex, a local LLM,
+or a plain terminal) attached to a task. A task can
 have any number of tabs, each running independently inside the same
 worktree.
 
@@ -137,9 +139,9 @@ Why multiple tabs?
 - Compare two different approaches side by side
 
 All tabs share the same worktree, so a file written in one tab is
-immediately visible to the others. Each tab is a full Claude Code
-session — the same one you'd get running `claude` in a terminal — so you
-can use any Claude Code feature inside a tab.
+immediately visible to the others. Each agent tab is a full Claude Code
+/ Codex session — the same one you'd get running `claude` / `codex` in a
+terminal — so you can use any of its features inside a tab.
 
 ### How a tab is launched
 
@@ -148,10 +150,12 @@ the tab bar (or in the center of the screen when there are no tabs) to
 choose what to launch:
 
 - **Claude icon**: Claude Code with Anthropic (default)
+- **Codex icon** (the OpenAI logo): the Codex CLI (see
+  [Codex](/en/features/codex/))
 - **Local LLM icon** (the logo of the provider in use): Claude Code with the
   local LLM chosen in Settings (shown only when a provider of
   [Local LLM (experimental)](/en/features/local-llm/) is enabled)
-- **Terminal icon**: a plain shell without Claude
+- **Terminal icon**: a plain shell without an agent
 
 When you create a Claude tab, Tsunagi:
 
@@ -162,6 +166,9 @@ When you create a Claude tab, Tsunagi:
    [Claude profile](/en/features/claude-profiles/)
 4. Wires Claude's hooks to the Tsunagi backend so the UI can read what
    the session is doing in real time
+
+For a Codex tab, steps 3–4 launch Codex instead, passing the hooks, MCP
+server, etc. via `-c` at launch (see [Codex](/en/features/codex/)).
 
 ### Persistence across reloads
 
@@ -176,7 +183,7 @@ this kills the PTY process and removes the tab record from the task.
 ## Progress bar — real-time todo tracking
 
 Each task card in the task list shows a **progress bar** that reflects
-what Claude is doing in real time.
+what the agent is doing in real time.
 
 How it works: when Claude calls its built-in task tools (`TaskCreate` /
 `TaskUpdate`, or `TodoWrite` on older setups) to record or update its
@@ -186,7 +193,8 @@ broadcasts it via Socket.IO to every connected browser. The progress
 bar is rendered from the completed vs. total count, and the card shows
 the step Claude is working on. In the task detail view, click the
 progress in the tab header to see every step and whether it is pending,
-in progress, completed, or blocked.
+in progress, completed, or blocked. Codex tabs show the plan from
+`update_plan` the same way.
 
 The progress stays after the session ends, because Claude keeps its
 task list per session and picks it up again on resume.

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2, MessageSquare, XCircle, type LucideIcon } from 'lucide-react';
 import type { Task } from '@minimalcorp/tsunagi-shared';
-import { activityKind, type ActivityKind } from '@/lib/claude-status';
+import { activityKind, type ActivityKind } from '@/lib/agent-status';
 import { useLiveTasks } from '@/hooks/useLiveTasks';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';

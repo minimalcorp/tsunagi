@@ -377,8 +377,8 @@ export async function tasksRoutes(fastify: FastifyInstance) {
           return reply.status(400).send({ error: 'Worktree not found' });
         }
 
-        const isClaudeRunning = task.tabs.some((tab) => tab.status === 'running');
-        if (isClaudeRunning) {
+        const isAgentRunning = task.tabs.some((tab) => tab.status === 'running');
+        if (isAgentRunning) {
           return reply.status(400).send({ error: 'Cannot rebase while Claude is running' });
         }
 

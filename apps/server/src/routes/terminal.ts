@@ -190,7 +190,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         // 既に動いているため、終了扱い・セッション削除はしない
         if (session.respawning) return;
         io.to(room).emit('exit', { exitCode });
-        // Ctrl+C等でClaudeが強制終了した場合にclaudeStatusをidleにリセット
+        // Ctrl+C等でClaudeが強制終了した場合にagentStatusをidleにリセット
         // todos は残す（Claude 側の Task はセッションに永続化され、--resume 後も続きから使われる）
         io.to(room).emit('status-changed', { sessionId, status: 'idle' });
         prisma.tab

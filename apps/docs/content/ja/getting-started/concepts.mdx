@@ -14,14 +14,14 @@ Tsunagi の用語はそれほど多くありません。以下を押さえてお
 - **タイトル** と (任意) **説明** (Markdown)
 - **owner / repo / branch** の組 — git コンテキストを識別
 - **ステータス**: `backlog` → `planning` → `coding` → `reviewing` → `done`
-- 0個以上の **タブ** (Claude セッション)
+- 0個以上の **タブ** (エージェントセッション等)
 - ステータス内ソート用の **order**
 
 タスクは Tsunagi が扱う最小単位です。タスクを作成すると、Tsunagi は worktree を自動的に作成します。タスクを削除すると worktree も削除されます。
 
 ## Worktree
 
-[git worktree](https://git-scm.com/docs/git-worktree) は、ブランチを独立したディレクトリにチェックアウトしながら、元のリポジトリと同じオブジェクトデータベースを共有する仕組みです。Tsunagi はタスクごとに1つの worktree を使うことで、複数の Claude セッションがファイルシステム上で衝突しないようにしています。
+[git worktree](https://git-scm.com/docs/git-worktree) は、ブランチを独立したディレクトリにチェックアウトしながら、元のリポジトリと同じオブジェクトデータベースを共有する仕組みです。Tsunagi はタスクごとに1つの worktree を使うことで、複数のエージェントセッションがファイルシステム上で衝突しないようにしています。
 
 Tsunagi の worktree は以下の場所に配置されます:
 
@@ -33,17 +33,20 @@ Tsunagi の worktree は以下の場所に配置されます:
 
 ## タブ (Tab)
 
-**タブ** は1つのタスクに紐付く Claude Code セッションです。1つのタスクは複数のタブを持てます——例えば「機能を実装するタブ」と「テストをデバッグするタブ」を同時に走らせることができます。
+**タブ** は1つのタスクに紐付くターミナルセッションです。タスクの worktree 内で、Claude Code・[Codex](/ja/features/codex/)・ローカルLLM (Ollama / LM Studio を使う Claude Code)・素のターミナルのいずれかを実行します。1つのタスクは複数のタブを持てます——例えば「機能を実装するタブ」と「テストをデバッグするタブ」を同時に走らせることができます。
 
 各タブは Tsunagi がタスクの worktree 内で起動する PTY バックエンドのターミナルセッションと 1対1 でマップされます。
 
 ## Hooks
 
-Tsunagi は Claude Code の [hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide) を listen して、各セッションからリアルタイム情報を取得します: Claude が追跡している todo、いつ作業を始めたか・止めたか、どのツールを呼び出したか、等。これが UI のプログレスバーやステータス表示の元データです。
+Tsunagi は各エージェントの hooks を受け取り、各セッションからリアルタイム情報を取得します: エージェントが追跡している todo、いつ作業を始めたか・止めたか、どのツールを呼び出したか、等。これが UI のプログレスバーやステータス表示 (running / waiting / success / idle) の元データです。
+
+- **Claude Code**: [hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide)。todo は `TaskCreate` / `TaskUpdate`
+- **Codex**: 起動時に `-c` で渡す hooks。todo は `update_plan`。失敗を通知する hook がないため、Codex のタブは error 状態になりません
 
 ## MCP サーバー
 
-Tsunagi はタスク管理を [MCP (Model Context Protocol) サーバー](https://docs.claude.com/en/docs/claude-code/mcp) として公開しています。これにより **Claude 自身が Tsunagi を呼び出して** タスクの作成・更新・並び替え・削除ができます。Tsunagi の MCP サーバーは Claude Code plugin としてバンドルされています (Tsunagi の内部ターミナルで起動した Claude Code が読み込む plugin がそれです)。
+Tsunagi はタスク管理を [MCP (Model Context Protocol) サーバー](https://docs.claude.com/en/docs/claude-code/mcp) として公開しています。これにより **エージェント自身が Tsunagi を呼び出して** タスクの作成・更新・並び替え・削除ができます。Claude Code にはバンドルの Claude Code plugin (後述) として、Codex には起動時の `-c mcp_servers.tsunagi.url` として渡されます。
 
 提供される MCP ツールには以下があります:
 
@@ -54,7 +57,7 @@ Tsunagi はタスク管理を [MCP (Model Context Protocol) サーバー](https:
 - `tsunagi_get_task`
 - ...他にもいくつか
 
-これらを組み合わせることで、Tsunagi を「いま進行中の作業の信頼できる情報源」として扱えるようになります (人間にとっても Claude にとっても)。
+これらを組み合わせることで、Tsunagi を「いま進行中の作業の信頼できる情報源」として扱えるようになります (人間にとってもエージェントにとっても)。
 
 ## Claude Code plugin
 
@@ -65,6 +68,8 @@ Tsunagi の内部ターミナルで起動した Claude Code は、同梱の `tsu
 - agent 定義 (`tsunagi-task-curator`) — タスク棚卸しワークフロー用
 
 Claude Code の設定には install しないので、Tsunagi の外で起動した Claude Code には影響しません。
+
+Codex には plugin の仕組みがないため、Tsunagi は起動時に MCP サーバー・skill (`developer_instructions`)・`tsunagi-task-curator` (agents 設定) を渡します。Codex の設定にも何も書き込みません ([Codex](/ja/features/codex/) 参照)。
 
 ## 単一インスタンス
 

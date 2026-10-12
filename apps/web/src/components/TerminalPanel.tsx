@@ -19,7 +19,7 @@ import {
   type Todo,
   type TerminalViewHandle,
   type TerminalStatus,
-  type ClaudeStatus,
+  type AgentStatus,
 } from '@/components/TerminalView';
 import { Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ import { useAgentAvailability } from '@/hooks/useAgentAvailability';
 export interface TabStatusEntry {
   /** TerminalView 未マウント（一度も表示していないタブ）の場合は null */
   terminal: TerminalStatus | null;
-  claude: ClaudeStatus;
+  claude: AgentStatus;
 }
 
 interface TerminalPanelProps {
@@ -48,7 +48,7 @@ interface TerminalPanelProps {
   /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
   /** Claudeステータス変化時のコールバック（詳細を開いたまま完了したときの既読化用） */
-  onClaudeStatusChange?: (tabId: string, claude: ClaudeStatus) => void;
+  onAgentStatusChange?: (tabId: string, claude: AgentStatus) => void;
 }
 
 /** タブ追加モード */
@@ -98,7 +98,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       onTabCreate,
       onTabDelete,
       onTodosUpdated,
-      onClaudeStatusChange,
+      onAgentStatusChange,
     },
     ref
   ) {
@@ -126,7 +126,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const [tabStatusMap, setTabStatusMap] = useState<Map<string, TabStatusEntry>>(
       () =>
         new Map(
-          tabs.map((tab) => [tab.tab_id, { terminal: null, claude: tab.status as ClaudeStatus }])
+          tabs.map((tab) => [tab.tab_id, { terminal: null, claude: tab.status as AgentStatus }])
         )
     );
 
@@ -139,7 +139,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         const next = new Map(prev);
         for (const tab of tabs) {
           if (!next.has(tab.tab_id)) {
-            next.set(tab.tab_id, { terminal: null, claude: tab.status as ClaudeStatus });
+            next.set(tab.tab_id, { terminal: null, claude: tab.status as AgentStatus });
             changed = true;
           }
         }
@@ -163,7 +163,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         next.set(tabId, { terminal: null, claude: status });
         return next;
       });
-      onClaudeStatusChange?.(tabId, status);
+      onAgentStatusChange?.(tabId, status);
     });
 
     // 各TerminalViewへのrefマップ
@@ -178,15 +178,15 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     }, [activeTabId]);
 
     const handleStatusChange = useCallback(
-      (tabId: string, terminal: TerminalStatus, claude: ClaudeStatus) => {
+      (tabId: string, terminal: TerminalStatus, claude: AgentStatus) => {
         setTabStatusMap((prev) => {
           const next = new Map(prev);
           next.set(tabId, { terminal, claude });
           return next;
         });
-        onClaudeStatusChange?.(tabId, claude);
+        onAgentStatusChange?.(tabId, claude);
       },
-      [onClaudeStatusChange]
+      [onAgentStatusChange]
     );
 
     useImperativeHandle(ref, () => ({
@@ -348,7 +348,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   mode={tab.mode}
                   className="h-full"
                   initialTodos={tab.todos}
-                  initialClaudeStatus={tab.status as ClaudeStatus}
+                  initialAgentStatus={tab.status as AgentStatus}
                   onTodosUpdated={onTodosUpdated}
                   onStatusChange={handleStatusChange}
                 />

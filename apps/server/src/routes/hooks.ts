@@ -22,7 +22,7 @@ export const hookEvents: HookEvent[] = [];
 /**
  * status から未読フラグを導出する。
  * 完了(success/error)で未読を立て、再実行・セッション終了で落とす。
- * web 側 (apps/web/src/lib/claude-status.ts の unreadForStatus) と同じルール。
+ * web 側 (apps/web/src/lib/agent-status.ts の unreadForStatus) と同じルール。
  */
 function unreadForStatus(status: string): boolean | undefined {
   switch (status) {

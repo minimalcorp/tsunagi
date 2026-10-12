@@ -26,7 +26,7 @@ import type { TabMode, Todo } from '@minimalcorp/tsunagi-shared';
 export type { Todo };
 
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
-export type ClaudeStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
+export type AgentStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
 
 interface TerminalViewProps {
   /** タブID（PTYのsessionIdと一致させる）。必須。 */
@@ -48,7 +48,7 @@ interface TerminalViewProps {
   /** DBから読み込んだ初期Todoリスト */
   initialTodos?: Todo[];
   /** DBから読み込んだ初期Claudeステータス（ページ再訪時にsuccess等を維持するため） */
-  initialClaudeStatus?: ClaudeStatus;
+  initialAgentStatus?: AgentStatus;
   /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
   /** タブがアクティブかどうか（フォーカス制御用） */
@@ -57,7 +57,7 @@ interface TerminalViewProps {
   onStatusChange?: (
     tabId: string,
     terminalStatus: TerminalStatus,
-    claudeStatus: ClaudeStatus
+    agentStatus: AgentStatus
   ) => void;
 }
 
@@ -79,7 +79,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     className = '',
     hideToolbar = false,
     initialTodos,
-    initialClaudeStatus,
+    initialAgentStatus,
     isActive,
     onTodosUpdated,
     onStatusChange,
@@ -116,9 +116,9 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const [status, setStatus] = useState<TerminalStatus>('idle');
   // セッション作成APIが返したエラー（例: Ollama のモデル未設定）。error オーバーレイに表示する
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>(initialClaudeStatus ?? 'idle');
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>(initialAgentStatus ?? 'idle');
   // ESC中断検知（term.onData のクロージャから最新値を読むためのref）
-  const claudeStatusRef = useRef<ClaudeStatus>(initialClaudeStatus ?? 'idle');
+  const agentStatusRef = useRef<AgentStatus>(initialAgentStatus ?? 'idle');
   // onData のハンドラは接続時に一度だけ登録するため、最新の mode は ref で参照する
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -147,10 +147,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         selectionBackground: '#add6ff',
       };
 
-  // status/claudeStatus 変化時に親へ通知
+  // status/agentStatus 変化時に親へ通知
   useEffect(() => {
-    onStatusChangeRef.current?.(tabId, status, claudeStatus);
-  }, [tabId, status, claudeStatus]);
+    onStatusChangeRef.current?.(tabId, status, agentStatus);
+  }, [tabId, status, agentStatus]);
 
   useLayoutEffect(() => {
     isActiveRef.current = isActive;
@@ -161,7 +161,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   });
 
   useLayoutEffect(() => {
-    claudeStatusRef.current = claudeStatus;
+    agentStatusRef.current = agentStatus;
   });
 
   // アクティブになったタイミングで xterm にフォーカスを当てる
@@ -651,8 +651,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // claude hooksからのステータス変更
     socket.on(
       'status-changed',
-      ({ status: newStatus }: { sessionId: string; status: ClaudeStatus }) => {
-        setClaudeStatus(newStatus);
+      ({ status: newStatus }: { sessionId: string; status: AgentStatus }) => {
+        setAgentStatus(newStatus);
       }
     );
 
@@ -681,7 +681,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       if (
         data === '\x1b' &&
         modeRef.current !== 'codex' &&
-        (claudeStatusRef.current === 'running' || claudeStatusRef.current === 'waiting') &&
+        (agentStatusRef.current === 'running' || agentStatusRef.current === 'waiting') &&
         sessionIdRef.current
       ) {
         void notifyInterrupt(sessionIdRef.current);
@@ -724,7 +724,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   }
 
   // コマンドはタブの mode に応じてサーバーが組み立てて PTY に書き込む
-  async function handleRunClaude() {
+  async function handleRunAgent() {
     const sid = sessionIdRef.current;
     if (!sid) return;
     try {
@@ -770,7 +770,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
             </Button>
             <Button
               size="xs"
-              onClick={() => void handleRunClaude()}
+              onClick={() => void handleRunAgent()}
               disabled={!isConnected}
               title={`Run ${agentLabel}`}
             >

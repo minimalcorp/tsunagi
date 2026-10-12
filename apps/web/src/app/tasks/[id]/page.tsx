@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/useToast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
-import type { ClaudeStatus } from '@/components/TerminalView';
+import type { AgentStatus } from '@/components/TerminalView';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { UpdateIndicator } from '@/components/UpdateIndicator';
@@ -71,8 +71,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   }, [id]);
 
   // 詳細を開いたまま Claude が完了した場合も、その場で既読にする
-  const handleClaudeStatusChange = useCallback(
-    (_tabId: string, claude: ClaudeStatus) => {
+  const handleAgentStatusChange = useCallback(
+    (_tabId: string, claude: AgentStatus) => {
       if (claude === 'success' || claude === 'failure' || claude === 'error') {
         markAsRead();
       }
@@ -361,7 +361,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               onTabChange={setActiveTabId}
               onTabCreate={handleTabCreate}
               onTabDelete={handleTabDelete}
-              onClaudeStatusChange={handleClaudeStatusChange}
+              onAgentStatusChange={handleAgentStatusChange}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
