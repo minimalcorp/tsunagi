@@ -235,7 +235,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     const handleTabCreateLocalLlm = useCallback(() => handleTabCreate('local'), [handleTabCreate]);
 
-    // Claude は常にボタンを出し、CLI が使えなければ無効化する。Codex は CLI を入れているときだけ出す
+    // エージェントのボタンは常に出し（使えることを知らせる）、CLI が使えなければ無効化する
     const agents = useAgentAvailability();
     const claudeOption: AgentTabOption = {
       disabledReason: agentDisabledReason(
@@ -243,10 +243,12 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         agents?.find((a) => a.agent === 'claude')
       ),
     };
-    const codexAvailability = agents?.find((a) => a.agent === 'codex');
-    const codexOption: AgentTabOption | undefined = codexAvailability?.installed
-      ? { disabledReason: agentDisabledReason('Codex', codexAvailability) }
-      : undefined;
+    const codexOption: AgentTabOption = {
+      disabledReason: agentDisabledReason(
+        'Codex',
+        agents?.find((a) => a.agent === 'codex')
+      ),
+    };
 
     // 実験的機能のローカルLLMは、プロバイダーが有効なときだけタブの作成ボタンを出す
     const { settings: ollamaSettings } = useOllamaSettings();
