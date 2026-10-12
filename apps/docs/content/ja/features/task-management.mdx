@@ -71,7 +71,7 @@ Tsunagi のタスクは以下を束ねるレコードです:
 
 - **タスク一覧** — 右クリックまたはカードメニュー
 - **タスク詳細画面** — オーバーフローメニュー
-- **Claude から MCP 経由** — Claude に依頼すれば `tsunagi_delete_task` を呼び出せます ([Tsunagi Plugin](/ja/features/plugin/) を参照)
+- **エージェントから MCP 経由** — Claude Code / Codex に依頼すれば `tsunagi_delete_task` を呼び出せます ([Tsunagi Plugin](/ja/features/plugin/) を参照)
 
 <Callout type="warning">
   タスクを削除すると、worktree の未コミットの変更も **失われます**。残したい変更は push または stash
@@ -150,11 +150,11 @@ Claude はタスク一覧をセッションごとに保持し、再開時に引�
 
 ## Monaco エディタ統合
 
-Tsunagi には UI 内でファイルを開ける組み込みの **Monaco エディタ** モーダルがあります。Claude (またはあなた) がターミナルの 1 行プロンプトより長い内容を編集する必要がある時に便利です——commit メッセージの執筆、Markdown プロンプトの編集、設定ファイルの微調整など。
+Tsunagi には UI 内でファイルを開ける組み込みの **Monaco エディタ** モーダルがあります。エージェント (またはあなた) がターミナルの 1 行プロンプトより長い内容を編集する必要がある時に便利です——commit メッセージの執筆、Markdown プロンプトの編集、設定ファイルの微調整など。
 
 ### 起動トリガー
 
-Tsunagi は各 Claude セッションのシェル環境で `EDITOR` を小さなヘルパースクリプトに向けて設定します。ツールがデフォルトエディタを開くとき (`git commit`、`git rebase -i`、各種 CLI の `npx prompt` など)、ヘルパーが `vi` のようなターミナルモードのエディタを起動する代わりに **Monaco モーダル** を Tsunagi UI 上で開きます。
+Tsunagi は各タブのシェル環境で `EDITOR` を小さなヘルパースクリプトに向けて設定します。ツールがデフォルトエディタを開くとき (`git commit`、`git rebase -i`、各種 CLI の `npx prompt` など)、ヘルパーが `vi` のようなターミナルモードのエディタを起動する代わりに **Monaco モーダル** を Tsunagi UI 上で開きます。
 
 ターミナルビューからキーボードショートカット (通常 `Ctrl+G`) で直接 Monaco を開き、カーソル位置のファイルを編集することもできます。
 
@@ -164,7 +164,7 @@ Tsunagi は各 Claude セッションのシェル環境で `EDITOR` を小さな
 - **複数行編集** — ターミナルの折り返しと戦う必要がない
 - **Tsunagi UI の中に留まれる** — アプリを切り替える必要がない
 
-モーダル内で通常通り編集し、保存 (`Cmd+S` または `Ctrl+S`) してディスミスします。Claude セッションに制御が戻り、編集済みファイルを参照して続行します。
+モーダル内で通常通り編集し、保存 (`Cmd+S` または `Ctrl+S`) してディスミスします。エージェントのセッションに制御が戻り、編集済みファイルを参照して続行します。
 
 ## フィルタリングと並び替え
 
@@ -190,8 +190,8 @@ Tsunagi は各 Claude セッションのシェル環境で `EDITOR` を小さな
 
 これにより:
 
-- **タスクの worktree を自分のエディタで直接開ける** (`code ~/.tsunagi/workspaces/owner/repo/feat-xxx/`)。Tsunagi の外で作業しても、Tsunagi UI は Claude セッションを通じてファイル変更を追跡し続けます
-- **1 タスクの複数 Claude セッションは 1 つの worktree を共有** するので、お互いの編集が見えます
+- **タスクの worktree を自分のエディタで直接開ける** (`code ~/.tsunagi/workspaces/owner/repo/feat-xxx/`)。Tsunagi の外で作業しても、Tsunagi UI はエージェントのセッションを通じてファイル変更を追跡し続けます
+- **1 タスクの複数のエージェントセッションは 1 つの worktree を共有** するので、お互いの編集が見えます
 - **異なるタスクは完全に別々のディレクトリに住む** ので、並列タスクがファイルシステム上で衝突することはありません (bare clone を共有していても)
 
 Tsunagi はこれらの worktree を自動管理します——タスク作成時の `git worktree add`、削除時の `git worktree remove` ——なので、通常は `git worktree` コマンドを自分で実行する必要はありません。

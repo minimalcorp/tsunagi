@@ -10,7 +10,7 @@ description: Claude Code の代わりに Codex CLI をタスクのタブで使�
 ## 前提
 
 - `codex` コマンドが `PATH` 上にあり、**v0.162.0 以降** であること
-- Tsunagi は `claude` と `codex` のどちらか一方があれば起動します。`codex` が入っていればタスク画面に Codex タブの作成ボタンが出ます
+- Tsunagi は `claude` と `codex` のどちらか一方があれば起動します。Codex タブの作成ボタンは常に表示され、`codex` が無い・古い間は押せません
 
 ## ログインとプロファイル
 
@@ -20,6 +20,7 @@ description: Claude Code の代わりに Codex CLI をタスクのタブで使�
 
 - プロファイルは `~/.tsunagi/codex-profiles/<名前>/` に作られます
 - **Login** を押すと開いたターミナルで `codex login` を実行します。Docker 内で動かしている場合、認証後にブラウザが `127.0.0.1:1455` を開けないため、そのアドレスバーの URL をダイアログに貼り付けてください
+- `codex login` は開始した時点で今のログインを解除します（Codex の仕様）
 - プロファイルを選んだタブでは `CODEX_API_KEY` / `CODEX_ACCESS_TOKEN` を環境から取り除きます（ログインより優先されてしまうため）
 
 ## Tsunagi との連携
@@ -34,7 +35,7 @@ Codex には Claude Code のプラグインに当たる仕組みがないため�
 | skill      | `tsunagi-task` の Codex 向けの本文を `developer_instructions` として渡す          |
 | subagent   | 並び替え・棚卸し用の `tsunagi-task-curator` を agent role として渡す              |
 
-権限は Claude Code タブの `--dangerously-skip-permissions` と同じく、`--dangerously-bypass-approvals-and-sandbox`（承認なし・サンドボックスなし）で起動します。
+権限は Claude Code タブの `--dangerously-skip-permissions` と同じく、`--dangerously-bypass-approvals-and-sandbox`（承認なし・サンドボックスなし）で起動します。タスクの worktree は信頼済みとして渡すため、フォルダの信頼確認は出ません。`-c` で設定を渡すため、起動時に「共有のバックグラウンドサーバーを使わずに起動した」という warning が出ますが、想定どおりです。
 
 ## 会話の再開
 
@@ -42,6 +43,6 @@ Codex のセッションIDは Tsunagi のタブIDと別に振られるため、�
 
 ## 制約
 
-- Codex にはターンの失敗を通知する hook がないため、API エラー等でターンが失敗しても **error** 状態にはなりません
+- Codex にはターンの失敗を通知する hook がないため、API エラー等でターンが失敗しても **error** 状態にはならず、次のプロンプト送信かセッション終了まで **running** のままになります
 - ローカルLLM（実験的機能）は Claude Code のタブでだけ使えます
 - `developer_instructions` に渡した skill の本文は、常にコンテキストに載ります

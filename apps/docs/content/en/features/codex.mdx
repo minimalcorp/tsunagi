@@ -10,7 +10,7 @@ Task tabs can run the [Codex CLI](https://developers.openai.com/codex/cli) (`cod
 ## Requirements
 
 - The `codex` command must be on your `PATH`, **v0.162.0 or later**.
-- Tsunagi starts if either `claude` or `codex` is installed. When `codex` is installed, the task screen shows a button to create a Codex tab.
+- Tsunagi starts if either `claude` or `codex` is installed. The Codex tab button is always shown, and is disabled while `codex` is missing or too old.
 
 ## Login and profiles
 
@@ -20,6 +20,7 @@ To log in or to use several accounts, open Settings → **Global** → **Codex P
 
 - Profiles are created at `~/.tsunagi/codex-profiles/<name>/`.
 - **Login** runs `codex login` in a terminal. When Tsunagi runs in Docker, the browser cannot open `127.0.0.1:1455` after authenticating; paste the URL from its address bar into the dialog.
+- `codex login` signs out the current login as soon as it starts (Codex behavior).
 - Tabs that use a profile drop `CODEX_API_KEY` / `CODEX_ACCESS_TOKEN` from the environment, since they take precedence over the login.
 
 ## Integration with Tsunagi
@@ -34,7 +35,7 @@ Codex has no equivalent of Claude Code plugins, so Tsunagi passes the following 
 | skill       | The Codex version of `tsunagi-task`, passed as `developer_instructions`       |
 | subagent    | `tsunagi-task-curator` for reordering and triage, passed as an agent role     |
 
-Like `--dangerously-skip-permissions` in Claude Code tabs, Codex runs with `--dangerously-bypass-approvals-and-sandbox` (no approvals, no sandbox).
+Like `--dangerously-skip-permissions` in Claude Code tabs, Codex runs with `--dangerously-bypass-approvals-and-sandbox` (no approvals, no sandbox). The task's worktree is passed as trusted, so the folder trust prompt is skipped. Because settings are passed with `-c`, Codex shows a startup warning that it runs without the shared background server; this is expected.
 
 ## Resuming conversations
 
@@ -42,6 +43,6 @@ Codex assigns its own session ID, separate from the Tsunagi tab ID, so the tab s
 
 ## Limitations
 
-- Codex has no hook for failed turns, so a turn that fails (API errors etc.) does not show the **error** status.
+- Codex has no hook for failed turns. A turn that fails (API errors etc.) does not show the **error** status; the tab stays **running** until the next prompt or the session ends.
 - Local LLM (experimental) is available in Claude Code tabs only.
 - The skill passed through `developer_instructions` is always in context.

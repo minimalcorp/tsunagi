@@ -88,7 +88,7 @@ You can delete a task from three places:
 
 - **The task list** — right-click or use the card menu
 - **The task detail view** — use the overflow menu
-- **From Claude via MCP** — Claude can call `tsunagi_delete_task` if you
+- **From an agent via MCP** — Claude Code or Codex can call `tsunagi_delete_task` if you
   ask it to (see [Tsunagi Plugin](/en/features/plugin/))
 
 <Callout type="warning">
@@ -210,13 +210,13 @@ Claude creates its first task.
 ## Monaco editor integration
 
 Tsunagi includes a built-in **Monaco editor** modal that can open files
-from inside the UI. This is useful when Claude (or you) needs to edit
+from inside the UI. This is useful when an agent (or you) needs to edit
 something longer than a single-line terminal prompt — writing a commit
 message, editing a prompt in Markdown, or tweaking a config file.
 
 ### How it's triggered
 
-Tsunagi sets `EDITOR` in every Claude session's shell environment to
+Tsunagi sets `EDITOR` in every tab's shell environment to
 point at a small helper script. Whenever a tool opens its default
 editor (`git commit`, `git rebase -i`, `npx prompt` in various CLIs,
 etc.), the helper opens a **Monaco modal** in the Tsunagi UI instead of
@@ -233,7 +233,7 @@ cursor.
 - **Stays inside the Tsunagi UI** — you never have to switch apps
 
 Inside the modal you edit normally, save (`Cmd+S` or `Ctrl+S`), and
-dismiss. Control returns to the Claude session, which sees the edited
+dismiss. Control returns to the agent session, which sees the edited
 file and continues.
 
 ## Filtering and reordering
@@ -266,8 +266,8 @@ Some useful consequences:
 - **You can open a task's worktree directly** in your own editor
   (`code ~/.tsunagi/workspaces/owner/repo/feat-xxx/`) and work outside
   of Tsunagi. The Tsunagi UI keeps tracking file changes through its
-  Claude sessions.
-- **Multiple Claude sessions per task share one worktree**, so they can
+  agent sessions.
+- **Multiple agent sessions per task share one worktree**, so they can
   see each other's edits.
 - **Different tasks live in completely separate directories**, so
   parallel tasks never collide on the file system even though they
