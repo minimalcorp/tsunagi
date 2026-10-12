@@ -160,6 +160,8 @@ export function SessionTabs({
     }
   }, [activeTabId, tabs]);
 
+  const hasActiveTab = tabs.some((t) => t.tab_id === activeTabId);
+
   // Terminalモードのタブには連番ラベル（terminal 1, terminal 2, ...）を割り当てる。
   // Claude用のステータス表示が存在しないため、番号で識別できるようにする。
   const terminalNumbers = new Map<string, number>();
@@ -298,14 +300,16 @@ export function SessionTabs({
           )}
         </div>
 
-        {/* Material Design Indicator */}
-        <div
-          className="absolute bottom-0 h-0.5 bg-primary transition-[left,width]"
-          style={{
-            left: `${indicatorStyle.left}px`,
-            width: `${indicatorStyle.width}px`,
-          }}
-        />
+        {/* Material Design Indicator（アクティブタブが存在しない場合は表示しない） */}
+        {hasActiveTab && (
+          <div
+            className="absolute bottom-0 h-0.5 bg-primary transition-[left,width]"
+            style={{
+              left: `${indicatorStyle.left}px`,
+              width: `${indicatorStyle.width}px`,
+            }}
+          />
+        )}
       </div>
     </>
   );
