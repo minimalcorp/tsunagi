@@ -12,6 +12,9 @@ import { AGENTS, type AgentAdapter } from './agents/index.js';
  * （resolveAgentProfileEnv）。
  */
 
+/** ログイン用 PTY の sessionId の接頭辞（タブの PTY と区別する） */
+export const LOGIN_SESSION_PREFIX = 'agent-login-';
+
 /** システム既定（設定ディレクトリの環境変数を付けず ~/.claude / ~/.codex を使う） */
 export const DEFAULT_PROFILE = 'default';
 

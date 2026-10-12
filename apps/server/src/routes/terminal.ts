@@ -4,6 +4,7 @@ import type { TabMode } from '@minimalcorp/tsunagi-shared';
 import { isShellForeground, ptyManager, type PtySession } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
 import { getAgentForMode } from '../lib/agents/index.js';
+import { LOGIN_SESSION_PREFIX } from '../lib/agent-profiles.js';
 import {
   PtyLaunchError,
   prepareAgentLaunchForSession,
@@ -283,6 +284,11 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       return reply.status(200).send({ sessionId, reused: true });
     }
 
+    // ログイン用 PTY は作り直さない（無ければ終わっている。ログインコマンドの無いシェルを出さない）
+    if (sessionId.startsWith(LOGIN_SESSION_PREFIX)) {
+      return reply.status(404).send({ error: 'Login session has ended. Close and try again.' });
+    }
+
     const pending = pendingCreations.get(sessionId);
     const creation =
       pending ??
@@ -332,11 +338,9 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       }
       // エージェントなどが動いている間に書き込むと、そのコマンドの入力欄に入ってしまう
       if (!isShellForeground(session)) {
-        return reply
-          .status(409)
-          .send({
-            error: 'ターミナルで実行中のコマンド（エージェント等）を終了してから実行してください',
-          });
+        return reply.status(409).send({
+          error: 'ターミナルで実行中のコマンド（エージェント等）を終了してから実行してください',
+        });
       }
       const tab = await prisma.tab.findUnique({ where: { tabId: sessionId } }).catch(() => null);
       const mode = (tab?.mode ?? 'claude') as TabMode;

@@ -8,6 +8,7 @@ import { deleteEnv, getEnv, setEnv } from '../lib/repositories/environment.js';
 import { AGENTS, getAgent, getAgentAvailability, type AgentAdapter } from '../lib/agents/index.js';
 import {
   DEFAULT_PROFILE,
+  LOGIN_SESSION_PREFIX,
   createProfile,
   deleteProfile,
   getProfileAuthStatus,
@@ -33,9 +34,6 @@ interface AssignmentBody {
   /** null は割り当てを外す（親を継承。global ではシステム既定） */
   slug: string | null;
 }
-
-/** ログイン用 PTY の sessionId の接頭辞（タブの PTY と区別する） */
-const LOGIN_SESSION_PREFIX = 'agent-login-';
 
 /** ログイン用 PTY の sessionId からエージェントを得る（`agent-login-<agent>-<slug>-<uuid>`） */
 function agentOfLoginSession(sessionId: string): AgentAdapter | undefined {
@@ -162,13 +160,9 @@ export async function agentProfilesRoutes(fastify: FastifyInstance) {
       if (!(await profileExists(agent, slug))) {
         return reply.status(404).send({ error: 'Profile not found' });
       }
-      // 同じエージェントのログイン用 PTY が残っていれば閉じる（戻り先のポートを1つの CLI に使わせる）
-      const agentPrefix = `${LOGIN_SESSION_PREFIX}${agent.id}-`;
-      for (const id of ptyManager.listSessions()) {
-        if (id.startsWith(agentPrefix)) ptyManager.deleteSession(id);
-      }
-      const prefix = `${agentPrefix}${slug}-`;
-      const sessionId = `${prefix}${crypto.randomUUID()}`;
+      // 古いログイン用 PTY はここでは閉じない（同時に届いた要求どうしで、相手が表示中の PTY を閉じてしまう）。
+      // ダイアログを閉じたときにクライアントが DELETE する
+      const sessionId = `${LOGIN_SESSION_PREFIX}${agent.id}-${slug}-${crypto.randomUUID()}`;
       const { env, unsetKeys } = loginPtyEnv(agent, slug);
       const configDir = env[agent.profile.configDirEnvKey];
       // CODEX_HOME は存在しないと codex が起動しない
