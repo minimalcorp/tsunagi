@@ -1,5 +1,6 @@
 import * as pty from 'node-pty';
 import * as os from 'os';
+import * as path from 'path';
 
 const SCROLLBACK_MAX_BYTES = 256 * 1024; // 256KB
 const SESSION_GC_INTERVAL_MS = 30 * 60 * 1000; // 30分
@@ -262,3 +263,16 @@ class PtyManager {
 }
 
 export const ptyManager = new PtyManager();
+
+/** 前面にいればシェルのプロンプトとみなすプロセス名（ログインシェルの先頭の `-` は外して比べる） */
+const SHELL_NAMES = new Set(['bash', 'zsh', 'sh', 'dash', 'fish', 'ksh']);
+
+/**
+ * PTY の前面がシェルか（エージェントなどのコマンドが動いていないか）。
+ * 判定できない環境（Windows）では true を返す
+ */
+export function isShellForeground(session: PtySession): boolean {
+  if (os.platform() === 'win32') return true;
+  const name = path.basename(session.pty.process).replace(/^-/, '');
+  return SHELL_NAMES.has(name) || name === path.basename(process.env.SHELL ?? '');
+}

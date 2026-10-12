@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { TabMode } from '@minimalcorp/tsunagi-shared';
-import { ptyManager, type PtySession } from '../pty-manager.js';
+import { isShellForeground, ptyManager, type PtySession } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
 import { getAgentForMode } from '../lib/agents/index.js';
 import {
@@ -329,6 +329,14 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       const session = ptyManager.getSession(sessionId);
       if (!session) {
         return reply.status(404).send({ error: 'Session not found' });
+      }
+      // エージェントなどが動いている間に書き込むと、そのコマンドの入力欄に入ってしまう
+      if (!isShellForeground(session)) {
+        return reply
+          .status(409)
+          .send({
+            error: 'ターミナルで実行中のコマンド（エージェント等）を終了してから実行してください',
+          });
       }
       const tab = await prisma.tab.findUnique({ where: { tabId: sessionId } }).catch(() => null);
       const mode = (tab?.mode ?? 'claude') as TabMode;

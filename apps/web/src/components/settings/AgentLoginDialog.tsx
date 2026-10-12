@@ -23,7 +23,9 @@ interface AgentLoginDialogProps {
 const LOGIN_HINT: Record<AgentProfileWithStatus['agent'], string> = {
   claude:
     'ブラウザで認証してください。ブラウザが開かない場合は表示された URL を開き、表示されたコードをこのターミナルに貼り付けます。',
-  codex: 'ブラウザで認証してください。ブラウザが開かない場合は表示された URL を開きます。',
+  // codex login は開始時に今のログインを解除する（logout）
+  codex:
+    'ブラウザで認証してください。ブラウザが開かない場合は表示された URL を開きます。ログイン済みの場合、今のログインはこの時点で解除されています。',
 };
 
 /**
