@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { TabMode } from '@minimalcorp/tsunagi-shared';
-import { isShellForeground, ptyManager, type PtySession } from '../pty-manager.js';
+import { isShellForeground, ptyManager } from '../pty-manager.js';
 import { prisma } from '../lib/db.js';
 import { getAgentForMode } from '../lib/agents/index.js';
 import { LOGIN_SESSION_PREFIX } from '../lib/agent-profiles.js';
@@ -39,28 +39,6 @@ function stripTerminalQueries(s: string): string {
   return s
     .replace(/\x1b\[[?>]?[0-9;]*n/g, '') // DSR: ESC[?6n(主犯) / ESC[6n / ESC[5n など
     .replace(/\x1b\[[?>=]?[0-9;]*c/g, ''); // DA: ESC[c / ESC[0c / ESC[>c / ESC[=c
-}
-
-/**
- * 表示中のクライアントがいなくなった PTY の cols をこの幅に縮める。
- * 一定の幅を下回ると Claude(Ink) が full-frame redraw を行い <Static> を再 emit するという
- * 観測に基づくしきい値。元 cols が既にこの値の場合のみ -1 にして必ず cols を変化させる。
- *
- * 再表示時は replay 後にクライアントが実サイズへ resize するため、必ず cols が変わり
- * SIGWINCH が飛んで Claude が現在の画面を描き直す（同一サイズの resize は no-op で
- * SIGWINCH が飛ばない）。縮める処理を切断時に済ませておくことで、縮めた時の再描画が
- * 再表示より前に scrollback に入り、replay と描き直しの順序がタイミングに依存しない。
- */
-const REDRAW_BUMP_COLS = 64;
-
-function bumpColsForRedraw(session: PtySession): void {
-  const { pty: ptyProcess } = session;
-  const cols = ptyProcess.cols === REDRAW_BUMP_COLS ? REDRAW_BUMP_COLS - 1 : REDRAW_BUMP_COLS;
-  try {
-    ptyProcess.resize(cols, ptyProcess.rows);
-  } catch {
-    // 終了済みの PTY は無視する
-  }
 }
 
 interface CreateSessionBody {
@@ -159,21 +137,23 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       ptyManager.setActiveSocket(sessionId, socket.id);
 
       const { pty: ptyProcess } = session;
-      const isReused = session.scrollback.length > 0;
+      const isReused = session.scrollbackSize > 0;
 
       // リングバッファの内容を一括送信（画面復元）。初回接続・再接続を問わず join のたびに送る。
-      // クライアントは replay を受けたら画面をクリアし、xterm を PTY と同じサイズにしてから
-      // 書き込み、完了後に実サイズへ resize する（新規セッションは data が空）。
+      // 出力は PTY サイズごとの区間に分けて送り、クライアントは画面をクリアした後、区間ごとに
+      // xterm をそのサイズにしてから書き込む（録画時と同じ幅で再生する）。書き終えたら実サイズへ
+      // resize し、サイズが変わっていれば SIGWINCH で Claude が現在の画面を描き直す。
+      // 切断中に PTY のサイズは変えない（以前は再描画を誘発するため cols を縮めていたが、
+      // Claude は resize のたびに履歴全体を再出力するため、狭い幅の履歴コピーが scrollback に
+      // 積まれて再表示時に横幅の狭い行や同じ内容の繰り返しが残る原因になっていた）。
       // 端末クエリ列（ESC[?6n / ESC[c 等）を除去してから replay する。
       // これを怠ると xterm.js が応答を生成し PTY へ注入され、入力欄に "1;2c64;3R..." が
       // 勝手に入力される（stripTerminalQueries のコメント参照）。
-      const buffered = isReused ? stripTerminalQueries(session.scrollback.join('')) : '';
-      socket.emit('replay', {
-        // 末尾の \r\n / \n / \r をトリムする。
-        data: buffered.replace(/[\r\n]+$/, ''),
-        cols: ptyProcess.cols,
-        rows: ptyProcess.rows,
-      });
+      const segments = ptyManager.getReplaySegments(session, stripTerminalQueries);
+      // 末尾の \r\n / \n / \r をトリムする。
+      const lastSegment = segments[segments.length - 1];
+      lastSegment.data = lastSegment.data.replace(/[\r\n]+$/, '');
+      socket.emit('replay', { segments });
 
       // reused の場合、最初の resize まで onData 出力をバッファリング
       let initialResizeHandled = !isReused;
@@ -219,7 +199,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
           if (sid !== sessionId) return;
           ptyManager.setTerminalSize(sessionId, socket.id, { cols, rows });
           if (ptyManager.getActiveSocket(sessionId) === socket.id) {
-            ptyProcess.resize(cols, rows);
+            ptyManager.resizePty(session, { cols, rows });
           }
 
           // reused時: 初回 resize 後にバッファリングしていた出力をフラッシュ
@@ -242,9 +222,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
           if (sid !== sessionId) return;
           ptyManager.setTerminalSize(sessionId, socket.id, { cols, rows });
           ptyManager.setActiveSocket(sessionId, socket.id);
-          if (ptyProcess.cols !== cols || ptyProcess.rows !== rows) {
-            ptyProcess.resize(cols, rows);
-          }
+          ptyManager.resizePty(session, { cols, rows });
         }
       );
 
@@ -282,20 +260,14 @@ export async function terminalRoutes(fastify: FastifyInstance) {
         const next = ptyManager.removeTerminalSocket(boundSessionId, socket.id);
         if (wasOwner && next) {
           // 同じ PTY を表示している socket が残っている → 最後に使われた socket に所有権と
-          // サイズを引き継ぐ（表示中なので GC も cols の縮小も行わない）
+          // サイズを引き継ぐ（表示中なので GC は行わない）
           ptyManager.setActiveSocket(boundSessionId, next.socketId);
           const session = ptyManager.getSession(boundSessionId);
-          try {
-            session?.pty.resize(next.size.cols, next.size.rows);
-          } catch {
-            // 終了済みの PTY は無視する
-          }
+          if (session) ptyManager.resizePty(session, next.size);
         } else if (wasOwner) {
+          // 表示中のクライアントがいなくなっても PTY のサイズはそのまま保つ。
+          // 再表示時にサイズが同じなら replay だけで復元され、違えば resize で Claude が描き直す
           ptyManager.scheduleGc(boundSessionId);
-          // 次に表示されたとき Claude に描き直させるため、表示中のクライアントがいない間に
-          // cols を縮めておく（REDRAW_BUMP_COLS 参照）
-          const session = ptyManager.getSession(boundSessionId);
-          if (session) bumpColsForRedraw(session);
         }
       }
     });
@@ -423,11 +395,15 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       if (!session) {
         return reply.status(404).send({ error: 'Session not found' });
       }
-      const raw = session.scrollback.join('');
+      // サイズ印は <RESIZE cols x rows> として埋め込む
+      const raw = session.scrollback
+        .map((e) => (typeof e === 'string' ? e : `<RESIZE ${e.cols}x${e.rows}>`))
+        .join('');
       // 制御文字を可視化して返す
       const visible = raw.replace(/\x1b/g, '<ESC>').replace(/\r/g, '<CR>').replace(/\n/g, '<LF>\n');
       return reply.send({
         sessionId,
+        startSize: session.scrollbackStartSize,
         chunks: session.scrollback.length,
         sizeBytes: session.scrollbackSize,
         raw: Buffer.from(raw).toString('base64'),

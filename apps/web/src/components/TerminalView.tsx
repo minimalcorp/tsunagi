@@ -26,6 +26,13 @@ import type { TabMode, Todo } from '@minimalcorp/tsunagi-shared';
 export type { Todo };
 
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
+
+/** サーバーからの replay の 1 区間。data はこの PTY サイズで描かれた出力 */
+interface ReplaySegment {
+  cols: number;
+  rows: number;
+  data: string;
+}
 export type AgentStatus = 'idle' | 'running' | 'waiting' | 'success' | 'failure' | 'error';
 
 interface TerminalViewProps {
@@ -101,7 +108,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   // 初回接続かどうかを追跡（再接続時のフォーカス復帰判定用）
   const hasConnectedOnceRef = useRef(false);
   // 接続後、replay（リングバッファ）を書き終えて sendResize() するまで useEffect / ResizeObserver からの sendResize を抑制
+  // （replay 中は xterm を録画時の PTY サイズにしているため、その途中のサイズを PTY へ送らない）
   const suppressResizeRef = useRef(false);
+  // replay の世代。再接続で replay が重なったとき、古い replay の書き込み連鎖を打ち切るために使う
+  const replayGenerationRef = useRef(0);
   // term.onData の購読。connectSocket のたびに張り直すため dispose を保持して解放漏れを防ぐ。
   const onDataDisposeRef = useRef<{ dispose: () => void } | null>(null);
   // ヘルスチェックのタイムアウトタイマー（多重発火・解放漏れ防止）
@@ -633,19 +643,30 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     });
 
     // 画面復元: 既存の表示に重ねず、クリアしてから replay する。
-    // xterm を PTY と同じサイズにしてから書き込むことで、Claude(Ink) が描いた幅と
-    // 表示の幅を一致させる。書き終えたら実サイズへ resize し、サイズが変われば
-    // SIGWINCH で Claude が現在の画面を描き直す（サーバーは切断時に PTY の cols を
-    // 縮めておくため、再表示時は通常サイズが変わる）。
-    socket.on('replay', ({ data, cols, rows }: { data: string; cols: number; rows: number }) => {
+    // サーバーは scrollback を PTY サイズごとの区間に分けて送る。区間ごとに xterm をそのサイズに
+    // してから書き込むことで、Claude(Ink) が描いた幅と表示の幅を一致させる（幅の違う出力を
+    // 一つの幅で書くと列指定が切り詰められて崩れる）。term.write は非同期キューなので、
+    // 次の区間の resize は前の区間の書き込み完了コールバックの中で行う。
+    // 全区間を書き終えたら実サイズへ fit し、PTY のサイズと違えば SIGWINCH で Claude が
+    // 現在の画面を描き直す（同じなら replay の内容がそのまま表示される）。
+    socket.on('replay', ({ segments }: { segments: ReplaySegment[] }) => {
+      // 書き込み中に再接続で次の replay が来たら、古い連鎖はそこで止める（区間の交互書き込みを防ぐ）
+      const generation = ++replayGenerationRef.current;
       clearTerminalDisplay(term);
-      term.resize(cols, rows);
-      term.write(data, () => {
-        suppressResizeRef.current = false;
-        fitAddonRef.current?.fit();
-        sendResize();
-        term.scrollToBottom();
-      });
+      const writeFrom = (index: number) => {
+        if (generation !== replayGenerationRef.current || termRef.current !== term) return;
+        const segment = segments[index];
+        if (!segment) {
+          suppressResizeRef.current = false;
+          fitAddonRef.current?.fit();
+          sendResize();
+          term.scrollToBottom();
+          return;
+        }
+        term.resize(segment.cols, segment.rows);
+        term.write(segment.data, () => writeFrom(index + 1));
+      };
+      writeFrom(0);
     });
 
     socket.on('output', ({ data }: { data: string }) => {
