@@ -71,9 +71,17 @@ export interface PtySession {
   respawning: boolean;
   /** 最後にユーザー入力があった時刻（入力中の作り直しを避けるため） */
   lastInputAt: number;
-  /** PTY出力のリングバッファ（再接続時にまとめて送信） */
-  scrollback: string[];
+  /**
+   * PTY出力のリングバッファ（再接続時にまとめて送信）。
+   * 文字列は PTY 出力、TerminalSize は「ここで PTY がこのサイズに変わった」印。
+   * replay 時にサイズの区切りごとに xterm を resize してから書くことで、録画時と同じ幅で再生する
+   * （幅の違う出力を一つの幅で再生すると、列指定が切り詰められて崩れる）。
+   */
+  scrollback: ScrollbackEntry[];
+  /** scrollback 中の出力のバイト数（サイズ印は含まない） */
   scrollbackSize: number;
+  /** scrollback の先頭時点の PTY サイズ（最初のサイズ印より前の出力がこの幅で描かれた） */
+  scrollbackStartSize: TerminalSize;
   /** 最後にPTY出力があった時刻（GC判定用） */
   lastOutputAt: number;
   /** 最後にWebSocket接続があった時刻 */
@@ -86,6 +94,16 @@ export interface TerminalSize {
   cols: number;
   rows: number;
 }
+
+/** scrollback の要素。文字列は PTY 出力、TerminalSize は PTY の resize 位置を示す印 */
+export type ScrollbackEntry = string | TerminalSize;
+
+/** replay 用に scrollback をサイズごとに区切ったもの。data はそのサイズで描かれた出力 */
+export interface ReplaySegment extends TerminalSize {
+  data: string;
+}
+
+const INITIAL_PTY_SIZE: TerminalSize = { cols: 80, rows: 24 };
 
 class PtyManager {
   private sessions = new Map<string, PtySession>();
@@ -179,8 +197,8 @@ class PtyManager {
 
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
+      cols: INITIAL_PTY_SIZE.cols,
+      rows: INITIAL_PTY_SIZE.rows,
       cwd,
       env: spawnEnv as Record<string, string>,
     });
@@ -198,6 +216,7 @@ class PtyManager {
       lastInputAt: 0,
       scrollback: [],
       scrollbackSize: 0,
+      scrollbackStartSize: INITIAL_PTY_SIZE,
       lastOutputAt: now,
       lastConnectedAt: now,
       gcTimer: null,
@@ -210,8 +229,13 @@ class PtyManager {
       session.scrollbackSize += data.length;
       // バッファ上限を超えたら古いものから削除
       while (session.scrollbackSize > SCROLLBACK_MAX_BYTES && session.scrollback.length > 0) {
-        session.scrollbackSize -= session.scrollback[0].length;
-        session.scrollback.shift();
+        const head = session.scrollback.shift()!;
+        if (typeof head === 'string') {
+          session.scrollbackSize -= head.length;
+        } else {
+          // サイズ印を捨てる → 残りの先頭はこのサイズで描かれている
+          session.scrollbackStartSize = head;
+        }
       }
     });
 
@@ -221,6 +245,63 @@ class PtyManager {
 
   getSession(sessionId: string): PtySession | undefined {
     return this.sessions.get(sessionId);
+  }
+
+  /**
+   * PTY を resize する。サイズが変わったときだけ SIGWINCH が飛び、scrollback にサイズ印を残す。
+   * PTY の resize は必ずここを通し、replay が「どの出力がどの幅で描かれたか」を再現できるようにする。
+   * @returns 実際にサイズが変わったか
+   */
+  resizePty(session: PtySession, size: TerminalSize): boolean {
+    const { pty: ptyProcess } = session;
+    if (ptyProcess.cols === size.cols && ptyProcess.rows === size.rows) return false;
+    try {
+      ptyProcess.resize(size.cols, size.rows);
+    } catch {
+      // 終了済みの PTY は無視する
+      return false;
+    }
+    // 直前の印以降に出力が無ければ、その印は不要なので置き換える
+    // （ウィンドウのドラッグ中など、出力を挟まず resize が連続しても印が溜まらないようにする）
+    const last = session.scrollback.at(-1);
+    if (last !== undefined && typeof last !== 'string') {
+      session.scrollback[session.scrollback.length - 1] = { cols: size.cols, rows: size.rows };
+    } else {
+      session.scrollback.push({ cols: size.cols, rows: size.rows });
+    }
+    return true;
+  }
+
+  /**
+   * 再接続時の画面復元用に、scrollback を PTY サイズごとの区間に分ける。
+   * 末尾の区間は必ず現在の PTY サイズになる（出力が無くても返す）。
+   * @param transform 各区間の出力に適用する加工（端末クエリの除去など。区間ごとに join 済みの文字列を渡す）
+   */
+  getReplaySegments(session: PtySession, transform: (data: string) => string): ReplaySegment[] {
+    const segments: ReplaySegment[] = [];
+    let size = session.scrollbackStartSize;
+    let chunks: string[] = [];
+    const flush = () => {
+      if (chunks.length > 0) {
+        segments.push({ ...size, data: transform(chunks.join('')) });
+        chunks = [];
+      }
+    };
+    for (const entry of session.scrollback) {
+      if (typeof entry === 'string') {
+        chunks.push(entry);
+      } else {
+        flush();
+        size = entry;
+      }
+    }
+    flush();
+    const current = { cols: session.pty.cols, rows: session.pty.rows };
+    const last = segments.at(-1);
+    if (!last || last.cols !== current.cols || last.rows !== current.rows) {
+      segments.push({ ...current, data: '' });
+    }
+    return segments;
   }
 
   deleteSession(sessionId: string): void {
