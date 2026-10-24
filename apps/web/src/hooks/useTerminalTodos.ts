@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import type { Todo } from '@minimalcorp/tsunagi-shared';
-import { getServerUrl } from '@/lib/api-url';
+import { clearRoomSubscriptions, getSharedSocket, syncRoomSubscriptions } from '@/lib/socket';
 
 export type { Todo };
 
@@ -11,65 +10,40 @@ export type { Todo };
 export type TabTodosMap = Map<string, Todo[]>;
 
 /**
- * Fastify socket.ioに接続してTodo更新を受信するhook。
+ * 共有 socket で Todo 更新（todos-updated）を受信する hook。
  * タスクカードの Progress Bar 表示に使用。
  */
 export function useTerminalTodos(runningTabIds: string[]): TabTodosMap {
   const [todosMap, setTodosMap] = useState<TabTodosMap>(new Map());
-  const socketRef = useRef<Socket | null>(null);
-  const joinedRoomsRef = useRef<Set<string>>(new Set());
+  const subscriptionsRef = useRef<Map<string, () => void>>(new Map());
 
   useEffect(() => {
-    // 接続がなければ作成
-    if (!socketRef.current) {
-      // polling 併用: iOS(WebKit) は Basic 認証情報を WS に付与しないため（認証付き公開時の iOS 対策）
-      const socket = io(getServerUrl(), { transports: ['polling', 'websocket'] });
-      socketRef.current = socket;
-
-      socket.on('todos-updated', ({ sessionId, todos }: { sessionId: string; todos: Todo[] }) => {
-        setTodosMap((prev) => {
-          const next = new Map(prev);
-          next.set(sessionId, todos);
-          return next;
-        });
+    const socket = getSharedSocket();
+    const handler = ({ sessionId, todos }: { sessionId: string; todos: Todo[] }) => {
+      setTodosMap((prev) => {
+        const next = new Map(prev);
+        next.set(sessionId, todos);
+        return next;
       });
+    };
+    socket.on('todos-updated', handler);
+    return () => {
+      socket.off('todos-updated', handler);
+    };
+  }, []);
 
-      // 再接続時はサーバ側 socket が新規（room 未参加）になるため、購読中の room を張り直す。
-      // これを怠るとスリープ復帰後に Todos のリアルタイム更新が静かに止まる。
-      socket.on('connect', () => {
-        for (const room of joinedRoomsRef.current) {
-          socket.emit('join', { room, mode: 'subscribe' });
-        }
-      });
-    }
-
-    const socket = socketRef.current;
-
-    // running中のタブのroomに参加
-    for (const tabId of runningTabIds) {
-      const room = `tab:${tabId}`;
-      if (!joinedRoomsRef.current.has(room)) {
-        socket.emit('join', { room, mode: 'subscribe' });
-        joinedRoomsRef.current.add(room);
-      }
-    }
-
-    // running中でなくなったタブのroomから退出
-    for (const room of joinedRoomsRef.current) {
-      const tabId = room.replace('tab:', '');
-      if (!runningTabIds.includes(tabId)) {
-        socket.emit('leave', { room });
-        joinedRoomsRef.current.delete(room);
-      }
-    }
+  // running 中のタブの room だけ購読する（購読のみ: PTY IO を接続しない）
+  useEffect(() => {
+    syncRoomSubscriptions(
+      subscriptionsRef.current,
+      runningTabIds.map((tabId) => `tab:${tabId}`)
+    );
   }, [runningTabIds]);
 
   useEffect(() => {
-    const joinedRooms = joinedRoomsRef.current;
+    const subscriptions = subscriptionsRef.current;
     return () => {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-      joinedRooms.clear();
+      clearRoomSubscriptions(subscriptions);
     };
   }, []);
 

@@ -4,13 +4,24 @@ import { useEffect, useRef, useState, useId } from 'react';
 import type { Components } from 'react-markdown';
 import { ExternalLink } from 'lucide-react';
 import { CodeBlock } from '@/components/CodeBlock';
-import mermaid from 'mermaid';
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
-});
+type Mermaid = typeof import('mermaid').default;
+let mermaidPromise: Promise<Mermaid> | null = null;
+
+/** mermaid は大きいので、mermaid ブロックを初めて描画する時に読み込む（初期化は 1 回だけ） */
+function loadMermaid(): Promise<Mermaid> {
+  if (!mermaidPromise) {
+    mermaidPromise = import('mermaid').then(({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose',
+      });
+      return mermaid;
+    });
+  }
+  return mermaidPromise;
+}
 
 function MermaidBlock({ code }: { code: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -23,6 +34,8 @@ function MermaidBlock({ code }: { code: string }) {
     async function render() {
       if (!containerRef.current) return;
       try {
+        const mermaid = await loadMermaid();
+        if (cancelled || !containerRef.current) return;
         const { svg } = await mermaid.render(`mermaid-${uniqueId}`, code);
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;

@@ -16,12 +16,21 @@ interface LiveTasksCallbacks {
 }
 
 /**
+ * 直近の全タスク。ページ遷移を跨いで保持し、次にマウントした画面は前回の内容を即描画してから
+ * 裏で取り直す（stale-while-revalidate）。詳細ページのサイドバーも同じ hook でリアルタイムに
+ * 追従しているため、トップへ戻った時点の内容はほぼ最新になっている。
+ */
+let tasksCache: Task[] | null = null;
+
+/**
  * 全タスクを取得し、タスク・タブの変化をリアルタイムに反映し続ける hook。
  * 表示側で絞り込む場合でも、状態の追従は全タスク・全タブを対象にする
  * （購読対象を絞ると、対象外タスクが実行中・未読になった変化を取りこぼすため）。
  */
 export function useLiveTasks(callbacks: LiveTasksCallbacks = {}) {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(() => tasksCache ?? []);
+  /** 一度でもタスク一覧を得たか（キャッシュまたは取得完了）。初期表示のゲートに使う */
+  const [hasLoaded, setHasLoaded] = useState(tasksCache !== null);
   const [isLoading, setIsLoading] = useState(true);
 
   const callbacksRef = useRef(callbacks);
@@ -31,6 +40,11 @@ export function useLiveTasks(callbacks: LiveTasksCallbacks = {}) {
     tasksRef.current = tasks;
   });
 
+  // 取得済みの内容だけをキャッシュする（初期値の [] で上書きしない）
+  useEffect(() => {
+    if (hasLoaded) tasksCache = tasks;
+  }, [tasks, hasLoaded]);
+
   const reload = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -38,6 +52,7 @@ export function useLiveTasks(callbacks: LiveTasksCallbacks = {}) {
       if (!res.ok) throw new Error('Failed to fetch tasks');
       const data = await res.json();
       setTasks(data.data.tasks);
+      setHasLoaded(true);
     } catch (error) {
       console.error('Failed to load tasks:', error);
     } finally {
@@ -92,5 +107,5 @@ export function useLiveTasks(callbacks: LiveTasksCallbacks = {}) {
     },
   });
 
-  return { tasks, setTasks, isLoading, reload };
+  return { tasks, setTasks, isLoading, hasLoaded, reload };
 }

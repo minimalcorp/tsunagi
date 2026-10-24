@@ -41,7 +41,7 @@ interface UpdateTaskData {
   order?: number;
 }
 
-interface TaskDialogProps {
+export interface TaskDialogProps {
   mode: 'create' | 'edit';
   isOpen: boolean;
   onClose: () => void;
