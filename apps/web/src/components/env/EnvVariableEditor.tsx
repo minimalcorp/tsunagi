@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, X, Check } from 'lucide-react';
+import { useState, useEffect, type ClipboardEvent } from 'react';
+import { Plus, X, Check, ClipboardPaste } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
+import { parseEnvText, isEnvText, type EnvEntry } from '@/lib/env-paste';
+import { toaster } from '@/lib/toaster';
 import { EnvVariableItem, type EnvironmentVariable } from './EnvVariableItem';
 import type { SelectedNode } from './EnvTreeNavigation';
 import { LoadingSpinner } from '../LoadingSpinner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/Dialog';
 
 // エージェントの認証は Profile で扱うため、汎用の環境変数としては登録させない（サーバーでも拒否する）
 const RESERVED_KEYS = [
@@ -33,6 +36,23 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
   const [addKey, setAddKey] = useState('');
   const [addValue, setAddValue] = useState('');
   const [addError, setAddError] = useState('');
+  // ペーストで取り込む変数のうち既存キーを上書きするものがある場合、確認待ちの内容を保持する
+  const [pendingImport, setPendingImport] = useState<{
+    entries: EnvEntry[];
+    overwriting: string[];
+  } | null>(null);
+
+  const fetchEnvVars = async (): Promise<EnvironmentVariable[]> => {
+    const params = new URLSearchParams({ scope: selectedNode.scope });
+    if (selectedNode.owner) params.set('owner', selectedNode.owner);
+    if (selectedNode.repo) params.set('repo', selectedNode.repo);
+
+    const response = await fetch(apiUrl(`/api/env/list?${params}`));
+    if (!response.ok) throw new Error('Failed to fetch environment variables');
+
+    const data = await response.json();
+    return data.data.envVars || [];
+  };
 
   // 環境変数をロード
   useEffect(() => {
@@ -217,6 +237,71 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
     setAddError('');
   };
 
+  const importEntries = async (entries: EnvEntry[]) => {
+    setAddError('');
+    try {
+      const response = await fetch(apiUrl('/api/env/bulk'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope: selectedNode.scope,
+          owner: selectedNode.owner,
+          repo: selectedNode.repo,
+          vars: entries,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || 'Failed to import environment variables');
+      }
+
+      setEnvVars(await fetchEnvVars());
+      handleCancelAdd();
+      toaster.create({
+        type: 'success',
+        title: `Imported ${entries.length} variable${entries.length === 1 ? '' : 's'}`,
+        description: entries.map((e) => e.key).join(', '),
+      });
+    } catch (err) {
+      console.error('Failed to import environment variables:', err);
+      setAddError(err instanceof Error ? err.message : 'Failed to import environment variables');
+    }
+  };
+
+  // キー入力欄に `export KEY=value` 等の形式のテキストがペーストされたら、個別入力ではなく一括取り込みに切り替える
+  // （値入力欄は `a=b` を含む生の値を貼る可能性があるため対象外）
+  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    const parsed = parseEnvText(e.clipboardData.getData('text'));
+    if (!isEnvText(parsed)) return;
+
+    e.preventDefault();
+    setAddError('');
+
+    const reserved = parsed.entries.filter((entry) => RESERVED_KEYS.includes(entry.key));
+    const entries = parsed.entries.filter((entry) => !RESERVED_KEYS.includes(entry.key));
+
+    if (reserved.length > 0) {
+      toaster.create({
+        type: 'warning',
+        title: 'Skipped reserved keys',
+        description: `${reserved.map((e) => e.key).join(', ')} — エージェントの認証は Claude Profile / Codex Profile で設定してください`,
+      });
+    }
+
+    if (entries.length === 0) return;
+
+    const existingKeys = new Set(envVars.map((v) => v.key));
+    const overwriting = entries.filter((entry) => existingKeys.has(entry.key)).map((e) => e.key);
+
+    if (overwriting.length > 0) {
+      setPendingImport({ entries, overwriting });
+      return;
+    }
+
+    void importEntries(entries);
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -249,11 +334,21 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
         {/* Add Variable Form */}
         {isAdding && (
           <div className="border border-border rounded p-3 bg-accent space-y-2">
-            <div className="text-sm font-medium text-foreground">New Variable</div>
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium text-foreground">New Variable</div>
+              <div
+                className="flex items-center gap-1 text-xs text-muted-foreground"
+                title="Paste `export KEY=value` / `KEY=value` / `SET KEY=value` lines to import them all at once"
+              >
+                <ClipboardPaste className="w-3.5 h-3.5" />
+                <span>Paste to import</span>
+              </div>
+            </div>
             <Input
               type="text"
               value={addKey}
               onChange={(e) => setAddKey(e.target.value.toUpperCase())}
+              onPaste={handlePaste}
               placeholder="VARIABLE_NAME"
               className="w-full font-mono"
               autoFocus
@@ -300,6 +395,29 @@ export function EnvVariableEditor({ selectedNode }: EnvVariableEditorProps) {
           ))
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingImport !== null}
+        onOpenChange={({ open }) => {
+          if (!open) setPendingImport(null);
+        }}
+        title="Overwrite existing variables?"
+        message={
+          <div className="space-y-2">
+            <p>The following variables already exist in this scope and will be overwritten:</p>
+            <ul className="font-mono text-foreground list-disc pl-5">
+              {pendingImport?.overwriting.map((key) => (
+                <li key={key}>{key}</li>
+              ))}
+            </ul>
+          </div>
+        }
+        confirmLabel="Overwrite"
+        variant="danger"
+        onConfirm={() => {
+          if (pendingImport) void importEntries(pendingImport.entries);
+        }}
+      />
     </div>
   );
 }

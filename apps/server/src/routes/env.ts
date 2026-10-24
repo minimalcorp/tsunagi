@@ -27,6 +27,15 @@ interface ToggleBody {
   repo?: string;
 }
 
+interface BulkBody {
+  scope: 'global' | 'owner' | 'repo';
+  owner?: string;
+  repo?: string;
+  vars: Array<{ key: string; value: string }>;
+}
+
+const ENV_KEY_RE = /^[A-Z0-9_]+$/;
+
 export async function envRoutes(fastify: FastifyInstance) {
   // GET /env
   fastify.get<{
@@ -162,6 +171,48 @@ export async function envRoutes(fastify: FastifyInstance) {
     } catch (error) {
       fastify.log.error(error, 'DELETE /env error');
       return reply.status(500).send({ error: 'Failed to delete environment variable' });
+    }
+  });
+
+  // POST /env/bulk — 複数の環境変数を一括で登録・上書きする（ペーストによる取り込み用）
+  fastify.post<{ Body: BulkBody }>('/env/bulk', async (request, reply) => {
+    try {
+      const { scope, owner, repo, vars } = request.body;
+
+      if (!scope || !Array.isArray(vars) || vars.length === 0) {
+        return reply.status(400).send({ error: 'Missing required fields: scope, vars' });
+      }
+
+      if (scope === 'owner' && !owner) {
+        return reply.status(400).send({ error: 'Missing required field: owner for scope=owner' });
+      }
+
+      if (scope === 'repo' && (!owner || !repo)) {
+        return reply.status(400).send({
+          error: 'Missing required fields: owner, repo for scope=repo',
+        });
+      }
+
+      for (const { key, value } of vars) {
+        if (typeof key !== 'string' || typeof value !== 'string' || !key || !value) {
+          return reply.status(400).send({ error: 'Each var requires non-empty key and value' });
+        }
+        if (!ENV_KEY_RE.test(key)) {
+          return reply.status(400).send({ error: `Invalid key: ${key}` });
+        }
+        if (RESERVED_ENV_KEYS.includes(key)) {
+          return reply.status(400).send({ error: RESERVED_KEY_ERROR });
+        }
+      }
+
+      for (const { key, value } of vars) {
+        await envRepo.setEnv(key, value, scope, owner, repo);
+      }
+      syncPtyEnv(fastify);
+      return reply.status(200).send({ data: { success: true, count: vars.length } });
+    } catch (error) {
+      fastify.log.error(error, 'POST /env/bulk error');
+      return reply.status(500).send({ error: 'Failed to import environment variables' });
     }
   });
 
