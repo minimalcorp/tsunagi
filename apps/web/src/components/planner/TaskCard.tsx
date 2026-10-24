@@ -109,6 +109,7 @@ export function TaskCard({ task, dragHandleProps, tabTodosMap }: TaskCardProps) 
   return (
     <div
       {...dragHandleProps}
+      data-task-id={task.id}
       onClick={() => router.push(`/tasks/${task.id}`)}
       className={cn(
         'relative rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md cursor-pointer',
