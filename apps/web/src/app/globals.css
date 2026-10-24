@@ -595,3 +595,19 @@ select {
     margin-bottom: 0;
   }
 }
+
+/* 詳細ページ左の一覧: スワイプで外せることを示すため、行を少しだけ左へ動かして戻す */
+@keyframes swipe-hint {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  30%,
+  70% {
+    transform: translateX(-48px);
+  }
+}
+
+.animate-swipe-hint {
+  animation: swipe-hint 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
