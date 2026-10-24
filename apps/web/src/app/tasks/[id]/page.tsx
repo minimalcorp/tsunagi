@@ -2,10 +2,11 @@
 
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ArrowLeft, Code2, Ellipsis, FolderX, Pencil, Terminal, Trash2 } from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
 import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
-import { TaskDialog } from '@/components/TaskDialog';
+import { LazyTaskDialog } from '@/components/LazyTaskDialog';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -13,8 +14,9 @@ import { rememberLastViewedTask } from '@/lib/last-viewed-task';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
 import type { AgentStatus } from '@/components/TerminalView';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
+import { cn } from '@/lib/utils';
 import { UpdateIndicator } from '@/components/UpdateIndicator';
 import {
   DropdownMenu,
@@ -295,14 +297,17 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       {/* Header - Fixed at top */}
       <div className="sticky top-0 z-50 p-4 border-b border-border bg-card">
         <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/')}
-            className="text-primary font-medium hover:bg-primary/10 hover:text-foreground"
+          {/* Link にしてトップの RSC とチャンクを先読みさせる（router.push だと戻る時に取りに行く） */}
+          <Link
+            href="/"
+            className={cn(
+              buttonVariants({ variant: 'ghost' }),
+              'text-primary font-medium hover:bg-primary/10 hover:text-foreground'
+            )}
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Board
-          </Button>
+          </Link>
 
           <h1 className="text-base font-semibold text-foreground absolute left-1/2 -translate-x-1/2 max-w-[50vw] truncate">
             {task.title}
@@ -387,7 +392,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       </div>
 
       {/* Edit Task Dialog */}
-      <TaskDialog
+      <LazyTaskDialog
         mode="edit"
         isOpen={isEditDialogOpen}
         onClose={() => setIsEditDialogOpen(false)}

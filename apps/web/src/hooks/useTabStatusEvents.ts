@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { useEffect, useRef } from 'react';
 import type { Tab } from '@minimalcorp/tsunagi-shared';
-import { getServerUrl } from '@/lib/api-url';
+import { clearRoomSubscriptions, getSharedSocket, syncRoomSubscriptions } from '@/lib/socket';
 
 // Socket.IOのAgentStatusをTab.statusにマッピング
 function toTabStatus(agentStatus: string): Tab['status'] | null {
@@ -27,80 +26,47 @@ function toTabStatus(agentStatus: string): Tab['status'] | null {
 /**
  * 指定したタブIDのSocket.IO roomを購読し、status-changedイベントを受信するhook。
  * タスク一覧 / プランナーのリアルタイムステータス更新に使用。
+ *
+ * 共有 socket を使うため、他の hook が購読している room のイベントも届く。
+ * 呼び出し側はタブIDで自分の対象かを判定すること。
  */
 export function useTabStatusEvents(
   tabIds: string[],
   onStatusChange: (tabId: string, status: Tab['status']) => void
 ): void {
-  const socketRef = useRef<Socket | null>(null);
-  const joinedRoomsRef = useRef<Set<string>>(new Set());
+  const subscriptionsRef = useRef<Map<string, () => void>>(new Map());
   const onStatusChangeRef = useRef(onStatusChange);
 
   useEffect(() => {
     onStatusChangeRef.current = onStatusChange;
   });
 
-  const ensureConnected = useCallback(() => {
-    if (!socketRef.current) {
-      // polling 併用: iOS(WebKit) は Basic 認証情報を WS に付与しないため（認証付き公開時の iOS 対策）
-      const socket = io(getServerUrl(), { transports: ['polling', 'websocket'] });
-      socketRef.current = socket;
-
-      socket.on(
-        'status-changed',
-        ({ sessionId, status }: { sessionId: string; status: string }) => {
-          const tabStatus = toTabStatus(status);
-          if (tabStatus !== null) {
-            onStatusChangeRef.current(sessionId, tabStatus);
-          }
-        }
-      );
-
-      // 再接続時はサーバ側 socket が新規（room 未参加）になるため、購読中の room を張り直す。
-      // これを怠るとスリープ復帰後にステータスのリアルタイム更新が静かに止まる。
-      socket.on('connect', () => {
-        for (const room of joinedRoomsRef.current) {
-          socket.emit('join', { room, mode: 'subscribe' });
-        }
-      });
-    }
-    return socketRef.current;
+  useEffect(() => {
+    const socket = getSharedSocket();
+    const handler = ({ sessionId, status }: { sessionId: string; status: string }) => {
+      const tabStatus = toTabStatus(status);
+      if (tabStatus !== null) {
+        onStatusChangeRef.current(sessionId, tabStatus);
+      }
+    };
+    socket.on('status-changed', handler);
+    return () => {
+      socket.off('status-changed', handler);
+    };
   }, []);
 
+  // tabIds の増減に合わせて room の購読を差分更新する（購読のみ: PTY IO を接続しない）
   useEffect(() => {
-    if (tabIds.length === 0) return;
-
-    const socket = ensureConnected();
-
-    // 新しいタブのroomに参加（購読のみ: PTY IO を接続しない）
-    // mode を省略するとサーバー側で 'terminal' 扱いになり、PTY に input/onData/exit
-    // ハンドラが登録され GC スケジュールにも参加してしまう。status 購読専用のため
-    // 必ず mode='subscribe' を指定する（再接続ハンドラ・useTerminalTodos と統一）。
-    for (const tabId of tabIds) {
-      const room = `tab:${tabId}`;
-      if (!joinedRoomsRef.current.has(room)) {
-        socket.emit('join', { room, mode: 'subscribe' });
-        joinedRoomsRef.current.add(room);
-      }
-    }
-
-    // 不要になったroomから退出
-    const tabIdSet = new Set(tabIds);
-    for (const room of joinedRoomsRef.current) {
-      const tabId = room.replace('tab:', '');
-      if (!tabIdSet.has(tabId)) {
-        socket.emit('leave', { room });
-        joinedRoomsRef.current.delete(room);
-      }
-    }
-  }, [tabIds, ensureConnected]);
+    syncRoomSubscriptions(
+      subscriptionsRef.current,
+      tabIds.map((tabId) => `tab:${tabId}`)
+    );
+  }, [tabIds]);
 
   useEffect(() => {
-    const joinedRooms = joinedRoomsRef.current;
+    const subscriptions = subscriptionsRef.current;
     return () => {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-      joinedRooms.clear();
+      clearRoomSubscriptions(subscriptions);
     };
   }, []);
 }

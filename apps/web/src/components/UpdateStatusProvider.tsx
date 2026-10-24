@@ -1,9 +1,9 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
 import type { RestartBlocker, UpdateStatus } from '@minimalcorp/tsunagi-shared';
-import { apiUrl, getServerUrl } from '@/lib/api-url';
+import { apiUrl } from '@/lib/api-url';
+import { getSharedSocket } from '@/lib/socket';
 
 /** 再起動の要求結果。実行中のタスクがあれば blockers を返し、再起動しない */
 export type RestartResult = { ok: true } | { ok: false; blockers: RestartBlocker[] };
@@ -58,24 +58,29 @@ export function UpdateStatusProvider({ children }: { children: React.ReactNode }
       setStatus(next);
     };
 
-    // polling 併用: iOS(WebKit) は Basic 認証情報を WS に付与しないため（認証付き公開時の iOS 対策）
-    const socket = io(getServerUrl(), { transports: ['polling', 'websocket'] });
-    socket.on('version:status', applyStatus);
-    // 他の画面から再起動された場合も含めて、再起動中の表示に切り替える
-    socket.on('version:restarting', () => setRestarting(true));
+    const socket = getSharedSocket();
+    const onRestarting = () => setRestarting(true);
     // 初回と再起動後の再接続で最新の状態を取り直す。同じバージョンのまま戻った場合は
     // 起動に失敗してロールバックしたため、再起動中の表示をやめる
-    socket.on('connect', () => {
+    const refresh = () => {
       void fetchStatus().then((next) => {
         if (cancelled || !next) return;
         applyStatus(next);
         setRestarting(false);
       });
-    });
+    };
+    socket.on('version:status', applyStatus);
+    // 他の画面から再起動された場合も含めて、再起動中の表示に切り替える
+    socket.on('version:restarting', onRestarting);
+    socket.on('connect', refresh);
+    // 共有 socket が既に接続済みなら connect は来ないので、ここで取りに行く
+    if (socket.connected) refresh();
 
     return () => {
       cancelled = true;
-      socket.disconnect();
+      socket.off('version:status', applyStatus);
+      socket.off('version:restarting', onRestarting);
+      socket.off('connect', refresh);
     };
   }, []);
 

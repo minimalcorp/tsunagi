@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
 import { Header } from '@/components/Header';
 import { RepositoryOnboardingOverlay } from '@/components/RepositoryOnboardingOverlay';
-import { TaskDialog } from '@/components/TaskDialog';
+import { LazyTaskDialog } from '@/components/LazyTaskDialog';
 import { CloneRepositoryDialog, type CloneResult } from '@/components/CloneRepositoryDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { RepositoryBoard, repoKeyOf } from '@/components/planner/RepositoryBoard';
@@ -24,6 +24,13 @@ type ColumnFilters = Record<string, FilterState>;
 
 const COLUMN_FILTERS_STORAGE_KEY = 'tsunagi:column-filters';
 const EMPTY_FILTERS: FilterState = { statuses: [], repos: [], search: '' };
+
+/**
+ * 直近のリポジトリ一覧と認証状態。ページ遷移を跨いで保持し、トップへ戻った時は前回の内容で
+ * 即座にボードを描画してから裏で取り直す（タスクは useLiveTasks が同様に保持する）。
+ */
+let repositoriesCache: Repository[] | null = null;
+let hasAuthCache: boolean | null = null;
 
 function hasActiveFilter(f: FilterState): boolean {
   return f.statuses.length > 0 || Boolean(f.search.trim());
@@ -48,7 +55,7 @@ export default function Home() {
   const {
     tasks,
     setTasks,
-    isLoading: isTasksLoading,
+    hasLoaded: hasTasksLoaded,
     reload: reloadTasks,
   } = useLiveTasks({
     onTaskCreated: (newTask, warnings) => {
@@ -89,11 +96,22 @@ export default function Home() {
       }
     },
   });
-  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [repositories, setRepositories] = useState<Repository[]>(() => repositoriesCache ?? []);
+  /** 一度でもリポジトリ一覧を得たか（キャッシュまたは取得完了）。初期表示のゲートに使う */
+  const [hasRepositoriesLoaded, setHasRepositoriesLoaded] = useState(repositoriesCache !== null);
   // 認証設定済みか（いずれかのエージェント（Claude / Codex）でログイン済み、または実験的機能のローカルLLM（Ollama / LM Studio）の設定）。
-  // 判定はサーバー(/api/onboarding/status)に一本化する
-  const [hasAuth, setHasAuth] = useState(false);
-  const [isMetaLoading, setIsMetaLoading] = useState(true);
+  // 判定はサーバー(/api/onboarding/status)に一本化する。null は未取得。
+  // サーバーは CLI を子プロセスで実行して判定するため、Claude 実行中などで秒単位に伸びることがある。
+  // ボードの描画はこれを待たず、取得できた時点でオンボーディング表示だけを切り替える
+  const [hasAuth, setHasAuth] = useState<boolean | null>(hasAuthCache);
+
+  useEffect(() => {
+    if (hasRepositoriesLoaded) repositoriesCache = repositories;
+  }, [repositories, hasRepositoriesLoaded]);
+
+  useEffect(() => {
+    hasAuthCache = hasAuth;
+  }, [hasAuth]);
   // Dialog states
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [addTaskRepo, setAddTaskRepo] = useState<{ owner: string; repo: string } | null>(null);
@@ -145,13 +163,14 @@ export default function Home() {
   const onboardingState = useMemo(() => {
     const state = {
       hasRepositories: repositories.length > 0,
-      hasAuth,
+      hasAuth: hasAuth === true,
       hasTasks: tasks.length > 0,
     };
 
     let nextStep: 'clone' | 'env' | 'task' | 'complete';
 
-    if (!state.hasAuth) {
+    // 認証状態が未取得（null）の間は env 案内を出さない（取得できて未設定と分かったら出す）
+    if (hasAuth === false) {
       nextStep = 'env';
     } else if (!state.hasRepositories) {
       nextStep = 'clone';
@@ -193,38 +212,39 @@ export default function Home() {
     return grouped;
   }, [tasks, columnFilters]);
 
-  // リポジトリ・オンボーディング状態のロード（タスクは useLiveTasks が初回ロードする）
-  const loadMeta = async () => {
-    setIsMetaLoading(true);
+  // リポジトリ一覧のロード（タスクは useLiveTasks が初回ロードする）
+  const loadRepositories = async () => {
     try {
-      const [ownersData, onboardingData] = await Promise.all([
-        fetch(apiUrl('/api/owners')).then((r) => r.json()),
-        fetch(apiUrl('/api/onboarding/status')).then((r) => r.json()),
-      ]);
-
+      const ownersData = await fetch(apiUrl('/api/owners')).then((r) => r.json());
       const allRepos = ownersData.data.owners.flatMap(
         (o: { repositories: Repository[] }) => o.repositories
       );
       setRepositories(allRepos);
-      setHasAuth(Boolean(onboardingData.data?.completed));
     } catch (error) {
-      console.error('Failed to load data:', error);
+      console.error('Failed to load repositories:', error);
     } finally {
-      setIsMetaLoading(false);
+      setHasRepositoriesLoaded(true);
     }
   };
+
+  // オンボーディング状態のロード。ボードの描画とは独立に、返ってきた時点で反映する
+  const loadOnboarding = async () => {
+    try {
+      const onboardingData = await fetch(apiUrl('/api/onboarding/status')).then((r) => r.json());
+      setHasAuth(Boolean(onboardingData.data?.completed));
+    } catch (error) {
+      console.error('Failed to load onboarding status:', error);
+    }
+  };
+
+  const loadMeta = () => Promise.all([loadRepositories(), loadOnboarding()]);
 
   const loadData = async () => {
     await Promise.all([reloadTasks(), loadMeta()]);
   };
 
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
   useEffect(() => {
-    if (isInitialLoad) {
-      loadMeta();
-      setIsInitialLoad(false);
-    }
+    void loadMeta();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -399,8 +419,9 @@ export default function Home() {
   };
 
   // タスクとリポジトリの両方が揃うまでボードを描画しない。
-  // 片方だけで描画すると Clone 列にスナップした後に列が前に挿入され、横スクロールが右端に飛ぶ
-  if ((isTasksLoading && tasks.length === 0) || (isMetaLoading && repositories.length === 0)) {
+  // 片方だけで描画すると Clone 列にスナップした後に列が前に挿入され、横スクロールが右端に飛ぶ。
+  // 2 回目以降はキャッシュで両方揃っているため、ここを通らず即座にボードが出る
+  if (!hasTasksLoaded || !hasRepositoriesLoaded) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -453,7 +474,7 @@ export default function Home() {
         isOnboarding={onboardingState.nextStep === 'clone'}
       />
 
-      <TaskDialog
+      <LazyTaskDialog
         mode="create"
         isOpen={addTaskRepo !== null}
         onClose={() => setAddTaskRepo(null)}

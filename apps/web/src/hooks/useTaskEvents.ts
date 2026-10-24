@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import type { Task } from '@minimalcorp/tsunagi-shared';
-import { getServerUrl } from '@/lib/api-url';
+import { getSharedSocket } from '@/lib/socket';
 
 interface TaskEventCallbacks {
   /** warnings: 作成は成功したが注意が必要な事項（例: fetch失敗） */
@@ -14,8 +13,8 @@ interface TaskEventCallbacks {
   onTaskTabsChanged?: (task: Task) => void;
 }
 
+/** 共有 socket で task:* イベントを購読する。アンマウント時はリスナーだけ外す（接続は共有） */
 export function useTaskEvents(callbacks: TaskEventCallbacks) {
-  const socketRef = useRef<Socket | null>(null);
   const callbacksRef = useRef(callbacks);
 
   useLayoutEffect(() => {
@@ -23,29 +22,31 @@ export function useTaskEvents(callbacks: TaskEventCallbacks) {
   });
 
   useEffect(() => {
-    // polling 併用: iOS(WebKit) は Basic 認証情報を WS に付与しないため（認証付き公開時の iOS 対策）
-    const socket = io(getServerUrl(), { transports: ['polling', 'websocket'] });
-    socketRef.current = socket;
+    const socket = getSharedSocket();
 
-    socket.on('task:created', ({ task, warnings }: { task: Task; warnings?: string[] }) => {
+    const onCreated = ({ task, warnings }: { task: Task; warnings?: string[] }) => {
       callbacksRef.current.onTaskCreated(task, warnings ?? []);
-    });
-
-    socket.on('task:updated', ({ task }: { task: Task }) => {
+    };
+    const onUpdated = ({ task }: { task: Task }) => {
       callbacksRef.current.onTaskUpdated(task);
-    });
-
-    socket.on('task:deleted', ({ taskId }: { taskId: string }) => {
+    };
+    const onDeleted = ({ taskId }: { taskId: string }) => {
       callbacksRef.current.onTaskDeleted(taskId);
-    });
-
-    socket.on('task:tabs-changed', ({ task }: { task: Task }) => {
+    };
+    const onTabsChanged = ({ task }: { task: Task }) => {
       callbacksRef.current.onTaskTabsChanged?.(task);
-    });
+    };
+
+    socket.on('task:created', onCreated);
+    socket.on('task:updated', onUpdated);
+    socket.on('task:deleted', onDeleted);
+    socket.on('task:tabs-changed', onTabsChanged);
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      socket.off('task:created', onCreated);
+      socket.off('task:updated', onUpdated);
+      socket.off('task:deleted', onDeleted);
+      socket.off('task:tabs-changed', onTabsChanged);
     };
   }, []);
 }
