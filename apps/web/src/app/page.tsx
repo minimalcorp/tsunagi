@@ -17,6 +17,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { hasUnreadResult } from '@/lib/agent-status';
 import { toaster } from '@/lib/toaster';
 import { apiUrl } from '@/lib/api-url';
+import { peekLastViewedTask } from '@/lib/last-viewed-task';
 
 /** 列ごとのフィルタ。sessionStorageに repoKey -> FilterState のマップで保存する */
 type ColumnFilters = Record<string, FilterState>;
@@ -127,6 +128,18 @@ export default function Home() {
     }
     return {};
   });
+
+  // タスク詳細から戻ってきた時に、最後に見ていたカードまでボードをスクロールする。
+  // 記録はボード側がスクロール後に消す（StrictMode の二重初期化でも値を失わないよう、ここでは読むだけ）
+  const [lastViewedTaskId] = useState(() => peekLastViewedTask());
+  const boardInitialFocus = useMemo(() => {
+    if (!lastViewedTaskId) return null;
+    const task = tasks.find((t) => t.id === lastViewedTaskId);
+    return {
+      taskId: lastViewedTaskId,
+      repoKey: task ? repoKeyOf(task.owner, task.repo) : undefined,
+    };
+  }, [lastViewedTaskId, tasks]);
 
   // フィルタで隠れているタスクの完了にも気付けるよう、未読数は全タスクから数える
   const unreadTaskCount = useMemo(() => tasks.filter(hasUnreadResult).length, [tasks]);
@@ -440,6 +453,7 @@ export default function Home() {
           isCloneOnboarding={onboardingState.nextStep === 'clone'}
           isCloneDialogOpen={isCloneDialogOpen}
           tabTodosMap={tabTodosMap}
+          initialFocus={boardInitialFocus}
         />
 
         {/* Onboarding overlay */}
