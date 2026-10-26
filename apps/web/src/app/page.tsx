@@ -310,22 +310,22 @@ export default function Home() {
         return prev.map((t) => reorderedById.get(t.id) ?? t);
       });
 
-      // Persist order to server
+      // 1操作 = 1リクエスト。結果は tasks:reordered で各画面に反映される（通知は出さない）
       try {
-        await Promise.all(
-          reorderedTasks.map((task, index) =>
-            fetch(apiUrl(`/api/tasks/${task.id}`), {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ order: index }),
-            })
-          )
-        );
+        const res = await fetch(apiUrl('/api/tasks/reorder'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskIds: reorderedTasks.map((task) => task.id) }),
+        });
+        if (!res.ok) throw new Error('Failed to reorder tasks');
       } catch (error) {
         console.error('Failed to update task order:', error);
+        toaster.create({ type: 'error', title: 'Failed to reorder tasks', duration: 5000 });
+        // 楽観的更新を取り消し、サーバー上の並び順に戻す
+        reloadTasks();
       }
     },
-    [setTasks]
+    [setTasks, reloadTasks]
   );
 
   /** 指定した列を先頭に移動する。細かい並び替えは settings ページで行う */

@@ -243,6 +243,47 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // PUT /tasks/reorder - ボード1列分の並び順を一括更新する。
+  // タスクごとに task:updated を流すと1回の操作で通知が大量に出るため、操作単位で tasks:reordered を1回だけ流す
+  fastify.put<{ Body: { taskIds: string[] } }>('/tasks/reorder', async (request, reply) => {
+    try {
+      const { taskIds } = request.body ?? {};
+
+      if (!Array.isArray(taskIds) || taskIds.length === 0) {
+        return reply.status(400).send({ error: 'Missing required field: taskIds' });
+      }
+      if (new Set(taskIds).size !== taskIds.length) {
+        return reply.status(400).send({ error: 'Duplicate task ids' });
+      }
+
+      const existing = new Map((await taskRepo.getTasks()).map((t) => [t.id, t]));
+      const unknown = taskIds.filter((id) => !existing.has(id));
+      if (unknown.length > 0) {
+        return reply.status(404).send({ error: `Unknown task ids: ${unknown.join(', ')}` });
+      }
+
+      const repoKeys = new Set(
+        taskIds.map((id) => {
+          const task = existing.get(id);
+          return `${task?.owner}/${task?.repo}`;
+        })
+      );
+      if (repoKeys.size > 1) {
+        return reply.status(400).send({ error: 'Tasks must belong to the same repository' });
+      }
+
+      await taskRepo.reorderTasks(taskIds);
+
+      const orders = taskIds.map((id, order) => ({ id, order }));
+      io.emit('tasks:reordered', { orders });
+
+      return reply.status(200).send({ data: { orders } });
+    } catch (error) {
+      fastify.log.error(error, 'PUT /tasks/reorder error');
+      return reply.status(500).send({ error: 'Failed to reorder tasks' });
+    }
+  });
+
   // PUT /tasks/:id
   fastify.put<{ Params: { id: string }; Body: UpdateBody }>(
     '/tasks/:id',
