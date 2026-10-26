@@ -105,6 +105,16 @@ export function useLiveTasks(callbacks: LiveTasksCallbacks = {}) {
       // タブの増減を反映 → allTabIds が変わり新しいタブの status 購読が始まる
       setTasks((prev) => prev.map((t) => (t.id === changedTask.id ? changedTask : t)));
     },
+    onTasksReordered: (orders) => {
+      // 並び替えは画面上で結果が見えるため、画面側への通知（トースト等）は行わない
+      const orderById = new Map(orders.map(({ id, order }) => [id, order]));
+      setTasks((prev) =>
+        prev.map((t) => {
+          const order = orderById.get(t.id);
+          return order === undefined || order === t.order ? t : { ...t, order };
+        })
+      );
+    },
   });
 
   return { tasks, setTasks, isLoading, hasLoaded, reload };

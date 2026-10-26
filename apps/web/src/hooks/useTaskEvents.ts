@@ -11,6 +11,8 @@ interface TaskEventCallbacks {
   onTaskDeleted: (taskId: string) => void;
   /** タブの作成・削除（status 購読対象の増減に使う） */
   onTaskTabsChanged?: (task: Task) => void;
+  /** 並び替え（1操作で1回）。order が変わったタスクの id と新しい order */
+  onTasksReordered?: (orders: { id: string; order: number }[]) => void;
 }
 
 /** 共有 socket で task:* イベントを購読する。アンマウント時はリスナーだけ外す（接続は共有） */
@@ -36,17 +38,22 @@ export function useTaskEvents(callbacks: TaskEventCallbacks) {
     const onTabsChanged = ({ task }: { task: Task }) => {
       callbacksRef.current.onTaskTabsChanged?.(task);
     };
+    const onReordered = ({ orders }: { orders: { id: string; order: number }[] }) => {
+      callbacksRef.current.onTasksReordered?.(orders);
+    };
 
     socket.on('task:created', onCreated);
     socket.on('task:updated', onUpdated);
     socket.on('task:deleted', onDeleted);
     socket.on('task:tabs-changed', onTabsChanged);
+    socket.on('tasks:reordered', onReordered);
 
     return () => {
       socket.off('task:created', onCreated);
       socket.off('task:updated', onUpdated);
       socket.off('task:deleted', onDeleted);
       socket.off('task:tabs-changed', onTabsChanged);
+      socket.off('tasks:reordered', onReordered);
     };
   }, []);
 }

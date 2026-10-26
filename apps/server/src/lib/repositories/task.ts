@@ -124,6 +124,16 @@ export async function bumpOrder(
   });
 }
 
+/**
+ * 表示順を一括更新する（ボードの1列分の並び替え）。
+ * 渡された id の並びをそのまま order 0..n-1 に割り当てるため、玉突き処理は不要。
+ */
+export async function reorderTasks(taskIds: string[]): Promise<void> {
+  await prisma.$transaction(
+    taskIds.map((id, index) => prisma.task.update({ where: { id }, data: { order: index } }))
+  );
+}
+
 // タスク論理削除
 export async function deleteTask(id: string): Promise<boolean> {
   try {
