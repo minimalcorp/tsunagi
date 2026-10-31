@@ -6,7 +6,7 @@ import { CloneColumn } from '@/components/planner/CloneColumn';
 import { RepositoryColumn } from '@/components/planner/RepositoryColumn';
 import type { FilterState } from '@/components/planner/FilterBar';
 import { cn } from '@/lib/utils';
-import { clearLastViewedTask } from '@/lib/last-viewed-task';
+import { loadBoardScroll, saveBoardScroll } from '@/lib/board-scroll';
 import type { TabTodosMap } from '@/hooks/useTerminalTodos';
 
 /** リポジトリを一意に識別するキー。フィルタ・タスクのグルーピングに使う */
@@ -29,11 +29,6 @@ interface RepositoryBoardProps {
   isCloneOnboarding?: boolean;
   isCloneDialogOpen?: boolean;
   tabTodosMap: TabTodosMap;
-  /**
-   * 初回描画時に view 内へ入れるタスク（タスク詳細から戻ってきた時の「最後に見ていたカード」）。
-   * カードがフィルタで隠れている場合は repoKey の列までだけ横スクロールする
-   */
-  initialFocus?: { taskId: string; repoKey?: string } | null;
 }
 
 const EMPTY_FILTERS: FilterState = { statuses: [], repos: [], search: '' };
@@ -53,36 +48,44 @@ export function RepositoryBoard({
   isCloneOnboarding = false,
   isCloneDialogOpen = false,
   tabTodosMap,
-  initialFocus,
 }: RepositoryBoardProps) {
   // ドラッグ中はスナップを外す（縦ドラッグ中に横スクロールが吸着するのを防ぐ）
   const [isDragging, setIsDragging] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // 最後に見ていたカードを view 内に入れる。ボードはタスク・リポジトリが揃ってから mount されるので、
-  // mount 時点で対象の DOM は存在する。描画前（useLayoutEffect）に位置を合わせ、左端から飛ぶ瞬間を見せない。
-  // タスク更新で再実行されないよう、一度だけ行う
-  const hasRestoredFocus = useRef(false);
+  // 前回トップページを表示していた時のスクロール位置（横 + 各列の縦）で表示し、以降の変化を記録する。
+  // ボードはタスク・リポジトリが揃ってから mount されるので、mount 時点で列の中身は描画済み。
+  // 描画前（useLayoutEffect）に位置を合わせ、先頭から飛ぶ瞬間を見せない
   useLayoutEffect(() => {
-    if (hasRestoredFocus.current || !initialFocus) return;
-    hasRestoredFocus.current = true;
-    clearLastViewedTask();
-
     const board = boardRef.current;
     if (!board) return;
 
-    const card = board.querySelector<HTMLElement>(`[data-task-id="${initialFocus.taskId}"]`);
-    const column =
-      card?.closest<HTMLElement>('[data-repo-key]') ??
-      (initialFocus.repoKey
-        ? board.querySelector<HTMLElement>(`[data-repo-key="${initialFocus.repoKey}"]`)
-        : null);
+    const scroll = loadBoardScroll() ?? { left: 0, columns: {} };
+    board.scrollLeft = scroll.left;
+    for (const list of board.querySelectorAll<HTMLElement>(
+      '[data-repo-key] [data-column-scroll]'
+    )) {
+      const key = list.closest<HTMLElement>('[data-repo-key]')?.dataset.repoKey;
+      if (key && scroll.columns[key] !== undefined) list.scrollTop = scroll.columns[key];
+    }
 
-    // 横: 列の左端はスナップ位置と一致するので、列を start に揃える（カードを揃えると px-4 分ずれて再スナップする）
-    column?.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'instant' });
-    // 縦: 列内のリストでカードを中央に出す。横は上で揃っているので動かさない
-    card?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
-  }, [initialFocus]);
+    // scroll はバブリングしないので、列内リストの scroll も capture で拾う
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target === board) {
+        scroll.left = board.scrollLeft;
+      } else if (target.matches('[data-column-scroll]')) {
+        const key = target.closest<HTMLElement>('[data-repo-key]')?.dataset.repoKey;
+        if (!key) return;
+        scroll.columns[key] = target.scrollTop;
+      } else {
+        return;
+      }
+      saveBoardScroll(scroll);
+    };
+    board.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    return () => board.removeEventListener('scroll', handleScroll, { capture: true });
+  }, []);
 
   // 列の並び順は settings ページで変更する（Repository.order）
   const sortedRepositories = useMemo(
