@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import {
   AlertCircle,
@@ -24,7 +25,19 @@ import { toaster } from '@/lib/toaster';
 import { useRestartToUpdate, useUpdateStatus } from './UpdateStatusProvider';
 import { cn } from '@/lib/utils';
 
+// react-markdown を全ページの初期チャンクに含めないよう、Popover を開いたときに読み込む
+const ReleaseNotes = dynamic(() => import('./ReleaseNotes').then((m) => m.ReleaseNotes), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center gap-2 text-muted-foreground">
+      <Loader2 className="size-4 animate-spin" />
+      Loading release notes...
+    </div>
+  ),
+});
+
 const NPM_URL = 'https://www.npmjs.com/package/@minimalcorp/tsunagi';
+const COMPARE_URL = 'https://github.com/minimalcorp/tsunagi/compare';
 const UPDATE_COMMANDS = [
   'npm i -g @minimalcorp/tsunagi@latest',
   'npx @minimalcorp/tsunagi@latest',
@@ -186,7 +199,7 @@ export function UpdatePopoverContent({ status }: { status: UpdateStatus }) {
   const target = state === 'ready' && version ? version : status.latest;
 
   return (
-    <PopoverContent align="end" className="w-80 gap-3">
+    <PopoverContent align="end" className="w-96 max-w-[calc(100vw-2rem)] gap-3">
       <PopoverHeader>
         <PopoverTitle>
           {status.updateAvailable ? 'New version available' : 'Reinstall recommended'}
@@ -197,6 +210,21 @@ export function UpdatePopoverContent({ status }: { status: UpdateStatus }) {
           </PopoverDescription>
         )}
       </PopoverHeader>
+      {status.updateAvailable && (
+        <>
+          <ReleaseNotes key={target} />
+          {/* ノートを取得できないときや Release の作成前でも、タグの差分で変更を確認できる */}
+          <a
+            href={`${COMPARE_URL}/tsunagi-v${status.current}...tsunagi-v${target}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 self-start text-muted-foreground hover:text-foreground"
+          >
+            Compare changes on GitHub
+            <ExternalLink className="size-3" />
+          </a>
+        </>
+      )}
       {status.updateAvailable && <UpdateSteps status={status} />}
       {status.entryOutdated && <ReinstallNotice />}
     </PopoverContent>

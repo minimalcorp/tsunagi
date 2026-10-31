@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { findRestartBlockers, getAutoUpdateStatus } from '../lib/auto-update.js';
+import { getReleaseNotes } from '../lib/release-notes.js';
 import { requestRestart } from '../lib/restart.js';
 import { checkForUpdateNow, getUpdateStatus } from '../lib/update-check.js';
 
@@ -19,6 +20,21 @@ export async function versionRoutes(fastify: FastifyInstance) {
       return reply.status(502).send({ error: 'Failed to reach npm registry' });
     }
     return reply.status(200).send({ data: getUpdateStatus() });
+  });
+
+  // GET /version/release-notes - 更新で入るバージョンの GitHub Release ノート
+  fastify.get('/version/release-notes', async (_request, reply) => {
+    const { current, latest, updateAvailable, autoUpdate } = getUpdateStatus();
+    // 用意できたのが latest より古い場合は、再起動で適用されるそのバージョンまでを返す
+    const target = autoUpdate.state === 'ready' && autoUpdate.version ? autoUpdate.version : latest;
+    if (!updateAvailable || !current || !target) {
+      return reply.status(200).send({ data: [] });
+    }
+    const notes = await getReleaseNotes(current, target);
+    if (!notes) {
+      return reply.status(502).send({ error: 'Failed to fetch release notes' });
+    }
+    return reply.status(200).send({ data: notes });
   });
 
   // POST /version/restart - インストール済みの新しいバージョンを再起動で適用する。
