@@ -322,6 +322,16 @@ export interface UpdateStatus {
   entryOutdated: boolean;
 }
 
+/** GitHub Release のノート（GET /api/version/release-notes） */
+export interface ReleaseNote {
+  version: string;
+  /** Release ページの URL */
+  url: string;
+  /** Markdown 本文（重複する見出しと Full Changelog 行は除去済み） */
+  body: string;
+  publishedAt: string | null;
+}
+
 /**
  * 新しいバージョンの自動インストールの状態。
  * - disabled: 自動更新できない（npm 以外での実行・dev 起動）。手動更新を案内する
