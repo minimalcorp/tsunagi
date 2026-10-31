@@ -94,7 +94,7 @@ export function RepositoryColumn({
       </div>
 
       {/* Scrollable task list */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4" data-column-scroll>
         {tasks.length > 0 ? (
           <TaskList
             droppableId={`planner-task-list-${owner}/${repo}`}

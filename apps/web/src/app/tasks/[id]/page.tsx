@@ -10,7 +10,6 @@ import { LazyTaskDialog } from '@/components/LazyTaskDialog';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { rememberLastViewedTask } from '@/lib/last-viewed-task';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
 import type { AgentStatus } from '@/components/TerminalView';
@@ -48,12 +47,6 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const terminalPanelRef = useRef<TerminalPanelHandle | null>(null);
 
   useDocumentTitle(task?.title);
-
-  // トップページに戻った時にこのタスクのカードまでスクロールするため、表示中のタスクを記録する
-  // （サイドパネルで別タスクに切り替えた場合も id が変わるのでここで追従する）
-  useEffect(() => {
-    rememberLastViewedTask(id);
-  }, [id]);
 
   // Socket.IOでサーバー側の変更（Claude/MCP経由を含む）をリアルタイムに反映
   useTaskEvents({
