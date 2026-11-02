@@ -160,7 +160,7 @@ export function AgentLoginDialog({ profile, onClose }: AgentLoginDialogProps) {
               {error}
             </div>
           ) : sessionId ? (
-            <TerminalView tabId={sessionId} hideToolbar isActive />
+            <TerminalView tabId={sessionId} isActive />
           ) : (
             <div className="flex h-full items-center justify-center">
               <LoadingSpinner size="sm" message="Starting..." />

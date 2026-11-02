@@ -8,8 +8,8 @@ import {
   useCallback,
   useImperativeHandle,
   forwardRef,
-  type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -51,10 +51,11 @@ interface TerminalViewProps {
   /** タブの起動モード（Run ボタンの表示と、ESC 中断の検知に使う） */
   mode?: TabMode;
   className?: string;
-  /** タブID・Run Claude 等のツールバーを出さない（Claude のログイン用ターミナル等） */
-  hideToolbar?: boolean;
-  /** ツールバーの右端に出す要素 */
-  toolbarEnd?: ReactNode;
+  /**
+   * タブID・Run Claude 等のツールバーの描画先。アクティブなタブのときだけ描画する。
+   * 未指定ならツールバーを出さない（Claude のログイン用ターミナル等）
+   */
+  toolbarContainer?: HTMLElement | null;
   /** DBから読み込んだ初期Todoリスト */
   initialTodos?: Todo[];
   /** DBから読み込んだ初期Claudeステータス（ページ再訪時にsuccess等を維持するため） */
@@ -92,8 +93,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     launchAgent = false,
     mode,
     className = '',
-    hideToolbar = false,
-    toolbarEnd,
+    toolbarContainer,
     initialTodos,
     initialAgentStatus,
     isActive,
@@ -836,48 +836,48 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   return (
     <div className={`flex flex-col h-full min-h-0 ${className}`}>
       {/* UUID表示バー */}
-      {!hideToolbar && (
-        <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0 bg-card">
-          <span className="font-mono text-xs text-muted-foreground" title={tabId}>
-            {shortTabId}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={handleCopyTabId}
-            className="text-muted-foreground hover:text-foreground"
-            title="Copy tab ID"
-          >
-            {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
-          </Button>
-          <Button
-            size="xs"
-            onClick={() => void handleRunAgent()}
-            disabled={!isConnected}
-            title={`Run ${agentLabel}`}
-          >
-            <Play className="w-3 h-3" />
-            Run {agentLabel}
-          </Button>
-          {envPending && (
+      {isActive &&
+        toolbarContainer &&
+        createPortal(
+          <>
+            <span className="font-mono text-xs text-muted-foreground" title={tabId}>
+              {shortTabId}
+            </span>
             <Button
-              variant="outline"
-              size="xs"
-              onClick={() => void handleApplyEnv()}
-              disabled={!isConnected}
-              className="text-warning"
-              title="環境変数が変更されました。Claude の応答待ちでない時に自動で反映されます。クリックで今すぐ反映します（ターミナルを再起動し、Claude は会話を再開します）"
+              variant="ghost"
+              size="icon-xs"
+              onClick={handleCopyTabId}
+              className="text-muted-foreground hover:text-foreground"
+              title="Copy tab ID"
             >
-              <RefreshCw className="w-3 h-3" />
-              Apply env
+              {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
             </Button>
-          )}
-          <div className="ml-auto flex min-w-0 items-center gap-2">
-            <TodoProgressPopover todos={todos} />
-            {toolbarEnd}
-          </div>
-        </div>
-      )}
+            <Button
+              size="xs"
+              onClick={() => void handleRunAgent()}
+              disabled={!isConnected}
+              title={`Run ${agentLabel}`}
+            >
+              <Play className="w-3 h-3" />
+              Run {agentLabel}
+            </Button>
+            {envPending && (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => void handleApplyEnv()}
+                disabled={!isConnected}
+                className="text-warning"
+                title="環境変数が変更されました。Claude の応答待ちでない時に自動で反映されます。クリックで今すぐ反映します（ターミナルを再起動し、Claude は会話を再開します）"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Apply env
+              </Button>
+            )}
+            <TodoProgressPopover todos={todos} className="ml-auto" />
+          </>,
+          toolbarContainer
+        )}
 
       {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
       <div className="relative flex-1 min-h-0 overflow-hidden">
