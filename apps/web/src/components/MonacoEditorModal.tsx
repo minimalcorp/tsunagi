@@ -6,6 +6,8 @@ import type { editor } from 'monaco-editor';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
+import { MONACO_INDENT_OPTIONS } from '@/lib/monaco-options';
+import { registerFocusTarget, setFocusModalOpen } from '@/lib/focus-target';
 
 export interface MonacoEditorModalProps {
   open: boolean;
@@ -16,7 +18,7 @@ export interface MonacoEditorModalProps {
   title?: string;
   /** 確定ボタンのラベル（デフォルト: "Submit"） */
   submitLabel?: string;
-  /** Monaco editorの言語（デフォルト: "plaintext"） */
+  /** Monaco editorの言語（デフォルト: "markdown"） */
   language?: string;
 }
 
@@ -37,7 +39,7 @@ export function MonacoEditorModal({
   initialValue = '',
   title = 'Editor',
   submitLabel = 'Submit',
-  language = 'plaintext',
+  language = 'markdown',
 }: MonacoEditorModalProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const handleSubmitRef = useRef<() => void>(() => {});
@@ -61,6 +63,17 @@ export function MonacoEditorModal({
     handleCancelRef.current = handleCancel;
     openRef.current = open;
   });
+
+  // 表示中はフォーカスの戻り先をモーダルにする（ウィンドウ復帰時に xterm へ奪われないように）
+  useEffect(() => {
+    setFocusModalOpen(open);
+    if (!open) return;
+    const unregister = registerFocusTarget('modal', () => editorRef.current?.focus());
+    return () => {
+      unregister();
+      setFocusModalOpen(false);
+    };
+  }, [open]);
 
   // open が true になったとき editor.layout() を呼ぶ。
   // layout() によりサイズが 0→実サイズに変わると onDidLayoutChange が発火し、
@@ -136,6 +149,7 @@ export function MonacoEditorModal({
               });
             }}
             options={{
+              ...MONACO_INDENT_OPTIONS,
               minimap: { enabled: false },
               lineNumbers: 'on',
               wordWrap: 'on',
