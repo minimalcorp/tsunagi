@@ -21,7 +21,7 @@ export function TaskViewModeToggle({ mode, canSplit, onChange }: TaskViewModeTog
   const options = canSplit ? OPTIONS : OPTIONS.filter((option) => option.mode !== 'split');
   return (
     <div
-      className="flex items-center rounded-md border border-input"
+      className="flex shrink-0 items-center rounded-md border border-input"
       role="group"
       aria-label="View mode"
     >
@@ -29,7 +29,7 @@ export function TaskViewModeToggle({ mode, canSplit, onChange }: TaskViewModeTog
         <Button
           key={value}
           variant="ghost"
-          size="icon"
+          size="icon-xs"
           title={label}
           aria-label={label}
           aria-pressed={mode === value}
@@ -39,7 +39,7 @@ export function TaskViewModeToggle({ mode, canSplit, onChange }: TaskViewModeTog
             mode === value ? 'bg-accent text-foreground' : 'text-muted-foreground'
           )}
         >
-          <Icon className="w-4 h-4" />
+          <Icon className="size-3.5" />
         </Button>
       ))}
     </div>

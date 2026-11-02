@@ -12,7 +12,8 @@ import {
 import type { LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
 import { EditorPane } from '@/components/task-detail/EditorPane';
-import type { TaskViewMode } from '@/hooks/useTaskViewMode';
+import { TaskViewModeToggle } from '@/components/task-detail/TaskViewModeToggle';
+import { useTaskViewMode } from '@/hooks/useTaskViewMode';
 import { registerFocusTarget, restoreFocus, setPaneFocusTarget } from '@/lib/focus-target';
 import { cn } from '@/lib/utils';
 import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
@@ -45,8 +46,6 @@ interface TerminalPanelProps {
   task: Task;
   tabs: Tab[];
   activeTabId?: string;
-  /** ターミナルのみ / 左右分割 / エディタのみ */
-  viewMode: TaskViewMode;
   onTabChange: (tabId: string) => void;
   onTabCreate: (mode: TabCreateMode) => Promise<string | undefined>;
   onTabDelete: (tabId: string) => void;
@@ -91,7 +90,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       task,
       tabs,
       activeTabId,
-      viewMode,
       onTabChange,
       onTabCreate,
       onTabDelete,
@@ -100,6 +98,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     },
     ref
   ) {
+    const { mode: viewMode, canSplit, setMode: setViewMode } = useTaskViewMode();
+
     // 一度でも表示されたタブのみTerminalViewをマウントする（遅延初期化）
     const [mountedTabIds, setMountedTabIds] = useState<Set<string>>(
       () => new Set(activeTabId ? [activeTabId] : [])
@@ -314,6 +314,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     };
 
     const isEditorOnly = viewMode === 'editor';
+    const viewModeToggle = (
+      <TaskViewModeToggle mode={viewMode} canSplit={canSplit} onChange={setViewMode} />
+    );
 
     return (
       <div className="flex flex-col flex-1 min-h-0">
@@ -376,6 +379,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                     initialAgentStatus={tab.status as AgentStatus}
                     onTodosUpdated={onTodosUpdated}
                     onStatusChange={handleStatusChange}
+                    toolbarEnd={viewModeToggle}
                   />
                 </div>
               );
@@ -446,6 +450,13 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                 Select a tab to view terminal
               </div>
             )}
+
+            {/* ツールバーが無い間も切り替えられるよう、ツールバーと同じ位置に出す */}
+            {!activeTabId && !isEditorOnly && (
+              <div className="absolute right-4 top-2 border border-transparent px-2 py-1">
+                {viewModeToggle}
+              </div>
+            )}
           </div>
 
           {viewMode !== 'terminal' && (
@@ -459,6 +470,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                   }
                   readOnly={!activeTabId}
                   onSend={handleSend}
+                  toolbarEnd={isEditorOnly ? viewModeToggle : undefined}
                 />
               </div>
             </div>
