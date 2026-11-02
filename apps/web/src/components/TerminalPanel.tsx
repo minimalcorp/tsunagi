@@ -100,6 +100,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   ) {
     const { mode: viewMode, canSplit, setMode: setViewMode } = useTaskViewMode();
 
+    // アクティブな TerminalView がツールバーの内容を描画する先
+    const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
+
     // 一度でも表示されたタブのみTerminalViewをマウントする（遅延初期化）
     const [mountedTabIds, setMountedTabIds] = useState<Set<string>>(
       () => new Set(activeTabId ? [activeTabId] : [])
@@ -314,9 +317,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     };
 
     const isEditorOnly = viewMode === 'editor';
-    const viewModeToggle = (
-      <TaskViewModeToggle mode={viewMode} canSplit={canSplit} onChange={setViewMode} />
-    );
 
     return (
       <div className="flex flex-col flex-1 min-h-0">
@@ -338,143 +338,151 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           />
         </div>
 
-        {/* TerminalViewエリア（visibility:hidden方式で複数を保持） */}
-        {/* absolute で全タブを重ねることで、visibility:hidden のタブが空白として残らないようにする */}
-        {/* エディタのみのモードでもターミナルは保持する。全幅を保って隠すことで、切り替えのたびに
+        <div className="flex-1 min-h-0 mx-4 mb-4 mt-2 flex flex-col overflow-hidden rounded-lg border border-border bg-card dark:rounded-none dark:border-0">
+          {/* ターミナルとエディタ共通のツールバー */}
+          <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0">
+            <div ref={setToolbarSlot} className="flex flex-1 min-w-0 items-center gap-2" />
+            <TaskViewModeToggle mode={viewMode} canSplit={canSplit} onChange={setViewMode} />
+          </div>
+
+          {/* TerminalViewエリア（visibility:hidden方式で複数を保持） */}
+          {/* absolute で全タブを重ねることで、visibility:hidden のタブが空白として残らないようにする */}
+          {/* エディタのみのモードでもターミナルは保持する。全幅を保って隠すことで、切り替えのたびに
             PTY をリサイズして Claude の画面を描き直させない */}
-        <div className="flex-1 min-h-0 relative flex">
-          <div
-            className={cn('min-w-0', isEditorOnly ? 'absolute inset-0' : 'relative flex-1 basis-0')}
-          >
-            {tabs.map((tab) => {
-              const isMounted = mountedTabIds.has(tab.tab_id);
-              const isActive = tab.tab_id === activeTabId;
+          <div className="flex-1 min-h-0 relative flex">
+            <div
+              className={cn(
+                'min-w-0',
+                isEditorOnly ? 'absolute inset-0' : 'relative flex-1 basis-0'
+              )}
+            >
+              {tabs.map((tab) => {
+                const isMounted = mountedTabIds.has(tab.tab_id);
+                const isActive = tab.tab_id === activeTabId;
 
-              if (!isMounted) return null;
+                if (!isMounted) return null;
 
-              return (
-                <div
-                  key={tab.tab_id}
-                  className="absolute inset-0 flex flex-col px-4 pb-4 pt-2"
-                  style={{
-                    visibility: isActive && !isEditorOnly ? 'visible' : 'hidden',
-                    pointerEvents: isActive && !isEditorOnly ? 'auto' : 'none',
-                  }}
-                >
-                  <TerminalView
-                    ref={(handle) => {
-                      if (handle) {
-                        terminalRefs.current.set(tab.tab_id, handle);
-                      } else {
-                        terminalRefs.current.delete(tab.tab_id);
-                      }
+                return (
+                  <div
+                    key={tab.tab_id}
+                    className="absolute inset-0 flex flex-col"
+                    style={{
+                      visibility: isActive && !isEditorOnly ? 'visible' : 'hidden',
+                      pointerEvents: isActive && !isEditorOnly ? 'auto' : 'none',
                     }}
-                    tabId={tab.tab_id}
-                    isActive={isActive}
-                    cwd={task.worktreePath}
-                    launchAgent={tab.mode !== 'terminal'}
-                    mode={tab.mode}
-                    className="h-full overflow-hidden rounded-lg border border-border bg-card dark:rounded-none dark:border-0"
-                    initialTodos={tab.todos}
-                    initialAgentStatus={tab.status as AgentStatus}
-                    onTodosUpdated={onTodosUpdated}
-                    onStatusChange={handleStatusChange}
-                    toolbarEnd={viewModeToggle}
+                  >
+                    <TerminalView
+                      ref={(handle) => {
+                        if (handle) {
+                          terminalRefs.current.set(tab.tab_id, handle);
+                        } else {
+                          terminalRefs.current.delete(tab.tab_id);
+                        }
+                      }}
+                      tabId={tab.tab_id}
+                      isActive={isActive}
+                      cwd={task.worktreePath}
+                      launchAgent={tab.mode !== 'terminal'}
+                      mode={tab.mode}
+                      className="h-full overflow-hidden"
+                      initialTodos={tab.todos}
+                      initialAgentStatus={tab.status as AgentStatus}
+                      onTodosUpdated={onTodosUpdated}
+                      onStatusChange={handleStatusChange}
+                      toolbarContainer={toolbarSlot}
+                    />
+                  </div>
+                );
+              })}
+
+              {tabs.length === 0 && (
+                <div
+                  className={cn(
+                    'h-full flex flex-col items-center justify-center gap-4 px-4',
+                    isEditorOnly && 'invisible'
+                  )}
+                >
+                  <p className="text-sm text-muted-foreground">起動するタブを選んでください</p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <span title={claudeOption.disabledReason}>
+                      <Button
+                        onClick={handleTabCreateClaude}
+                        disabled={Boolean(claudeOption.disabledReason)}
+                      >
+                        <ClaudeIcon className="w-4 h-4" />
+                        Claude Code
+                      </Button>
+                    </span>
+                    {codexOption && (
+                      <span title={codexOption.disabledReason}>
+                        <Button
+                          variant="outline"
+                          onClick={handleTabCreateCodex}
+                          disabled={Boolean(codexOption.disabledReason)}
+                        >
+                          <CodexIcon className="w-4 h-4" />
+                          Codex
+                        </Button>
+                      </span>
+                    )}
+                    {localLlmOption && (
+                      <span
+                        title={
+                          localLlmOption.disabledReason ??
+                          `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
+                        }
+                      >
+                        <Button
+                          variant="outline"
+                          onClick={() => void handleTabCreateLocalLlm()}
+                          disabled={Boolean(localLlmOption.disabledReason)}
+                        >
+                          <LocalLlmTabIcon provider={localLlmOption.provider} className="w-4 h-4" />
+                          {localLlmTabLabel(localLlmOption.provider)}
+                        </Button>
+                      </span>
+                    )}
+                    <Button variant="outline" onClick={handleTabCreateTerminal}>
+                      <Terminal className="w-4 h-4" />
+                      Terminal
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {tabs.length > 0 && !activeTabId && (
+                <div
+                  className={cn(
+                    'h-full flex items-center justify-center text-muted-foreground text-sm',
+                    isEditorOnly && 'invisible'
+                  )}
+                >
+                  Select a tab to view terminal
+                </div>
+              )}
+            </div>
+
+            {viewMode !== 'terminal' && (
+              <div
+                className={cn(
+                  'flex-1 basis-0 min-w-0 relative',
+                  !isEditorOnly && 'border-l border-border'
+                )}
+              >
+                <div className="absolute inset-0 flex flex-col">
+                  <EditorPane
+                    value={activeTabId ? (drafts.get(activeTabId) ?? '') : ''}
+                    onChange={handleDraftChange}
+                    canSend={
+                      activeTabId ? tabStatusMap.get(activeTabId)?.terminal === 'connected' : false
+                    }
+                    readOnly={!activeTabId}
+                    onSend={handleSend}
                   />
                 </div>
-              );
-            })}
-
-            {tabs.length === 0 && (
-              <div
-                className={cn(
-                  'h-full flex flex-col items-center justify-center gap-4 px-4',
-                  isEditorOnly && 'invisible'
-                )}
-              >
-                <p className="text-sm text-muted-foreground">起動するタブを選んでください</p>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <span title={claudeOption.disabledReason}>
-                    <Button
-                      onClick={handleTabCreateClaude}
-                      disabled={Boolean(claudeOption.disabledReason)}
-                    >
-                      <ClaudeIcon className="w-4 h-4" />
-                      Claude Code
-                    </Button>
-                  </span>
-                  {codexOption && (
-                    <span title={codexOption.disabledReason}>
-                      <Button
-                        variant="outline"
-                        onClick={handleTabCreateCodex}
-                        disabled={Boolean(codexOption.disabledReason)}
-                      >
-                        <CodexIcon className="w-4 h-4" />
-                        Codex
-                      </Button>
-                    </span>
-                  )}
-                  {localLlmOption && (
-                    <span
-                      title={
-                        localLlmOption.disabledReason ??
-                        `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
-                      }
-                    >
-                      <Button
-                        variant="outline"
-                        onClick={() => void handleTabCreateLocalLlm()}
-                        disabled={Boolean(localLlmOption.disabledReason)}
-                      >
-                        <LocalLlmTabIcon provider={localLlmOption.provider} className="w-4 h-4" />
-                        {localLlmTabLabel(localLlmOption.provider)}
-                      </Button>
-                    </span>
-                  )}
-                  <Button variant="outline" onClick={handleTabCreateTerminal}>
-                    <Terminal className="w-4 h-4" />
-                    Terminal
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {tabs.length > 0 && !activeTabId && (
-              <div
-                className={cn(
-                  'h-full flex items-center justify-center text-muted-foreground text-sm',
-                  isEditorOnly && 'invisible'
-                )}
-              >
-                Select a tab to view terminal
-              </div>
-            )}
-
-            {/* ツールバーが無い間も切り替えられるよう、ツールバーと同じ位置に出す */}
-            {!activeTabId && !isEditorOnly && (
-              <div className="absolute right-4 top-2 border border-transparent px-2 py-1">
-                {viewModeToggle}
               </div>
             )}
           </div>
-
-          {viewMode !== 'terminal' && (
-            <div className="flex-1 basis-0 min-w-0 relative">
-              <div className="absolute inset-0 flex flex-col px-4 pb-4 pt-2">
-                <EditorPane
-                  value={activeTabId ? (drafts.get(activeTabId) ?? '') : ''}
-                  onChange={handleDraftChange}
-                  canSend={
-                    activeTabId ? tabStatusMap.get(activeTabId)?.terminal === 'connected' : false
-                  }
-                  readOnly={!activeTabId}
-                  onSend={handleSend}
-                  toolbarEnd={isEditorOnly ? viewModeToggle : undefined}
-                />
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );
