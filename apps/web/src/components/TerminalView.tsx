@@ -8,6 +8,7 @@ import {
   useCallback,
   useImperativeHandle,
   forwardRef,
+  type ReactNode,
 } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -52,6 +53,8 @@ interface TerminalViewProps {
   className?: string;
   /** タブID・Run Claude 等のツールバーを出さない（Claude のログイン用ターミナル等） */
   hideToolbar?: boolean;
+  /** ツールバーの右端に出す要素 */
+  toolbarEnd?: ReactNode;
   /** DBから読み込んだ初期Todoリスト */
   initialTodos?: Todo[];
   /** DBから読み込んだ初期Claudeステータス（ページ再訪時にsuccess等を維持するため） */
@@ -90,6 +93,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     mode,
     className = '',
     hideToolbar = false,
+    toolbarEnd,
     initialTodos,
     initialAgentStatus,
     isActive,
@@ -868,7 +872,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
               Apply env
             </Button>
           )}
-          <TodoProgressPopover todos={todos} className="ml-auto" />
+          <div className="ml-auto flex min-w-0 items-center gap-2">
+            <TodoProgressPopover todos={todos} />
+            {toolbarEnd}
+          </div>
         </div>
       )}
 

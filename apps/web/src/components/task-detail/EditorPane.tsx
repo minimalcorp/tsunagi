@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Editor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { SendHorizontal } from 'lucide-react';
@@ -21,10 +21,19 @@ interface EditorPaneProps {
   readOnly: boolean;
   /** アクティブなタブへ送信する。送信できたら true */
   onSend: (text: string, submit: boolean) => boolean;
+  /** 上部ツールバーの右端に出す要素。無ければツールバーを出さない */
+  toolbarEnd?: ReactNode;
 }
 
 /** アクティブなタブへ送る Markdown を書くペイン */
-export function EditorPane({ value, onChange, canSend, readOnly, onSend }: EditorPaneProps) {
+export function EditorPane({
+  value,
+  onChange,
+  canSend,
+  readOnly,
+  onSend,
+  toolbarEnd,
+}: EditorPaneProps) {
   const { effectiveTheme } = useTheme();
   const { submitOnSend, setSubmitOnSend } = useSubmitOnSend();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -47,6 +56,11 @@ export function EditorPane({ value, onChange, canSend, readOnly, onSend }: Edito
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden rounded-lg border border-border bg-card dark:rounded-none dark:border-0">
+      {toolbarEnd && (
+        <div className="flex items-center justify-end px-2 py-1 border-b border-border flex-shrink-0 bg-card">
+          {toolbarEnd}
+        </div>
+      )}
       <div className="flex-1 min-h-0">
         <Editor
           height="100%"
