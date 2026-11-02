@@ -15,12 +15,12 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { io, type Socket } from 'socket.io-client';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Loader2, Copy, Play, Check, SquarePen, RefreshCw } from 'lucide-react';
-import { MonacoEditorModal } from '@/components/MonacoEditorModal';
+import { Loader2, Copy, Play, Check, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TodoProgressPopover } from '@/components/TodoProgressPopover';
 import { apiUrl, getServerUrl } from '@/lib/api-url';
 import { toaster } from '@/lib/toaster';
+import { getFocusTarget, restoreFocus, setPaneFocusTarget } from '@/lib/focus-target';
 import type { TabMode, Todo } from '@minimalcorp/tsunagi-shared';
 
 export type { Todo };
@@ -72,6 +72,11 @@ interface TerminalViewProps {
 export interface TerminalViewHandle {
   /** PTYにテキストを書き込む（末尾改行は自動付加しない） */
   sendInput: (data: string) => void;
+  /**
+   * テキストを貼り付けとして送る。submit なら続けて Enter を送って確定する。
+   * 未接続で送れないときは false を返す。
+   */
+  sendText: (text: string, submit: boolean) => boolean;
   /** xterm.js にフォーカスを当てる */
   focus: () => void;
 }
@@ -98,7 +103,6 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const sessionIdRef = useRef<string | null>(tabId);
-  const [showEditorModal, setShowEditorModal] = useState(false);
   // EditorSessionProvider 経由（Ctrl+G）でエディタが開いているかを追跡するref。
   // xterm の customKeyEventHandler（_keyUp内のfocus再取得）から参照する。
   const isExternalEditorOpenRef = useRef(false);
@@ -192,26 +196,27 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     agentStatusRef.current = agentStatus;
   });
 
-  // アクティブになったタイミングで xterm にフォーカスを当てる
+  /**
+   * アクティブなタブのときだけ、今フォーカスを持つべき場所へ戻す。
+   * 戻り先がターミナル以外（右ペイン・モーダル）なら xterm は奪わない。
+   */
+  function refocus() {
+    if (!isActiveRef.current) return;
+    if (getFocusTarget() !== 'terminal') {
+      restoreFocus();
+      return;
+    }
+    // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない場合がある）
+    containerRef.current
+      ?.querySelector<HTMLTextAreaElement>('textarea.xterm-helper-textarea')
+      ?.focus();
+  }
+
+  // アクティブになったタイミングでフォーカスを当てる
   // タブヘッダーのクリックでは xterm の mousedown handler が呼ばれないため明示的にフォーカスする
   useEffect(() => {
-    if (!isActive) return;
-    termRef.current?.focus();
-  }, [isActive]);
-
-  // Editor Modal の開閉に合わせてフォーカスを制御
-  // 開く: xterm を blur → Monaco がフォーカスを取得できるようにする
-  // 閉じる: Dialog close 処理完了後に xterm にフォーカスを戻す
-  useEffect(() => {
-    if (showEditorModal) {
-      termRef.current?.blur();
-    } else if (isActive) {
-      const textarea = containerRef.current?.querySelector<HTMLTextAreaElement>(
-        'textarea.xterm-helper-textarea'
-      );
-      textarea?.focus();
-    }
-  }, [showEditorModal, isActive]);
+    refocus();
+  }, [isActive]); // refocus は ref のみ参照するため依存不要
 
   // connected になったタイミングで fit() を再呼び出し（オーバーレイ消滅後のサイズ確定）
   useEffect(() => {
@@ -255,9 +260,11 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
     // マウント時にアクティブタブなら即座にフォーカス（新規タブ作成時用）
     // useEffect([isActive]) はこのマウントeffectより先に実行されるため termRef.current が null でスキップされる。
     // ここで補完することで新規タブでも確実にフォーカスが当たる。
-    if (isActiveRef.current) {
-      term.focus();
-    }
+    refocus();
+
+    // クリック等でターミナルにフォーカスが移ったら、以後の戻り先をターミナルにする
+    const onTerminalFocus = () => setPaneFocusTarget('terminal');
+    term.textarea?.addEventListener('focus', onTerminalFocus);
 
     // エディタモーダルが開いている間は xterm の _keyUp が this.focus() を呼んでフォーカスを
     // 奪い返すのを防ぐ。customKeyEventHandler が false を返すと _keyUp が早期リターンする。
@@ -355,6 +362,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       abortController.abort();
       mountAbortRef.current = null;
       observer.disconnect();
+      term.textarea?.removeEventListener('focus', onTerminalFocus);
       container.removeEventListener('compositionend', onCompositionEndCapture, true);
       container.removeEventListener('touchstart', onTouchStart);
       container.removeEventListener('touchmove', onTouchMove);
@@ -395,13 +403,8 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       isExternalEditorOpenRef.current = false;
       fitAddonRef.current?.fit();
       sendResize();
-      // アクティブタブのみフォーカスを復帰する
-      if (!isActiveRef.current) return;
-      // xterm 内の textarea を直接 focus する（Terminal.focus() では効かない）
-      const textarea = containerRef.current?.querySelector<HTMLTextAreaElement>(
-        'textarea.xterm-helper-textarea'
-      );
-      textarea?.focus();
+      // アクティブタブのみ、モーダルを開く前の場所へフォーカスを戻す
+      refocus();
     }
     window.addEventListener('editor-session-open', handleEditorSessionOpen);
     window.addEventListener('editor-session-done', handleEditorSessionDone);
@@ -451,9 +454,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
         healthCheckAckHandlerRef.current = null;
         // 接続は生きている → フォアグラウンド復帰時のみフォーカスを戻す
         // （周期チェックのたびにフォーカスを奪うと他のUI操作を妨げるため）
-        if (opts.refocus && isActiveRef.current) {
-          termRef.current?.focus();
-        }
+        if (opts.refocus) refocus();
       };
       healthCheckAckHandlerRef.current = onAck;
       socket.once('health-check-ack', onAck);
@@ -542,6 +543,18 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       if (socket?.connected && sid) {
         socket.emit('input', { sessionId: sid, data });
       }
+    },
+    sendText: (text: string, submit: boolean) => {
+      const socket = socketRef.current;
+      const term = termRef.current;
+      const sid = sessionIdRef.current;
+      if (!socket?.connected || !term || !sid) return false;
+      // term.paste() を使うことで xterm の Bracketed Paste Mode を自動処理する。
+      // bracketedPasteMode ON（Claude Code等）: \x1b[200~...\x1b[201~ でラップして改行をそのまま挿入
+      // bracketedPasteMode OFF（通常シェル）: \r?\n → \r に変換（xterm 内部処理）
+      term.paste(text);
+      if (submit) socket.emit('input', { sessionId: sid, data: '\r' });
+      return true;
     },
     focus: () => {
       termRef.current?.focus();
@@ -637,9 +650,7 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       socket.emit('join', { room: `tab:${sessionId}`, mode: 'terminal' });
 
       // 再接続時: アクティブタブならフォーカスを復帰
-      if (isReconnect && isActiveRef.current) {
-        term.focus();
-      }
+      if (isReconnect) refocus();
     });
 
     // 画面復元: 既存の表示に重ねず、クリアしてから replay する。
@@ -819,115 +830,83 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const shortTabId = tabId.length > 8 ? `${tabId.slice(0, 8)}…` : tabId;
 
   return (
-    <>
-      <div className={`flex flex-col h-full min-h-0 ${className}`}>
-        {/* UUID表示バー */}
-        {!hideToolbar && (
-          <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0 bg-card">
-            <span className="font-mono text-xs text-muted-foreground" title={tabId}>
-              {shortTabId}
-            </span>
+    <div className={`flex flex-col h-full min-h-0 ${className}`}>
+      {/* UUID表示バー */}
+      {!hideToolbar && (
+        <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0 bg-card">
+          <span className="font-mono text-xs text-muted-foreground" title={tabId}>
+            {shortTabId}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={handleCopyTabId}
+            className="text-muted-foreground hover:text-foreground"
+            title="Copy tab ID"
+          >
+            {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+          </Button>
+          <Button
+            size="xs"
+            onClick={() => void handleRunAgent()}
+            disabled={!isConnected}
+            title={`Run ${agentLabel}`}
+          >
+            <Play className="w-3 h-3" />
+            Run {agentLabel}
+          </Button>
+          {envPending && (
             <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={handleCopyTabId}
-              className="text-muted-foreground hover:text-foreground"
-              title="Copy tab ID"
-            >
-              {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
-            </Button>
-            <Button
+              variant="outline"
               size="xs"
-              onClick={() => void handleRunAgent()}
+              onClick={() => void handleApplyEnv()}
               disabled={!isConnected}
-              title={`Run ${agentLabel}`}
+              className="text-warning"
+              title="環境変数が変更されました。Claude の応答待ちでない時に自動で反映されます。クリックで今すぐ反映します（ターミナルを再起動し、Claude は会話を再開します）"
             >
-              <Play className="w-3 h-3" />
-              Run {agentLabel}
+              <RefreshCw className="w-3 h-3" />
+              Apply env
             </Button>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => setShowEditorModal(true)}
-              disabled={!isConnected}
-              className="text-muted-foreground hover:text-foreground"
-              title="Open editor input"
-            >
-              <SquarePen className="w-3 h-3" />
-              Open Editor
-            </Button>
-            {envPending && (
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => void handleApplyEnv()}
-                disabled={!isConnected}
-                className="text-warning"
-                title="環境変数が変更されました。Claude の応答待ちでない時に自動で反映されます。クリックで今すぐ反映します（ターミナルを再起動し、Claude は会話を再開します）"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Apply env
-              </Button>
-            )}
-            <TodoProgressPopover todos={todos} className="ml-auto" />
+          )}
+          <TodoProgressPopover todos={todos} className="ml-auto" />
+        </div>
+      )}
+
+      {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        {/* FitAddon は親要素の padding を差し引かないため、padding は fit 対象の外側に付ける */}
+        <div className="w-full h-full p-1">
+          <div ref={containerRef} className="w-full h-full" />
+        </div>
+
+        {/* 接続中オーバーレイ: connected になると消える */}
+        {isConnecting && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Connecting...</span>
+            </div>
           </div>
         )}
 
-        {/* Terminal エリア: xterm コンテナは常にDOMに存在（マウント要件）、接続中はオーバーレイで隠す */}
-        <div className="relative flex-1 min-h-0 overflow-hidden">
-          {/* FitAddon は親要素の padding を差し引かないため、padding は fit 対象の外側に付ける */}
-          <div className="w-full h-full p-1">
-            <div ref={containerRef} className="w-full h-full" />
+        {/* exited / error: overlayで再接続を促す */}
+        {isPausedOrExited && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/90">
+            <div className="text-center space-y-2">
+              {status === 'error' && (
+                <p className="text-xs text-destructive">{sessionError ?? 'Connection failed'}</p>
+              )}
+              {status === 'exited' && (
+                <p className="text-xs text-muted-foreground">Session ended</p>
+              )}
+              {status === 'paused' && <p className="text-xs text-muted-foreground">Paused</p>}
+              <Button size="xs" onClick={reconnectSession}>
+                Reconnect
+              </Button>
+            </div>
           </div>
-
-          {/* 接続中オーバーレイ: connected になると消える */}
-          {isConnecting && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Connecting...</span>
-              </div>
-            </div>
-          )}
-
-          {/* exited / error: overlayで再接続を促す */}
-          {isPausedOrExited && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/90">
-              <div className="text-center space-y-2">
-                {status === 'error' && (
-                  <p className="text-xs text-destructive">{sessionError ?? 'Connection failed'}</p>
-                )}
-                {status === 'exited' && (
-                  <p className="text-xs text-muted-foreground">Session ended</p>
-                )}
-                {status === 'paused' && <p className="text-xs text-muted-foreground">Paused</p>}
-                <Button size="xs" onClick={reconnectSession}>
-                  Reconnect
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
-
-      {/* Editor Input Modal */}
-      <MonacoEditorModal
-        open={showEditorModal}
-        onOpenChange={(details) => {
-          if (!details.open) setShowEditorModal(false);
-        }}
-        onSubmit={(text) => {
-          // term.paste() を使うことで xterm の Bracketed Paste Mode を自動処理する。
-          // bracketedPasteMode ON（Claude Code等）: \x1b[200~...\x1b[201~ でラップして改行をそのまま挿入
-          // bracketedPasteMode OFF（通常シェル）: \r?\n → \r に変換（xterm 内部処理）
-          if (termRef.current && text) {
-            termRef.current.paste(text);
-          }
-          setShowEditorModal(false);
-        }}
-        title="Terminal Input"
-        submitLabel="Paste"
-      />
-    </>
+    </div>
   );
 });

@@ -11,6 +11,10 @@ import {
 } from 'react';
 import type { LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
+import { EditorPane } from '@/components/task-detail/EditorPane';
+import type { TaskViewMode } from '@/hooks/useTaskViewMode';
+import { registerFocusTarget, restoreFocus, setPaneFocusTarget } from '@/lib/focus-target';
+import { cn } from '@/lib/utils';
 import { useTabStatusEvents } from '@/hooks/useTabStatusEvents';
 import {
   TerminalView,
@@ -41,6 +45,8 @@ interface TerminalPanelProps {
   task: Task;
   tabs: Tab[];
   activeTabId?: string;
+  /** ターミナルのみ / 左右分割 / エディタのみ */
+  viewMode: TaskViewMode;
   onTabChange: (tabId: string) => void;
   onTabCreate: (mode: TabCreateMode) => Promise<string | undefined>;
   onTabDelete: (tabId: string) => void;
@@ -85,6 +91,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       task,
       tabs,
       activeTabId,
+      viewMode,
       onTabChange,
       onTabCreate,
       onTabDelete,
@@ -160,13 +167,28 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     // 各TerminalViewへのrefマップ
     const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
 
-    // アクティブタブが変わったら xterm にフォーカスを移す
+    // タブごとの下書き（送信後に消す。リロードでは保持しない）
+    const [drafts, setDrafts] = useState<Map<string, string>>(() => new Map());
+
+    useEffect(
+      () =>
+        registerFocusTarget('terminal', () => {
+          if (activeTabId) terminalRefs.current.get(activeTabId)?.focus();
+        }),
+      [activeTabId]
+    );
+
+    // タスク詳細を離れたら戻り先を既定に戻す（ログイン用ターミナル等はターミナルが受ける）
+    useEffect(() => () => setPaneFocusTarget('terminal'), []);
+
+    // 表示モードやアクティブタブが変わったら、フォーカスを持つべき場所へ移す。
+    // 片方しか表示しないモードはその表示先へ、左右分割は直前の場所へ戻す。
     // TerminalPanel の effect は子コンポーネントの effects より後に実行されるため、
     // termRef.current が確実に設定済みの状態でフォーカスできる
     useEffect(() => {
-      if (!activeTabId) return;
-      terminalRefs.current.get(activeTabId)?.focus();
-    }, [activeTabId]);
+      if (viewMode !== 'split') setPaneFocusTarget(viewMode);
+      restoreFocus();
+    }, [viewMode, activeTabId]);
 
     const handleStatusChange = useCallback(
       (tabId: string, terminal: TerminalStatus, claude: AgentStatus) => {
@@ -270,11 +292,28 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           next.delete(tabId);
           return next;
         });
+        setDrafts((prev) => {
+          const next = new Map(prev);
+          next.delete(tabId);
+          return next;
+        });
         terminalRefs.current.delete(tabId);
         onTabDelete(tabId);
       },
       [onTabDelete]
     );
+
+    const handleDraftChange = (text: string) => {
+      if (!activeTabId) return;
+      setDrafts((prev) => new Map(prev).set(activeTabId, text));
+    };
+
+    const handleSend = (text: string, submit: boolean) => {
+      if (!activeTabId) return false;
+      return terminalRefs.current.get(activeTabId)?.sendText(text, submit) ?? false;
+    };
+
+    const isEditorOnly = viewMode === 'editor';
 
     return (
       <div className="flex flex-col flex-1 min-h-0">
@@ -298,98 +337,130 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
         {/* TerminalViewエリア（visibility:hidden方式で複数を保持） */}
         {/* absolute で全タブを重ねることで、visibility:hidden のタブが空白として残らないようにする */}
-        <div className="flex-1 min-h-0 relative">
-          {tabs.map((tab) => {
-            const isMounted = mountedTabIds.has(tab.tab_id);
-            const isActive = tab.tab_id === activeTabId;
+        {/* エディタのみのモードでもターミナルは保持する。全幅を保って隠すことで、切り替えのたびに
+            PTY をリサイズして Claude の画面を描き直させない */}
+        <div className="flex-1 min-h-0 relative flex">
+          <div
+            className={cn('min-w-0', isEditorOnly ? 'absolute inset-0' : 'relative flex-1 basis-0')}
+          >
+            {tabs.map((tab) => {
+              const isMounted = mountedTabIds.has(tab.tab_id);
+              const isActive = tab.tab_id === activeTabId;
 
-            if (!isMounted) return null;
+              if (!isMounted) return null;
 
-            return (
-              <div
-                key={tab.tab_id}
-                className="absolute inset-0 flex flex-col px-4 pb-4 pt-2"
-                style={{
-                  visibility: isActive ? 'visible' : 'hidden',
-                  pointerEvents: isActive ? 'auto' : 'none',
-                }}
-              >
-                <TerminalView
-                  ref={(handle) => {
-                    if (handle) {
-                      terminalRefs.current.set(tab.tab_id, handle);
-                    } else {
-                      terminalRefs.current.delete(tab.tab_id);
-                    }
+              return (
+                <div
+                  key={tab.tab_id}
+                  className="absolute inset-0 flex flex-col px-4 pb-4 pt-2"
+                  style={{
+                    visibility: isActive && !isEditorOnly ? 'visible' : 'hidden',
+                    pointerEvents: isActive && !isEditorOnly ? 'auto' : 'none',
                   }}
-                  tabId={tab.tab_id}
-                  isActive={isActive}
-                  cwd={task.worktreePath}
-                  launchAgent={tab.mode !== 'terminal'}
-                  mode={tab.mode}
-                  className="h-full overflow-hidden rounded-lg border border-border bg-card dark:rounded-none dark:border-0"
-                  initialTodos={tab.todos}
-                  initialAgentStatus={tab.status as AgentStatus}
-                  onTodosUpdated={onTodosUpdated}
-                  onStatusChange={handleStatusChange}
+                >
+                  <TerminalView
+                    ref={(handle) => {
+                      if (handle) {
+                        terminalRefs.current.set(tab.tab_id, handle);
+                      } else {
+                        terminalRefs.current.delete(tab.tab_id);
+                      }
+                    }}
+                    tabId={tab.tab_id}
+                    isActive={isActive}
+                    cwd={task.worktreePath}
+                    launchAgent={tab.mode !== 'terminal'}
+                    mode={tab.mode}
+                    className="h-full overflow-hidden rounded-lg border border-border bg-card dark:rounded-none dark:border-0"
+                    initialTodos={tab.todos}
+                    initialAgentStatus={tab.status as AgentStatus}
+                    onTodosUpdated={onTodosUpdated}
+                    onStatusChange={handleStatusChange}
+                  />
+                </div>
+              );
+            })}
+
+            {tabs.length === 0 && (
+              <div
+                className={cn(
+                  'h-full flex flex-col items-center justify-center gap-4 px-4',
+                  isEditorOnly && 'invisible'
+                )}
+              >
+                <p className="text-sm text-muted-foreground">起動するタブを選んでください</p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <span title={claudeOption.disabledReason}>
+                    <Button
+                      onClick={handleTabCreateClaude}
+                      disabled={Boolean(claudeOption.disabledReason)}
+                    >
+                      <ClaudeIcon className="w-4 h-4" />
+                      Claude Code
+                    </Button>
+                  </span>
+                  {codexOption && (
+                    <span title={codexOption.disabledReason}>
+                      <Button
+                        variant="outline"
+                        onClick={handleTabCreateCodex}
+                        disabled={Boolean(codexOption.disabledReason)}
+                      >
+                        <CodexIcon className="w-4 h-4" />
+                        Codex
+                      </Button>
+                    </span>
+                  )}
+                  {localLlmOption && (
+                    <span
+                      title={
+                        localLlmOption.disabledReason ??
+                        `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
+                      }
+                    >
+                      <Button
+                        variant="outline"
+                        onClick={() => void handleTabCreateLocalLlm()}
+                        disabled={Boolean(localLlmOption.disabledReason)}
+                      >
+                        <LocalLlmTabIcon provider={localLlmOption.provider} className="w-4 h-4" />
+                        {localLlmTabLabel(localLlmOption.provider)}
+                      </Button>
+                    </span>
+                  )}
+                  <Button variant="outline" onClick={handleTabCreateTerminal}>
+                    <Terminal className="w-4 h-4" />
+                    Terminal
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {tabs.length > 0 && !activeTabId && (
+              <div
+                className={cn(
+                  'h-full flex items-center justify-center text-muted-foreground text-sm',
+                  isEditorOnly && 'invisible'
+                )}
+              >
+                Select a tab to view terminal
+              </div>
+            )}
+          </div>
+
+          {viewMode !== 'terminal' && (
+            <div className="flex-1 basis-0 min-w-0 relative">
+              <div className="absolute inset-0 flex flex-col px-4 pb-4 pt-2">
+                <EditorPane
+                  value={activeTabId ? (drafts.get(activeTabId) ?? '') : ''}
+                  onChange={handleDraftChange}
+                  canSend={
+                    activeTabId ? tabStatusMap.get(activeTabId)?.terminal === 'connected' : false
+                  }
+                  readOnly={!activeTabId}
+                  onSend={handleSend}
                 />
               </div>
-            );
-          })}
-
-          {tabs.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center gap-4 px-4">
-              <p className="text-sm text-muted-foreground">起動するタブを選んでください</p>
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <span title={claudeOption.disabledReason}>
-                  <Button
-                    onClick={handleTabCreateClaude}
-                    disabled={Boolean(claudeOption.disabledReason)}
-                  >
-                    <ClaudeIcon className="w-4 h-4" />
-                    Claude Code
-                  </Button>
-                </span>
-                {codexOption && (
-                  <span title={codexOption.disabledReason}>
-                    <Button
-                      variant="outline"
-                      onClick={handleTabCreateCodex}
-                      disabled={Boolean(codexOption.disabledReason)}
-                    >
-                      <CodexIcon className="w-4 h-4" />
-                      Codex
-                    </Button>
-                  </span>
-                )}
-                {localLlmOption && (
-                  <span
-                    title={
-                      localLlmOption.disabledReason ??
-                      `${localLlmTabLabel(localLlmOption.provider)}: ${localLlmOption.model}`
-                    }
-                  >
-                    <Button
-                      variant="outline"
-                      onClick={() => void handleTabCreateLocalLlm()}
-                      disabled={Boolean(localLlmOption.disabledReason)}
-                    >
-                      <LocalLlmTabIcon provider={localLlmOption.provider} className="w-4 h-4" />
-                      {localLlmTabLabel(localLlmOption.provider)}
-                    </Button>
-                  </span>
-                )}
-                <Button variant="outline" onClick={handleTabCreateTerminal}>
-                  <Terminal className="w-4 h-4" />
-                  Terminal
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {tabs.length > 0 && !activeTabId && (
-            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              Select a tab to view terminal
             </div>
           )}
         </div>

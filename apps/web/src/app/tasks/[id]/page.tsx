@@ -10,6 +10,7 @@ import { LazyTaskDialog } from '@/components/LazyTaskDialog';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useTaskViewMode } from '@/hooks/useTaskViewMode';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
 import type { AgentStatus } from '@/components/TerminalView';
@@ -17,6 +18,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { cn } from '@/lib/utils';
 import { UpdateIndicator } from '@/components/UpdateIndicator';
+import { TaskViewModeToggle } from '@/components/task-detail/TaskViewModeToggle';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +47,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const terminalPanelRef = useRef<TerminalPanelHandle | null>(null);
+  const { mode: viewMode, canSplit, setMode: setViewMode } = useTaskViewMode();
 
   useDocumentTitle(task?.title);
 
@@ -308,6 +311,9 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
 
           <div className="flex items-center gap-1">
             <UpdateIndicator />
+            {worktreeExists && (
+              <TaskViewModeToggle mode={viewMode} canSplit={canSplit} onChange={setViewMode} />
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -363,6 +369,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               task={task}
               tabs={tabs}
               activeTabId={activeTabId}
+              viewMode={viewMode}
               onTabChange={setActiveTabId}
               onTabCreate={handleTabCreate}
               onTabDelete={handleTabDelete}

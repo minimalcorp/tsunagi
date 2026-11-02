@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, type FormEvent } fro
 import type { Repository, Task } from '@minimalcorp/tsunagi-shared';
 import { Editor } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
+import { MONACO_INDENT_OPTIONS } from '@/lib/monaco-options';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownComponents } from './MarkdownComponents';
@@ -102,6 +103,7 @@ function DescriptionEditorViewer({
           editorInstance.onDidBlurEditorText(() => onFocusChange?.(false));
         }}
         options={{
+          ...MONACO_INDENT_OPTIONS,
           minimap: { enabled: false },
           lineNumbers: 'on',
           wordWrap: 'on',
