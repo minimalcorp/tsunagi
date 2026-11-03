@@ -14,6 +14,7 @@ import {
 import { RepositoryManagement } from '@/components/settings/RepositoryManagement';
 import { RemoveRepositorySection } from '@/components/settings/RemoveRepositorySection';
 import { VoiceInputGuide } from '@/components/settings/VoiceInputGuide';
+import { ClaudeTuiSection } from '@/components/settings/ClaudeTuiSection';
 import { LocalModelSection } from '@/components/settings/LocalModelSection';
 import { OllamaSection } from '@/components/settings/OllamaSection';
 import { LmStudioSection } from '@/components/settings/LmStudioSection';
@@ -139,6 +140,9 @@ export default function SettingsPage() {
                   selectedNode={selectedNode}
                 />
               ))}
+
+              {/* Claude Code の画面描画 (Global scope only) */}
+              {selectedNode.scope === 'global' && <ClaudeTuiSection />}
 
               {/* Environment Variables Section */}
               <EnvVariableEditor selectedNode={selectedNode} />

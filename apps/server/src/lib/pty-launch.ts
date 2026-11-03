@@ -9,6 +9,7 @@ import { getWorktreePath } from './worktree-manager.js';
 import { getEnv } from './repositories/environment.js';
 import { resolveAgentProfileEnv } from './agent-profiles.js';
 import { AgentLaunchError as PtyLaunchError, getAgentForMode } from './agents/index.js';
+import { resolveClaudeTuiEnv } from './claude-tui.js';
 
 // このファイル基準で解決する(cwd 非依存):
 //   dev:        apps/server/src/lib      → apps/server/scripts
@@ -43,7 +44,8 @@ export { PtyLaunchError };
 /**
  * sessionId(=tab_id) から PTY の作業ディレクトリと環境変数を解決する。
  * 環境変数の優先順位: リクエストで渡されたenv > エージェント固有のenv（ローカルLLMの provider 等） >
- * DB env(global/owner/repo、エージェントのプロファイルを設定ディレクトリに変換) > tsunagi独自のEDITOR設定
+ * DB env(global/owner/repo、エージェントのプロファイルを設定ディレクトリに変換) >
+ * tsunagi独自の既定値（EDITOR・Claude の TUI レンダラ等）
  */
 export async function resolvePtyLaunch(
   sessionId: string,
@@ -85,7 +87,11 @@ export async function resolvePtyLaunch(
 
   // tsunagi-editor.sh をデフォルトにすることで Ctrl+G が Monaco Modal を開く。
   // DB / リクエストで EDITOR が明示設定されている場合はそちらが優先される。
+  // claude を起動するタブ（terminal タブの Run も claude）には TUI レンダラの設定も既定値として渡す。
+  // DB の環境変数で CLAUDE_CODE_NO_FLICKER を明示した場合はそちらが優先される
+  const claudeTuiEnv = getAgentForMode(mode).id === 'claude' ? await resolveClaudeTuiEnv() : {};
   const tsunagiDefaultEnv: Record<string, string> = {
+    ...claudeTuiEnv,
     EDITOR: TSUNAGI_EDITOR_PATH,
     TSUNAGI_SESSION_ID: sessionId,
     // monaco-editor.sh が API(Fastify) を叩くためのベース URL。サーバーと同一
