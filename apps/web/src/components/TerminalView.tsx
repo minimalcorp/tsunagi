@@ -569,13 +569,16 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
    * xterm.js の表示バッファをクリアする。
    * term.reset() は xterm.js が PTY に DA クエリ(\x1b[c)を送出するため使用禁止。
    * DA への応答(\x1b[?1;2c)がリングバッファに混入し画面が汚染される。
+   * \x1b[?1049l : alt screen を抜ける（fullscreen の Claude の再接続時。抜けずにクリアすると
+   *              通常の画面に古い内容が残り、replay 先頭のモード設定で alt screen を抜けたときに重なる）
    * \x1b[2J  : 画面クリア
    * \x1b[3J  : スクロールバックバッファクリア
    * \x1b[H   : カーソルをホーム(1,1)へ移動
    * これらは xterm.js 内部でのみ処理され、PTY には送出されない。
+   * alt screen・マウス等のモードは、サーバーが replay の先頭に付けるシーケンスで復元される。
    */
   function clearTerminalDisplay(term: Terminal) {
-    term.write('\x1b[2J\x1b[3J\x1b[H');
+    term.write('\x1b[?1049l\x1b[2J\x1b[3J\x1b[H');
   }
 
   async function connectSession(sessionId: string, term: Terminal, signal: AbortSignal) {

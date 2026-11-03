@@ -25,6 +25,12 @@ import {
   syncSearxng,
 } from '../lib/searxng.js';
 import { normalizeBaseUrl } from '../lib/local-llm-env.js';
+import {
+  getClaudeTuiSettings,
+  parseClaudeTuiSettings,
+  saveClaudeTuiSettings,
+} from '../lib/claude-tui.js';
+import { notifyEnvChanged } from '../lib/pty-env-sync.js';
 
 /** クエリの baseUrl（未指定なら保存済みの値）を正規化する。不正なら null */
 async function resolveOllamaBaseUrl(baseUrl: string | undefined): Promise<string | null> {
@@ -49,6 +55,23 @@ async function sendResult<T>(
 }
 
 export async function settingsRoutes(fastify: FastifyInstance) {
+  // ---- Claude Code の TUI レンダラ ----
+
+  fastify.get('/settings/claude-tui', async (_request, reply) => {
+    return reply.status(200).send({ data: await getClaudeTuiSettings() });
+  });
+
+  fastify.put('/settings/claude-tui', async (request, reply) => {
+    const parsed = parseClaudeTuiSettings(request.body);
+    if ('error' in parsed) {
+      return reply.status(400).send({ error: parsed.error });
+    }
+    const saved = await saveClaudeTuiSettings(parsed.settings);
+    // 起動中の claude タブにも反映する（作り直して --resume。応答中などは反映待ちにする）
+    notifyEnvChanged().catch((err: unknown) => fastify.log.warn(err, 'Failed to sync PTY env'));
+    return reply.status(200).send({ data: saved });
+  });
+
   // ---- Ollama ----
 
   fastify.get('/settings/ollama', async (_request, reply) => {

@@ -82,6 +82,8 @@ export interface PtySession {
   scrollbackSize: number;
   /** scrollback の先頭時点の PTY サイズ（最初のサイズ印より前の出力がこの幅で描かれた） */
   scrollbackStartSize: TerminalSize;
+  /** scrollback の先頭時点の DEC private mode（捨てた出力に含まれていたモード変更を反映したもの） */
+  scrollbackStartModes: ModeTracker;
   /** 最後にPTY出力があった時刻（GC判定用） */
   lastOutputAt: number;
   /** 最後にWebSocket接続があった時刻 */
@@ -104,6 +106,62 @@ export interface ReplaySegment extends TerminalSize {
 }
 
 const INITIAL_PTY_SIZE: TerminalSize = { cols: 80, rows: 24 };
+
+/**
+ * replay 時に復元する DEC private mode（ESC[?Nh / ESC[?Nl）と、端末の初期値。
+ * これらは有効化のシーケンスが起動時などに一度しか出力されないため、scrollback の上限で
+ * 先頭が捨てられると replay で失われる（例: fullscreen の Claude が出す ESC[?1049h が消え、
+ * alt screen に描くはずの画面が通常の画面に再生される）。
+ */
+const TRACKED_MODE_DEFAULTS: ReadonlyMap<number, boolean> = new Map([
+  [1, false], // DECCKM（カーソルキーのアプリケーションモード）
+  [25, true], // カーソル表示
+  [47, false], // alt screen（旧式）
+  [1047, false], // alt screen
+  [1049, false], // alt screen（カーソル保存付き）
+  [1000, false], // マウス: クリック
+  [1002, false], // マウス: ドラッグ
+  [1003, false], // マウス: すべての移動
+  [1004, false], // フォーカスイベント
+  [1005, false], // マウス: UTF-8 形式
+  [1006, false], // マウス: SGR 形式
+  [1015, false], // マウス: urxvt 形式
+  [2004, false], // bracketed paste
+]);
+
+/** 出力から DEC private mode の変更を拾う。チャンク境界で切れたシーケンスは次のチャンクとつなげて読む */
+class ModeTracker {
+  readonly modes = new Map(TRACKED_MODE_DEFAULTS);
+  private carry = '';
+
+  feed(data: string): void {
+    const text = this.carry + data;
+    for (const match of text.matchAll(/\x1b\[\?([0-9;]+)([hl])/g)) {
+      const enabled = match[2] === 'h';
+      for (const param of match[1].split(';')) {
+        const mode = Number(param);
+        if (this.modes.has(mode)) this.modes.set(mode, enabled);
+      }
+    }
+    // 末尾の書きかけのシーケンス（ESC / ESC[ / ESC[?123 など）は次のチャンクと合わせて読む
+    this.carry = /\x1b(\[(\?[0-9;]*)?)?$/.exec(text)?.[0] ?? '';
+  }
+
+  /**
+   * 現在のモードをすべて明示的に設定するシーケンス。無効化を先に、有効化を後に並べる
+   * （xterm.js はマウス系のモードをどれか1つ無効化するとマウス追跡自体を止めるため、
+   * 有効化の後に別のマウスモードの無効化が来ると有効化が打ち消される）
+   */
+  toSequence(): string {
+    const entries = Array.from(this.modes);
+    const set = (enabled: boolean) =>
+      entries
+        .filter(([, value]) => value === enabled)
+        .map(([mode]) => `\x1b[?${mode}${enabled ? 'h' : 'l'}`)
+        .join('');
+    return set(false) + set(true);
+  }
+}
 
 class PtyManager {
   private sessions = new Map<string, PtySession>();
@@ -217,6 +275,7 @@ class PtyManager {
       scrollback: [],
       scrollbackSize: 0,
       scrollbackStartSize: INITIAL_PTY_SIZE,
+      scrollbackStartModes: new ModeTracker(),
       lastOutputAt: now,
       lastConnectedAt: now,
       gcTimer: null,
@@ -232,6 +291,8 @@ class PtyManager {
         const head = session.scrollback.shift()!;
         if (typeof head === 'string') {
           session.scrollbackSize -= head.length;
+          // 捨てる出力に含まれるモード変更は、先頭時点のモードとして持ち越す
+          session.scrollbackStartModes.feed(head);
         } else {
           // サイズ印を捨てる → 残りの先頭はこのサイズで描かれている
           session.scrollbackStartSize = head;
@@ -275,6 +336,8 @@ class PtyManager {
   /**
    * 再接続時の画面復元用に、scrollback を PTY サイズごとの区間に分ける。
    * 末尾の区間は必ず現在の PTY サイズになる（出力が無くても返す）。
+   * 先頭の区間には scrollback の先頭時点の DEC private mode を設定するシーケンスを付ける
+   * （先頭が捨てられていても alt screen・マウス・bracketed paste の状態を正しく再現するため）。
    * @param transform 各区間の出力に適用する加工（端末クエリの除去など。区間ごとに join 済みの文字列を渡す）
    */
   getReplaySegments(session: PtySession, transform: (data: string) => string): ReplaySegment[] {
@@ -301,6 +364,7 @@ class PtyManager {
     if (!last || last.cols !== current.cols || last.rows !== current.rows) {
       segments.push({ ...current, data: '' });
     }
+    segments[0].data = session.scrollbackStartModes.toSequence() + segments[0].data;
     return segments;
   }
 

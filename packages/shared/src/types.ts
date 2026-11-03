@@ -247,6 +247,15 @@ export interface LmStudioEstimate {
   verdict: string | null;
 }
 
+/**
+ * Claude Code の画面描画（TUI レンダラ）の設定。
+ * fullscreen: true なら tsunagi が起動する claude に CLAUDE_CODE_NO_FLICKER=1 を渡す。
+ * false なら何も渡さず、Claude Code 自身の設定（/tui）に従う
+ */
+export interface ClaudeTuiSettings {
+  fullscreen: boolean;
+}
+
 // ローカル検索（SearXNG）。Ollama / LM Studio タブの web_search MCP から使う
 /**
  * SearXNG の起動方法。
