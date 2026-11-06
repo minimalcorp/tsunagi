@@ -28,8 +28,8 @@ export type { Todo };
 
 export type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'paused' | 'exited' | 'error';
 
-/** サーバーからの replay の 1 区間。data はこの PTY サイズで描かれた出力 */
-interface ReplaySegment {
+/** サーバーからの画面のスナップショット。この PTY サイズの xterm に書くと、その時点の画面・モードを再現する */
+interface TerminalSnapshot {
   cols: number;
   rows: number;
   data: string;
@@ -115,10 +115,10 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   const statusRef = useRef<TerminalStatus>('idle');
   // 初回接続かどうかを追跡（再接続時のフォーカス復帰判定用）
   const hasConnectedOnceRef = useRef(false);
-  // 接続後、replay（リングバッファ）を書き終えて sendResize() するまで useEffect / ResizeObserver からの sendResize を抑制
-  // （replay 中は xterm を録画時の PTY サイズにしているため、その途中のサイズを PTY へ送らない）
+  // 接続後、replay（画面のスナップショット）を書き終えて sendResize() するまで useEffect / ResizeObserver からの sendResize を抑制
+  // （replay 中は xterm をスナップショットの PTY サイズにしているため、その途中のサイズを PTY へ送らない）
   const suppressResizeRef = useRef(false);
-  // replay の世代。再接続で replay が重なったとき、古い replay の書き込み連鎖を打ち切るために使う
+  // replay の世代。再接続で replay が重なったとき、古い replay の完了処理を行わないために使う
   const replayGenerationRef = useRef(0);
   // term.onData の購読。connectSocket のたびに張り直すため dispose を保持して解放漏れを防ぐ。
   const onDataDisposeRef = useRef<{ dispose: () => void } | null>(null);
@@ -568,14 +568,14 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
   /**
    * xterm.js の表示バッファをクリアする。
    * term.reset() は xterm.js が PTY に DA クエリ(\x1b[c)を送出するため使用禁止。
-   * DA への応答(\x1b[?1;2c)がリングバッファに混入し画面が汚染される。
+   * DA への応答(\x1b[?1;2c)が PTY に入力され画面が汚染される。
    * \x1b[?1049l : alt screen を抜ける（fullscreen の Claude の再接続時。抜けずにクリアすると
-   *              通常の画面に古い内容が残り、replay 先頭のモード設定で alt screen を抜けたときに重なる）
+   *              通常の画面に古い内容が残り、スナップショットの画面と重なる）
    * \x1b[2J  : 画面クリア
    * \x1b[3J  : スクロールバックバッファクリア
    * \x1b[H   : カーソルをホーム(1,1)へ移動
    * これらは xterm.js 内部でのみ処理され、PTY には送出されない。
-   * alt screen・マウス等のモードは、サーバーが replay の先頭に付けるシーケンスで復元される。
+   * alt screen・マウス等のモードは、サーバーのスナップショットに含まれるシーケンスで復元される。
    */
   function clearTerminalDisplay(term: Terminal) {
     term.write('\x1b[?1049l\x1b[2J\x1b[3J\x1b[H');
@@ -660,31 +660,22 @@ export const TerminalView = forwardRef<TerminalViewHandle, TerminalViewProps>(fu
       if (isReconnect) refocus();
     });
 
-    // 画面復元: 既存の表示に重ねず、クリアしてから replay する。
-    // サーバーは scrollback を PTY サイズごとの区間に分けて送る。区間ごとに xterm をそのサイズに
-    // してから書き込むことで、Claude(Ink) が描いた幅と表示の幅を一致させる（幅の違う出力を
-    // 一つの幅で書くと列指定が切り詰められて崩れる）。term.write は非同期キューなので、
-    // 次の区間の resize は前の区間の書き込み完了コールバックの中で行う。
-    // 全区間を書き終えたら実サイズへ fit し、PTY のサイズと違えば SIGWINCH で Claude が
-    // 現在の画面を描き直す（同じなら replay の内容がそのまま表示される）。
-    socket.on('replay', ({ segments }: { segments: ReplaySegment[] }) => {
-      // 書き込み中に再接続で次の replay が来たら、古い連鎖はそこで止める（区間の交互書き込みを防ぐ）
+    // 画面復元: 既存の表示に重ねず、クリアしてからサーバーのスナップショットを書き込む。
+    // スナップショットはサーバーの headless xterm が保持する端末の現在の状態で、その PTY サイズの
+    // xterm に書くと画面・カーソル・alt screen・モードが再現される。書き終えたら実サイズへ fit し、
+    // PTY のサイズと違えば SIGWINCH で Claude が現在の画面を描き直す（同じならそのまま表示される）。
+    socket.on('replay', ({ snapshot }: { snapshot: TerminalSnapshot }) => {
+      // 書き込み中に再接続で次の replay が来たら、古い方の完了処理は行わない
       const generation = ++replayGenerationRef.current;
       clearTerminalDisplay(term);
-      const writeFrom = (index: number) => {
+      term.resize(snapshot.cols, snapshot.rows);
+      term.write(snapshot.data, () => {
         if (generation !== replayGenerationRef.current || termRef.current !== term) return;
-        const segment = segments[index];
-        if (!segment) {
-          suppressResizeRef.current = false;
-          fitAddonRef.current?.fit();
-          sendResize();
-          term.scrollToBottom();
-          return;
-        }
-        term.resize(segment.cols, segment.rows);
-        term.write(segment.data, () => writeFrom(index + 1));
-      };
-      writeFrom(0);
+        suppressResizeRef.current = false;
+        fitAddonRef.current?.fit();
+        sendResize();
+        term.scrollToBottom();
+      });
     });
 
     socket.on('output', ({ data }: { data: string }) => {

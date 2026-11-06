@@ -60,6 +60,8 @@
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@prisma/adapter-libsql": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/headless": "^6.0.0",
     "dotenv": "^17.2.3",
     "fastify": "^5.8.2",
     "node-pty": "^1.1.0",
