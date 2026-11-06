@@ -1,8 +1,8 @@
 import * as pty from 'node-pty';
 import * as os from 'os';
 import * as path from 'path';
+import { TerminalMirror } from './lib/terminal-mirror.js';
 
-const SCROLLBACK_MAX_BYTES = 256 * 1024; // 256KB
 const SESSION_GC_INTERVAL_MS = 30 * 60 * 1000; // 30分
 
 /**
@@ -72,18 +72,12 @@ export interface PtySession {
   /** 最後にユーザー入力があった時刻（入力中の作り直しを避けるため） */
   lastInputAt: number;
   /**
-   * PTY出力のリングバッファ（再接続時にまとめて送信）。
-   * 文字列は PTY 出力、TerminalSize は「ここで PTY がこのサイズに変わった」印。
-   * replay 時にサイズの区切りごとに xterm を resize してから書くことで、録画時と同じ幅で再生する
-   * （幅の違う出力を一つの幅で再生すると、列指定が切り詰められて崩れる）。
+   * PTY 出力を流し込んでいる headless xterm（再接続時の画面復元に使う、端末の現在の状態）。
+   * PTY の resize も必ずここに反映する（PtyManager.resizePty）
    */
-  scrollback: ScrollbackEntry[];
-  /** scrollback 中の出力のバイト数（サイズ印は含まない） */
-  scrollbackSize: number;
-  /** scrollback の先頭時点の PTY サイズ（最初のサイズ印より前の出力がこの幅で描かれた） */
-  scrollbackStartSize: TerminalSize;
-  /** scrollback の先頭時点の DEC private mode（捨てた出力に含まれていたモード変更を反映したもの） */
-  scrollbackStartModes: ModeTracker;
+  mirror: TerminalMirror;
+  /** PTY の出力が一度でもあったか（再接続か、新規の PTY かの判定に使う） */
+  hasOutput: boolean;
   /** 最後にPTY出力があった時刻（GC判定用） */
   lastOutputAt: number;
   /** 最後にWebSocket接続があった時刻 */
@@ -97,71 +91,7 @@ export interface TerminalSize {
   rows: number;
 }
 
-/** scrollback の要素。文字列は PTY 出力、TerminalSize は PTY の resize 位置を示す印 */
-export type ScrollbackEntry = string | TerminalSize;
-
-/** replay 用に scrollback をサイズごとに区切ったもの。data はそのサイズで描かれた出力 */
-export interface ReplaySegment extends TerminalSize {
-  data: string;
-}
-
 const INITIAL_PTY_SIZE: TerminalSize = { cols: 80, rows: 24 };
-
-/**
- * replay 時に復元する DEC private mode（ESC[?Nh / ESC[?Nl）と、端末の初期値。
- * これらは有効化のシーケンスが起動時などに一度しか出力されないため、scrollback の上限で
- * 先頭が捨てられると replay で失われる（例: fullscreen の Claude が出す ESC[?1049h が消え、
- * alt screen に描くはずの画面が通常の画面に再生される）。
- */
-const TRACKED_MODE_DEFAULTS: ReadonlyMap<number, boolean> = new Map([
-  [1, false], // DECCKM（カーソルキーのアプリケーションモード）
-  [25, true], // カーソル表示
-  [47, false], // alt screen（旧式）
-  [1047, false], // alt screen
-  [1049, false], // alt screen（カーソル保存付き）
-  [1000, false], // マウス: クリック
-  [1002, false], // マウス: ドラッグ
-  [1003, false], // マウス: すべての移動
-  [1004, false], // フォーカスイベント
-  [1005, false], // マウス: UTF-8 形式
-  [1006, false], // マウス: SGR 形式
-  [1015, false], // マウス: urxvt 形式
-  [2004, false], // bracketed paste
-]);
-
-/** 出力から DEC private mode の変更を拾う。チャンク境界で切れたシーケンスは次のチャンクとつなげて読む */
-class ModeTracker {
-  readonly modes = new Map(TRACKED_MODE_DEFAULTS);
-  private carry = '';
-
-  feed(data: string): void {
-    const text = this.carry + data;
-    for (const match of text.matchAll(/\x1b\[\?([0-9;]+)([hl])/g)) {
-      const enabled = match[2] === 'h';
-      for (const param of match[1].split(';')) {
-        const mode = Number(param);
-        if (this.modes.has(mode)) this.modes.set(mode, enabled);
-      }
-    }
-    // 末尾の書きかけのシーケンス（ESC / ESC[ / ESC[?123 など）は次のチャンクと合わせて読む
-    this.carry = /\x1b(\[(\?[0-9;]*)?)?$/.exec(text)?.[0] ?? '';
-  }
-
-  /**
-   * 現在のモードをすべて明示的に設定するシーケンス。無効化を先に、有効化を後に並べる
-   * （xterm.js はマウス系のモードをどれか1つ無効化するとマウス追跡自体を止めるため、
-   * 有効化の後に別のマウスモードの無効化が来ると有効化が打ち消される）
-   */
-  toSequence(): string {
-    const entries = Array.from(this.modes);
-    const set = (enabled: boolean) =>
-      entries
-        .filter(([, value]) => value === enabled)
-        .map(([mode]) => `\x1b[?${mode}${enabled ? 'h' : 'l'}`)
-        .join('');
-    return set(false) + set(true);
-  }
-}
 
 class PtyManager {
   private sessions = new Map<string, PtySession>();
@@ -272,32 +202,19 @@ class PtyManager {
       envPending: false,
       respawning: false,
       lastInputAt: 0,
-      scrollback: [],
-      scrollbackSize: 0,
-      scrollbackStartSize: INITIAL_PTY_SIZE,
-      scrollbackStartModes: new ModeTracker(),
+      mirror: new TerminalMirror(INITIAL_PTY_SIZE.cols, INITIAL_PTY_SIZE.rows),
+      hasOutput: false,
       lastOutputAt: now,
       lastConnectedAt: now,
       gcTimer: null,
     };
 
-    // PTY出力をリングバッファに蓄積
+    // PTY 出力を headless xterm に反映する（再接続時はこの状態を直列化して送る）。
+    // 各 socket の出力転送（routes/terminal.ts）より先に登録し、スナップショットとの順序を保証する
     ptyProcess.onData((data) => {
       session.lastOutputAt = Date.now();
-      session.scrollback.push(data);
-      session.scrollbackSize += data.length;
-      // バッファ上限を超えたら古いものから削除
-      while (session.scrollbackSize > SCROLLBACK_MAX_BYTES && session.scrollback.length > 0) {
-        const head = session.scrollback.shift()!;
-        if (typeof head === 'string') {
-          session.scrollbackSize -= head.length;
-          // 捨てる出力に含まれるモード変更は、先頭時点のモードとして持ち越す
-          session.scrollbackStartModes.feed(head);
-        } else {
-          // サイズ印を捨てる → 残りの先頭はこのサイズで描かれている
-          session.scrollbackStartSize = head;
-        }
-      }
+      session.hasOutput = true;
+      session.mirror.write(data);
     });
 
     this.sessions.set(sessionId, session);
@@ -309,8 +226,8 @@ class PtyManager {
   }
 
   /**
-   * PTY を resize する。サイズが変わったときだけ SIGWINCH が飛び、scrollback にサイズ印を残す。
-   * PTY の resize は必ずここを通し、replay が「どの出力がどの幅で描かれたか」を再現できるようにする。
+   * PTY を resize する。サイズが変わったときだけ SIGWINCH が飛ぶ。
+   * PTY の resize は必ずここを通し、headless xterm のサイズを PTY と一致させる。
    * @returns 実際にサイズが変わったか
    */
   resizePty(session: PtySession, size: TerminalSize): boolean {
@@ -322,50 +239,8 @@ class PtyManager {
       // 終了済みの PTY は無視する
       return false;
     }
-    // 直前の印以降に出力が無ければ、その印は不要なので置き換える
-    // （ウィンドウのドラッグ中など、出力を挟まず resize が連続しても印が溜まらないようにする）
-    const last = session.scrollback.at(-1);
-    if (last !== undefined && typeof last !== 'string') {
-      session.scrollback[session.scrollback.length - 1] = { cols: size.cols, rows: size.rows };
-    } else {
-      session.scrollback.push({ cols: size.cols, rows: size.rows });
-    }
+    session.mirror.resize(size.cols, size.rows);
     return true;
-  }
-
-  /**
-   * 再接続時の画面復元用に、scrollback を PTY サイズごとの区間に分ける。
-   * 末尾の区間は必ず現在の PTY サイズになる（出力が無くても返す）。
-   * 先頭の区間には scrollback の先頭時点の DEC private mode を設定するシーケンスを付ける
-   * （先頭が捨てられていても alt screen・マウス・bracketed paste の状態を正しく再現するため）。
-   * @param transform 各区間の出力に適用する加工（端末クエリの除去など。区間ごとに join 済みの文字列を渡す）
-   */
-  getReplaySegments(session: PtySession, transform: (data: string) => string): ReplaySegment[] {
-    const segments: ReplaySegment[] = [];
-    let size = session.scrollbackStartSize;
-    let chunks: string[] = [];
-    const flush = () => {
-      if (chunks.length > 0) {
-        segments.push({ ...size, data: transform(chunks.join('')) });
-        chunks = [];
-      }
-    };
-    for (const entry of session.scrollback) {
-      if (typeof entry === 'string') {
-        chunks.push(entry);
-      } else {
-        flush();
-        size = entry;
-      }
-    }
-    flush();
-    const current = { cols: session.pty.cols, rows: session.pty.rows };
-    const last = segments.at(-1);
-    if (!last || last.cols !== current.cols || last.rows !== current.rows) {
-      segments.push({ ...current, data: '' });
-    }
-    segments[0].data = session.scrollbackStartModes.toSequence() + segments[0].data;
-    return segments;
   }
 
   deleteSession(sessionId: string): void {
@@ -379,6 +254,7 @@ class PtyManager {
     } catch {
       // already dead
     }
+    session.mirror.dispose();
     this.sessions.delete(sessionId);
   }
 

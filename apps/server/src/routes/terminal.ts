@@ -17,30 +17,6 @@ interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
 }
 
-/**
- * 再接続時の画面復元用 scrollback から「端末への問い合わせ（クエリ）」シーケンスを除去する。
- *
- * Claude(Ink) は描画中に DECXCPR(ESC[?6n) や DA(ESC[c) を大量に出力する。これらは生の
- * まま scrollback に蓄積される。再接続時に scrollback をそのまま replay すると、xterm.js が
- * 「今ホストから来たクエリ」と誤認して応答を生成し（deviceStatusPrivate / sendDeviceAttributes →
- * triggerDataEvent）、その応答が onData → emit('input') → PTY へ注入される。
- * 結果、シェルや Claude の入力欄に "1;2c64;3R64;3R..."（DA応答 ESC[?1;2c / CPR応答 ESC[?r;cR の
- * 可視部）が勝手に入力される。
- *
- * クエリ列は視覚出力を持たないため、replay からは除去して構わない（画面復元は壊れない）。
- * 対象は CSI ... n（DSR系: ESC[?6n / ESC[6n / ESC[5n）と CSI ... c（DA系: ESC[c / ESC[0c /
- * ESC[>c）。チャンク境界を跨ぐクエリ列を取りこぼさないよう、必ず scrollback を join した
- * 後の文字列に適用する。
- *
- * 注意: ライブ出力（onData 経由の emit('output')）には適用しない。動作中の Claude が正当に
- * 要求しているクエリへの応答は PTY に返す必要があるため、除去は replay 限定とする。
- */
-function stripTerminalQueries(s: string): string {
-  return s
-    .replace(/\x1b\[[?>]?[0-9;]*n/g, '') // DSR: ESC[?6n(主犯) / ESC[6n / ESC[5n など
-    .replace(/\x1b\[[?>=]?[0-9;]*c/g, ''); // DA: ESC[c / ESC[0c / ESC[>c / ESC[=c
-}
-
 interface CreateSessionBody {
   cwd?: string;
   env?: Record<string, string>;
@@ -74,6 +50,8 @@ export async function terminalRoutes(fastify: FastifyInstance) {
   io.on('connection', (socket) => {
     let boundSessionId: string | null = null;
     let dataHandlerDispose: (() => void) | null = null;
+    /** join の世代。スナップショットを待つ間に join し直した場合、古いスナップショットを送らないために使う */
+    let joinGeneration = 0;
     let exitHandlerDispose: (() => void) | null = null;
 
     // join: roomに参加する。
@@ -137,37 +115,44 @@ export async function terminalRoutes(fastify: FastifyInstance) {
       ptyManager.setActiveSocket(sessionId, socket.id);
 
       const { pty: ptyProcess } = session;
-      const isReused = session.scrollbackSize > 0;
+      const isReused = session.hasOutput;
+      const generation = ++joinGeneration;
 
-      // リングバッファの内容を一括送信（画面復元）。初回接続・再接続を問わず join のたびに送る。
-      // 出力は PTY サイズごとの区間に分けて送り、クライアントは画面をクリアした後、区間ごとに
-      // xterm をそのサイズにしてから書き込む（録画時と同じ幅で再生する）。書き終えたら実サイズへ
-      // resize し、サイズが変わっていれば SIGWINCH で Claude が現在の画面を描き直す。
-      // 切断中に PTY のサイズは変えない（以前は再描画を誘発するため cols を縮めていたが、
-      // Claude は resize のたびに履歴全体を再出力するため、狭い幅の履歴コピーが scrollback に
-      // 積まれて再表示時に横幅の狭い行や同じ内容の繰り返しが残る原因になっていた）。
-      // 端末クエリ列（ESC[?6n / ESC[c 等）を除去してから replay する。
-      // これを怠ると xterm.js が応答を生成し PTY へ注入され、入力欄に "1;2c64;3R..." が
-      // 勝手に入力される（stripTerminalQueries のコメント参照）。
-      const segments = ptyManager.getReplaySegments(session, stripTerminalQueries);
-      // 末尾の \r\n / \n / \r をトリムする。
-      const lastSegment = segments[segments.length - 1];
-      lastSegment.data = lastSegment.data.replace(/[\r\n]+$/, '');
-      socket.emit('replay', { segments });
-
-      // reused の場合、最初の resize まで onData 出力をバッファリング
+      // PTY出力 → このsocketのみに送信（io.to(room)だと同一PTYに複数socket接続時に重複するため）。
+      // 画面復元（replay）を送るまでは溜めておく（replay より先に届くと、replay 前のクリアで消える）。
+      // reused の場合はさらに、クライアントが replay を書き終えて最初の resize を送るまで溜める。
+      let replaySent = false;
       let initialResizeHandled = !isReused;
       const pendingOutput: string[] = [];
-
-      // PTY出力 → このsocketのみに送信（io.to(room)だと同一PTYに複数socket接続時に重複するため）
+      const flushPendingOutput = () => {
+        if (!replaySent || !initialResizeHandled || pendingOutput.length === 0) return;
+        const flushed = pendingOutput.join('');
+        pendingOutput.length = 0;
+        socket.emit('output', { data: flushed });
+      };
       const dataHandler = ptyProcess.onData((data: string) => {
-        if (!initialResizeHandled) {
+        if (!replaySent || !initialResizeHandled) {
           pendingOutput.push(data);
           return;
         }
         socket.emit('output', { data });
       });
       dataHandlerDispose = () => dataHandler.dispose();
+
+      // 画面復元: headless xterm に保持している端末の現在の状態を送る。初回接続・再接続を問わず
+      // join のたびに送る。クライアントは画面をクリアし、xterm をスナップショットのサイズにして書き込み、
+      // 実サイズへ fit して resize を送る（サイズが変わっていれば SIGWINCH で描き直される）。
+      // スナップショットは「この時点までの出力」を反映したもので、以降の出力は上の dataHandler が送る
+      // （PtyManager の onData は dataHandler より先に登録されているため、取りこぼしも重複も無い）。
+      // スナップショットは端末クエリ（ESC[6n / ESC[c 等）を含まないため、クライアントの xterm が
+      // 応答を PTY へ注入することもない。
+      void session.mirror.snapshot().then((snapshot) => {
+        // 待っている間に同じ socket が join し直していれば、古いスナップショットは送らない
+        if (generation !== joinGeneration) return;
+        socket.emit('replay', { snapshot });
+        replaySent = true;
+        flushPendingOutput();
+      });
 
       // PTYプロセス終了 → room全体に通知（全接続クライアントに終了を伝える）+ セッション削除
       const exitHandler = ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
@@ -205,11 +190,7 @@ export async function terminalRoutes(fastify: FastifyInstance) {
           // reused時: 初回 resize 後にバッファリングしていた出力をフラッシュ
           if (!initialResizeHandled) {
             initialResizeHandled = true;
-            if (pendingOutput.length > 0) {
-              const flushed = pendingOutput.join('');
-              pendingOutput.length = 0;
-              socket.emit('output', { data: flushed });
-            }
+            flushPendingOutput();
           }
         }
       );
@@ -386,27 +367,27 @@ export async function terminalRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET /terminal/sessions/:sessionId/scrollback - リングバッファ内容をdump（デバッグ用）
+  // GET /terminal/sessions/:sessionId/snapshot - 再接続時に送る画面のスナップショットをdump（デバッグ用）
   fastify.get<{ Params: { sessionId: string } }>(
-    '/terminal/sessions/:sessionId/scrollback',
+    '/terminal/sessions/:sessionId/snapshot',
     async (request, reply) => {
       const { sessionId } = request.params;
       const session = ptyManager.getSession(sessionId);
       if (!session) {
         return reply.status(404).send({ error: 'Session not found' });
       }
-      // サイズ印は <RESIZE cols x rows> として埋め込む
-      const raw = session.scrollback
-        .map((e) => (typeof e === 'string' ? e : `<RESIZE ${e.cols}x${e.rows}>`))
-        .join('');
+      const { cols, rows, data } = await session.mirror.snapshot();
       // 制御文字を可視化して返す
-      const visible = raw.replace(/\x1b/g, '<ESC>').replace(/\r/g, '<CR>').replace(/\n/g, '<LF>\n');
+      const visible = data
+        .replace(/\x1b/g, '<ESC>')
+        .replace(/\r/g, '<CR>')
+        .replace(/\n/g, '<LF>\n');
       return reply.send({
         sessionId,
-        startSize: session.scrollbackStartSize,
-        chunks: session.scrollback.length,
-        sizeBytes: session.scrollbackSize,
-        raw: Buffer.from(raw).toString('base64'),
+        cols,
+        rows,
+        sizeBytes: data.length,
+        raw: Buffer.from(data).toString('base64'),
         visible,
       });
     }
