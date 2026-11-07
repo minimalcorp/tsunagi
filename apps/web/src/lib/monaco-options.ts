@@ -8,3 +8,11 @@ export const MONACO_INDENT_OPTIONS = {
   insertSpaces: true,
   detectIndentation: false,
 } as const;
+
+/**
+ * EditContext API（monaco 0.55 の既定）を使わず、従来の textarea で入力を受ける。
+ * EditContext だと日本語 IME の予測候補（Tab）で左右キーが候補移動に使われないため。
+ */
+export const MONACO_IME_OPTIONS = {
+  editContext: false,
+} as const;

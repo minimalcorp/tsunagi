@@ -170,9 +170,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     // 各TerminalViewへのrefマップ
     const terminalRefs = useRef<Map<string, TerminalViewHandle>>(new Map());
 
-    // タブごとの下書き（送信後に消す。リロードでは保持しない）
-    const [drafts, setDrafts] = useState<Map<string, string>>(() => new Map());
-
     useEffect(
       () =>
         registerFocusTarget('terminal', () => {
@@ -295,21 +292,11 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           next.delete(tabId);
           return next;
         });
-        setDrafts((prev) => {
-          const next = new Map(prev);
-          next.delete(tabId);
-          return next;
-        });
         terminalRefs.current.delete(tabId);
         onTabDelete(tabId);
       },
       [onTabDelete]
     );
-
-    const handleDraftChange = (text: string) => {
-      if (!activeTabId) return;
-      setDrafts((prev) => new Map(prev).set(activeTabId, text));
-    };
 
     const handleSend = (text: string, submit: boolean) => {
       if (!activeTabId) return false;
@@ -317,6 +304,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     };
 
     const isEditorOnly = viewMode === 'editor';
+    // タブごとの下書きは EditorPane が Monaco のモデルとして持つ（リロードでは保持しない）
+    const draftIds = useMemo(() => tabs.map((tab) => tab.tab_id), [tabs]);
 
     return (
       <div className="flex flex-col flex-1 min-h-0">
@@ -471,12 +460,11 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               >
                 <div className="absolute inset-0 flex flex-col">
                   <EditorPane
-                    value={activeTabId ? (drafts.get(activeTabId) ?? '') : ''}
-                    onChange={handleDraftChange}
+                    draftId={activeTabId ?? null}
+                    draftIds={draftIds}
                     canSend={
                       activeTabId ? tabStatusMap.get(activeTabId)?.terminal === 'connected' : false
                     }
-                    readOnly={!activeTabId}
                     onSend={handleSend}
                   />
                 </div>

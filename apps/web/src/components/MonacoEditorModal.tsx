@@ -6,7 +6,7 @@ import type { editor } from 'monaco-editor';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
-import { MONACO_INDENT_OPTIONS } from '@/lib/monaco-options';
+import { MONACO_IME_OPTIONS, MONACO_INDENT_OPTIONS } from '@/lib/monaco-options';
 import { registerFocusTarget, setFocusModalOpen } from '@/lib/focus-target';
 
 export interface MonacoEditorModalProps {
@@ -150,6 +150,7 @@ export function MonacoEditorModal({
             }}
             options={{
               ...MONACO_INDENT_OPTIONS,
+              ...MONACO_IME_OPTIONS,
               minimap: { enabled: false },
               lineNumbers: 'on',
               wordWrap: 'on',
