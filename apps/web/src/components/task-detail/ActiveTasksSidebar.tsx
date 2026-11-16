@@ -68,29 +68,26 @@ function isBusy(kind: ActivityKind | null) {
 
 /**
  * タスクの現在の状態を一覧に反映する。
- * - 実行中・未読になったタスクを追加する（外した時と状態が変わっていなければ追加しない）
+ * - 実行中・未読になったタスクを追加する（外したタスクは状態に関わらず追加しない）
  * - 存在しなくなったタスクを取り除く
  * 変化がなければ同じ参照を返す。
  */
 function reconcile(state: SidebarTaskListState, tasks: Task[]): SidebarTaskListState {
   const ids = new Set(tasks.map((t) => t.id));
   const shown = state.shown.filter((id) => ids.has(id));
-  const dismissed: SidebarTaskListState['dismissed'] = {};
+  const hidden = state.hidden.filter((id) => ids.has(id));
+  const hiddenSet = new Set(hidden);
 
   for (const task of tasks) {
-    const kind = activityKind(task);
-    if (task.id in state.dismissed && state.dismissed[task.id] === kind) {
-      dismissed[task.id] = kind;
-      continue;
-    }
-    if (kind && !shown.includes(task.id)) shown.push(task.id);
+    if (hiddenSet.has(task.id)) continue;
+    if (activityKind(task) && !shown.includes(task.id)) shown.push(task.id);
   }
 
   const unchanged =
     shown.length === state.shown.length &&
     shown.every((id, i) => id === state.shown[i]) &&
-    Object.keys(dismissed).length === Object.keys(state.dismissed).length;
-  return unchanged ? state : { ...state, shown, dismissed };
+    hidden.length === state.hidden.length;
+  return unchanged ? state : { ...state, shown, hidden };
 }
 
 function subscribeHover(onChange: () => void) {
@@ -188,15 +185,11 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
     now - (settledAtRef.current.get(task.id) ?? 0) >= REMOVE_COOLDOWN_MS;
 
   const removeTasks = (ids: string[]) => {
-    const byId = new Map(tasks.map((t) => [t.id, t]));
-    update((prev) => {
-      const dismissed = { ...prev.dismissed };
-      for (const id of ids) {
-        const task = byId.get(id);
-        if (task) dismissed[id] = activityKind(task);
-      }
-      return { ...prev, shown: prev.shown.filter((id) => !ids.includes(id)), dismissed };
-    });
+    update((prev) => ({
+      ...prev,
+      shown: prev.shown.filter((id) => !ids.includes(id)),
+      hidden: [...prev.hidden, ...ids.filter((id) => !prev.hidden.includes(id))],
+    }));
   };
 
   /** 一括で外す確認ダイアログを開く（対象は開いた時点で外せるタスク） */
@@ -317,7 +310,8 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
             list?
           </p>
           <p className="text-sm text-muted-foreground">
-            Running or waiting tasks stay. The tasks themselves are not deleted.
+            Running or waiting tasks stay. The tasks themselves are not deleted. Removed tasks stay
+            hidden until you show them again from the task page.
           </p>
           <div className="flex justify-end gap-2 pt-2">
             <DialogClose render={<Button variant="outline" className="cursor-pointer" />}>

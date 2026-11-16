@@ -1,7 +1,6 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import type { ActivityKind } from '@/lib/agent-status';
 
 const STORAGE_KEY = 'tsunagi:sidebar-tasks';
 
@@ -9,16 +8,13 @@ const STORAGE_KEY = 'tsunagi:sidebar-tasks';
 export interface SidebarTaskListState {
   /** 一覧に表示するタスクID（追加順） */
   shown: string[];
-  /**
-   * 一覧から外したタスクと、外した時点の状態。
-   * 状態が変わるまでは再追加しない（未読のまま外したタスクが即座に戻らないように）
-   */
-  dismissed: Record<string, ActivityKind | null>;
+  /** 一覧から外したタスクID。明示的に再表示する（タスク詳細ヘッダの操作）まで自動では追加しない */
+  hidden: string[];
   /** スワイプ操作のヒントを表示済みか */
   hintSeen: boolean;
 }
 
-const EMPTY: SidebarTaskListState = { shown: [], dismissed: {}, hintSeen: false };
+const EMPTY: SidebarTaskListState = { shown: [], hidden: [], hintSeen: false };
 
 const listeners = new Set<() => void>();
 let cachedRaw: string | null = null;
@@ -37,10 +33,13 @@ function getSnapshot(): SidebarTaskListState {
   if (raw === cachedRaw) return cachedState;
   cachedRaw = raw;
   try {
-    const parsed = raw ? (JSON.parse(raw) as Partial<SidebarTaskListState>) : {};
+    const parsed = raw
+      ? (JSON.parse(raw) as Partial<SidebarTaskListState> & { dismissed?: Record<string, unknown> })
+      : {};
     cachedState = {
       shown: Array.isArray(parsed.shown) ? parsed.shown : [],
-      dismissed: parsed.dismissed ?? {},
+      // 旧形式（dismissed: 外した時点の状態）は外したタスクをそのまま非表示として引き継ぐ
+      hidden: Array.isArray(parsed.hidden) ? parsed.hidden : Object.keys(parsed.dismissed ?? {}),
       hintSeen: parsed.hintSeen === true,
     };
   } catch {
