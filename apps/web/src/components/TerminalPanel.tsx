@@ -98,7 +98,10 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     },
     ref
   ) {
-    const { mode: viewMode, canSplit, setMode: setViewMode } = useTaskViewMode();
+    const { mode: selectedViewMode, canSplit, setMode: setViewMode } = useTaskViewMode();
+    // タブが無いときはエディタと表示切り替えを出さない（保存済みの選択は変えない）
+    const hasTabs = tabs.length > 0;
+    const viewMode = hasTabs ? selectedViewMode : 'terminal';
 
     // アクティブな TerminalView がツールバーの内容を描画する先
     const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
@@ -329,10 +332,12 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
         <div className="flex-1 min-h-0 mx-4 mb-4 mt-2 flex flex-col overflow-hidden rounded-lg border border-border bg-card dark:rounded-none dark:border-0">
           {/* ターミナルとエディタ共通のツールバー */}
-          <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0">
-            <div ref={setToolbarSlot} className="flex flex-1 min-w-0 items-center gap-2" />
-            <TaskViewModeToggle mode={viewMode} canSplit={canSplit} onChange={setViewMode} />
-          </div>
+          {hasTabs && (
+            <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0">
+              <div ref={setToolbarSlot} className="flex flex-1 min-w-0 items-center gap-2" />
+              <TaskViewModeToggle mode={viewMode} canSplit={canSplit} onChange={setViewMode} />
+            </div>
+          )}
 
           {/* TerminalViewエリア（visibility:hidden方式で複数を保持） */}
           {/* absolute で全タブを重ねることで、visibility:hidden のタブが空白として残らないようにする */}
