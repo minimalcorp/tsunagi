@@ -3,7 +3,16 @@
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Code2, Ellipsis, FolderX, Pencil, Terminal, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Code2,
+  Ellipsis,
+  EyeOff,
+  FolderX,
+  Pencil,
+  Terminal,
+  Trash2,
+} from 'lucide-react';
 import { apiUrl } from '@/lib/api-url';
 import type { Task, Tab } from '@minimalcorp/tsunagi-shared';
 import { LazyTaskDialog } from '@/components/LazyTaskDialog';
@@ -11,6 +20,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useToast } from '@/hooks/useToast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
+import { useSidebarTaskList } from '@/hooks/useSidebarTaskList';
 import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
 import type { AgentStatus } from '@/components/TerminalView';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -43,6 +53,8 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const { state: sidebarState, update: updateSidebar } = useSidebarTaskList();
+  const isHiddenFromSidebar = sidebarState.hidden.includes(id);
 
   const terminalPanelRef = useRef<TerminalPanelHandle | null>(null);
 
@@ -302,9 +314,29 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
             Back to Board
           </Link>
 
-          <h1 className="text-base font-semibold text-foreground absolute left-1/2 -translate-x-1/2 max-w-[50vw] truncate">
-            {task.title}
-          </h1>
+          <div className="absolute left-1/2 -translate-x-1/2 max-w-[50vw] flex items-center gap-1">
+            <h1 className="min-w-0 truncate text-base font-semibold text-foreground">
+              {task.title}
+            </h1>
+            {isHiddenFromSidebar && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden md:inline-flex shrink-0 text-muted-foreground hover:text-foreground"
+                aria-label="Hidden from sidebar. Click to show"
+                title="Hidden from sidebar. Click to show"
+                onClick={() =>
+                  updateSidebar((prev) => ({
+                    ...prev,
+                    hidden: prev.hidden.filter((hiddenId) => hiddenId !== id),
+                    shown: prev.shown.includes(id) ? prev.shown : [...prev.shown, id],
+                  }))
+                }
+              >
+                <EyeOff />
+              </Button>
+            )}
+          </div>
 
           <div className="flex items-center gap-1">
             <UpdateIndicator />
