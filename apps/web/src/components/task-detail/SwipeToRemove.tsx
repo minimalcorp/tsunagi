@@ -13,8 +13,6 @@ const DRAG_THRESHOLD = 8;
 
 interface SwipeToRemoveProps {
   children: ReactNode;
-  /** スワイプを受け付けるか。操作開始時に、そのイベントの timeStamp を渡して判定する */
-  canSwipe: (timeStamp: number) => boolean;
   /** 削除アクションを出したまま止まっているか */
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,8 +31,6 @@ interface DragState {
   /** 操作開始時の位置（開いていれば -ACTION_WIDTH） */
   base: number;
   dragging: boolean;
-  /** 外せない行。横に動かしても行は動かさず、click だけ抑止する */
-  locked: boolean;
 }
 
 /**
@@ -43,7 +39,6 @@ interface DragState {
  */
 export function SwipeToRemove({
   children,
-  canSwipe,
   open,
   onOpenChange,
   onRemove,
@@ -97,7 +92,6 @@ export function SwipeToRemove({
       startY: e.clientY,
       base: open ? -ACTION_WIDTH : 0,
       dragging: false,
-      locked: !canSwipe(e.timeStamp),
     };
   };
 
@@ -114,12 +108,10 @@ export function SwipeToRemove({
         return;
       }
       drag.dragging = true;
-      if (drag.locked) return;
       // ヒントの再生中にスワイプしたら、操作方法は伝わったのでヒントを終える
       if (hint) onHintEnd?.();
       e.currentTarget.setPointerCapture(e.pointerId);
     }
-    if (drag.locked) return;
     setDragOffset(Math.min(0, Math.max(-e.currentTarget.offsetWidth, drag.base + dx)));
   };
 
@@ -130,7 +122,6 @@ export function SwipeToRemove({
 
     // ドラッグの後に発火する click で詳細へ遷移しないようにする
     suppressClickRef.current = true;
-    if (drag.locked) return;
     const distance = -Math.min(0, drag.base + e.clientX - drag.startX);
     setDragOffset(null);
     if (distance > e.currentTarget.offsetWidth * FULL_SWIPE_RATIO) {

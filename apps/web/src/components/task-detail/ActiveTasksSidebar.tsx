@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CheckCircle2,
@@ -30,9 +30,6 @@ const ACTIVITY_ORDER: Record<ActivityKind, number> = {
   running: 3,
 };
 
-/** running / waiting から別の状態に移ってから、一覧から外せるようになるまでの時間（誤操作防止） */
-const REMOVE_COOLDOWN_MS = 3000;
-
 type AgentState = 'running' | 'waiting' | 'error' | 'success';
 
 /** 実行ステータスのアイコン。判定・色は TaskCard の AgentStatusIndicator と揃える */
@@ -59,11 +56,6 @@ function agentState(tabs: Task['tabs']): AgentState | null {
   if (tabs.some((t) => t.status === 'error')) return 'error';
   if (tabs.every((t) => t.status === 'success')) return 'success';
   return null;
-}
-
-/** 外せない状態（実行中・入力待ち）か */
-function isBusy(kind: ActivityKind | null) {
-  return kind === 'running' || kind === 'waiting';
 }
 
 /**
@@ -120,20 +112,6 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
     if (state !== storedState) update((prev) => reconcile(prev, tasks));
   }, [state, storedState, tasks, update]);
 
-  // running / waiting から抜けた時刻（performance.now 基準。このタブで観測したもののみ）。
-  // 外せるようになるまでの猶予に使い、操作時のイベントの timeStamp と比べる
-  const prevKindsRef = useRef(new Map<string, ActivityKind | null>());
-  const settledAtRef = useRef(new Map<string, number>());
-  useEffect(() => {
-    for (const task of tasks) {
-      const kind = activityKind(task);
-      if (isBusy(prevKindsRef.current.get(task.id) ?? null) && !isBusy(kind)) {
-        settledAtRef.current.set(task.id, performance.now());
-      }
-      prevKindsRef.current.set(task.id, kind);
-    }
-  }, [tasks]);
-
   const { active, done } = useMemo(() => {
     const byId = new Map(tasks.map((t) => [t.id, t]));
     const active: { task: Task; kind: ActivityKind }[] = [];
@@ -159,7 +137,6 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
   }, [tasks, state.shown, currentTaskId]);
 
   const rows = useMemo(() => [...active.map(({ task }) => task), ...done], [active, done]);
-  const removableRows = rows.filter((task) => !isBusy(activityKind(task)));
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [clearTargets, setClearTargets] = useState<string[] | null>(null);
@@ -174,15 +151,10 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
   const hintId = state.hintSeen
     ? null
     : canHover
-      ? removableRows.some((t) => t.id === hoveredId)
+      ? rows.some((t) => t.id === hoveredId)
         ? hoveredId
         : null
-      : (removableRows[0]?.id ?? null);
-
-  /** 外せるか（猶予時間があるため、操作時のイベントの timeStamp で判定する） */
-  const canRemoveAt = (task: Task, now: number) =>
-    !isBusy(activityKind(task)) &&
-    now - (settledAtRef.current.get(task.id) ?? 0) >= REMOVE_COOLDOWN_MS;
+      : (rows[0]?.id ?? null);
 
   const removeTasks = (ids: string[]) => {
     update((prev) => ({
@@ -192,15 +164,13 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
     }));
   };
 
-  /** 一括で外す確認ダイアログを開く（対象は開いた時点で外せるタスク） */
-  const openClearDialog = (e: React.MouseEvent) => {
-    const ids = rows.filter((t) => canRemoveAt(t, e.timeStamp)).map((t) => t.id);
-    if (ids.length > 0) setClearTargets(ids);
+  /** 一括で外す確認ダイアログを開く（対象は開いた時点の全タスク） */
+  const openClearDialog = () => {
+    if (rows.length > 0) setClearTargets(rows.map((t) => t.id));
   };
 
   const renderRow = (task: Task) => {
     const isCurrent = task.id === currentTaskId;
-    const busy = isBusy(activityKind(task));
     const agent = agentState(task.tabs);
     const { icon: Icon, className, label } = agent ? AGENT_STATE[agent] : IDLE_STATE;
     let marker = unreadKind(task);
@@ -209,15 +179,14 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
     return (
       <li key={task.id}>
         <SwipeToRemove
-          canSwipe={(timeStamp) => canRemoveAt(task, timeStamp)}
-          open={openId === task.id && !busy}
+          open={openId === task.id}
           onOpenChange={(open) =>
             setOpenId((prev) => (open ? task.id : prev === task.id ? null : prev))
           }
           onRemove={() => removeTasks([task.id])}
           hint={hintId === task.id}
           onHintEnd={() => update((prev) => ({ ...prev, hintSeen: true }))}
-          onMouseEnter={() => !state.hintSeen && !busy && setHoveredId((prev) => prev ?? task.id)}
+          onMouseEnter={() => !state.hintSeen && setHoveredId((prev) => prev ?? task.id)}
         >
           {marker && (
             <span
@@ -278,7 +247,7 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
           className="ml-auto text-muted-foreground hover:text-foreground"
           aria-label="Clear list"
           title="Clear list"
-          disabled={removableRows.length === 0}
+          disabled={rows.length === 0}
           onClick={openClearDialog}
         >
           <ListX />
@@ -310,8 +279,8 @@ export function ActiveTasksSidebar({ currentTaskId }: ActiveTasksSidebarProps) {
             list?
           </p>
           <p className="text-sm text-muted-foreground">
-            Running or waiting tasks stay. The tasks themselves are not deleted. Removed tasks stay
-            hidden until you show them again from the task page.
+            The tasks themselves are not deleted. Removed tasks stay hidden until you show them
+            again from the task page.
           </p>
           <div className="flex justify-end gap-2 pt-2">
             <DialogClose render={<Button variant="outline" className="cursor-pointer" />}>
