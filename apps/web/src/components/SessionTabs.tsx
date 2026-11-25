@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Tab } from '@minimalcorp/tsunagi-shared';
 import {
   X,
@@ -134,28 +134,9 @@ export function SessionTabs({
   onTabDelete,
   tabStatusMap,
 }: SessionTabsProps) {
-  const tabRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const [deleteTarget, setDeleteTarget] = useState<{ tabId: string; isRunning: boolean } | null>(
     null
   );
-
-  // アクティブタブのインジケーター位置を更新
-  // offsetLeft/offsetWidth を使用（position:absolute の参照座標と一致し、スクロール時もズレない）
-  useEffect(() => {
-    const activeIndex = tabs.findIndex((t) => t.tab_id === activeTabId);
-    if (activeIndex !== -1 && tabRefs.current[activeIndex]) {
-      const tabElement = tabRefs.current[activeIndex];
-      if (tabElement) {
-        setIndicatorStyle({
-          left: tabElement.offsetLeft,
-          width: tabElement.offsetWidth,
-        });
-      }
-    }
-  }, [activeTabId, tabs]);
-
-  const hasActiveTab = tabs.some((t) => t.tab_id === activeTabId);
 
   // Terminalモードのタブには連番ラベル（terminal 1, terminal 2, ...）を割り当てる。
   // Claude用のステータス表示が存在しないため、番号で識別できるようにする。
@@ -188,8 +169,8 @@ export function SessionTabs({
         }}
         variant="danger"
       />
-      <div className="relative flex items-center gap-2 overflow-x-auto border-b border-border pb-1">
-        {tabs.map((tab, index) => {
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-border pb-1">
+        {tabs.map((tab) => {
           const isActive = activeTabId === tab.tab_id;
           const entry = tabStatusMap?.get(tab.tab_id);
           const isRunning =
@@ -199,12 +180,9 @@ export function SessionTabs({
           return (
             <div
               key={tab.tab_id}
-              ref={(el) => {
-                tabRefs.current[index] = el;
-              }}
               onClick={() => onTabChange(tab.tab_id)}
               className={`
-              flex items-center gap-2 px-4 pt-1 pb-2 h-10 flex-shrink-0 transition-colors cursor-pointer
+              relative flex items-center gap-2 px-4 pt-1 pb-2 h-10 flex-shrink-0 transition-colors cursor-pointer
               ${
                 isActive
                   ? 'text-primary'
@@ -246,6 +224,8 @@ export function SessionTabs({
               >
                 <X className="w-4 h-4" />
               </Button>
+              {/* アクティブタブのインジケーター（タブ要素内に配置し幅をCSSで追従させる。-bottom-1 は親の pb-1 分） */}
+              {isActive && <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-primary" />}
             </div>
           );
         })}
@@ -296,17 +276,6 @@ export function SessionTabs({
             </span>
           )}
         </div>
-
-        {/* Material Design Indicator（アクティブタブが存在しない場合は表示しない） */}
-        {hasActiveTab && (
-          <div
-            className="absolute bottom-0 h-0.5 bg-primary transition-[left,width]"
-            style={{
-              left: `${indicatorStyle.left}px`,
-              width: `${indicatorStyle.width}px`,
-            }}
-          />
-        )}
       </div>
     </>
   );
