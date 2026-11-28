@@ -13,6 +13,7 @@ import {
   deleteTask,
   listRepos,
   ensureDefaultWorktree,
+  renameTab,
   TaskServiceError,
   type TaskIdentifier,
 } from '../lib/services/task-service.js';
@@ -209,6 +210,22 @@ function createMcpServer(io?: SocketIOServer): Server {
         },
       },
       {
+        name: 'tsunagi_rename_tab',
+        description:
+          'タスク詳細のタブ名を変更する。空文字で名前を外す（セッションタイトル由来の自動の名前、または既定表示に戻る）',
+        inputSchema: {
+          type: 'object',
+          required: ['tabId', 'name'],
+          properties: {
+            tabId: {
+              type: 'string',
+              description: 'タブID（= session_id。環境変数 TSUNAGI_SESSION_ID の値）',
+            },
+            name: { type: 'string', description: 'タブ名（最大50文字）。空文字で名前を外す' },
+          },
+        },
+      },
+      {
         name: 'tsunagi_ensure_default_worktree',
         description:
           'リポジトリのdefault branch worktreeを確保する（なければ作成、あれば最新化）。返却されたパスを使ってリポジトリの内容を読むことができる。',
@@ -370,6 +387,15 @@ function createMcpServer(io?: SocketIOServer): Server {
               content: [{ type: 'text', text: JSON.stringify({ tabId, todos: [] }, null, 2) }],
             };
           }
+        }
+
+        case 'tsunagi_rename_tab': {
+          const { tabId, name } = (args ?? {}) as { tabId?: unknown; name?: unknown };
+          if (typeof tabId !== 'string' || !tabId) {
+            return { content: [{ type: 'text', text: 'tabId is required' }], isError: true };
+          }
+          const tab = await renameTab(tabId, name, { io });
+          return { content: [{ type: 'text', text: JSON.stringify(tab, null, 2) }] };
         }
 
         case 'tsunagi_ensure_default_worktree': {

@@ -170,6 +170,14 @@ When you create a Claude tab, Tsunagi:
 For a Codex tab, steps 3–4 launch Codex instead, passing the hooks, MCP
 server, etc. via `-c` at launch (see [Codex](/en/features/codex/)).
 
+### Tab names
+
+Each tab shows a name, and its state (running, done, waiting for input, …) is shown as an icon (hover for the state name). The name is chosen in this order:
+
+1. A name you set: double-click the tab, or right-click → "Rename" (Enter to save, Esc to cancel, empty to clear). Claude can also change it with `tsunagi_rename_tab`
+2. The agent's session title (the title Claude Code generates or sets with `/rename`, or Codex's thread name), refreshed at the end of every turn
+3. The default: a per-launcher number such as `claude 1` / `codex 1` / `local 1` / `terminal 1`
+
 ### Persistence across reloads
 
 Tab sessions are persisted on the server side. If you refresh the

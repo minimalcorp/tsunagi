@@ -88,4 +88,9 @@ export interface AgentAdapter {
   buildCommand(tabId: string, mode: TabMode): Promise<string>;
   /** hook の受信内容を正規化する。状態遷移に関係しないイベントは null */
   normalizeHook(request: HookRequest): NormalizedHookEvent | null;
+  /**
+   * ターン終了時の hook からセッションタイトル（タブの自動の名前）を読む。読めなければ null。
+   * エージェントの内部ファイルに依存するため、対応しないエージェントは省略する
+   */
+  readSessionTitle?(request: HookRequest): Promise<string | null>;
 }

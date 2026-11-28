@@ -31,6 +31,7 @@ MCP server は Tsunagi のタスク管理を [Model Context Protocol](https://do
 | `tsunagi_delete_task`             | タスクと worktree を削除                                        |
 | `tsunagi_ensure_default_worktree` | `.default` worktree をリモートと同期                            |
 | `tsunagi_get_tab_todos`           | 指定タブセッションの todo リストを読む                          |
+| `tsunagi_rename_tab`              | タスク詳細のタブ名を変更（空文字で解除）                        |
 
 すべてのツールは Tsunagi が起動する任意の Claude セッション内で追加設定なく使えます。「backlog を優先度順に並び替えて」「このタスクを削除して」といった依頼を Claude にするだけで、裏でこれらのツールが呼ばれます。
 
