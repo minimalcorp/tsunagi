@@ -21,7 +21,11 @@ import { useToast } from '@/hooks/useToast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useTaskEvents } from '@/hooks/useTaskEvents';
 import { useSidebarTaskList } from '@/hooks/useSidebarTaskList';
-import { TerminalPanel, type TerminalPanelHandle } from '@/components/TerminalPanel';
+import {
+  TerminalPanel,
+  type TabCreateOptions,
+  type TerminalPanelHandle,
+} from '@/components/TerminalPanel';
 import type { AgentStatus } from '@/components/TerminalView';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/Dialog';
@@ -177,16 +181,26 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
     }
   };
 
-  // タブ作成（新規tab_idを返す）
-  const handleTabCreate = async (mode: Tab['mode'] = 'claude'): Promise<string | undefined> => {
+  // タブ作成（新規tab_idを返す。markdown は同じファイルのタブがあればそれを返す）
+  const handleTabCreate = async (
+    mode: Tab['mode'] = 'claude',
+    options: TabCreateOptions = {}
+  ): Promise<string | undefined> => {
     try {
       const response = await fetch(apiUrl(`/api/tasks/${id}/tabs`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode, ...options }),
       });
 
-      if (!response.ok) throw new Error('Failed to create tab');
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        if (mode === 'markdown') {
+          toast.error(undefined, 'Markdown を開けませんでした', body.error ?? response.statusText);
+          return undefined;
+        }
+        throw new Error('Failed to create tab');
+      }
 
       const data = await response.json();
       const newTab = data.data.tab;
@@ -202,6 +216,53 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       return undefined;
     }
   };
+
+  // Markdown タブの表示ファイル差し替え（相対リンク）。既に開いているファイルならそのタブへ切り替える
+  const handleMarkdownNavigate = async (tabId: string, filePath: string) => {
+    const opened = tabs.find((t) => t.mode === 'markdown' && t.filePath === filePath);
+    if (opened) {
+      setActiveTabId(opened.tab_id);
+      return;
+    }
+    try {
+      const response = await fetch(apiUrl(`/api/tasks/${id}/tabs/${tabId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? response.statusText);
+      const updated = body.data.tab as Tab;
+      setTabs((prev) => prev.map((t) => (t.tab_id === tabId ? updated : t)));
+    } catch (error) {
+      toast.error(
+        undefined,
+        'Markdown を開けませんでした',
+        error instanceof Error ? error.message : undefined
+      );
+    }
+  };
+
+  // Markdown タブの未読（エージェントが開いた手順書）は、そのタブを表示した時に落とす
+  const activeTab = tabs.find((t) => t.tab_id === activeTabId);
+  const unreadMarkdownTabId =
+    activeTab?.mode === 'markdown' && activeTab.unread ? activeTab.tab_id : null;
+  useEffect(() => {
+    if (!unreadMarkdownTabId) return;
+    fetch(apiUrl(`/api/tasks/${id}/tabs/${unreadMarkdownTabId}`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unread: false }),
+    })
+      .then(() =>
+        setTabs((prev) =>
+          prev.map((t) => (t.tab_id === unreadMarkdownTabId ? { ...t, unread: false } : t))
+        )
+      )
+      .catch(() => {
+        // 既読化の失敗は表示に影響しない
+      });
+  }, [id, unreadMarkdownTabId]);
 
   // タブ削除
   const handleTabDelete = async (tab_id: string) => {
@@ -440,6 +501,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               onTabCreate={handleTabCreate}
               onTabDelete={handleTabDelete}
               onTabRename={handleTabRename}
+              onMarkdownNavigate={handleMarkdownNavigate}
               onAgentStatusChange={handleAgentStatusChange}
             />
           ) : (

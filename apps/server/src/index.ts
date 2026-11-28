@@ -23,6 +23,7 @@ import { watchUserSettingsForLocalModel } from './lib/claude-config-guard.js';
 import { LOCAL_MODEL_ALIAS } from './lib/local-llm-env.js';
 import { terminalRoutes } from './routes/terminal.js';
 import { editorRoutes } from './routes/editor.js';
+import { markdownRoutes } from './routes/markdown.js';
 import { settingsRoutes } from './routes/settings.js';
 import { versionRoutes } from './routes/version.js';
 import { startUpdateCheck, stopUpdateCheck } from './lib/update-check.js';
@@ -129,6 +130,7 @@ async function start() {
   await fastify.register(mcpWebRoutes, { prefix: '/api' });
   await fastify.register(terminalRoutes, { prefix: '/api' });
   await fastify.register(editorRoutes, { prefix: '/api' });
+  await fastify.register(markdownRoutes, { prefix: '/api' });
   await fastify.register(settingsRoutes, { prefix: '/api' });
   await fastify.register(localLlmRoutes, { prefix: '/api' });
   await fastify.register(versionRoutes, { prefix: '/api' });

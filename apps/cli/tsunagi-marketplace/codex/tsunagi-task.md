@@ -98,6 +98,15 @@ subagentの返却を受けた後、メインセッションの役割:
 ファイルシステム上に計画ファイルを作成しない。
 `planning` 完了時点で `description` は完成していること。`coding` 中に計画変更があれば随時更新する。
 
+## 手順書・チェックリストを Markdown で書いた時（Markdown Viewer）
+
+ユーザーが読んだり手作業で進めたりする Markdown ファイル（手順書・runbook・チェックリスト・作業計画等）を書き出したら、tsunagi の Markdown Viewer で開く。リポジトリの成果物（README 等）や、tsunagi タスクの実装計画（`description` に書く）には使わない。
+
+- GitHub Flavored Markdown で書く。手作業の手順はタスクリスト `- [ ] 手順`、区切りは `##` 見出し、注意書きは `> [!NOTE]` / `> [!WARNING]` 等の alert、流れは ` ```mermaid ` の図
+- 書き出したら絶対パスで `tsunagi_open_markdown`（`path` + `session_id` か `cwd`）を呼ぶ。タスク詳細に Markdown タブが開く（表示中タブは切り替わらず未読ドットが付く）
+- 返却された `viewerUrl` もユーザーに提示する
+- ユーザーが Viewer でチェックした結果はファイルに保存される。進捗の確認や続きの作業の前にファイルを読み直す
+
 ## よくある間違い
 
 | ❌ 誤り                                   | ✅ 正しい                                               | 備考                                        |

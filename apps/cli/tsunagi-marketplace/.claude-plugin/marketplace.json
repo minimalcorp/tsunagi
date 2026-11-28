@@ -5,7 +5,7 @@
     {
       "name": "tsunagi-plugin",
       "source": "./plugins/tsunagi-plugin",
-      "description": "tsunagiサーバーへClaude CLIイベントを転送し、MCPサーバーとタスク管理スキルを提供する"
+      "description": "tsunagiサーバーへClaude CLIイベントを転送し、MCPサーバーとタスク管理・Markdown Viewer スキルを提供する"
     }
   ]
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -12,50 +12,66 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// localStorageから初期テーマを取得
-function getInitialTheme(): Theme {
-  if (typeof window === 'undefined') return 'system';
-  const storedTheme = localStorage.getItem('theme') as Theme | null;
-  return storedTheme || 'system';
+const STORAGE_KEY = 'theme';
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+
+/*
+ * 保存済みテーマ（localStorage）と OS のダークモード設定は外部ストアとして購読する。
+ * サーバー描画とハイドレーションでは getServerSnapshot（'system' / light）を使い、
+ * その後クライアントの値で描画し直すため、SSR された ThemeToggle 等で
+ * ハイドレーション不一致が起きない（useState の初期値で localStorage を読むと起きる）。
+ */
+const themeListeners = new Set<() => void>();
+
+function readStoredTheme(): Theme {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === 'light' || stored === 'dark' ? stored : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+function subscribeTheme(listener: () => void) {
+  themeListeners.add(listener);
+  // 他のタブでの変更（同じタブ内の変更では storage イベントは発火しない）
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY || e.key === null) listener();
+  };
+  window.addEventListener('storage', onStorage);
+  return () => {
+    themeListeners.delete(listener);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+function subscribeSystemDark(listener: () => void) {
+  const mediaQuery = window.matchMedia(DARK_QUERY);
+  mediaQuery.addEventListener('change', listener);
+  return () => mediaQuery.removeEventListener('change', listener);
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
-  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
+  const theme = useSyncExternalStore(subscribeTheme, readStoredTheme, () => 'system' as const);
+  const systemDark = useSyncExternalStore(
+    subscribeSystemDark,
+    () => window.matchMedia(DARK_QUERY).matches,
+    () => false
+  );
+  const effectiveTheme = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme;
 
-  // システムテーマの監視とdata-theme属性の設定
+  // html の dark クラスに反映する
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const root = document.documentElement;
-
-    const updateEffectiveTheme = () => {
-      const resolved = theme === 'system' ? (mediaQuery.matches ? 'dark' : 'light') : theme;
-      setEffectiveTheme(resolved);
-      root.classList.toggle('dark', resolved === 'dark');
-    };
-
-    updateEffectiveTheme();
-
-    const handleChange = () => {
-      if (theme === 'system') {
-        updateEffectiveTheme();
-      }
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme]);
+    document.documentElement.classList.toggle('dark', effectiveTheme === 'dark');
+  }, [effectiveTheme]);
 
   const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem('theme', newTheme);
-
-    if (newTheme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      setEffectiveTheme(mediaQuery.matches ? 'dark' : 'light');
-    } else {
-      setEffectiveTheme(newTheme);
+    try {
+      localStorage.setItem(STORAGE_KEY, newTheme);
+    } catch {
+      // localStorage が使えない環境ではテーマを切り替えられない（表示は system のまま）
     }
+    themeListeners.forEach((listener) => listener());
   };
 
   return (

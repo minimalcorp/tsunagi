@@ -44,9 +44,9 @@ export type AgentId = 'claude' | 'codex';
 
 /**
  * タブの起動モード。local: ローカルLLM（Settings で選んだ使用中のモデル）で claude を起動。
- * ollama / lmstudio は旧形式（local と同じ扱い）
+ * ollama / lmstudio は旧形式（local と同じ扱い）。markdown: Markdown Viewer（PTY を持たない）
  */
-export type TabMode = 'terminal' | 'claude' | 'codex' | 'local' | LocalLlmProvider;
+export type TabMode = 'terminal' | 'claude' | 'codex' | 'local' | 'markdown' | LocalLlmProvider;
 
 // Tab型（タブとメッセージ履歴を分離）
 export interface Tab {
@@ -64,6 +64,8 @@ export interface Tab {
   name?: string;
   /** エージェントのセッションタイトルから自動で付く名前 */
   autoName?: string;
+  /** mode='markdown' のタブが表示するファイルの絶対パス */
+  filePath?: string;
   startedAt: string;
   completedAt?: string;
   updatedAt: string;

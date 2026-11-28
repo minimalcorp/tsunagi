@@ -13,7 +13,10 @@ import {
   XCircle,
   MessageSquare,
   Pencil,
+  FileText,
 } from 'lucide-react';
+import { MarkdownOpenPopover } from '@/components/markdown-viewer/MarkdownOpenPopover';
+import { basename, type MarkdownOutline } from '@/components/markdown-viewer/markdown-utils';
 import type { AgentTabOption, LocalLlmTabOption, TabStatusEntry } from '@/components/TerminalPanel';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/button';
@@ -46,6 +49,11 @@ interface SessionTabsProps {
   onTabRename: (tabId: string, name: string) => void;
   /** タブごとのリアルタイムステータス */
   tabStatusMap?: Map<string, TabStatusEntry>;
+  /** Markdown タブ追加（worktree 内の一覧から選ぶ。省略時はボタン非表示） */
+  worktreePath?: string;
+  onTabCreateMarkdown?: (filePath: string) => void;
+  /** Markdown タブの進捗（マウント済みのタブのみ） */
+  markdownOutlines?: Map<string, MarkdownOutline | null>;
 }
 
 /** タブ名の最大文字数（サーバーの TAB_NAME_MAX_LENGTH と同じ） */
@@ -137,6 +145,28 @@ function TabNameInput({
   );
 }
 
+/** Markdown タブの進捗と未読ドット（エージェントが開いた手順書） */
+function MarkdownTabMeta({
+  tab,
+  outline,
+}: {
+  tab: Tab;
+  outline: MarkdownOutline | null | undefined;
+}) {
+  return (
+    <>
+      {outline && outline.total > 0 && (
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {outline.done}/{outline.total}
+        </span>
+      )}
+      {tab.unread && (
+        <span className="size-1.5 rounded-full bg-primary" aria-label="未読" title="未読" />
+      )}
+    </>
+  );
+}
+
 export function SessionTabs({
   tabs,
   activeTabId,
@@ -151,6 +181,9 @@ export function SessionTabs({
   onTabDelete,
   onTabRename,
   tabStatusMap,
+  worktreePath,
+  onTabCreateMarkdown,
+  markdownOutlines,
 }: SessionTabsProps) {
   const [deleteTarget, setDeleteTarget] = useState<{ tabId: string; isRunning: boolean } | null>(
     null
@@ -167,7 +200,13 @@ export function SessionTabs({
     modeCounts.set(label, count);
     defaultNames.set(tab.tab_id, `${label} ${count}`);
   }
-  const displayName = (tab: Tab) => tab.name ?? tab.autoName ?? defaultNames.get(tab.tab_id) ?? '';
+  // Markdown タブは表示中のファイル名を既定表示にする
+  const displayName = (tab: Tab) =>
+    tab.name ??
+    tab.autoName ??
+    (tab.mode === 'markdown' && tab.filePath ? basename(tab.filePath) : undefined) ??
+    defaultNames.get(tab.tab_id) ??
+    '';
 
   return (
     <>
@@ -217,7 +256,11 @@ export function SessionTabs({
             `}
               >
                 <div className="font-medium flex items-center gap-2">
-                  {tab.mode === 'terminal' ? (
+                  {tab.mode === 'markdown' ? (
+                    <span title={tab.filePath ?? 'Markdown'} className="flex items-center">
+                      <FileText className="w-3 h-3" />
+                    </span>
+                  ) : tab.mode === 'terminal' ? (
                     <span title="Terminal" className="flex items-center">
                       <Terminal className="w-3 h-3" />
                     </span>
@@ -261,6 +304,9 @@ export function SessionTabs({
                       {name}
                     </span>
                   )}
+                  {tab.mode === 'markdown' && (
+                    <MarkdownTabMeta tab={tab} outline={markdownOutlines?.get(tab.tab_id)} />
+                  )}
                 </div>
                 <Button
                   variant="ghost"
@@ -290,6 +336,9 @@ export function SessionTabs({
         {/* divider + アクションボタン群 */}
         <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
           <div className="w-px self-stretch bg-theme" />
+          {worktreePath && onTabCreateMarkdown && (
+            <MarkdownOpenPopover worktreePath={worktreePath} onOpen={onTabCreateMarkdown} />
+          )}
           {onTabCreateTerminal && (
             <Button size="icon" onClick={onTabCreateTerminal} title="Open terminal">
               <Terminal className="w-4 h-4" />

@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import { prisma } from '../lib/db.js';
+import { LocalFileError, markdownViewerUrl } from '../lib/markdown-file.js';
+import { openMarkdownTab } from '../lib/services/markdown-tab.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -14,6 +16,7 @@ import {
   listRepos,
   ensureDefaultWorktree,
   renameTab,
+  resolveTask,
   TaskServiceError,
   type TaskIdentifier,
 } from '../lib/services/task-service.js';
@@ -226,6 +229,25 @@ function createMcpServer(io?: SocketIOServer): Server {
         },
       },
       {
+        name: 'tsunagi_open_markdown',
+        description:
+          'Markdown ファイル（手順書・チェックリスト等）をタスク詳細の Markdown Viewer タブで開く。' +
+          'GFM のタスクリスト・mermaid・alert を表示でき、ユーザーがチェックした結果は元ファイルに書き戻される。' +
+          '同じファイルのタブがあれば再利用する。ユーザーの表示中タブは切り替えず未読表示になる。' +
+          'id, session_id, cwd のいずれか1つ以上でタスクを指定する(必須)。',
+        inputSchema: {
+          type: 'object',
+          required: ['path'],
+          properties: {
+            path: {
+              type: 'string',
+              description: '開く Markdown ファイルの絶対パス（.md / .markdown）',
+            },
+            ...taskIdentifierProperties,
+          },
+        },
+      },
+      {
         name: 'tsunagi_ensure_default_worktree',
         description:
           'リポジトリのdefault branch worktreeを確保する（なければ作成、あれば最新化）。返却されたパスを使ってリポジトリの内容を読むことができる。',
@@ -396,6 +418,56 @@ function createMcpServer(io?: SocketIOServer): Server {
           }
           const tab = await renameTab(tabId, name, { io });
           return { content: [{ type: 'text', text: JSON.stringify(tab, null, 2) }] };
+        }
+
+        case 'tsunagi_open_markdown': {
+          checkTypos(args as Record<string, unknown> | undefined);
+          const {
+            path: filePath,
+            id,
+            session_id,
+            cwd,
+          } = (args ?? {}) as {
+            path?: string;
+            id?: string;
+            session_id?: string;
+            cwd?: string;
+          };
+          const task = await resolveTask({ id, session_id, cwd });
+          if (!task) throw new TaskServiceError('Task not found', 'TASK_NOT_FOUND');
+          let result;
+          try {
+            result = await openMarkdownTab(task.id, filePath, { unread: true, io });
+          } catch (error) {
+            if (error instanceof LocalFileError) {
+              return {
+                content: [{ type: 'text', text: `Cannot open markdown: ${error.message}` }],
+                isError: true,
+              };
+            }
+            throw error;
+          }
+          if (!result) throw new TaskServiceError('Task not found', 'TASK_NOT_FOUND');
+          const realPath = result.tab.filePath ?? '';
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    tabId: result.tab.tab_id,
+                    reused: result.reused,
+                    path: realPath,
+                    viewerUrl: markdownViewerUrl(realPath),
+                    message:
+                      'Opened in the task detail Markdown tab. Share viewerUrl with the user as well.',
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
         }
 
         case 'tsunagi_ensure_default_worktree': {
