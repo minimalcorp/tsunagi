@@ -217,6 +217,44 @@ export async function updateTab(
   return mapTab(updatedTab);
 }
 
+/** タブ名の最大文字数（trim 後） */
+export const TAB_NAME_MAX_LENGTH = 50;
+
+/**
+ * タブ名を正規化する。空文字・null は「名前を外す」(null)。長すぎる・文字列でない場合は undefined（不正）
+ */
+export function normalizeTabName(name: unknown): string | null | undefined {
+  if (name === null) return null;
+  if (typeof name !== 'string') return undefined;
+  const trimmed = name.trim();
+  if (Array.from(trimmed).length > TAB_NAME_MAX_LENGTH) return undefined;
+  return trimmed === '' ? null : trimmed;
+}
+
+// タブ名変更（null で名前を外す）。taskId を渡すとそのタスクのタブに限る
+export async function renameTab(
+  tab_id: string,
+  name: string | null,
+  taskId?: string
+): Promise<{ tab: Tab; taskId: string } | null> {
+  if (!tab_id) return null;
+  const tab = await prisma.tab.findFirst({ where: { tabId: tab_id, ...(taskId && { taskId }) } });
+  if (!tab) return null;
+  const updated = await prisma.tab.update({ where: { tabId: tab_id }, data: { name } });
+  return { tab: mapTab(updated), taskId: updated.taskId };
+}
+
+/**
+ * エージェントのセッションタイトルから付く名前を保存する。
+ * 変化したときだけ更新し、更新したタブの taskId を返す（変化なし・タブなしは null）
+ */
+export async function setTabAutoName(tab_id: string, autoName: string): Promise<string | null> {
+  const tab = await prisma.tab.findUnique({ where: { tabId: tab_id } });
+  if (!tab || tab.autoName === autoName) return null;
+  await prisma.tab.update({ where: { tabId: tab_id }, data: { autoName } });
+  return tab.taskId;
+}
+
 // タブ削除
 export async function deleteTab(taskId: string, tab_id: string): Promise<boolean> {
   try {
@@ -310,6 +348,8 @@ type PrismaTab = {
   todos: string | null;
   unread: boolean;
   agentSessionId: string | null;
+  name: string | null;
+  autoName: string | null;
   startedAt: Date;
   completedAt: Date | null;
   updatedAt: Date;
@@ -347,6 +387,8 @@ function mapTab(tab: PrismaTab): Tab {
     unread: tab.unread,
     todos: tab.todos ? JSON.parse(tab.todos) : [],
     agentSessionId: tab.agentSessionId ?? undefined,
+    name: tab.name ?? undefined,
+    autoName: tab.autoName ?? undefined,
     startedAt: tab.startedAt.toISOString(),
     completedAt: tab.completedAt?.toISOString(),
     updatedAt: tab.updatedAt.toISOString(),

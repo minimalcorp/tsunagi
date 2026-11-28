@@ -49,6 +49,8 @@ interface TerminalPanelProps {
   onTabChange: (tabId: string) => void;
   onTabCreate: (mode: TabCreateMode) => Promise<string | undefined>;
   onTabDelete: (tabId: string) => void;
+  /** タブ名の変更（空文字で名前を外す） */
+  onTabRename: (tabId: string, name: string) => void;
   /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
   /** Claudeステータス変化時のコールバック（詳細を開いたまま完了したときの既読化用） */
@@ -93,6 +95,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       onTabChange,
       onTabCreate,
       onTabDelete,
+      onTabRename,
       onTodosUpdated,
       onAgentStatusChange,
     },
@@ -326,6 +329,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             localLlmOption={localLlmOption}
             onTabCreateLocalLlm={handleTabCreateLocalLlm}
             onTabDelete={handleTabDelete}
+            onTabRename={onTabRename}
             tabStatusMap={tabStatusMap}
           />
         </div>

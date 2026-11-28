@@ -68,6 +68,10 @@ model Tab {
   unread       Boolean   @default(false)
   // エージェント側のセッションID（タブIDと別の ID を振るエージェントのみ。Codex の thread id）。resume に使う
   agentSessionId String?  @map("agent_session_id")
+  // ユーザー（または MCP）が付けたタブ名。null なら autoName → 既定表示（mode + 連番）
+  name         String?
+  // エージェントのセッションタイトル（Claude の ai-title / Codex の thread_name）から自動で付く名前
+  autoName     String?   @map("auto_name")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)

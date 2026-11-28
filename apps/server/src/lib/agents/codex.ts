@@ -7,6 +7,7 @@ import { getStateDir } from '../data-path.js';
 import { prisma } from '../db.js';
 import { planToTodos } from '../tab-todos.js';
 import { agentCliEnv, runAgentCli } from './cli.js';
+import { readCodexThreadName } from './session-title.js';
 import type { AgentAdapter, AgentProfileSpec, NormalizedHookEvent } from './types.js';
 
 // Fastify(API) の公開ポート。index.ts と同じ既定値・同じ環境変数を見る
@@ -54,6 +55,8 @@ const SIMPLE_EVENTS: Record<string, Exclude<NormalizedHookEvent['kind'], 'tool-p
 interface CodexHookBody {
   hook_event_name?: string;
   session_id?: string;
+  /** <CODEX_HOME>/sessions/YYYY/MM/DD/rollout-*.jsonl */
+  transcript_path?: string | null;
   tool_name?: string;
   tool_input?: unknown;
 }
@@ -323,5 +326,16 @@ export const codexAdapter: AgentAdapter = {
       };
     }
     return null;
+  },
+
+  // <CODEX_HOME>/session_index.jsonl のスレッド名を読む。CODEX_HOME はタブのプロファイルで変わるため
+  // transcript のパスから辿り、無ければ外側の CODEX_HOME → 既定（~/.codex）
+  async readSessionTitle({ body }) {
+    const { session_id: threadId, transcript_path: transcriptPath } = body as CodexHookBody;
+    if (!threadId) return null;
+    const codexHome = transcriptPath
+      ? path.resolve(path.dirname(transcriptPath), '../../../..')
+      : (process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'));
+    return readCodexThreadName(path.join(codexHome, 'session_index.jsonl'), threadId);
   },
 };

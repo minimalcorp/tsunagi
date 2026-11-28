@@ -9,6 +9,7 @@ import { LOCAL_LLM_UNSET_ENV_KEYS, LOCAL_MODEL_ALIAS, buildLocalLlmEnv } from '.
 import { ensureActiveLoaded, getLocalLlmSettings } from '../local-llm.js';
 import { TODO_TOOL_NAMES, applyToolToTodos } from '../tab-todos.js';
 import { agentCliEnv, runAgentCli } from './cli.js';
+import { readClaudeTranscriptTitle } from './session-title.js';
 import {
   AgentLaunchError,
   type AgentAdapter,
@@ -20,6 +21,7 @@ import {
 interface ClaudeHookBody {
   hook_event_name?: string;
   session_id?: string;
+  transcript_path?: string;
   // PreToolUse / PostToolUse / PostToolUseFailure
   tool_name?: string;
   tool_input?: Record<string, unknown>;
@@ -159,5 +161,11 @@ export const claudeAdapter: AgentAdapter = {
       };
     }
     return null;
+  },
+
+  // transcript の ai-title（自動で付くタイトル）/ custom-title（/rename）を読む
+  async readSessionTitle({ body }) {
+    const { transcript_path: transcriptPath } = body as ClaudeHookBody;
+    return transcriptPath ? readClaudeTranscriptTitle(transcriptPath) : null;
   },
 };

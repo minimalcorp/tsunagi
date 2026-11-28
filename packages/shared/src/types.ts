@@ -60,6 +60,10 @@ export interface Tab {
   todos?: Todo[];
   /** エージェント側のセッションID（タブIDと別の ID を振るエージェントのみ。Codex の thread id） */
   agentSessionId?: string;
+  /** ユーザー（または MCP）が付けたタブ名。未設定なら autoName → 既定表示（mode + 連番） */
+  name?: string;
+  /** エージェントのセッションタイトルから自動で付く名前 */
+  autoName?: string;
   startedAt: string;
   completedAt?: string;
   updatedAt: string;

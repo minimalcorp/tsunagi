@@ -6,7 +6,7 @@ import * as taskRepo from '../repositories/task.js';
 import * as repoRepo from '../repositories/repository.js';
 import * as worktreeManager from '../worktree-manager.js';
 import { normalizeBranchName, validateBranchName } from '../branch-utils.js';
-import type { Task, Repository } from '@minimalcorp/tsunagi-shared';
+import type { Task, Tab, Repository } from '@minimalcorp/tsunagi-shared';
 import { prisma } from '../db.js';
 
 // ============================================
@@ -44,6 +44,8 @@ export class TaskServiceError extends Error {
       | 'INVALID_BRANCH'
       | 'WORKTREE_CREATION_FAILED'
       | 'TASK_NOT_FOUND'
+      | 'TAB_NOT_FOUND'
+      | 'INVALID_TAB_NAME'
       | 'IDENTIFIER_REQUIRED'
       | 'INTERNAL_ERROR'
   ) {
@@ -322,6 +324,40 @@ export async function updateTask(
   options?.io?.emit('task:updated', { task: updatedTask });
 
   return updatedTask;
+}
+
+/**
+ * タブの増減・名前の変化を他の画面（ボード・詳細）に通知する。
+ * task:updated だとボードで「Task updated」トーストが出るため別イベントにしている
+ */
+export async function emitTabsChanged(taskId: string, io: IOEmitter | undefined): Promise<void> {
+  if (!io) return;
+  const task = await taskRepo.getTask(taskId);
+  if (task) io.emit('task:tabs-changed', { task });
+}
+
+/**
+ * タブ名を変更する（空文字・null で名前を外し、自動の名前 → 既定表示に戻す）。
+ * taskId を渡すとそのタスクのタブに限る
+ */
+export async function renameTab(
+  tabId: string,
+  rawName: unknown,
+  options?: ServiceOptions & { taskId?: string }
+): Promise<Tab> {
+  const name = taskRepo.normalizeTabName(rawName);
+  if (name === undefined) {
+    throw new TaskServiceError(
+      `Tab name must be a string of at most ${taskRepo.TAB_NAME_MAX_LENGTH} characters`,
+      'INVALID_TAB_NAME'
+    );
+  }
+  const result = await taskRepo.renameTab(tabId, name, options?.taskId);
+  if (!result) {
+    throw new TaskServiceError('Tab not found', 'TAB_NOT_FOUND');
+  }
+  await emitTabsChanged(result.taskId, options?.io);
+  return result.tab;
 }
 
 /**

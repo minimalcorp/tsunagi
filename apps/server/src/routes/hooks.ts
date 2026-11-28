@@ -2,7 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import type { Server as SocketIOServer } from 'socket.io';
 import { prisma } from '../lib/db.js';
 import { parseTodos } from '../lib/tab-todos.js';
-import { getAgent, type NormalizedHookEvent } from '../lib/agents/index.js';
+import {
+  getAgent,
+  type AgentAdapter,
+  type HookRequest,
+  type NormalizedHookEvent,
+} from '../lib/agents/index.js';
+import { TAB_NAME_MAX_LENGTH, setTabAutoName } from '../lib/repositories/task.js';
+import { emitTabsChanged } from '../lib/services/task-service.js';
 
 interface FastifyWithIO extends FastifyInstance {
   io: SocketIOServer;
@@ -177,6 +184,37 @@ async function applyHookEvent(
   }
 }
 
+/** セッションタイトルを読み直すイベント（ターンの終わり） */
+const TITLE_REFRESH_KINDS = new Set<NormalizedHookEvent['kind']>([
+  'stop',
+  'stop-failure',
+  'session-end',
+]);
+
+/**
+ * エージェントのセッションタイトルをタブの自動の名前として保存し、変化したら他の画面に通知する。
+ * 失敗してもステータス更新には影響させない
+ */
+async function refreshTabAutoName(
+  fastify: FastifyInstance,
+  io: SocketIOServer,
+  adapter: AgentAdapter,
+  request: HookRequest,
+  tabId: string
+): Promise<void> {
+  try {
+    const title = await adapter.readSessionTitle?.(request);
+    if (!title) return;
+    const taskId = await setTabAutoName(
+      tabId,
+      Array.from(title).slice(0, TAB_NAME_MAX_LENGTH).join('')
+    );
+    if (taskId) await emitTabsChanged(taskId, io);
+  } catch (err) {
+    fastify.log.warn(err, '[hooks] Failed to refresh tab auto name');
+  }
+}
+
 export async function hooksRoutes(fastify: FastifyInstance) {
   const io = (fastify as FastifyWithIO).io;
 
@@ -188,7 +226,8 @@ export async function hooksRoutes(fastify: FastifyInstance) {
       if (!adapter) return reply.status(404).send({ error: 'Unknown agent' });
 
       const body = request.body ?? {};
-      const event = adapter.normalizeHook({ body, headers: request.headers });
+      const hookRequest: HookRequest = { body, headers: request.headers };
+      const event = adapter.normalizeHook(hookRequest);
       const eventName = typeof body.hook_event_name === 'string' ? body.hook_event_name : undefined;
       fastify.log.info(
         { agent: adapter.id, eventName, tabId: event?.tabId },
@@ -208,6 +247,10 @@ export async function hooksRoutes(fastify: FastifyInstance) {
 
       if (event) {
         await applyHookEvent(fastify, io, event);
+        // ファイル読み込みで hook の応答（エージェント側の待ち）を遅らせないよう待たない
+        if (TITLE_REFRESH_KINDS.has(event.kind)) {
+          void refreshTabAutoName(fastify, io, adapter, hookRequest, event.tabId);
+        }
       } else {
         fastify.log.debug({ agent: adapter.id, eventName }, 'Unhandled hook event');
       }

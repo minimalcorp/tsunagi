@@ -12,6 +12,8 @@ import {
   updateTask,
   deleteTask,
   validateNewTaskBranch,
+  renameTab,
+  emitTabsChanged as emitTabsChangedFor,
   TaskServiceError,
 } from '../lib/services/task-service.js';
 
@@ -472,12 +474,8 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // タブの増減を他の画面（ボード・詳細のサイドバー）に通知し、新しいタブの status 購読を始めさせる。
-  // task:updated だとボードで「Task updated」トーストが出るため別イベントにしている
-  const emitTabsChanged = async (taskId: string) => {
-    const task = await taskRepo.getTask(taskId);
-    if (task) io.emit('task:tabs-changed', { task });
-  };
+  // タブの増減を他の画面（ボード・詳細のサイドバー）に通知し、新しいタブの status 購読を始めさせる
+  const emitTabsChanged = (taskId: string) => emitTabsChangedFor(taskId, io);
 
   // GET /tasks/:id/tabs
   fastify.get<{ Params: { id: string } }>('/tasks/:id/tabs', async (request, reply) => {
@@ -536,12 +534,29 @@ export async function tasksRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { id: taskId, tab_id } = request.params;
-        const updatedTab = await taskRepo.updateTab(taskId, tab_id, request.body);
+        const { name, ...rest } = request.body ?? {};
+        const hasName = 'name' in (request.body ?? {});
+        let updatedTab: Tab | null = null;
+        if (Object.keys(rest).length > 0 || !hasName) {
+          updatedTab = await taskRepo.updateTab(taskId, tab_id, rest);
+          if (!updatedTab) {
+            return reply.status(404).send({ error: 'Tab not found' });
+          }
+        }
+        // name は検証して他の画面にも通知する（空文字・null で名前を外す）。他の項目の更新後に行い、
+        // 失敗した更新の途中で通知しない
+        if (hasName) {
+          updatedTab = await renameTab(tab_id, name, { io, taskId });
+        }
         if (!updatedTab) {
           return reply.status(404).send({ error: 'Tab not found' });
         }
         return reply.status(200).send({ data: { tab: updatedTab } });
       } catch (error) {
+        if (error instanceof TaskServiceError) {
+          const status = error.code === 'INVALID_TAB_NAME' ? 400 : 404;
+          return reply.status(status).send({ error: error.message });
+        }
         fastify.log.error(error, 'PUT /tasks/:id/tabs/:tab_id error');
         return reply.status(500).send({ error: 'Failed to update tab' });
       }

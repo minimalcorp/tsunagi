@@ -68,6 +68,16 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
         setTask(updatedTask);
       }
     },
+    // タブの増減・名前の変化（別の画面・MCP・セッションタイトル）を反映する
+    onTaskTabsChanged: (changedTask) => {
+      if (changedTask.id !== id) return;
+      const nextTabs = changedTask.tabs ?? [];
+      setTabs(nextTabs);
+      // 別の画面で選択中のタブが消された場合は先頭のタブに移る
+      setActiveTabId((current) =>
+        current && !nextTabs.some((t) => t.tab_id === current) ? nextTabs[0]?.tab_id : current
+      );
+    },
     onTaskDeleted: (taskId) => {
       if (taskId === id) {
         toast.info('Task deleted', task?.title ?? undefined);
@@ -211,6 +221,37 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
       }
     } catch (error) {
       console.error('Failed to delete tab:', error);
+    }
+  };
+
+  // タブ名変更（空文字で名前を外す）。先に表示を変え、失敗したら戻す
+  const handleTabRename = async (tab_id: string, name: string) => {
+    const previous = tabs.find((t) => t.tab_id === tab_id)?.name;
+    const optimistic = name.trim() || undefined;
+    setTabs((prev) => prev.map((t) => (t.tab_id === tab_id ? { ...t, name: optimistic } : t)));
+    try {
+      const response = await fetch(apiUrl(`/api/tasks/${id}/tabs/${tab_id}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Failed to rename tab');
+      }
+    } catch (error) {
+      console.error('Failed to rename tab:', error);
+      // 失敗までの間に別の画面・MCP で付いた名前は上書きしない
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.tab_id === tab_id && t.name === optimistic ? { ...t, name: previous } : t
+        )
+      );
+      toast.error(
+        undefined,
+        'Failed to rename tab',
+        error instanceof Error ? error.message : undefined
+      );
     }
   };
 
@@ -398,6 +439,7 @@ export default function TaskDetailPage({ params }: TaskDetailPageProps) {
               onTabChange={setActiveTabId}
               onTabCreate={handleTabCreate}
               onTabDelete={handleTabDelete}
+              onTabRename={handleTabRename}
               onAgentStatusChange={handleAgentStatusChange}
             />
           ) : (
