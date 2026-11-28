@@ -21,17 +21,18 @@ Tsunagi は独自の Claude Code プラグイン——**MCP server**、**skill**
 
 MCP server は Tsunagi のタスク管理を [Model Context Protocol](https://docs.claude.com/en/docs/claude-code/mcp) 経由で Claude が直接呼べるツール群として公開しています。
 
-| ツール                            | 用途                                                            |
-| --------------------------------- | --------------------------------------------------------------- |
-| `tsunagi_list_repos`              | 登録済みリポジトリを一覧                                        |
-| `tsunagi_list_tasks`              | タスクを一覧 (status / owner / repo 等でフィルタ可)             |
-| `tsunagi_get_task`                | `id` / `session_id` / `cwd` でタスクを取得                      |
-| `tsunagi_create_task`             | 新しいタスクと worktree を作成                                  |
-| `tsunagi_update_task`             | タスクの title / description / status / order / effort 等を更新 |
-| `tsunagi_delete_task`             | タスクと worktree を削除                                        |
-| `tsunagi_ensure_default_worktree` | `.default` worktree をリモートと同期                            |
-| `tsunagi_get_tab_todos`           | 指定タブセッションの todo リストを読む                          |
-| `tsunagi_rename_tab`              | タスク詳細のタブ名を変更（空文字で解除）                        |
+| ツール                            | 用途                                                                                |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `tsunagi_list_repos`              | 登録済みリポジトリを一覧                                                            |
+| `tsunagi_list_tasks`              | タスクを一覧 (status / owner / repo 等でフィルタ可)                                 |
+| `tsunagi_get_task`                | `id` / `session_id` / `cwd` でタスクを取得                                          |
+| `tsunagi_create_task`             | 新しいタスクと worktree を作成                                                      |
+| `tsunagi_update_task`             | タスクの title / description / status / order / effort 等を更新                     |
+| `tsunagi_delete_task`             | タスクと worktree を削除                                                            |
+| `tsunagi_ensure_default_worktree` | `.default` worktree をリモートと同期                                                |
+| `tsunagi_get_tab_todos`           | 指定タブセッションの todo リストを読む                                              |
+| `tsunagi_rename_tab`              | タスク詳細のタブ名を変更（空文字で解除）                                            |
+| `tsunagi_open_markdown`           | Markdown をタスク詳細の [Markdown Viewer](/ja/features/markdown-viewer/) タブで開く |
 
 すべてのツールは Tsunagi が起動する任意の Claude セッション内で追加設定なく使えます。「backlog を優先度順に並び替えて」「このタスクを削除して」といった依頼を Claude にするだけで、裏でこれらのツールが呼ばれます。
 
@@ -42,6 +43,10 @@ MCP server は Tsunagi のタスク管理を [Model Context Protocol](https://do
 にあります。
 
 あなた自身が skill を読む必要はありません——Claude は Tsunagi のツールを呼ぶ前に自動的にこれを読みます。
+
+### Skill: `markdown-viewer`
+
+手順書・チェックリストなどの Markdown を書き出した時に、GFM のタスクリストで書き、`tsunagi_open_markdown` で [Markdown Viewer](/ja/features/markdown-viewer/) に開くよう Claude に教える skill です。
 
 ### Curator agent: `tsunagi-task-curator`
 

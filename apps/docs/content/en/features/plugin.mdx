@@ -30,17 +30,18 @@ The MCP server exposes Tsunagi's task management as a set of tools that
 Claude can call directly through the
 [Model Context Protocol](https://docs.claude.com/en/docs/claude-code/mcp).
 
-| Tool                              | Purpose                                                         |
-| --------------------------------- | --------------------------------------------------------------- |
-| `tsunagi_list_repos`              | List registered repositories                                    |
-| `tsunagi_list_tasks`              | List tasks with optional status / owner / repo filters          |
-| `tsunagi_get_task`                | Fetch a task by `id`, `session_id`, or `cwd`                    |
-| `tsunagi_create_task`             | Create a new task and worktree                                  |
-| `tsunagi_update_task`             | Update a task's title, description, status, order, effort, etc. |
-| `tsunagi_delete_task`             | Delete a task and its worktree                                  |
-| `tsunagi_ensure_default_worktree` | Ensure the `.default` worktree is synced with the remote        |
-| `tsunagi_get_tab_todos`           | Read the todo list of a specific tab session                    |
-| `tsunagi_rename_tab`              | Rename a task detail tab (empty string clears it)               |
+| Tool                              | Purpose                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `tsunagi_list_repos`              | List registered repositories                                                                      |
+| `tsunagi_list_tasks`              | List tasks with optional status / owner / repo filters                                            |
+| `tsunagi_get_task`                | Fetch a task by `id`, `session_id`, or `cwd`                                                      |
+| `tsunagi_create_task`             | Create a new task and worktree                                                                    |
+| `tsunagi_update_task`             | Update a task's title, description, status, order, effort, etc.                                   |
+| `tsunagi_delete_task`             | Delete a task and its worktree                                                                    |
+| `tsunagi_ensure_default_worktree` | Ensure the `.default` worktree is synced with the remote                                          |
+| `tsunagi_get_tab_todos`           | Read the todo list of a specific tab session                                                      |
+| `tsunagi_rename_tab`              | Rename a task detail tab (empty string clears it)                                                 |
+| `tsunagi_open_markdown`           | Open a Markdown file in a [Markdown Viewer](/en/features/markdown-viewer/) tab of the task detail |
 
 Every tool is available inside any Claude session Tsunagi launches, and
 Claude can invoke them without any extra configuration on your part.
@@ -57,6 +58,10 @@ full text of the skill is in
 
 You don't need to read the skill yourself — Claude reads it before
 calling any Tsunagi tool.
+
+### Skill: `markdown-viewer`
+
+Teaches Claude to write runbooks and checklists as GFM task lists and open them in the [Markdown Viewer](/en/features/markdown-viewer/) with `tsunagi_open_markdown`.
 
 ### Curator agent: `tsunagi-task-curator`
 

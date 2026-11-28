@@ -152,7 +152,11 @@ export async function deleteTask(id: string): Promise<boolean> {
 // ============================================
 
 // タブ作成
-export async function createTab(taskId: string, mode: Tab['mode'] = 'claude'): Promise<Tab | null> {
+export async function createTab(
+  taskId: string,
+  mode: Tab['mode'] = 'claude',
+  options: { filePath?: string; unread?: boolean } = {}
+): Promise<Tab | null> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: { tabs: true },
@@ -173,6 +177,8 @@ export async function createTab(taskId: string, mode: Tab['mode'] = 'claude'): P
       order,
       status: 'idle',
       mode,
+      filePath: options.filePath ?? null,
+      unread: options.unread ?? false,
       startedAt: new Date(),
     },
   });
@@ -208,6 +214,9 @@ export async function updateTab(
     data: {
       ...(updates.status && { status: updates.status }),
       ...(updates.unread !== undefined && { unread: updates.unread }),
+      // markdown タブのみ表示ファイルを差し替え可能（相対リンク遷移）。パス検証は呼び出し側で行う
+      ...(tab.mode === 'markdown' &&
+        typeof updates.filePath === 'string' && { filePath: updates.filePath }),
       ...(updates.completedAt !== undefined && {
         completedAt: updates.completedAt ? new Date(updates.completedAt) : null,
       }),
@@ -278,7 +287,8 @@ export async function deleteTab(taskId: string, tab_id: string): Promise<boolean
  */
 export async function markTaskTabsRead(taskId: string): Promise<number> {
   const result = await prisma.tab.updateMany({
-    where: { taskId, unread: true },
+    // markdown タブの未読（エージェントが開いた手順書）はタブを開いた時だけ落とす
+    where: { taskId, unread: true, NOT: { mode: 'markdown' } },
     data: { unread: false },
   });
   return result.count;
@@ -350,6 +360,7 @@ type PrismaTab = {
   agentSessionId: string | null;
   name: string | null;
   autoName: string | null;
+  filePath: string | null;
   startedAt: Date;
   completedAt: Date | null;
   updatedAt: Date;
@@ -389,6 +400,7 @@ function mapTab(tab: PrismaTab): Tab {
     agentSessionId: tab.agentSessionId ?? undefined,
     name: tab.name ?? undefined,
     autoName: tab.autoName ?? undefined,
+    filePath: tab.filePath ?? undefined,
     startedAt: tab.startedAt.toISOString(),
     completedAt: tab.completedAt?.toISOString(),
     updatedAt: tab.updatedAt.toISOString(),

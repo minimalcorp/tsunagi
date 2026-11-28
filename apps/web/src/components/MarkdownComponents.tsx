@@ -9,7 +9,7 @@ type Mermaid = typeof import('mermaid').default;
 let mermaidPromise: Promise<Mermaid> | null = null;
 
 /** mermaid は大きいので、mermaid ブロックを初めて描画する時に読み込む（初期化は 1 回だけ） */
-function loadMermaid(): Promise<Mermaid> {
+export function loadMermaid(): Promise<Mermaid> {
   if (!mermaidPromise) {
     mermaidPromise = import('mermaid').then(({ default: mermaid }) => {
       mermaid.initialize({

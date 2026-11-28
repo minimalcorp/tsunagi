@@ -1,6 +1,7 @@
 export default {
   'repository-management': 'Repository Management',
   'task-management': 'Task Management',
+  'markdown-viewer': 'Markdown Viewer',
   'auto-update': 'Auto Update',
   plugin: 'Tsunagi Plugin',
   'environment-variables': 'Environment Variables',

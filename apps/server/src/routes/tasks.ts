@@ -1,4 +1,6 @@
 import type { FastifyInstance } from 'fastify';
+import { LocalFileError, resolveMarkdownFile } from '../lib/markdown-file.js';
+import { openMarkdownTab } from '../lib/services/markdown-tab.js';
 import type { Server as SocketIOServer } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tab, Task } from '@minimalcorp/tsunagi-shared';
@@ -495,12 +497,24 @@ export async function tasksRoutes(fastify: FastifyInstance) {
   });
 
   // POST /tasks/:id/tabs
-  fastify.post<{ Params: { id: string }; Body: { mode?: Tab['mode'] } }>(
+  fastify.post<{ Params: { id: string }; Body: { mode?: Tab['mode']; filePath?: string } }>(
     '/tasks/:id/tabs',
     async (request, reply) => {
       try {
         const { id: taskId } = request.params;
         const requested = request.body?.mode;
+
+        // Markdown Viewer タブ: PTY を持たない。同じファイルのタブがあれば再利用する
+        if (requested === 'markdown') {
+          const result = await openMarkdownTab(taskId, request.body?.filePath, { io });
+          if (!result) {
+            return reply.status(404).send({ error: 'Task not found' });
+          }
+          return reply
+            .status(result.reused ? 200 : 201)
+            .send({ data: { tab: result.tab, reused: result.reused } });
+        }
+
         const mode: Tab['mode'] =
           requested === 'terminal' || requested === 'codex'
             ? requested
@@ -522,6 +536,9 @@ export async function tasksRoutes(fastify: FastifyInstance) {
 
         return reply.status(201).send({ data: { tab: newTab } });
       } catch (error) {
+        if (error instanceof LocalFileError) {
+          return reply.status(error.statusCode).send({ error: error.message });
+        }
         fastify.log.error(error, 'POST /tasks/:id/tabs error');
         return reply.status(500).send({ error: 'Failed to create tab' });
       }
@@ -536,6 +553,10 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         const { id: taskId, tab_id } = request.params;
         const { name, ...rest } = request.body ?? {};
         const hasName = 'name' in (request.body ?? {});
+        // markdown タブの表示ファイル差し替え（相対リンク遷移）。タブ作成と同じ検証を通す
+        if (rest.filePath !== undefined) {
+          rest.filePath = (await resolveMarkdownFile(rest.filePath)).realPath;
+        }
         let updatedTab: Tab | null = null;
         if (Object.keys(rest).length > 0 || !hasName) {
           updatedTab = await taskRepo.updateTab(taskId, tab_id, rest);
@@ -551,11 +572,15 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         if (!updatedTab) {
           return reply.status(404).send({ error: 'Tab not found' });
         }
+        if (rest.filePath !== undefined) await emitTabsChanged(taskId);
         return reply.status(200).send({ data: { tab: updatedTab } });
       } catch (error) {
         if (error instanceof TaskServiceError) {
           const status = error.code === 'INVALID_TAB_NAME' ? 400 : 404;
           return reply.status(status).send({ error: error.message });
+        }
+        if (error instanceof LocalFileError) {
+          return reply.status(error.statusCode).send({ error: error.message });
         }
         fastify.log.error(error, 'PUT /tasks/:id/tabs/:tab_id error');
         return reply.status(500).send({ error: 'Failed to update tab' });

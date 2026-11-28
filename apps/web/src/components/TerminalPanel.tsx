@@ -11,6 +11,8 @@ import {
 } from 'react';
 import type { LocalLlmProvider, Tab, Task } from '@minimalcorp/tsunagi-shared';
 import { SessionTabs } from '@/components/SessionTabs';
+import { MarkdownTabView } from '@/components/markdown-viewer/MarkdownTabView';
+import type { MarkdownOutline } from '@/components/markdown-viewer/markdown-utils';
 import { EditorPane } from '@/components/task-detail/EditorPane';
 import { TaskViewModeToggle } from '@/components/task-detail/TaskViewModeToggle';
 import { useTaskViewMode } from '@/hooks/useTaskViewMode';
@@ -47,10 +49,12 @@ interface TerminalPanelProps {
   tabs: Tab[];
   activeTabId?: string;
   onTabChange: (tabId: string) => void;
-  onTabCreate: (mode: TabCreateMode) => Promise<string | undefined>;
+  onTabCreate: (mode: TabCreateMode, options?: TabCreateOptions) => Promise<string | undefined>;
   onTabDelete: (tabId: string) => void;
   /** タブ名の変更（空文字で名前を外す） */
   onTabRename: (tabId: string, name: string) => void;
+  /** Markdown タブ内の相対リンクで表示ファイルを差し替える */
+  onMarkdownNavigate?: (tabId: string, filePath: string) => void;
   /** Todoリスト更新時のコールバック（タスクカードの Progress Bar 用） */
   onTodosUpdated?: (tabId: string, todos: Todo[]) => void;
   /** Claudeステータス変化時のコールバック（詳細を開いたまま完了したときの既読化用） */
@@ -59,6 +63,11 @@ interface TerminalPanelProps {
 
 /** タブ追加モード */
 export type TabCreateMode = Tab['mode'];
+
+/** タブ追加時の追加情報（markdown タブの表示ファイル） */
+export interface TabCreateOptions {
+  filePath?: string;
+}
 
 /** ローカルLLMタブの作成ボタン（Ollama / LM Studio のどちらかが有効なときだけ出す） */
 export interface LocalLlmTabOption {
@@ -96,6 +105,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       onTabCreate,
       onTabDelete,
       onTabRename,
+      onMarkdownNavigate,
       onTodosUpdated,
       onAgentStatusChange,
     },
@@ -104,7 +114,28 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const { mode: selectedViewMode, canSplit, setMode: setViewMode } = useTaskViewMode();
     // タブが無いときはエディタと表示切り替えを出さない（保存済みの選択は変えない）
     const hasTabs = tabs.length > 0;
-    const viewMode = hasTabs ? selectedViewMode : 'terminal';
+    // Markdown タブは送信先の PTY が無いため、エディタを出さない
+    const isMarkdownActive = tabs.some(
+      (tab) => tab.tab_id === activeTabId && tab.mode === 'markdown'
+    );
+    const viewMode = hasTabs && !isMarkdownActive ? selectedViewMode : 'terminal';
+
+    // Markdown タブの進捗（マウント済みのタブのみ。タブラベルに出す）
+    const [markdownOutlines, setMarkdownOutlines] = useState<Map<string, MarkdownOutline | null>>(
+      () => new Map()
+    );
+    const handleOutlineChange = useCallback((tabId: string, outline: MarkdownOutline | null) => {
+      setMarkdownOutlines((prev) => {
+        if (prev.get(tabId) === outline) return prev;
+        const next = new Map(prev);
+        next.set(tabId, outline);
+        return next;
+      });
+    }, []);
+    const handleMarkdownNavigate = useCallback(
+      (tabId: string, filePath: string) => onMarkdownNavigate?.(tabId, filePath),
+      [onMarkdownNavigate]
+    );
 
     // アクティブな TerminalView がツールバーの内容を描画する先
     const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
@@ -230,8 +261,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     );
 
     const handleTabCreate = useCallback(
-      async (mode: TabCreateMode) => {
-        const newTabId = await onTabCreate(mode);
+      async (mode: TabCreateMode, options?: TabCreateOptions) => {
+        const newTabId = await onTabCreate(mode, options);
         if (newTabId) {
           setMountedTabIds((prev) => {
             const next = new Set(prev);
@@ -253,6 +284,11 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const handleTabCreateCodex = useCallback(() => handleTabCreate('codex'), [handleTabCreate]);
 
     const handleTabCreateLocalLlm = useCallback(() => handleTabCreate('local'), [handleTabCreate]);
+
+    const handleTabCreateMarkdown = useCallback(
+      (filePath: string) => handleTabCreate('markdown', { filePath }),
+      [handleTabCreate]
+    );
 
     // エージェントのボタンは常に出し（使えることを知らせる）、CLI が使えなければ無効化する
     const agents = useAgentAvailability();
@@ -331,6 +367,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             onTabDelete={handleTabDelete}
             onTabRename={onTabRename}
             tabStatusMap={tabStatusMap}
+            worktreePath={task.worktreePath}
+            onTabCreateMarkdown={handleTabCreateMarkdown}
+            markdownOutlines={markdownOutlines}
           />
         </div>
 
@@ -339,7 +378,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           {hasTabs && (
             <div className="flex items-center gap-2 px-2 py-1 border-b border-border flex-shrink-0">
               <div ref={setToolbarSlot} className="flex flex-1 min-w-0 items-center gap-2" />
-              <TaskViewModeToggle mode={viewMode} canSplit={canSplit} onChange={setViewMode} />
+              {!isMarkdownActive && (
+                <TaskViewModeToggle mode={viewMode} canSplit={canSplit} onChange={setViewMode} />
+              )}
             </div>
           )}
 
@@ -369,26 +410,36 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                       pointerEvents: isActive && !isEditorOnly ? 'auto' : 'none',
                     }}
                   >
-                    <TerminalView
-                      ref={(handle) => {
-                        if (handle) {
-                          terminalRefs.current.set(tab.tab_id, handle);
-                        } else {
-                          terminalRefs.current.delete(tab.tab_id);
-                        }
-                      }}
-                      tabId={tab.tab_id}
-                      isActive={isActive}
-                      cwd={task.worktreePath}
-                      launchAgent={tab.mode !== 'terminal'}
-                      mode={tab.mode}
-                      className="h-full overflow-hidden"
-                      initialTodos={tab.todos}
-                      initialAgentStatus={tab.status as AgentStatus}
-                      onTodosUpdated={onTodosUpdated}
-                      onStatusChange={handleStatusChange}
-                      toolbarContainer={toolbarSlot}
-                    />
+                    {tab.mode === 'markdown' ? (
+                      <MarkdownTabView
+                        tab={tab}
+                        isActive={isActive}
+                        toolbarContainer={toolbarSlot}
+                        onNavigate={handleMarkdownNavigate}
+                        onOutlineChange={handleOutlineChange}
+                      />
+                    ) : (
+                      <TerminalView
+                        ref={(handle) => {
+                          if (handle) {
+                            terminalRefs.current.set(tab.tab_id, handle);
+                          } else {
+                            terminalRefs.current.delete(tab.tab_id);
+                          }
+                        }}
+                        tabId={tab.tab_id}
+                        isActive={isActive}
+                        cwd={task.worktreePath}
+                        launchAgent={tab.mode !== 'terminal'}
+                        mode={tab.mode}
+                        className="h-full overflow-hidden"
+                        initialTodos={tab.todos}
+                        initialAgentStatus={tab.status as AgentStatus}
+                        onTodosUpdated={onTodosUpdated}
+                        onStatusChange={handleStatusChange}
+                        toolbarContainer={toolbarSlot}
+                      />
+                    )}
                   </div>
                 );
               })}

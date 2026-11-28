@@ -1,7 +1,7 @@
 {
   "name": "tsunagi-plugin",
-  "version": "1.0.2",
-  "description": "tsunagiサーバーへClaude CLIイベントを転送し、MCPサーバーとタスク管理スキルを提供する",
+  "version": "1.1.0",
+  "description": "tsunagiサーバーへClaude CLIイベントを転送し、MCPサーバーとタスク管理・Markdown Viewer スキルを提供する",
   "hooks": {
     "SessionStart": [
       {

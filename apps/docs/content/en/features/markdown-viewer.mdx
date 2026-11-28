@@ -1,0 +1,53 @@
+---
+title: Markdown Viewer
+description: View runbooks written by Claude (including GFM task lists) and write checks back to the file.
+---
+
+import { Callout } from 'nextra/components';
+
+# Markdown Viewer
+
+Renders a local Markdown file as GitHub Flavored Markdown. Clicking a `- [ ]` item rewrites `[ ]` / `[x]` in the original file. When Claude Code or Codex writes a runbook, it opens automatically as a tab in the task detail.
+
+## Opening a file
+
+| Method              | Details                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Task detail tab     | Use the <kbd>FileText</kbd> button in the tab bar to pick a .md in the worktree (newest first) or enter an absolute path |
+| Claude Code / Codex | After writing a runbook, the agent calls the MCP tool `tsunagi_open_markdown` and also shares the URL                    |
+| Standalone page     | `http://localhost:2791/markdown-viewer?path=<URL-encoded absolute path>`                                                 |
+
+Without `path`, the standalone page shows a path input and recently opened files.
+
+<Callout type="info">
+  Tabs opened by an agent are added with an unread dot without switching your current tab. An
+  existing tab for the same file is reused.
+</Callout>
+
+## What it renders
+
+- Task lists (checks are written back; done items are dimmed and struck through), a table of contents with per-section progress
+- GFM tables, code, footnotes, etc.
+- Alerts: `> [!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` / `[!CAUTION]`
+- mermaid diagrams (pan and zoom, see below)
+- Relative links: `.md` files open in the viewer; images (png / jpg / gif / webp / svg) are displayed
+
+The view refreshes automatically when the file changes. A check on a file that changed since it was loaded is not saved; the latest content is reloaded instead.
+
+## mermaid controls
+
+Click a diagram to activate it (highlighted border). Press Esc or click outside to release.
+
+| Input                    | Action                      |
+| ------------------------ | --------------------------- |
+| Pinch / ⌘・Ctrl + scroll | Zoom (even when not active) |
+| Two-finger swipe         | Pan (only while active)     |
+| Drag                     | Pan                         |
+| ⇧1 / ⇧0                  | Fit / 100%                  |
+| ⌘・Ctrl + `+` / `-`      | Zoom in / out               |
+| Double-click             | Fit                         |
+
+## Limitations
+
+- Only absolute paths to `.md` / `.markdown` files (up to 5MB) can be read and written
+- When exposed via [Remote Access](/en/features/remote-access/), it works the same once Basic auth passes
